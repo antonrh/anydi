@@ -1,0 +1,17 @@
+site_name: Pyxdi
+site_description: Dependence Injection library
+site_author: Anton Ruhlov
+site_url: https://github.com/antonrh/pyxdi
+
+theme:
+  name: material
+  palette:
+    scheme: default
+    primary: green
+
+repo_name: antonrh/pyxdi
+repo_url: https://github.com/antonrh/pyxdi
+edit_uri: ""
+
+nav:
+  - Introduction: index.md
