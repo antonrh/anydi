@@ -1,0 +1,2 @@
+class ScopeMismatch(RuntimeError):
+    pass
