@@ -3,24 +3,26 @@ name = "pyxdi"
 version = "0.1.0"
 description = ""
 authors = ["Anton Ruhlov <antonruhlov@gmail.com>"]
+license = "MIT"
+readme = "README.md"
+repository = "https://github.com/antonrh/pyxdi"
+keywords = ["dependency injection", "dependencies", "di"]
+packages = [
+    { include = "pyxdi", from = "." },
+]
 
 [tool.poetry.dependencies]
-python = "^3.10"
-venusian = "^3.0.0"
-anyio = "^3.6.2"
-asgiref = "^3.6.0"
+python = ">=3.7,<3.12"
+anyio = {version = "^3.6.2", extras = ["asyncio"]}
 
 [tool.poetry.dev-dependencies]
 black = "^23.1.0"
-isort = "^5.12.0"
-flake8 = "^6.0.0"
+isort = "^5.11.5"
+flake8 = "^5.0.4"
 flake8-tidy-imports = "^4.8.0"
-mypy = "^1.0"
-Flask = "^2.2.2"
-fastapi = "^0.89.1"
-uvicorn = "^0.20.0"
 pytest = "^7.2.1"
 pytest-cov = "^4.0.0"
+mypy = "^1.0"
 
 [tool.black]
 line-length = 88
