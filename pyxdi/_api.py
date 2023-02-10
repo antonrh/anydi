@@ -11,7 +11,7 @@ except ImportError:
     anyio_installed = False
 
 from ._contstants import DEFAULT_MODE
-from ._core import DI, Context, Depends
+from ._core import DI, Context, Marker
 from ._types import Dependency, DependencyFunctionT, Mode, Scope
 from ._utils import scan_package
 
@@ -24,8 +24,7 @@ _async_di: t.Optional["AsyncDI"] = None
 _lock = threading.RLock()
 
 
-def depends() -> t.Any:  # noqa
-    return Depends()
+mark = marker = Marker()
 
 
 def _get_di() -> DI:

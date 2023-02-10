@@ -4,9 +4,10 @@ from ._api import (
     close,
     dep,
     dependency,
-    depends,
     init,
     inject,
+    mark,
+    marker,
     request_context,
 )
 
@@ -16,8 +17,9 @@ __all__ = [
     "close",
     "dep",
     "dependency",
-    "depends",
     "init",
     "inject",
+    "mark",
+    "marker",
     "request_context",
 ]

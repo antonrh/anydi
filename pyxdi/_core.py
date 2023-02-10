@@ -26,7 +26,7 @@ class Binding:
     scope: Scope
 
 
-class Depends:
+class Marker:
     __slots__ = ()
 
 
@@ -169,7 +169,7 @@ class BaseDI(abc.ABC):
         parameters = signature.parameters
         params = {}
         for parameter in parameters.values():
-            if not isinstance(parameter.default, Depends):
+            if not isinstance(parameter.default, Marker):
                 continue
             annotation = parameter.annotation
             if annotation is inspect._empty:  # noqa
