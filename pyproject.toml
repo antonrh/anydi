@@ -6,7 +6,7 @@ authors = ["Anton Ruhlov <antonruhlov@gmail.com>"]
 license = "MIT"
 readme = "README.md"
 repository = "https://github.com/antonrh/pyxdi"
-keywords = ["dependency injection", "dependencies", "di"]
+keywords = ["dependency injection", "dependencies", "di", "async", "asyncio", "application"]
 packages = [
     { include = "pyxdi", from = "." },
 ]
