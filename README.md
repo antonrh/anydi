@@ -1,4 +1,4 @@
-# Pyxdi
+# Pyxdi (in dev)
 
 `Pyxdi` is a modern, lightweight and async-friendly Python Dependency Injection library that leverages type annotations ([PEP 484](https://peps.python.org/pep-0484/))
 to effortlessly manage dependencies in your applications, inspired by the functionality of [pytest fixtures](https://docs.pytest.org/en/7.2.x/explanation/fixtures.html).
@@ -38,3 +38,11 @@ def say_hello(message: str = pyxdi.mark) -> None:
 if __name__ == "__main__":
     say_hello()
 ```
+
+---
+
+## TODO
+* Unit tests
+* Autowiring
+* Documentation
+* Examples
