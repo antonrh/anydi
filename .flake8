@@ -1,7 +1,7 @@
 [flake8]
 max-line-length = 88
 select = C,E,F,W,B,B950,I252,T20
-ignore = E501,W503
+ignore = E501,W503,F811
 exclude =
     .git,
     __pycache__
