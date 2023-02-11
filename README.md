@@ -46,3 +46,5 @@ if __name__ == "__main__":
 * Autowiring
 * Documentation
 * Examples
+* Pypi package
+* GitHub actions
