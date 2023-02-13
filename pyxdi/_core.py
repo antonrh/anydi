@@ -20,14 +20,14 @@ ALLOWED_SCOPES: t.Dict[Scope, t.List[Scope]] = {
 }
 
 
+class DependencyMarker:
+    __slots__ = ()
+
+
 @dataclass(frozen=True)
 class Binding:
     dependency: Dependency
     scope: Scope
-
-
-class Marker:
-    __slots__ = ()
 
 
 class BaseDI(abc.ABC):
@@ -84,11 +84,11 @@ class BaseDI(abc.ABC):
     def provide(
         self, *, scope: t.Optional[Scope] = None, override: bool = False
     ) -> t.Callable[[Dependency], t.Any]:
-        def bind(dependency: Dependency) -> t.Any:
+        def bind_dependency(dependency: Dependency) -> t.Any:
             interface = self.get_dependency_annotation(dependency)
             self.bind(interface, dependency, scope=scope, override=override)
 
-        return bind
+        return bind_dependency
 
     def validate_sub_dependencies(
         self, interface: t.Type[InterfaceT], dependency: Dependency, scope: Scope
@@ -169,7 +169,7 @@ class BaseDI(abc.ABC):
         parameters = signature.parameters
         params = {}
         for parameter in parameters.values():
-            if not isinstance(parameter.default, Marker):
+            if not isinstance(parameter.default, DependencyMarker):
                 continue
             annotation = parameter.annotation
             if annotation is inspect._empty:  # noqa

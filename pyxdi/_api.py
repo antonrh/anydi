@@ -11,7 +11,7 @@ except ImportError:
     anyio_installed = False
 
 from ._contstants import DEFAULT_MODE
-from ._core import DI, Context, Marker
+from ._core import DI, Context, DependencyMarker
 from ._types import Dependency, DependencyFunctionT, Mode, Scope
 from ._utils import scan_package
 
@@ -24,7 +24,7 @@ _async_di: t.Optional["AsyncDI"] = None
 _lock = threading.RLock()
 
 
-mark = marker = Marker()
+dep = DependencyMarker()
 
 
 def _get_di() -> DI:
@@ -123,7 +123,7 @@ async def arequest_context() -> t.AsyncIterator["AsyncContext"]:
 
 
 @t.overload
-def dependency(
+def provider(
     func: None = ...,
     *,
     scope: Scope | None = None,
@@ -133,7 +133,7 @@ def dependency(
 
 
 @t.overload
-def dependency(
+def provider(
     func: DependencyFunctionT,
     *,
     scope: Scope | None = None,
@@ -142,7 +142,7 @@ def dependency(
     ...
 
 
-def dependency(
+def provider(
     func: t.Union[DependencyFunctionT, None] = None,
     *,
     scope: Scope | None = None,
@@ -156,10 +156,7 @@ def dependency(
     elif callable(func):
         return provide(func)  # type: ignore[no-any-return]
     else:
-        raise ValueError("Invalid arguments provided to dependency")
-
-
-dep = dependency
+        raise ValueError("Invalid provided dependency arguments.")
 
 
 def inject(obj: t.Callable[..., t.Any]) -> t.Any:

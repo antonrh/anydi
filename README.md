@@ -25,13 +25,13 @@ import pyxdi
 pyxdi.init()
 
 
-@pyxdi.dep
+@pyxdi.provider
 def message() -> str:
     return "Hello, world!"
 
 
 @pyxdi.inject
-def say_hello(message: str = pyxdi.mark) -> None:
+def say_hello(message: str = pyxdi.dep) -> None:
     print(message)
 
 
