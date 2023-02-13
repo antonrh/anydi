@@ -31,7 +31,7 @@ def message() -> str:
 
 
 @pyxdi.inject
-def say_hello(message: str = pyxdi.dep) -> None:
+def say_hello(message: str = pyxdi.depend) -> None:
     print(message)
 
 
