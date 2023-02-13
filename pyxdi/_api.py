@@ -24,7 +24,7 @@ _async_di: t.Optional["AsyncDI"] = None
 _lock = threading.RLock()
 
 
-depend = DependencyMarker()
+dep = DependencyMarker()
 
 
 def _get_di() -> DI:
