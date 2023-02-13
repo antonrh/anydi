@@ -39,9 +39,6 @@ class AsyncDI(BaseDI):
 
     async def close(self) -> None:
         await self.singleton_context.close()
-        request_context = self.request_context_var.get()
-        if request_context:
-            await request_context.close()
 
     @contextlib.asynccontextmanager
     async def request_context(self) -> t.AsyncIterator[AsyncContext]:
@@ -74,7 +71,7 @@ class AsyncDI(BaseDI):
         stack: contextlib.AsyncExitStack | None = None,
         sync_stack: contextlib.ExitStack | None = None,
     ) -> t.Any:
-        dependency = self.get_binding(interface).dependency
+        dependency = self.get_binding(interface).provider
         args, kwargs = await self.get_provider_arguments(dependency)
         if inspect.isasyncgenfunction(dependency):
             acm = contextlib.asynccontextmanager(dependency)(*args, **kwargs)

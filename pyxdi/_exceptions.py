@@ -1,18 +1,26 @@
-class BindError(RuntimeError):
+class ProviderAlreadyBound(Exception):
     pass
 
 
-class ProviderAlreadyBound(BindError):
+class InvalidMode(ValueError):
     pass
 
 
-class InvalidMode(BindError):
+class InvalidProviderType(Exception):
     pass
 
 
-class InvalidScope(BindError):
+class InvalidScope(Exception):
     pass
 
 
-class ScopeMismatch(BindError):
+class ScopeMismatch(Exception):
+    pass
+
+
+class MissingProviderAnnotation(Exception):
+    pass
+
+
+class UnknownProviderDependency(Exception):
     pass

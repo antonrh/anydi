@@ -10,7 +10,15 @@ from dataclasses import dataclass
 from types import TracebackType
 
 from ._contstants import DEFAULT_SCOPE
-from ._exceptions import InvalidMode, InvalidScope, ProviderAlreadyBound, ScopeMismatch
+from ._exceptions import (
+    InvalidMode,
+    InvalidProviderType,
+    InvalidScope,
+    MissingProviderAnnotation,
+    ProviderAlreadyBound,
+    ScopeMismatch,
+    UnknownProviderDependency,
+)
 from ._types import InterfaceT, Mode, Provider, Scope
 
 ALLOWED_SCOPES: t.Dict[Scope, t.List[Scope]] = {
@@ -20,14 +28,21 @@ ALLOWED_SCOPES: t.Dict[Scope, t.List[Scope]] = {
 }
 
 
-class DependencyMarker:
+class Dependency:
     __slots__ = ()
 
 
 @dataclass(frozen=True)
 class Binding:
-    dependency: Provider
+    provider: Provider
     scope: Scope
+
+
+@dataclass(frozen=True)
+class LazyBinding:
+    interface: t.Type[t.Any]
+    parameter_name: str
+    binding: Binding
 
 
 class BaseDI(abc.ABC):
@@ -37,9 +52,9 @@ class BaseDI(abc.ABC):
         self.default_scope = default_scope or DEFAULT_SCOPE
         self.bindings: t.Dict[t.Type[t.Any], Binding] = {}
         self.signature_cache: t.Dict[t.Callable[..., t.Any], inspect.Signature] = {}
-        self.lazy_interfaces: t.Dict[
-            t.Type[t.Any], t.List[t.Type[t.Any]]
-        ] = defaultdict(list)
+        self.lazy_bindings: t.Dict[t.Type[t.Any], t.List[LazyBinding]] = defaultdict(
+            list
+        )
 
     def get_binding(self, interface: t.Type[InterfaceT]) -> Binding:
         try:
@@ -63,11 +78,15 @@ class BaseDI(abc.ABC):
     ) -> None:
         scope = scope or self.default_scope
 
-        self.ensure_valid_scope(scope)
+        if not self.has_valid_scope(scope):
+            raise InvalidScope(
+                f"Invalid scope. Only {', '.join(t.get_args(Scope))} "
+                "scope are supported."
+            )
 
-        if self.has_binding(interface) and not override:
-            raise ProviderAlreadyBound(
-                f"Provider interface `{self.get_qualname(interface)}` already bound."
+        if not self.has_valid_provider_type(provider):
+            raise InvalidProviderType(
+                "Invalid provider type. Only callable providers are allowed."
             )
 
         if self.mode == "sync" and (
@@ -79,9 +98,16 @@ class BaseDI(abc.ABC):
                 f"`{self.get_qualname(provider)}` in `sync` mode."
             )
 
-        self.validate_sub_provider(interface, provider, scope=scope)
+        if self.has_binding(interface) and not override:
+            raise ProviderAlreadyBound(
+                f"Provider interface `{self.get_qualname(interface)}` already bound."
+            )
 
-        self.bindings[interface] = Binding(dependency=provider, scope=scope)
+        binding = Binding(provider=provider, scope=scope)
+
+        self.validate_sub_providers(interface, binding)
+
+        self.bindings[interface] = binding
 
     def provide(
         self, *, scope: t.Optional[Scope] = None, override: bool = False
@@ -93,30 +119,41 @@ class BaseDI(abc.ABC):
         return provider_func
 
     @staticmethod
-    def ensure_valid_scope(scope: Scope) -> None:
-        if scope not in t.get_args(Scope):
-            raise InvalidScope("Invalid scope.")
+    def has_valid_scope(scope: Scope) -> bool:
+        return scope in t.get_args(Scope)
 
-    def validate_sub_provider(
-        self, interface: t.Type[InterfaceT], provider: Provider, scope: Scope
+    @staticmethod
+    def has_valid_provider_type(provider: Provider) -> bool:
+        return callable(provider)
+
+    def validate_sub_providers(
+        self, interface: t.Type[InterfaceT], binding: Binding
     ) -> None:
         related_bindings = []
 
+        provider, scope = binding.provider, binding.scope
+
         for parameter in self.get_signature(provider).parameters.values():
             if parameter.annotation is inspect._empty:  # noqa
-                raise TypeError(
-                    f"Missing dependency `{self.get_qualname(provider)}` provider "
-                    f"sub dependency `{parameter.name}` annotation."
+                raise MissingProviderAnnotation(
+                    f"Missing provider `{self.get_qualname(provider)}` "
+                    f"dependency `{parameter.name}` annotation."
                 )
             try:
                 sub_binding = self.get_binding(parameter.annotation)
                 related_bindings.append((sub_binding, True))
             except LookupError:
-                self.lazy_interfaces[parameter.annotation].append(interface)
+                self.lazy_bindings[parameter.annotation].append(
+                    LazyBinding(
+                        interface=interface,
+                        parameter_name=parameter.name,
+                        binding=binding,
+                    )
+                )
 
-        for lazy_interface in self.lazy_interfaces.pop(interface, []):
+        for lazy_binding in self.lazy_bindings.pop(interface, []):
             try:
-                sub_binding = self.get_binding(lazy_interface)
+                sub_binding = self.get_binding(lazy_binding.interface)
                 related_bindings.append((sub_binding, False))
             except LookupError:
                 pass
@@ -132,8 +169,25 @@ class BaseDI(abc.ABC):
                     f"You tried to bind the `{scope}` scoped dependency "
                     f"`{self.get_qualname(provider)}` with "
                     f"a `{related_binding.scope}` scoped "
-                    f"{self.get_qualname(related_binding.dependency)}`."
+                    f"{self.get_qualname(related_binding.provider)}`."
                 )
+
+    def validate_bindings(self) -> None:
+        if self.lazy_bindings:
+            messages = []
+            for lazy_interface, sub_bindings in self.lazy_bindings.items():
+                for sub_binding in sub_bindings:
+                    provider = sub_binding.binding.provider
+                    parameter_name = sub_binding.parameter_name
+                    provider_name = self.get_qualname(provider)
+                    messages.append(
+                        f"- `{provider_name}` has unknown `{parameter_name}`:"
+                        f" `{self.get_qualname(lazy_interface)}` parameter"
+                    )
+            message = "\n".join(messages)
+            raise UnknownProviderDependency(
+                f"Unknown provider dependencies detected:\n{message}."
+            )
 
     def get_provider_annotation(self, provider: Provider) -> t.Any:
         annotation = self.get_signature(provider).return_annotation
@@ -175,7 +229,7 @@ class BaseDI(abc.ABC):
         parameters = signature.parameters
         params = {}
         for parameter in parameters.values():
-            if not isinstance(parameter.default, DependencyMarker):
+            if not isinstance(parameter.default, Dependency):
                 continue
             annotation = parameter.annotation
             if annotation is inspect._empty:  # noqa
@@ -188,10 +242,8 @@ class BaseDI(abc.ABC):
     @staticmethod
     def get_qualname(obj: t.Any) -> str:
         qualname = obj.__qualname__
-        module_name = getattr(obj, "__module__", None)
-        if module_name:
-            return f"{module_name}.{qualname}".removeprefix("builtins.")
-        return str(qualname)
+        module_name = getattr(obj, "__module__", "__main__")
+        return f"{module_name}.{qualname}".removeprefix("builtins.")
 
 
 class DI(BaseDI):
@@ -221,9 +273,6 @@ class DI(BaseDI):
 
     def close(self) -> None:
         self.singleton_context.close()
-        request_context = self.request_context_var.get()
-        if request_context:
-            request_context.close()
 
     @contextlib.contextmanager
     def request_context(self) -> t.Iterator[Context]:
@@ -247,7 +296,7 @@ class DI(BaseDI):
         interface: t.Type[InterfaceT],
         stack: t.Optional[contextlib.ExitStack] = None,
     ) -> t.Any:
-        provider = self.get_binding(interface).dependency
+        provider = self.get_binding(interface).provider
         args, kwargs = self.get_provider_arguments(provider)
         if inspect.isgeneratorfunction(provider):
             cm = contextlib.contextmanager(provider)(*args, **kwargs)
@@ -261,7 +310,7 @@ class DI(BaseDI):
 
     def get_provider_arguments(
         self, provider: Provider
-    ) -> tuple[list[t.Any], dict[str, t.Any]]:
+    ) -> t.Tuple[t.List[t.Any], t.Dict[str, t.Any]]:
         args = []
         kwargs = {}
         signature = self.get_signature(provider)
