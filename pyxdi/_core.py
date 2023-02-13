@@ -10,8 +10,8 @@ from dataclasses import dataclass
 from types import TracebackType
 
 from ._contstants import DEFAULT_SCOPE
-from ._exceptions import ScopeMismatch
-from ._types import Dependency, InterfaceT, Mode, Scope
+from ._exceptions import InvalidMode, InvalidScope, ProviderAlreadyBound, ScopeMismatch
+from ._types import InterfaceT, Mode, Provider, Scope
 
 ALLOWED_SCOPES: t.Dict[Scope, t.List[Scope]] = {
     "singleton": ["singleton"],
@@ -26,7 +26,7 @@ class DependencyMarker:
 
 @dataclass(frozen=True)
 class Binding:
-    dependency: Dependency
+    dependency: Provider
     scope: Scope
 
 
@@ -56,49 +56,56 @@ class BaseDI(abc.ABC):
     def bind(
         self,
         interface: t.Type[InterfaceT],
-        dependency: Dependency,
+        provider: Provider,
         *,
         scope: t.Optional[Scope] = None,
         override: bool = False,
     ) -> None:
+        scope = scope or self.default_scope
+
+        self.ensure_valid_scope(scope)
+
         if self.has_binding(interface) and not override:
-            raise ValueError(
-                f"Dependency interface `{self.get_qualname(interface)}` already bound."
+            raise ProviderAlreadyBound(
+                f"Provider interface `{self.get_qualname(interface)}` already bound."
             )
 
         if self.mode == "sync" and (
-            inspect.isasyncgenfunction(dependency)
-            or inspect.iscoroutinefunction(dependency)
+            inspect.isasyncgenfunction(provider)
+            or inspect.iscoroutinefunction(provider)
         ):
-            raise RuntimeError(
-                f"Cannot bind asynchronous dependency "
-                f"`{self.get_qualname(dependency)}` in `sync` mode."
+            raise InvalidMode(
+                f"Cannot bind asynchronous provider "
+                f"`{self.get_qualname(provider)}` in `sync` mode."
             )
 
-        scope = scope or self.default_scope
+        self.validate_sub_provider(interface, provider, scope=scope)
 
-        self.validate_sub_dependencies(interface, dependency, scope=scope)
-
-        self.bindings[interface] = Binding(dependency=dependency, scope=scope)
+        self.bindings[interface] = Binding(dependency=provider, scope=scope)
 
     def provide(
         self, *, scope: t.Optional[Scope] = None, override: bool = False
-    ) -> t.Callable[[Dependency], t.Any]:
-        def bind_dependency(dependency: Dependency) -> t.Any:
-            interface = self.get_dependency_annotation(dependency)
-            self.bind(interface, dependency, scope=scope, override=override)
+    ) -> t.Callable[[Provider], t.Any]:
+        def provider_func(provider: Provider) -> t.Any:
+            interface = self.get_provider_annotation(provider)
+            self.bind(interface, provider, scope=scope, override=override)
 
-        return bind_dependency
+        return provider_func
 
-    def validate_sub_dependencies(
-        self, interface: t.Type[InterfaceT], dependency: Dependency, scope: Scope
+    @staticmethod
+    def ensure_valid_scope(scope: Scope) -> None:
+        if scope not in t.get_args(Scope):
+            raise InvalidScope("Invalid scope.")
+
+    def validate_sub_provider(
+        self, interface: t.Type[InterfaceT], provider: Provider, scope: Scope
     ) -> None:
         related_bindings = []
 
-        for parameter in self.get_signature(dependency).parameters.values():
+        for parameter in self.get_signature(provider).parameters.values():
             if parameter.annotation is inspect._empty:  # noqa
                 raise TypeError(
-                    f"Missing dependency `{self.get_qualname(dependency)}` provider "
+                    f"Missing dependency `{self.get_qualname(provider)}` provider "
                     f"sub dependency `{parameter.name}` annotation."
                 )
             try:
@@ -123,21 +130,20 @@ class BaseDI(abc.ABC):
             if left_scope not in allowed_scopes:
                 raise ScopeMismatch(
                     f"You tried to bind the `{scope}` scoped dependency "
-                    f"`{self.get_qualname(dependency)}` with "
+                    f"`{self.get_qualname(provider)}` with "
                     f"a `{related_binding.scope}` scoped "
                     f"{self.get_qualname(related_binding.dependency)}`."
                 )
 
-    def get_dependency_annotation(self, dependency: Dependency) -> t.Any:
-        annotation = self.get_signature(dependency).return_annotation
+    def get_provider_annotation(self, provider: Provider) -> t.Any:
+        annotation = self.get_signature(provider).return_annotation
 
-        if inspect.isclass(dependency):
+        if inspect.isclass(provider):
             return annotation
 
         if annotation is inspect._empty:  # noqa
             raise TypeError(
-                f"Missing `{self.get_qualname(dependency)}` "
-                f"dependency provider return annotation."
+                f"Missing `{self.get_qualname(provider)}` provider return annotation."
             )
 
         origin = t.get_origin(annotation)
@@ -149,7 +155,7 @@ class BaseDI(abc.ABC):
                 return annotation
             else:
                 raise TypeError(
-                    f"Cannot use `{self.get_qualname(dependency)}` generic type "
+                    f"Cannot use `{self.get_qualname(provider)}` generic type "
                     f"annotation without actual type."
                 )
 
@@ -201,19 +207,17 @@ class DI(BaseDI):
     def get(self, interface: t.Type[InterfaceT]) -> InterfaceT:
         binding = self.get_binding(interface)
 
-        if binding.scope == "transient":
-            return t.cast(InterfaceT, self.create_instance(interface))
-
-        elif binding.scope == "singleton":
+        if binding.scope == "singleton":
             return self.singleton_context.get(interface)
 
         elif binding.scope == "request":
-            request_registry = self.request_context_var.get()
-            if request_registry is None:
+            request_context = self.request_context_var.get()
+            if request_context is None:
                 raise LookupError("Request context is not started.")
-            return request_registry.get(interface)
+            return request_context.get(interface)
 
-        raise ValueError(f"Invalid `{binding.scope}` scope.")
+        # Transient scope
+        return t.cast(InterfaceT, self.create_instance(interface))
 
     def close(self) -> None:
         self.singleton_context.close()
@@ -243,24 +247,24 @@ class DI(BaseDI):
         interface: t.Type[InterfaceT],
         stack: t.Optional[contextlib.ExitStack] = None,
     ) -> t.Any:
-        dependency = self.get_binding(interface).dependency
-        args, kwargs = self.get_dependency_arguments(dependency)
-        if inspect.isgeneratorfunction(dependency):
-            cm = contextlib.contextmanager(dependency)(*args, **kwargs)
+        provider = self.get_binding(interface).dependency
+        args, kwargs = self.get_provider_arguments(provider)
+        if inspect.isgeneratorfunction(provider):
+            cm = contextlib.contextmanager(provider)(*args, **kwargs)
             if stack:
                 return stack.enter_context(cm)
             with contextlib.ExitStack() as stack:
                 return stack.enter_context(cm)
-        elif inspect.isfunction(dependency):
-            return dependency(*args, **kwargs)
-        return dependency
+        elif inspect.isfunction(provider):
+            return provider(*args, **kwargs)
+        return provider
 
-    def get_dependency_arguments(
-        self, dependency: Dependency
+    def get_provider_arguments(
+        self, provider: Provider
     ) -> tuple[list[t.Any], dict[str, t.Any]]:
         args = []
         kwargs = {}
-        signature = self.get_signature(dependency)
+        signature = self.get_signature(provider)
         for parameter in signature.parameters.values():
             instance = self.get(parameter.annotation)
             if parameter.kind == parameter.POSITIONAL_ONLY:

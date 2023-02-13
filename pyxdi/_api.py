@@ -12,7 +12,7 @@ except ImportError:
 
 from ._contstants import DEFAULT_MODE
 from ._core import DI, Context, DependencyMarker
-from ._types import Dependency, DependencyFunctionT, Mode, Scope
+from ._types import Mode, Provider, ProviderFunctionT, Scope
 from ._utils import scan_package
 
 if t.TYPE_CHECKING:
@@ -134,20 +134,20 @@ def provider(
 
 @t.overload
 def provider(
-    func: DependencyFunctionT,
+    func: ProviderFunctionT,
     *,
     scope: Scope | None = None,
     override: bool = False,
-) -> t.Callable[[Dependency], t.Any]:
+) -> t.Callable[[Provider], t.Any]:
     ...
 
 
 def provider(
-    func: t.Union[DependencyFunctionT, None] = None,
+    func: t.Union[ProviderFunctionT, None] = None,
     *,
     scope: Scope | None = None,
     override: bool = False,
-) -> t.Union[DependencyFunctionT, t.Callable[[Dependency], t.Any]]:
+) -> t.Union[ProviderFunctionT, t.Callable[[Provider], t.Any]]:
     di = _get_di_or_async_di()
     provide = di.provide(scope=scope, override=override)
 

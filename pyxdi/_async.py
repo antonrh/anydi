@@ -10,7 +10,7 @@ from types import TracebackType
 import anyio
 
 from ._core import BaseDI
-from ._types import Dependency, InterfaceT, Scope
+from ._types import InterfaceT, Provider, Scope
 
 
 class AsyncDI(BaseDI):
@@ -26,10 +26,7 @@ class AsyncDI(BaseDI):
     async def get(self, interface: t.Type[InterfaceT]) -> InterfaceT:
         binding = self.get_binding(interface)
 
-        if binding.scope == "transient":
-            return t.cast(InterfaceT, await self.create_instance(interface))
-
-        elif binding.scope == "singleton":
+        if binding.scope == "singleton":
             return await self.singleton_context.get(interface)
 
         elif binding.scope == "request":
@@ -38,13 +35,13 @@ class AsyncDI(BaseDI):
                 raise LookupError("Request context is not started.")
             return await request_registry.get(interface)
 
-        raise ValueError(f"Invalid `{binding.scope}` scope.")
+        return t.cast(InterfaceT, await self.create_instance(interface))
 
     async def close(self) -> None:
         await self.singleton_context.close()
-        scoped_context = self.request_context_var.get()
-        if scoped_context:
-            await scoped_context.close()
+        request_context = self.request_context_var.get()
+        if request_context:
+            await request_context.close()
 
     @contextlib.asynccontextmanager
     async def request_context(self) -> t.AsyncIterator[AsyncContext]:
@@ -78,7 +75,7 @@ class AsyncDI(BaseDI):
         sync_stack: contextlib.ExitStack | None = None,
     ) -> t.Any:
         dependency = self.get_binding(interface).dependency
-        args, kwargs = await self.get_dependency_arguments(dependency)
+        args, kwargs = await self.get_provider_arguments(dependency)
         if inspect.isasyncgenfunction(dependency):
             acm = contextlib.asynccontextmanager(dependency)(*args, **kwargs)
             if stack:
@@ -100,12 +97,12 @@ class AsyncDI(BaseDI):
             return await anyio.to_thread.run_sync(partial(dependency, *args, **kwargs))
         return dependency
 
-    async def get_dependency_arguments(
-        self, dependency: Dependency
+    async def get_provider_arguments(
+        self, provider: Provider
     ) -> tuple[list[t.Any], dict[str, t.Any]]:
         args = []
         kwargs = {}
-        signature = inspect.signature(dependency)
+        signature = inspect.signature(provider)
         for parameter in signature.parameters.values():
             instance = await self.get(parameter.annotation)
             if parameter.kind == parameter.POSITIONAL_ONLY:
