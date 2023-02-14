@@ -96,4 +96,4 @@ jobs:
           token: ${{ secrets.CODECOV_TOKEN }}
           name: python-${{ matrix.python-version }}
         # Use always() to always run this step to publish test results when there are test failures
-        if: ${{ always() }}
+        if: ${{ always() && matrix.python-version == '3.10' }}
