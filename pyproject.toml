@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "pyxdi"
-version = "0.1.0"
+version = "0.1.0-alpha.0"
 description = "Dependence Injection library"
 authors = ["Anton Ruhlov <antonruhlov@gmail.com>"]
 license = "MIT"
