@@ -4,6 +4,7 @@
 to effortlessly manage dependencies in your applications, inspired by the functionality of [pytest fixtures](https://docs.pytest.org/en/7.2.x/explanation/fixtures.html).
 
 [![CI](https://github.com/antonrh/pyxdi/actions/workflows/ci.yml/badge.svg)](https://github.com/antonrh/pyxdi/actions/workflows/ci.yml)
+[![codecov](https://codecov.io/gh/antonrh/pyxdi/branch/main/graph/badge.svg?token=67CLD19I0C)](https://codecov.io/gh/antonrh/pyxdi)
 [![Code style: black](https://img.shields.io/badge/code%20style-black-000000.svg)](https://github.com/psf/black)
 
 ---
