@@ -17,9 +17,9 @@ class AsyncDI(BaseDI):
     mode = "async"
 
     def __init__(
-        self, default_scope: t.Optional[Scope] = None, autowire: t.Optional[bool] = None
+        self, default_scope: t.Optional[Scope] = None, autobind: t.Optional[bool] = None
     ) -> None:
-        super().__init__(default_scope, autowire)
+        super().__init__(default_scope, autobind)
         self.singleton_context = AsyncContext(self, scope="singleton")
         self.request_context_var: ContextVar[t.Optional[AsyncContext]] = ContextVar(
             "request_context", default=None

@@ -9,9 +9,7 @@ def scan_package(
 ) -> None:
     if isinstance(package, str):
         package = importlib.import_module(package)
-    package_path = getattr(package, "__path__", None)
-    if not package_path:
-        return
+    package_path = getattr(package, "__path__")
     include = include or [""]
     for module_info in pkgutil.walk_packages(
         path=package_path, prefix=package.__name__ + "."

@@ -9,7 +9,7 @@ from contextvars import ContextVar
 from dataclasses import dataclass
 from types import TracebackType
 
-from ._contstants import DEFAULT_AUTOWIRE, DEFAULT_SCOPE
+from ._contstants import DEFAULT_AUTOBIND, DEFAULT_SCOPE
 from ._exceptions import (
     BindingDoesNotExist,
     InvalidMode,
@@ -61,10 +61,10 @@ class BaseDI(abc.ABC):
     mode: t.ClassVar[Mode]
 
     def __init__(
-        self, default_scope: t.Optional[Scope] = None, autowire: t.Optional[bool] = None
+        self, default_scope: t.Optional[Scope] = None, autobind: t.Optional[bool] = None
     ) -> None:
         self.default_scope = default_scope or DEFAULT_SCOPE
-        self.autowire = autowire or DEFAULT_AUTOWIRE
+        self.autobind = autobind or DEFAULT_AUTOBIND
         self.bindings: t.Dict[t.Type[t.Any], Binding] = {}
         self.signature_cache: t.Dict[t.Callable[..., t.Any], inspect.Signature] = {}
         self.unresolved_bindings: t.Dict[
@@ -92,11 +92,7 @@ class BaseDI(abc.ABC):
         scope: t.Optional[Scope] = None,
         override: bool = False,
     ) -> None:
-        if scope is None:
-            if self.autowire:
-                scope = self.detect_autowired_scope(provider)
-            else:
-                scope = self.default_scope
+        scope = scope or self.default_scope
 
         if not self.has_valid_scope(scope):
             raise InvalidScope(
@@ -148,11 +144,8 @@ class BaseDI(abc.ABC):
             or inspect.isgeneratorfunction(provider)
             or inspect.iscoroutinefunction(provider)
             or inspect.isasyncgenfunction(provider)
-            or (self.autowire and inspect.isclass(provider))
+            or (self.autobind and inspect.isclass(provider))
         )
-
-    def detect_autowired_scope(self, provider: Provider) -> Scope:
-        return self.default_scope  # TODO:
 
     def validate_sub_providers(
         self, interface: t.Type[InterfaceT], binding: Binding
@@ -281,8 +274,9 @@ class BaseDI(abc.ABC):
                 and annotation not in self.unresolved_bindings
                 and annotation not in self.unresolved_dependencies
             ):
-                if self.autowire:
-                    self.bind(annotation, annotation)
+                if self.autobind and inspect.isclass(annotation):
+                    scope = getattr(annotation, "__autobind_scope__", None)
+                    self.bind(annotation, annotation, scope=scope)
                 else:
                     self.unresolved_dependencies[annotation] = UnresolvedDependency(
                         parameter_name=parameter.name, obj=obj
@@ -302,9 +296,9 @@ class DI(BaseDI):
     mode = "sync"
 
     def __init__(
-        self, default_scope: t.Optional[Scope] = None, autowire: t.Optional[bool] = None
+        self, default_scope: t.Optional[Scope] = None, autobind: t.Optional[bool] = None
     ) -> None:
-        super().__init__(default_scope, autowire)
+        super().__init__(default_scope, autobind)
         self.singleton_context = Context(self, scope="singleton")
         self.request_context_var: ContextVar[Context | None] = ContextVar(
             "request_context", default=None

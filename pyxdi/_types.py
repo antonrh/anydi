@@ -5,3 +5,4 @@ ProviderFunctionT = t.TypeVar("ProviderFunctionT", bound=t.Callable[..., t.Any])
 Scope = t.Literal["transient", "singleton", "request"]
 Mode = t.Literal["sync", "async"]
 InterfaceT = t.TypeVar("InterfaceT")
+ClassT = t.TypeVar("ClassT")

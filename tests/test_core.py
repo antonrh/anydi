@@ -1,8 +1,10 @@
 import typing as t
+from dataclasses import dataclass
 
 import pytest
 
 from pyxdi._core import DI, Binding, DependencyParam  # noqa
+from pyxdi._decorators import transient  # noqa
 from pyxdi._exceptions import (  # noqa
     BindingDoesNotExist,
     InvalidMode,
@@ -25,8 +27,8 @@ def di() -> DI:
 
 
 @pytest.fixture
-def autowired_di() -> DI:
-    return DI(autowire=True)
+def autobind_di() -> DI:
+    return DI(autobind=True)
 
 
 def test_has_binding(di: DI) -> None:
@@ -289,18 +291,23 @@ def test_get_injectable_params(di: DI) -> None:
     assert result == "service ident = 1000"
 
 
-# def test_autowire_dependency(autowired_di: DI) -> None:
-#     @autowired_di.provide(scope="transient")
-#     def ident() -> str:
-#         return "test"
-#
-#     @autowired_di.inject_callable
-#     def func(service: Service = DependencyParam()) -> str:
-#         return service.ident
-#
-#     result = func()
-#
-#     assert result == "test"
+def test_autobind_dependency(autobind_di: DI) -> None:
+    @autobind_di.provide(scope="transient")
+    def ident() -> str:
+        return "test"
+
+    @transient
+    @dataclass
+    class Component:
+        ident: str
+
+    @autobind_di.inject_callable
+    def func(component: Component = DependencyParam()) -> str:
+        return component.ident
+
+    result = func()
+
+    assert result == "test"
 
 
 def test_close(di: DI) -> None:
