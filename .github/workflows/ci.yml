@@ -91,9 +91,6 @@ jobs:
         run: poetry install --no-interaction
       - name: Run tests
         run: poetry run pytest -vv --cov=pyxdi/ --cov-report=xml
-      - uses: codecov/codecov-action@v1
-        with:
-          token: ${{ secrets.CODECOV_TOKEN }}
-          name: python-${{ matrix.python-version }}
-        # Use always() to always run this step to publish test results when there are test failures
-        if: ${{ always() && matrix.python-version == '3.10' }}
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v3
+        if: matrix.python-version == '3.10'
