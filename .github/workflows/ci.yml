@@ -1,1 +1,44 @@
+name: CI
 
+on:
+  pull_request:
+    branches:
+      - master
+    types: [ opened, synchronize, labeled ]
+
+jobs:
+  cancel-build:
+    name: Cancel previous build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: styfle/cancel-workflow-action@0.9.1
+        with:
+          access_token: ${{ github.token }}
+
+  lint:
+    name: Code quality
+    runs-on: ubuntu-latest
+    needs: [ cancel-build ]
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+      - name: Set up Python 3.10
+        uses: actions/setup-python@v4
+        with:
+          python-version: "3.10"
+          cache: 'poetry'
+      - name: Update pip
+        run: |
+          pip install -U wheel
+          pip install -U setuptools
+          python -m pip install -U pip
+      - name: Install dependencies
+        run: poetry install
+      - name: Imports sorting
+        run: isort --check pyxdi/ tests/
+      - name: Code formatting
+        run: black --check pyxdi/ tests/
+      - name: Code style
+        run: flake8 pyxdi/ tests/
+      - name: Static type checking
+        run: mypy pyxdi/ tests/
