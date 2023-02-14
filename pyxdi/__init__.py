@@ -8,6 +8,7 @@ from ._api import (
     provider,
     request_context,
 )
+from ._decorators import request, singleton, transient
 
 __all__ = [
     "aclose",
@@ -18,4 +19,7 @@ __all__ = [
     "inject",
     "provider",
     "request_context",
+    "request",
+    "singleton",
+    "transient",
 ]

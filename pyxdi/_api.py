@@ -11,7 +11,7 @@ except ImportError:
     anyio_installed = False
 
 from ._contstants import DEFAULT_MODE
-from ._core import DI, Context, Dependency
+from ._core import DI, Context, DependencyParam
 from ._types import Mode, Provider, ProviderFunctionT, Scope
 from ._utils import scan_package
 
@@ -24,7 +24,7 @@ _async_di: t.Optional["AsyncDI"] = None
 _lock = threading.RLock()
 
 
-dep = Dependency()
+dep = DependencyParam()
 
 
 def _get_di() -> DI:
@@ -61,6 +61,7 @@ def _get_di_or_async_di() -> t.Union[DI, "AsyncDI"]:
 def init(
     *,
     mode: t.Optional[Mode] = None,
+    autobind: t.Optional[bool] = None,
     default_scope: t.Optional[Scope] = None,
     packages: t.Optional[t.Iterable[t.Union[ModuleType | str]]] = None,
     include: t.Optional[t.Iterable[str]] = None,
@@ -89,9 +90,9 @@ def init(
 
             from ._async import AsyncDI
 
-            _async_di = AsyncDI(default_scope=default_scope)
+            _async_di = AsyncDI(default_scope=default_scope, autobind=autobind)
         else:
-            _di = DI(default_scope=default_scope)
+            _di = DI(default_scope=default_scope, autobind=autobind)
 
         packages = packages or []
         for package in packages:
