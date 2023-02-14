@@ -2,8 +2,9 @@ import typing as t
 
 import pytest
 
-from pyxdi._core import DI, Binding, Dependency  # noqa
+from pyxdi._core import DI, Binding, DependencyParam  # noqa
 from pyxdi._exceptions import (  # noqa
+    BindingDoesNotExist,
     InvalidMode,
     InvalidProviderType,
     InvalidScope,
@@ -23,6 +24,11 @@ def di() -> DI:
     return DI()
 
 
+@pytest.fixture
+def autowired_di() -> DI:
+    return DI(autowire=True)
+
+
 def test_has_binding(di: DI) -> None:
     di.bind(str, lambda: "test")
 
@@ -39,7 +45,7 @@ def test_get_binding(di: DI) -> None:
 
 
 def test_get_binding_not_found(di: DI) -> None:
-    with pytest.raises(LookupError):
+    with pytest.raises(BindingDoesNotExist):
         assert di.get_binding(Service)
 
 
@@ -60,10 +66,10 @@ def test_validate_unresolved_provider_dependencies(di: DI) -> None:
 
 
 def test_validate_unresolved_injected_dependencies(di: DI) -> None:
-    def func1(service: Service = Dependency()) -> None:  # type: ignore[assignment]
+    def func1(service: Service = DependencyParam()) -> None:
         return None
 
-    def func2(message: str = Dependency()) -> None:  # type: ignore[assignment]
+    def func2(message: str = DependencyParam()) -> None:
         return None
 
     di.inject_callable(func1)
@@ -253,8 +259,8 @@ def test_get_provider_annotation_origin_without_args(di: DI) -> None:
 
 
 def test_get_injectable_params_missing_annotation(di: DI) -> None:
-    def func(name=Dependency()) -> str:
-        return name
+    def func(name=DependencyParam()) -> str:  # type: ignore[no-untyped-def]
+        return name  # type: ignore[no-any-return]
 
     with pytest.raises(MissingAnnotation) as exc_info:
         di.inject_callable(func)
@@ -275,12 +281,26 @@ def test_get_injectable_params(di: DI) -> None:
         return Service(ident=ident)
 
     @di.inject_callable
-    def func(name: str, service: Service = Dependency()) -> str:
+    def func(name: str, service: Service = DependencyParam()) -> str:
         return f"{name} = {service.ident}"
 
     result = func(name="service ident")
 
-    assert result == f"service ident = 1000"
+    assert result == "service ident = 1000"
+
+
+# def test_autowire_dependency(autowired_di: DI) -> None:
+#     @autowired_di.provide(scope="transient")
+#     def ident() -> str:
+#         return "test"
+#
+#     @autowired_di.inject_callable
+#     def func(service: Service = DependencyParam()) -> str:
+#         return service.ident
+#
+#     result = func()
+#
+#     assert result == "test"
 
 
 def test_close(di: DI) -> None:

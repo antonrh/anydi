@@ -1,3 +1,7 @@
+class BindingDoesNotExist(Exception):
+    pass
+
+
 class ProviderAlreadyBound(Exception):
     pass
 

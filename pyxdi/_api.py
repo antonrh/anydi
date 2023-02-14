@@ -11,7 +11,7 @@ except ImportError:
     anyio_installed = False
 
 from ._contstants import DEFAULT_MODE
-from ._core import DI, Context, Dependency
+from ._core import DI, Context, DependencyParam
 from ._types import Mode, Provider, ProviderFunctionT, Scope
 from ._utils import scan_package
 
@@ -24,7 +24,7 @@ _async_di: t.Optional["AsyncDI"] = None
 _lock = threading.RLock()
 
 
-dep = Dependency()
+dep = DependencyParam()
 
 
 def _get_di() -> DI:

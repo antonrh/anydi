@@ -11,6 +11,7 @@ from types import TracebackType
 
 from ._contstants import DEFAULT_AUTOWIRE, DEFAULT_SCOPE
 from ._exceptions import (
+    BindingDoesNotExist,
     InvalidMode,
     InvalidProviderType,
     InvalidScope,
@@ -31,6 +32,10 @@ ALLOWED_SCOPES: t.Dict[Scope, t.List[Scope]] = {
 
 class Dependency:
     __slots__ = ()
+
+
+def DependencyParam() -> t.Any:  # noqa
+    return Dependency()
 
 
 @dataclass(frozen=True)
@@ -71,7 +76,7 @@ class BaseDI(abc.ABC):
         try:
             return self.bindings[interface]
         except KeyError:
-            raise LookupError(
+            raise BindingDoesNotExist(
                 f"Binding to `{self.get_qualname(interface)}` "
                 f"dependency is not registered."
             )
@@ -87,7 +92,11 @@ class BaseDI(abc.ABC):
         scope: t.Optional[Scope] = None,
         override: bool = False,
     ) -> None:
-        scope = scope or self.default_scope
+        if scope is None:
+            if self.autowire:
+                scope = self.detect_autowired_scope(provider)
+            else:
+                scope = self.default_scope
 
         if not self.has_valid_scope(scope):
             raise InvalidScope(
@@ -133,14 +142,17 @@ class BaseDI(abc.ABC):
     def has_valid_scope(scope: Scope) -> bool:
         return scope in t.get_args(Scope)
 
-    @staticmethod
-    def has_valid_provider_type(provider: Provider) -> bool:
+    def has_valid_provider_type(self, provider: Provider) -> bool:
         return (
             inspect.isfunction(provider)
             or inspect.isgeneratorfunction(provider)
             or inspect.iscoroutinefunction(provider)
             or inspect.isasyncgenfunction(provider)
+            or (self.autowire and inspect.isclass(provider))
         )
+
+    def detect_autowired_scope(self, provider: Provider) -> Scope:
+        return self.default_scope  # TODO:
 
     def validate_sub_providers(
         self, interface: t.Type[InterfaceT], binding: Binding
@@ -158,7 +170,7 @@ class BaseDI(abc.ABC):
             try:
                 sub_binding = self.get_binding(parameter.annotation)
                 related_bindings.append((sub_binding, True))
-            except LookupError:
+            except BindingDoesNotExist:
                 self.unresolved_bindings[parameter.annotation].append(
                     UnresolvedBinding(
                         interface=interface,
@@ -269,9 +281,13 @@ class BaseDI(abc.ABC):
                 and annotation not in self.unresolved_bindings
                 and annotation not in self.unresolved_dependencies
             ):
-                self.unresolved_dependencies[annotation] = UnresolvedDependency(
-                    parameter_name=parameter.name, obj=obj
-                )
+                if self.autowire:
+                    self.bind(annotation, annotation)
+                else:
+                    self.unresolved_dependencies[annotation] = UnresolvedDependency(
+                        parameter_name=parameter.name, obj=obj
+                    )
+
             params[parameter.name] = annotation
         return params
 
