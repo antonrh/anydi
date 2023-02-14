@@ -5,7 +5,7 @@ from types import ModuleType
 
 
 def scan_package(
-    package: ModuleType | str, include: t.Iterable[str] | None = None
+    package: t.Union[ModuleType, str], include: t.Optional[t.Iterable[str]] = None
 ) -> None:
     if isinstance(package, str):
         package = importlib.import_module(package)
