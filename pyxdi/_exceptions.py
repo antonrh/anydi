@@ -18,9 +18,13 @@ class ScopeMismatch(Exception):
     pass
 
 
-class MissingProviderAnnotation(Exception):
+class MissingAnnotation(Exception):
     pass
 
 
-class UnknownProviderDependency(Exception):
+class NotSupportedAnnotation(Exception):
+    pass
+
+
+class UnknownDependency(Exception):
     pass

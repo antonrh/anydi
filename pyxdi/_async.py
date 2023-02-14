@@ -16,8 +16,10 @@ from ._types import InterfaceT, Provider, Scope
 class AsyncDI(BaseDI):
     mode = "async"
 
-    def __init__(self, default_scope: t.Optional[Scope] = None) -> None:
-        super().__init__(default_scope)
+    def __init__(
+        self, default_scope: t.Optional[Scope] = None, autowire: t.Optional[bool] = None
+    ) -> None:
+        super().__init__(default_scope, autowire)
         self.singleton_context = AsyncContext(self, scope="singleton")
         self.request_context_var: ContextVar[t.Optional[AsyncContext]] = ContextVar(
             "request_context", default=None

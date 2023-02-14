@@ -9,15 +9,16 @@ from contextvars import ContextVar
 from dataclasses import dataclass
 from types import TracebackType
 
-from ._contstants import DEFAULT_SCOPE
+from ._contstants import DEFAULT_AUTOWIRE, DEFAULT_SCOPE
 from ._exceptions import (
     InvalidMode,
     InvalidProviderType,
     InvalidScope,
-    MissingProviderAnnotation,
+    MissingAnnotation,
+    NotSupportedAnnotation,
     ProviderAlreadyBound,
     ScopeMismatch,
-    UnknownProviderDependency,
+    UnknownDependency,
 )
 from ._types import InterfaceT, Mode, Provider, Scope
 
@@ -39,22 +40,32 @@ class Binding:
 
 
 @dataclass(frozen=True)
-class LazyBinding:
+class UnresolvedBinding:
     interface: t.Type[t.Any]
     parameter_name: str
     binding: Binding
 
 
+@dataclass(frozen=True)
+class UnresolvedDependency:
+    parameter_name: str
+    obj: t.Callable[..., t.Any]
+
+
 class BaseDI(abc.ABC):
     mode: t.ClassVar[Mode]
 
-    def __init__(self, default_scope: t.Optional[Scope] = None) -> None:
+    def __init__(
+        self, default_scope: t.Optional[Scope] = None, autowire: t.Optional[bool] = None
+    ) -> None:
         self.default_scope = default_scope or DEFAULT_SCOPE
+        self.autowire = autowire or DEFAULT_AUTOWIRE
         self.bindings: t.Dict[t.Type[t.Any], Binding] = {}
         self.signature_cache: t.Dict[t.Callable[..., t.Any], inspect.Signature] = {}
-        self.lazy_bindings: t.Dict[t.Type[t.Any], t.List[LazyBinding]] = defaultdict(
-            list
-        )
+        self.unresolved_bindings: t.Dict[
+            t.Type[t.Any], t.List[UnresolvedBinding]
+        ] = defaultdict(list)
+        self.unresolved_dependencies: t.Dict[t.Type[t.Any], UnresolvedDependency] = {}
 
     def get_binding(self, interface: t.Type[InterfaceT]) -> Binding:
         try:
@@ -124,7 +135,12 @@ class BaseDI(abc.ABC):
 
     @staticmethod
     def has_valid_provider_type(provider: Provider) -> bool:
-        return callable(provider)
+        return (
+            inspect.isfunction(provider)
+            or inspect.isgeneratorfunction(provider)
+            or inspect.iscoroutinefunction(provider)
+            or inspect.isasyncgenfunction(provider)
+        )
 
     def validate_sub_providers(
         self, interface: t.Type[InterfaceT], binding: Binding
@@ -135,7 +151,7 @@ class BaseDI(abc.ABC):
 
         for parameter in self.get_signature(provider).parameters.values():
             if parameter.annotation is inspect._empty:  # noqa
-                raise MissingProviderAnnotation(
+                raise MissingAnnotation(
                     f"Missing provider `{self.get_qualname(provider)}` "
                     f"dependency `{parameter.name}` annotation."
                 )
@@ -143,20 +159,17 @@ class BaseDI(abc.ABC):
                 sub_binding = self.get_binding(parameter.annotation)
                 related_bindings.append((sub_binding, True))
             except LookupError:
-                self.lazy_bindings[parameter.annotation].append(
-                    LazyBinding(
+                self.unresolved_bindings[parameter.annotation].append(
+                    UnresolvedBinding(
                         interface=interface,
                         parameter_name=parameter.name,
                         binding=binding,
                     )
                 )
 
-        for lazy_binding in self.lazy_bindings.pop(interface, []):
-            try:
-                sub_binding = self.get_binding(lazy_binding.interface)
-                related_bindings.append((sub_binding, False))
-            except LookupError:
-                pass
+        for unresolved_binding in self.unresolved_bindings.pop(interface, []):
+            sub_binding = self.get_binding(unresolved_binding.interface)
+            related_bindings.append((sub_binding, False))
 
         for related_binding, direct in related_bindings:
             if direct:
@@ -172,35 +185,48 @@ class BaseDI(abc.ABC):
                     f"{self.get_qualname(related_binding.provider)}`."
                 )
 
-    def validate_bindings(self) -> None:
-        if self.lazy_bindings:
+    def validate(self) -> None:
+        if self.unresolved_bindings:
             messages = []
-            for lazy_interface, sub_bindings in self.lazy_bindings.items():
+            for unresolved_interface, sub_bindings in self.unresolved_bindings.items():
                 for sub_binding in sub_bindings:
                     provider = sub_binding.binding.provider
                     parameter_name = sub_binding.parameter_name
                     provider_name = self.get_qualname(provider)
                     messages.append(
-                        f"- `{provider_name}` has unknown `{parameter_name}`:"
-                        f" `{self.get_qualname(lazy_interface)}` parameter"
+                        f"- `{provider_name}` has unknown `{parameter_name}: "
+                        f"{self.get_qualname(unresolved_interface)}` parameter"
                     )
             message = "\n".join(messages)
-            raise UnknownProviderDependency(
-                f"Unknown provider dependencies detected:\n{message}."
+            raise UnknownDependency(
+                f"Unknown provided dependencies detected:\n{message}."
+            )
+        if self.unresolved_dependencies:
+            messages = []
+            for (
+                unresolved_interface,
+                dependency,
+            ) in self.unresolved_dependencies.items():
+                parameter_name = dependency.parameter_name
+                messages.append(
+                    f"- `{self.get_qualname(dependency.obj)}` has unknown "
+                    f"`{parameter_name}: {self.get_qualname(unresolved_interface)}` "
+                    f"injected parameter"
+                )
+            message = "\n".join(messages)
+            raise UnknownDependency(
+                f"Unknown injected dependencies detected:\n{message}."
             )
 
     def get_provider_annotation(self, provider: Provider) -> t.Any:
         annotation = self.get_signature(provider).return_annotation
 
-        if inspect.isclass(provider):
-            return annotation
-
         if annotation is inspect._empty:  # noqa
-            raise TypeError(
+            raise MissingAnnotation(
                 f"Missing `{self.get_qualname(provider)}` provider return annotation."
             )
 
-        origin = t.get_origin(annotation)
+        origin = t.get_origin(annotation) or annotation
         args = t.get_args(annotation)
 
         # Supported generic types
@@ -208,13 +234,13 @@ class BaseDI(abc.ABC):
             if args:
                 return annotation
             else:
-                raise TypeError(
+                raise NotSupportedAnnotation(
                     f"Cannot use `{self.get_qualname(provider)}` generic type "
                     f"annotation without actual type."
                 )
 
         try:
-            return t.get_args(annotation)[0]
+            return args[0]
         except IndexError:
             return annotation
 
@@ -229,12 +255,22 @@ class BaseDI(abc.ABC):
         parameters = signature.parameters
         params = {}
         for parameter in parameters.values():
-            if not isinstance(parameter.default, Dependency):
-                continue
             annotation = parameter.annotation
             if annotation is inspect._empty:  # noqa
-                raise TypeError(
+                raise MissingAnnotation(
                     f"Missing `{self.get_qualname(obj)}` parameter annotation."
+                )
+
+            if not isinstance(parameter.default, Dependency):
+                continue
+
+            if (
+                not self.has_binding(annotation)
+                and annotation not in self.unresolved_bindings
+                and annotation not in self.unresolved_dependencies
+            ):
+                self.unresolved_dependencies[annotation] = UnresolvedDependency(
+                    parameter_name=parameter.name, obj=obj
                 )
             params[parameter.name] = annotation
         return params
@@ -249,8 +285,10 @@ class BaseDI(abc.ABC):
 class DI(BaseDI):
     mode = "sync"
 
-    def __init__(self, default_scope: t.Optional[Scope] = None) -> None:
-        super().__init__(default_scope)
+    def __init__(
+        self, default_scope: t.Optional[Scope] = None, autowire: t.Optional[bool] = None
+    ) -> None:
+        super().__init__(default_scope, autowire)
         self.singleton_context = Context(self, scope="singleton")
         self.request_context_var: ContextVar[Context | None] = ContextVar(
             "request_context", default=None
@@ -304,9 +342,7 @@ class DI(BaseDI):
                 return stack.enter_context(cm)
             with contextlib.ExitStack() as stack:
                 return stack.enter_context(cm)
-        elif inspect.isfunction(provider):
-            return provider(*args, **kwargs)
-        return provider
+        return provider(*args, **kwargs)
 
     def get_provider_arguments(
         self, provider: Provider

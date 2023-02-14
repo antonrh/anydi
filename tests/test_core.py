@@ -1,16 +1,17 @@
-from typing import Iterator
+import typing as t
 
 import pytest
 
-from pyxdi._core import DI, Binding  # noqa
+from pyxdi._core import DI, Binding, Dependency  # noqa
 from pyxdi._exceptions import (  # noqa
     InvalidMode,
     InvalidProviderType,
     InvalidScope,
-    MissingProviderAnnotation,
+    MissingAnnotation,
+    NotSupportedAnnotation,
     ProviderAlreadyBound,
     ScopeMismatch,
-    UnknownProviderDependency,
+    UnknownDependency,
 )
 from pyxdi._types import Scope  # noqa
 
@@ -20,23 +21,6 @@ from tests.fixtures import Service
 @pytest.fixture
 def di() -> DI:
     return DI()
-
-
-def test_close(di: DI) -> None:
-    events = []
-
-    def dep1() -> Iterator[str]:
-        events.append("dep1:before")
-        yield "test"
-        events.append("dep1:after")
-
-    di.bind(str, dep1, scope="singleton")
-
-    assert di.get(str)
-
-    di.close()
-
-    assert events == ["dep1:before", "dep1:after"]
 
 
 def test_has_binding(di: DI) -> None:
@@ -59,19 +43,41 @@ def test_get_binding_not_found(di: DI) -> None:
         assert di.get_binding(Service)
 
 
-def test_validate_bindings(di: DI) -> None:
+def test_validate_unresolved_provider_dependencies(di: DI) -> None:
     def service(ident: str) -> Service:
         return Service(ident=ident)
 
     di.bind(Service, service)
 
-    with pytest.raises(UnknownProviderDependency) as exc_info:
-        di.validate_bindings()
+    with pytest.raises(UnknownDependency) as exc_info:
+        di.validate()
 
     assert str(exc_info.value) == (
-        "Unknown provider dependencies detected:\n"
-        "- `tests.test_core.test_validate_bindings.<locals>.service` "
-        "has unknown `ident`: `str` parameter."
+        "Unknown provided dependencies detected:\n"
+        "- `tests.test_core.test_validate_unresolved_provider_dependencies"
+        ".<locals>.service` has unknown `ident: str` parameter."
+    )
+
+
+def test_validate_unresolved_injected_dependencies(di: DI) -> None:
+    def func1(service: Service = Dependency()) -> None:  # type: ignore[assignment]
+        return None
+
+    def func2(message: str = Dependency()) -> None:  # type: ignore[assignment]
+        return None
+
+    di.inject_callable(func1)
+    di.inject_callable(func2)
+
+    with pytest.raises(UnknownDependency) as exc_info:
+        di.validate()
+
+    assert str(exc_info.value) == (
+        "Unknown injected dependencies detected:\n"
+        "- `tests.test_core.test_validate_unresolved_injected_dependencies.<locals>"
+        ".func1` has unknown `service: tests.fixtures.Service` injected parameter\n"
+        "- `tests.test_core.test_validate_unresolved_injected_dependencies.<locals>"
+        ".func2` has unknown `message: str` injected parameter."
     )
 
 
@@ -106,67 +112,6 @@ def test_bind_invalid_provider_type(di: DI) -> None:
     )
 
 
-def test_bind_singleton_scoped_and_get_instance(di: DI) -> None:
-    ident = "test"
-
-    def provider() -> Service:
-        return Service(ident=ident)
-
-    di.bind(Service, provider, scope="singleton")
-
-    service = di.get(Service)
-
-    assert service.ident == ident
-
-    assert di.get(Service) is service
-
-
-def test_bind_transient_scoped_and_get_instance(di: DI) -> None:
-    ident = "test"
-
-    def provider() -> Service:
-        return Service(ident=ident)
-
-    di.bind(Service, provider, scope="transient")
-
-    service = di.get(Service)
-
-    assert service.ident == ident
-    assert not di.get(Service) is service
-
-
-def test_bind_request_scoped_and_get_instance(di: DI) -> None:
-    ident = "test"
-
-    def provider() -> Service:
-        return Service(ident=ident)
-
-    di.bind(Service, provider, scope="request")
-
-    with di.request_context():
-        service = di.get(Service)
-
-        assert service.ident == ident
-        assert di.get(Service) is service
-
-    with di.request_context():
-        assert not di.get(Service) is service
-
-
-def test_bind_request_scoped_not_started(di: DI) -> None:
-    ident = "test"
-
-    def provider() -> Service:
-        return Service(ident=ident)
-
-    di.bind(Service, provider, scope="request")
-
-    with pytest.raises(LookupError) as exc_info:
-        di.get(Service)
-
-    assert str(exc_info.value) == "Request context is not started."
-
-
 def test_bind_cannot_override(di: DI) -> None:
     di.bind(str, lambda: "test")
 
@@ -183,23 +128,6 @@ def test_bind_override(di: DI) -> None:
     assert di.get(str) == "other"
 
 
-def test_bind_transient_scoped_generator_provider(di: DI) -> None:
-    ident = "test"
-
-    def provider() -> Iterator[Service]:
-        service = Service(ident=ident)
-        service.events.append("before")
-        yield service
-        service.events.append("after")
-
-    di.bind(Service, provider, scope="transient")
-
-    service = di.get(Service)
-
-    assert service.ident == "test"
-    assert service.events == ["before", "after"]
-
-
 def test_bind_provider_without_annotation(di: DI) -> None:
     def service_ident() -> str:
         return "10000"
@@ -209,7 +137,7 @@ def test_bind_provider_without_annotation(di: DI) -> None:
 
     di.bind(str, service_ident)
 
-    with pytest.raises(MissingProviderAnnotation) as exc_info:
+    with pytest.raises(MissingAnnotation) as exc_info:
         di.bind(Service, service)
 
     assert str(exc_info.value) == (
@@ -276,6 +204,180 @@ def test_bind_allowed_scopes(
     assert result == valid
 
 
+@pytest.mark.parametrize(
+    "annotation, expected",
+    [
+        (str, str),
+        (int, int),
+        (Service, Service),
+        (t.Iterator[Service], Service),
+        (t.AsyncIterator[Service], Service),
+        (t.Dict[str, t.Any], t.Dict[str, t.Any]),
+        (t.List[str], t.List[str]),
+        (t.Tuple[str, ...], t.Tuple[str, ...]),
+    ],
+)
+def test_get_supported_provider_annotation(
+    di: DI, annotation: t.Type[t.Any], expected: t.Type[t.Any]
+) -> None:
+    def provider() -> annotation:  # type: ignore[valid-type]
+        return object()
+
+    assert di.get_provider_annotation(provider) == expected
+
+
+def test_get_provider_annotation_missing(di: DI) -> None:
+    def provider():  # type: ignore[no-untyped-def]
+        return object()
+
+    with pytest.raises(MissingAnnotation) as exc_info:
+        di.get_provider_annotation(provider)
+
+    assert str(exc_info.value) == (
+        "Missing `tests.test_core.test_get_provider_annotation_missing.<locals>"
+        ".provider` provider return annotation."
+    )
+
+
+def test_get_provider_annotation_origin_without_args(di: DI) -> None:
+    def provider() -> list:  # type: ignore[type-arg]
+        return []
+
+    with pytest.raises(NotSupportedAnnotation) as exc_info:
+        di.get_provider_annotation(provider)
+
+    assert str(exc_info.value) == (
+        "Cannot use `tests.test_core.test_get_provider_annotation_origin_without_args."
+        "<locals>.provider` generic type annotation without actual type."
+    )
+
+
+def test_get_injectable_params_missing_annotation(di: DI) -> None:
+    def func(name=Dependency()) -> str:
+        return name
+
+    with pytest.raises(MissingAnnotation) as exc_info:
+        di.inject_callable(func)
+
+    assert str(exc_info.value) == (
+        "Missing `tests.test_core.test_get_injectable_params_missing_annotation"
+        ".<locals>.func` parameter annotation."
+    )
+
+
+def test_get_injectable_params(di: DI) -> None:
+    @di.provide()
+    def ident() -> str:
+        return "1000"
+
+    @di.provide()
+    def service(ident: str) -> Service:
+        return Service(ident=ident)
+
+    @di.inject_callable
+    def func(name: str, service: Service = Dependency()) -> str:
+        return f"{name} = {service.ident}"
+
+    result = func(name="service ident")
+
+    assert result == f"service ident = 1000"
+
+
+def test_close(di: DI) -> None:
+    events = []
+
+    def dep1() -> t.Iterator[str]:
+        events.append("dep1:before")
+        yield "test"
+        events.append("dep1:after")
+
+    di.bind(str, dep1, scope="singleton")
+
+    assert di.get(str)
+
+    di.close()
+
+    assert events == ["dep1:before", "dep1:after"]
+
+
+def test_bind_transient_scoped_generator_provider(di: DI) -> None:
+    ident = "test"
+
+    def provider() -> t.Iterator[Service]:
+        service = Service(ident=ident)
+        service.events.append("before")
+        yield service
+        service.events.append("after")
+
+    di.bind(Service, provider, scope="transient")
+
+    service = di.get(Service)
+
+    assert service.ident == "test"
+    assert service.events == ["before", "after"]
+
+
+def test_bind_singleton_scoped_and_get_instance(di: DI) -> None:
+    ident = "test"
+
+    def provider() -> Service:
+        return Service(ident=ident)
+
+    di.bind(Service, provider, scope="singleton")
+
+    service = di.get(Service)
+
+    assert service.ident == ident
+
+    assert di.get(Service) is service
+
+
+def test_bind_transient_scoped_and_get_instance(di: DI) -> None:
+    ident = "test"
+
+    def provider() -> Service:
+        return Service(ident=ident)
+
+    di.bind(Service, provider, scope="transient")
+
+    service = di.get(Service)
+
+    assert service.ident == ident
+    assert not di.get(Service) is service
+
+
+def test_bind_request_scoped_and_get_instance(di: DI) -> None:
+    ident = "test"
+
+    def provider() -> Service:
+        return Service(ident=ident)
+
+    di.bind(Service, provider, scope="request")
+
+    with di.request_context():
+        service = di.get(Service)
+
+        assert service.ident == ident
+        assert di.get(Service) is service
+
+    with di.request_context():
+        assert not di.get(Service) is service
+
+
+def test_bind_request_scoped_not_started(di: DI) -> None:
+    ident = "test"
+
+    def provider() -> Service:
+        return Service(ident=ident)
+
+    di.bind(Service, provider, scope="request")
+
+    with pytest.raises(LookupError) as exc_info:
+        di.get(Service)
+
+    assert str(exc_info.value) == "Request context is not started."
+
+
 def test_get_and_set_with_request_context(di: DI) -> None:
     @di.provide(scope="request")
     def service(ident: str) -> Service:
@@ -285,3 +387,24 @@ def test_get_and_set_with_request_context(di: DI) -> None:
         ctx.set(str, lambda: "test")
 
         assert di.get(Service).ident == "test"
+
+
+def test_get_provider_arguments(di: DI) -> None:
+    @di.provide()
+    def a() -> int:
+        return 10
+
+    @di.provide()
+    def b() -> float:
+        return 1.0
+
+    @di.provide()
+    def c() -> str:
+        return "test"
+
+    @di.provide()
+    def service(a: int, /, b: float, *, c: str) -> Service:
+        ident = f"{a}/{b}/{c}"
+        return Service(ident=ident)
+
+    assert di.get(Service).ident == "10/1.0/test"
