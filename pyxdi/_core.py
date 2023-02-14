@@ -7,6 +7,7 @@ import typing as t
 from collections import defaultdict
 from contextvars import ContextVar
 from dataclasses import dataclass
+from functools import wraps
 from types import TracebackType
 
 from ._contstants import DEFAULT_AUTOBIND, DEFAULT_SCOPE
@@ -332,6 +333,7 @@ class DI(BaseDI):
     def inject_callable(self, obj: t.Callable[..., t.Any]) -> t.Callable[..., t.Any]:
         injectable_params = self.get_injectable_params(obj)
 
+        @wraps(obj)
         def wrapped(*args: t.Any, **kwargs: t.Any) -> t.Any:
             for name, annotation in injectable_params.items():
                 kwargs[name] = self.get(annotation)
@@ -383,7 +385,8 @@ class Context:
         return t.cast(InterfaceT, instance)
 
     def set(self, interface: t.Type[InterfaceT], instance: t.Any) -> None:
-        self.di.bind(interface, instance, scope=self.scope)
+        if not self.di.has_binding(interface):
+            self.di.bind(interface, lambda: instance, scope=self.scope)
 
     def close(self) -> None:
         self.stack.close()

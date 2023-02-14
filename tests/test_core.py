@@ -411,7 +411,7 @@ def test_get_and_set_with_request_context(di: DI) -> None:
         return Service(ident=ident)
 
     with di.request_context() as ctx:
-        ctx.set(str, lambda: "test")
+        ctx.set(str, "test")
 
         assert di.get(Service).ident == "test"
 
