@@ -5,7 +5,13 @@ to effortlessly manage dependencies in your applications, inspired by the functi
 
 [![CI](https://github.com/antonrh/pyxdi/actions/workflows/ci.yml/badge.svg)](https://github.com/antonrh/pyxdi/actions/workflows/ci.yml)
 [![codecov](https://codecov.io/gh/antonrh/pyxdi/branch/main/graph/badge.svg?token=67CLD19I0C)](https://codecov.io/gh/antonrh/pyxdi)
+[![Documentation Status](https://readthedocs.org/projects/pyxdi/badge/?version=latest)](https://pyxdi.readthedocs.io/en/latest/?badge=latest)
 [![Code style: black](https://img.shields.io/badge/code%20style-black-000000.svg)](https://github.com/psf/black)
+
+---
+Documentation
+
+http://pyxdi.readthedocs.io/
 
 ---
 
@@ -15,6 +21,12 @@ Install using `pip`:
 
 ```bash
 pip install pyxdi
+```
+
+or using `poetry`:
+
+```bash
+poetry add pyxdi
 ```
 
 ## Quick Example
