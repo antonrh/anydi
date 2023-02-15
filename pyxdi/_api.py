@@ -7,7 +7,7 @@ try:
     import anyio  # noqa
 
     anyio_installed = True
-except ImportError:
+except ImportError:  # pragma: no cover
     anyio_installed = False
 
 from ._contstants import DEFAULT_MODE
@@ -78,14 +78,14 @@ def init(
     mode = mode or DEFAULT_MODE
 
     with _lock:
-        if mode == "sync" and _di or mode == "async" and _async_di:
+        if mode == "sync" and _di or mode == "async" and _async_di:  # pragma: no cover
             return
 
         if mode == "async":
             if not anyio_installed:
                 raise RuntimeError(
                     "Please, install `async` extension run in asynchronous mode. "
-                    "eg. pip install pyxdi[async]"
+                    "eg. pip install pyxdi[async]."
                 )
 
             from ._async import AsyncDI
@@ -102,13 +102,15 @@ def init(
 def close() -> None:
     global _di
     if _di:
-        return _di.close()
+        _di.close()
+        _di = None
 
 
 async def aclose() -> None:
     global _async_di
     if _async_di:
         await _async_di.close()
+        _async_di = None
 
 
 @contextlib.contextmanager
@@ -153,13 +155,9 @@ def provider(
 ) -> t.Union[ProviderFunctionT, t.Callable[[Provider], t.Any]]:
     di = _get_di_or_async_di()
     provide = di.provide(scope=scope, override=override)
-
     if func is None:
         return provide
-    elif callable(func):
-        return provide(func)  # type: ignore[no-any-return]
-    else:
-        raise ValueError("Invalid provided dependency arguments.")
+    return provide(func)  # type: ignore[no-any-return]
 
 
 def inject(obj: t.Callable[..., t.Any]) -> t.Any:

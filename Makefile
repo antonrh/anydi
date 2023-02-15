@@ -13,3 +13,7 @@ lint: ## Run code linters
 fmt: ## Run code formatters
 	poetry run black pyxdi/ tests/ examples/
 	poetry run isort pyxdi/ tests/ examples/
+
+
+test:  ## Run unit tests
+	poetry run pytest -vv --cov=pyxdi/

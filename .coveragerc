@@ -6,4 +6,7 @@ exclude_lines =
     @abstractmethod
     @abc.abstractmethod
     if TYPE_CHECKING
+    if t.TYPE_CHECKING
+    @t.overload
     raise NotImplementedError
+

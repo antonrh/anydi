@@ -43,6 +43,14 @@ sections = ["FUTURE", "STDLIB", "THIRDPARTY", "FIRSTPARTY", "TESTS", "LOCALFOLDE
 python_version = "3.10"
 strict = true
 
+[tool.pytest.ini_options]
+addopts = [
+    "--strict-config",
+    "--strict-markers",
+]
+xfail_strict = true
+junit_family = "xunit2"
+
 [build-system]
 requires = ["poetry-core>=1.0.0"]
 build-backend = "poetry.core.masonry.api"
