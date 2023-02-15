@@ -3,6 +3,7 @@ source = pyxdi/
 
 [report]
 exclude_lines =
+    pragma: no cover
     @abstractmethod
     @abc.abstractmethod
     if TYPE_CHECKING
