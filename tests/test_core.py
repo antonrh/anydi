@@ -391,7 +391,7 @@ def test_bind_request_scoped_and_get_instance(di: DI) -> None:
         assert not di.get(Service) is service
 
 
-def test_bind_request_scoped_not_started(di: DI) -> None:
+def test_get_request_scoped_not_started(di: DI) -> None:
     ident = "test"
 
     def provider() -> Service:
