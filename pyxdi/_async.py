@@ -81,7 +81,7 @@ class AsyncDI(BaseDI):
                 return await stack.enter_async_context(acm)
             async with contextlib.AsyncExitStack() as stack:
                 return await stack.enter_async_context(acm)
-        if inspect.isgeneratorfunction(dependency):
+        elif inspect.isgeneratorfunction(dependency):
             cm = contextlib.contextmanager(dependency)(*args, **kwargs)
             if sync_stack:
                 return await anyio.to_thread.run_sync(sync_stack.enter_context, cm)
@@ -89,12 +89,10 @@ class AsyncDI(BaseDI):
             try:
                 return await anyio.to_thread.run_sync(sync_stack.enter_context, cm)
             finally:
-                return await anyio.to_thread.run_sync(sync_stack.close)
+                await anyio.to_thread.run_sync(sync_stack.close)
         elif inspect.iscoroutinefunction(dependency):
             return await dependency(*args, **kwargs)
-        elif inspect.isfunction(dependency):
-            return await anyio.to_thread.run_sync(partial(dependency, *args, **kwargs))
-        return dependency
+        return await anyio.to_thread.run_sync(partial(dependency, *args, **kwargs))
 
     async def get_provider_arguments(
         self, provider: Provider

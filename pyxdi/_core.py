@@ -174,7 +174,7 @@ class BaseDI(abc.ABC):
                 )
 
         for unresolved_binding in self.unresolved_bindings.pop(interface, []):
-            sub_binding = self.get_binding(unresolved_binding.interface)
+            sub_binding = self.get_binding(unresolved_binding.interface)  # noqa
             related_bindings.append((sub_binding, False))
 
         for related_binding, direct in related_bindings:
