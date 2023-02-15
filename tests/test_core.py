@@ -320,7 +320,7 @@ def test_close(di: DI) -> None:
 
     di.bind(str, dep1, scope="singleton")
 
-    assert di.get(str)
+    assert di.get(str) == "test"
 
     di.close()
 
