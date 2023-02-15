@@ -7,14 +7,16 @@ import pyxdi
 
 
 @pytest.fixture(scope="module", autouse=True)
-def init_di() -> t.Iterator[None]:
-    pyxdi.close()  # ensure that pyxdi closed
-    yield
+async def close_all() -> None:
+    pyxdi.close()
+    await pyxdi.aclose()
 
 
 @pytest.fixture(scope="module")
 def client() -> t.Iterator[FlaskClient]:
     from examples.flask import app
+
+    app.testing = True
 
     with app.test_client() as client:
         yield client

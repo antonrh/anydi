@@ -3,8 +3,8 @@ import typing as t
 import anyio.to_thread
 import pytest
 
-from pyxdi._async import AsyncDI
-from pyxdi._core import DependencyParam
+from pyxdi._async import AsyncDI  # noqa
+from pyxdi._core import DependencyParam  # noqa
 
 from tests.fixtures import Service
 
