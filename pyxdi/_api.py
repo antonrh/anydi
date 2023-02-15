@@ -100,13 +100,15 @@ def init(
 
 
 def close() -> None:
-    di = _get_di()
-    return di.close()
+    global _di
+    if _di:
+        return _di.close()
 
 
 async def aclose() -> None:
-    di = _get_async_di()
-    await di.close()
+    global _async_di
+    if _async_di:
+        await _async_di.close()
 
 
 @contextlib.contextmanager
