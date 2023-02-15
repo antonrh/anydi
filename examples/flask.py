@@ -7,10 +7,9 @@ import pyxdi.ext.flask
 from examples.common.repository import InMemoryUserRepository, UserRepository
 from examples.common.service import UserService
 
-pyxdi.init()
-
 app = Flask(__name__)
 
+pyxdi.init()
 pyxdi.ext.flask.install(app)
 
 
