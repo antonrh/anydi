@@ -128,7 +128,7 @@ class AsyncContext:
         return t.cast(InterfaceT, instance)
 
     def set(self, interface: t.Type[InterfaceT], instance: t.Any) -> None:
-        self.di.bind(interface, instance, scope=self.scope)
+        self.di.bind(interface, lambda: instance, scope=self.scope)
 
     async def close(self) -> None:
         await self.stack.aclose()
