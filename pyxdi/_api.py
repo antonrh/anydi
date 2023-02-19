@@ -11,51 +11,54 @@ except ImportError:  # pragma: no cover
     anyio_installed = False
 
 from ._contstants import DEFAULT_MODE
-from ._core import DI, Context, DependencyParam
+from ._core import DependencyParam, DIContext, ScopedContext
 from ._types import Mode, Provider, ProviderFunctionT, Scope
 from ._utils import scan_package
 
 if t.TYPE_CHECKING:
-    from ._async import AsyncContext, AsyncDI
+    from ._async import AsyncDIContext, AsyncScopedContext
 
 
-_di: t.Optional[DI] = None
-_async_di: t.Optional["AsyncDI"] = None
+_di_context: t.Optional[DIContext] = None
+_async_di_context: t.Optional["AsyncDIContext"] = None
 _lock = threading.RLock()
 
 
 dep = DependencyParam()
 
 
-def _get_di() -> DI:
-    global _di
+def _get_di_context() -> DIContext:
+    global _di_context
 
-    if _di is None:
+    if _di_context is None:
         raise RuntimeError(
             '`pyxdi` not initialized. Please, call `pyxdi.init(mode="sync")` first.'
         )
-    return _di
+    return _di_context
 
 
-def _get_async_di() -> "AsyncDI":
-    global _async_di
+def _get_async_di_context() -> "AsyncDIContext":
+    global _async_di_context
 
-    if _async_di is None:
+    if _async_di_context is None:
         raise RuntimeError(
             "`pyxdi` not initialized. " 'Please, call `pyxdi.init(mode="async")` first.'
         )
-    return _async_di
+    return _async_di_context
 
 
-def _get_di_or_async_di() -> t.Union[DI, "AsyncDI"]:
-    global _di
-    global _async_di
+def _get_di_or_async_di_context() -> t.Union[DIContext, "AsyncDIContext"]:
+    global _di_context
+    global _async_di_context
 
-    if _di is None and _async_di is None:
+    if _di_context is None and _async_di_context is None:
         raise RuntimeError(
             "`pyxdi` not initialized. Please, call `pyxdi.init()` first."
         )
-    return t.cast(t.Union[DI, "AsyncDI"], _di or _async_di)
+    return t.cast(
+        t.Union[DIContext, "AsyncDIContext"],
+        _di_context or _async_di_context,
+    )
 
 
 def init(
@@ -66,19 +69,21 @@ def init(
     packages: t.Optional[t.Iterable[t.Union[ModuleType | str]]] = None,
     include: t.Optional[t.Iterable[str]] = None,
 ) -> None:
-    global _di
-    global _async_di
+    global _di_context
+    global _async_di_context
 
-    if _di or _async_di:
-        if _di:
+    if _di_context or _async_di_context:
+        if _di_context:
             raise RuntimeError("`pyxdi` already initialized in `sync` mode.")
-        elif _async_di:
+        elif _async_di_context:
             raise RuntimeError("`pyxdi` already initialized in `async` mode.")
 
     mode = mode or DEFAULT_MODE
 
     with _lock:
-        if mode == "sync" and _di or mode == "async" and _async_di:  # pragma: no cover
+        if (
+            mode == "sync" and _di_context or mode == "async" and _async_di_context
+        ):  # pragma: no cover
             return
 
         if mode == "async":
@@ -88,11 +93,13 @@ def init(
                     "eg. pip install pyxdi[async]."
                 )
 
-            from ._async import AsyncDI
+            from ._async import AsyncDIContext
 
-            _async_di = AsyncDI(default_scope=default_scope, autobind=autobind)
+            _async_di_context = AsyncDIContext(
+                default_scope=default_scope, autobind=autobind
+            )
         else:
-            _di = DI(default_scope=default_scope, autobind=autobind)
+            _di_context = DIContext(default_scope=default_scope, autobind=autobind)
 
         packages = packages or []
         for package in packages:
@@ -100,29 +107,29 @@ def init(
 
 
 def close() -> None:
-    global _di
-    if _di:
-        _di.close()
-        _di = None
+    global _di_context
+    if _di_context:
+        _di_context.close()
+        _di_context = None
 
 
 async def aclose() -> None:
-    global _async_di
-    if _async_di:
-        await _async_di.close()
-        _async_di = None
+    global _async_di_context
+    if _async_di_context:
+        await _async_di_context.close()
+        _async_di_context = None
 
 
 @contextlib.contextmanager
-def request_context() -> t.Iterator[Context]:
-    di = _get_di()
+def request_context() -> t.Iterator[ScopedContext]:
+    di = _get_di_context()
     with di.request_context() as ctx:
         yield ctx
 
 
 @contextlib.asynccontextmanager
-async def arequest_context() -> t.AsyncIterator["AsyncContext"]:
-    di = _get_async_di()
+async def arequest_context() -> t.AsyncIterator["AsyncScopedContext"]:
+    di = _get_async_di_context()
     async with di.request_context() as ctx:
         yield ctx
 
@@ -153,13 +160,13 @@ def provider(
     scope: Scope | None = None,
     override: bool = False,
 ) -> t.Union[ProviderFunctionT, t.Callable[[Provider], t.Any]]:
-    di = _get_di_or_async_di()
-    provide = di.provide(scope=scope, override=override)
+    di_context = _get_di_or_async_di_context()
+    provide = di_context.provide(scope=scope, override=override)
     if func is None:
         return provide
     return provide(func)  # type: ignore[no-any-return]
 
 
 def inject(obj: t.Callable[..., t.Any]) -> t.Any:
-    di = _get_di_or_async_di()
-    return di.inject_callable(obj)
+    di_context = _get_di_or_async_di_context()
+    return di_context.inject_callable(obj)

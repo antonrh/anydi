@@ -58,7 +58,7 @@ class UnresolvedDependency:
     obj: t.Callable[..., t.Any]
 
 
-class BaseDI(abc.ABC):
+class BaseDIContext(abc.ABC):
     mode: t.ClassVar[Mode]
 
     def __init__(
@@ -293,15 +293,15 @@ class BaseDI(abc.ABC):
         return f"{module_name}.{qualname}".removeprefix("builtins.")
 
 
-class DI(BaseDI):
+class DIContext(BaseDIContext):
     mode = "sync"
 
     def __init__(
         self, default_scope: t.Optional[Scope] = None, autobind: t.Optional[bool] = None
     ) -> None:
         super().__init__(default_scope, autobind)
-        self.singleton_context = Context(self, scope="singleton")
-        self.request_context_var: ContextVar[Context | None] = ContextVar(
+        self.singleton_context = ScopedContext("singleton", root=self)
+        self.request_context_var: ContextVar[ScopedContext | None] = ContextVar(
             "request_context", default=None
         )
 
@@ -324,8 +324,8 @@ class DI(BaseDI):
         self.singleton_context.close()
 
     @contextlib.contextmanager
-    def request_context(self) -> t.Iterator[Context]:
-        with Context(di=self, scope="request") as context:
+    def request_context(self) -> t.Iterator[ScopedContext]:
+        with ScopedContext("request", root=self) as context:
             token = self.request_context_var.set(context)
             yield context
             self.request_context_var.reset(token)
@@ -371,27 +371,27 @@ class DI(BaseDI):
         return args, kwargs
 
 
-class Context:
-    def __init__(self, di: "DI", scope: Scope) -> None:
-        self.di = di
+class ScopedContext:
+    def __init__(self, scope: Scope, root: "DIContext") -> None:
         self.scope = scope
+        self.root = root
         self.instances: dict[t.Any, t.Any] = {}
         self.stack = contextlib.ExitStack()
 
     def get(self, interface: t.Type[InterfaceT]) -> InterfaceT:
         if (instance := self.instances.get(interface)) is None:
-            instance = self.di.create_instance(interface, stack=self.stack)
+            instance = self.root.create_instance(interface, stack=self.stack)
             self.instances[interface] = instance
         return t.cast(InterfaceT, instance)
 
     def set(self, interface: t.Type[InterfaceT], instance: t.Any) -> None:
-        if not self.di.has_binding(interface):
-            self.di.bind(interface, lambda: instance, scope=self.scope)
+        if not self.root.has_binding(interface):
+            self.root.bind(interface, lambda: instance, scope=self.scope)
 
     def close(self) -> None:
         self.stack.close()
 
-    def __enter__(self) -> Context:
+    def __enter__(self) -> ScopedContext:
         return self
 
     def __exit__(

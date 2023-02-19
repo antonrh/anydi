@@ -46,11 +46,11 @@ def test_init_in_async_mode_anyio_not_installed() -> None:
 def test_init_in_sync_mode_and_close() -> None:
     pyxdi.init()
 
-    assert pyxdi._api._di
+    assert pyxdi._api._di_context
 
     pyxdi.close()
 
-    assert pyxdi._api._di is None
+    assert pyxdi._api._di_context is None
 
 
 def test_init_with_scan_packages() -> None:
@@ -64,11 +64,11 @@ def test_init_with_scan_packages() -> None:
 async def test_init_in_async_mode_and_close() -> None:
     pyxdi.init(mode="async")
 
-    assert pyxdi._api._async_di
+    assert pyxdi._api._async_di_context
 
     await pyxdi.aclose()
 
-    assert pyxdi._api._async_di is None
+    assert pyxdi._api._async_di_context is None
 
 
 def test_provider_not_initialized() -> None:
@@ -90,7 +90,7 @@ def test_provider_no_arguments() -> None:
     def service() -> str:
         return "OK"
 
-    assert pyxdi._api._get_di().has_binding(str)
+    assert pyxdi._api._get_di_context().has_binding(str)
 
 
 def test_provider_callable() -> None:
@@ -100,7 +100,7 @@ def test_provider_callable() -> None:
     def service() -> str:
         return "OK"
 
-    assert pyxdi._api._get_di().has_binding(str)
+    assert pyxdi._api._get_di_context().has_binding(str)
 
 
 def test_request_context() -> None:
@@ -109,7 +109,7 @@ def test_request_context() -> None:
     with pyxdi.request_context() as ctx:
         ctx.set(str, "hello")
 
-        assert pyxdi._api._get_di().get(str) == "hello"
+        assert pyxdi._api._get_di_context().get(str) == "hello"
 
 
 def test_request_context_not_initialized() -> None:
@@ -128,7 +128,7 @@ async def test_arequest_context() -> None:
     async with pyxdi.arequest_context() as ctx:
         ctx.set(str, "hello")
 
-        assert (await pyxdi._api._get_async_di().get(str)) == "hello"
+        assert (await pyxdi._api._get_async_di_context().get(str)) == "hello"
 
 
 async def test_arequest_context_not_initialized() -> None:
