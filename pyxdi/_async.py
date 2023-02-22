@@ -9,21 +9,21 @@ from types import TracebackType
 
 import anyio
 
-from ._core import BaseDI
+from ._core import BaseDIContext
 from ._types import InterfaceT, Provider, Scope
 
 
-class AsyncDI(BaseDI):
+class AsyncDIContext(BaseDIContext):
     mode = "async"
 
     def __init__(
         self, default_scope: t.Optional[Scope] = None, autobind: t.Optional[bool] = None
     ) -> None:
         super().__init__(default_scope, autobind)
-        self.singleton_context = AsyncContext(self, scope="singleton")
-        self.request_context_var: ContextVar[t.Optional[AsyncContext]] = ContextVar(
-            "request_context", default=None
-        )
+        self.singleton_context = AsyncScopedContext("singleton", root=self)
+        self.request_context_var: ContextVar[
+            t.Optional[AsyncScopedContext]
+        ] = ContextVar("request_context", default=None)
 
     async def get(self, interface: t.Type[InterfaceT]) -> InterfaceT:
         binding = self.get_binding(interface)
@@ -43,8 +43,8 @@ class AsyncDI(BaseDI):
         await self.singleton_context.close()
 
     @contextlib.asynccontextmanager
-    async def request_context(self) -> t.AsyncIterator[AsyncContext]:
-        async with AsyncContext(di=self, scope="request") as context:
+    async def request_context(self) -> t.AsyncIterator[AsyncScopedContext]:
+        async with AsyncScopedContext("request", root=self) as context:
             token = self.request_context_var.set(context)
             yield context
             self.request_context_var.reset(token)
@@ -109,30 +109,30 @@ class AsyncDI(BaseDI):
         return args, kwargs
 
 
-class AsyncContext:
-    def __init__(self, di: AsyncDI, scope: Scope) -> None:
-        self.di = di
+class AsyncScopedContext:
+    def __init__(self, scope: Scope, root: AsyncDIContext) -> None:
         self.scope = scope
+        self.root = root
         self.instances: dict[t.Any, t.Any] = {}
         self.stack = contextlib.AsyncExitStack()
         self.sync_stack = contextlib.ExitStack()
 
     async def get(self, interface: t.Type[InterfaceT]) -> InterfaceT:
         if (instance := self.instances.get(interface)) is None:
-            instance = await self.di.create_instance(
+            instance = await self.root.create_instance(
                 interface, stack=self.stack, sync_stack=self.sync_stack
             )
             self.instances[interface] = instance
         return t.cast(InterfaceT, instance)
 
     def set(self, interface: t.Type[InterfaceT], instance: t.Any) -> None:
-        self.di.bind(interface, lambda: instance, scope=self.scope)
+        self.root.bind(interface, lambda: instance, scope=self.scope)
 
     async def close(self) -> None:
         await self.stack.aclose()
         await anyio.to_thread.run_sync(self.sync_stack.close)
 
-    async def __aenter__(self) -> AsyncContext:
+    async def __aenter__(self) -> AsyncScopedContext:
         return self
 
     async def __aexit__(
