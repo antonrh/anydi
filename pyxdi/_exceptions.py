@@ -1,12 +1,16 @@
+class ProviderNotRegistered(Exception):
+    pass
+
+
+class ProviderNotStarted(Exception):
+    pass
+
+
 class BindingDoesNotExist(Exception):
     pass
 
 
-class ProviderAlreadyBound(Exception):
-    pass
-
-
-class InvalidMode(ValueError):
+class ProviderAlreadyRegistered(Exception):
     pass
 
 

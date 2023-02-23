@@ -1,24 +1,10 @@
-from ._api import (
-    aclose,
-    arequest_context,
-    close,
-    dep,
-    init,
-    inject,
-    provider,
-    request_context,
-)
+from ._api import dep
+from ._base import PyxDI
 from ._decorators import request, singleton, transient
 
 __all__ = [
-    "aclose",
-    "arequest_context",
-    "close",
+    "PyxDI",
     "dep",
-    "init",
-    "inject",
-    "provider",
-    "request_context",
     "request",
     "singleton",
     "transient",

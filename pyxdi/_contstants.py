@@ -1,5 +1,4 @@
-from ._types import Mode, Scope
+from ._types import Scope
 
 DEFAULT_SCOPE: Scope = "singleton"
-DEFAULT_MODE: Mode = "sync"
 DEFAULT_AUTOBIND = False
