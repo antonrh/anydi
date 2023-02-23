@@ -222,6 +222,7 @@ class PyxDI:
         return t.cast(InterfaceT, self.create_instance(provider))
 
     def start(self) -> t.Union[None, t.Awaitable[None]]:
+        self.validate()
         if self._is_async_loop_running:
             return self._singleton_context.astart()
         self._singleton_context.start()
