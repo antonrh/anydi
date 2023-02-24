@@ -24,6 +24,25 @@ def di() -> PyxDI:
     return PyxDI()
 
 
+def test_start_and_close(di: PyxDI) -> None:
+    events = []
+
+    def dep1() -> t.Iterator[str]:
+        events.append("dep1:before")
+        yield "test"
+        events.append("dep1:after")
+
+    di.register_provider(str, dep1, scope="singleton")
+
+    di.start()
+
+    assert di.get(str) == "test"
+
+    di.close()
+
+    assert events == ["dep1:before", "dep1:after"]
+
+
 def test_has_provider(di: PyxDI) -> None:
     di.register_provider(str, lambda: "test")
 
@@ -246,3 +265,34 @@ def test_get_provider_annotation_origin_without_args(di: PyxDI) -> None:
         "Cannot use `tests.test_base.test_get_provider_annotation_origin_without_args."
         "<locals>.provider` generic type annotation without actual type."
     )
+
+
+def test_get_injectable_params_missing_annotation(di: PyxDI) -> None:
+    def func(name=DependencyParam()) -> str:  # type: ignore[no-untyped-def]
+        return name  # type: ignore[no-any-return]
+
+    with pytest.raises(MissingAnnotation) as exc_info:
+        di.inject(func)
+
+    assert str(exc_info.value) == (
+        "Missing `tests.test_base.test_get_injectable_params_missing_annotation"
+        ".<locals>.func` parameter annotation."
+    )
+
+
+def test_get_injectable_params(di: PyxDI) -> None:
+    @di.provider
+    def ident() -> str:
+        return "1000"
+
+    @di.provider
+    def service(ident: str) -> Service:
+        return Service(ident=ident)
+
+    @di.inject
+    def func(name: str, service: Service = DependencyParam()) -> str:
+        return f"{name} = {service.ident}"
+
+    result = func(name="service ident")
+
+    assert result == "service ident = 1000"

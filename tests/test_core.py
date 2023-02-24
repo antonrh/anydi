@@ -26,37 +26,6 @@ def di_context() -> DIContext:
     return DIContext()
 
 
-def test_get_injectable_params_missing_annotation(di_context: DIContext) -> None:
-    def func(name=DependencyParam()) -> str:  # type: ignore[no-untyped-def]
-        return name  # type: ignore[no-any-return]
-
-    with pytest.raises(MissingAnnotation) as exc_info:
-        di_context.inject_callable(func)
-
-    assert str(exc_info.value) == (
-        "Missing `tests.test_core.test_get_injectable_params_missing_annotation"
-        ".<locals>.func` parameter annotation."
-    )
-
-
-def test_get_injectable_params(di_context: DIContext) -> None:
-    @di_context.provide()
-    def ident() -> str:
-        return "1000"
-
-    @di_context.provide()
-    def service(ident: str) -> Service:
-        return Service(ident=ident)
-
-    @di_context.inject_callable
-    def func(name: str, service: Service = DependencyParam()) -> str:
-        return f"{name} = {service.ident}"
-
-    result = func(name="service ident")
-
-    assert result == "service ident = 1000"
-
-
 def test_autobind_dependency() -> None:
     di_context = DIContext(autobind=True)
 
@@ -76,23 +45,6 @@ def test_autobind_dependency() -> None:
     result = func()
 
     assert result == "test"
-
-
-def test_close(di_context: DIContext) -> None:
-    events = []
-
-    def dep1() -> t.Iterator[str]:
-        events.append("dep1:before")
-        yield "test"
-        events.append("dep1:after")
-
-    di_context.bind(str, dep1, scope="singleton")
-
-    assert di_context.get(str) == "test"
-
-    di_context.close()
-
-    assert events == ["dep1:before", "dep1:after"]
 
 
 def test_bind_transient_scoped_generator_provider(di_context: DIContext) -> None:

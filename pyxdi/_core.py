@@ -259,9 +259,6 @@ class DIContext(BaseDIContext):
         # Transient scope
         return t.cast(InterfaceT, self.create_instance(interface))
 
-    def close(self) -> None:
-        self.singleton_context.close()
-
     @contextlib.contextmanager
     def request_context(self) -> t.Iterator[ScopedContext]:
         with ScopedContext("request", root=self) as context:
