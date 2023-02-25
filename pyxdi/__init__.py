@@ -1,6 +1,7 @@
-from ._api import dep
-from ._base import PyxDI
-from ._decorators import request, singleton, transient
+from .core import DependencyParam, PyxDI
+from .decorators import request, singleton, transient
+
+dep = DependencyParam()
 
 __all__ = [
     "PyxDI",

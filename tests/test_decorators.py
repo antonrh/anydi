@@ -1,4 +1,4 @@
-from pyxdi._decorators import request, singleton, transient  # noqa
+from pyxdi.decorators import request, singleton, transient
 
 from tests.fixtures import Service
 

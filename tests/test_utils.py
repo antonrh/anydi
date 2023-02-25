@@ -1,4 +1,4 @@
-from pyxdi._utils import scan_package  # noqa
+from pyxdi.utils import scan_package
 
 
 def test_scan_package() -> None:
