@@ -13,7 +13,7 @@ packages = [
 
 [tool.poetry.dependencies]
 python = ">=3.7,<3.12"
-anyio = {version = "^3.6.2", extras = ["asyncio"]}
+anyio = "^3.6.2"
 mkdocs = {version = "^1.4.2", extras = ["docs"]}
 mkdocs-material = {version = "^9.0.12", extras = ["docs"]}
 

@@ -442,7 +442,6 @@ def test_request_context(di: PyxDI) -> None:
 # Asynchronous lifespan
 
 
-@pytest.mark.anyio
 async def test_astart_and_aclose_singleton_context(di: PyxDI) -> None:
     events = []
 
@@ -462,7 +461,6 @@ async def test_astart_and_aclose_singleton_context(di: PyxDI) -> None:
     assert events == ["dep1:before", "dep1:after"]
 
 
-@pytest.mark.anyio
 async def test_arequest_context(di: PyxDI) -> None:
     events = []
 
@@ -537,7 +535,6 @@ def test_get_singleton_scoped_started_with_async_resource_provider(di: PyxDI) ->
     )
 
 
-@pytest.mark.anyio
 async def test_get_singleton_scoped_async_resource(di: PyxDI) -> None:
     instance = "test"
 
@@ -551,7 +548,6 @@ async def test_get_singleton_scoped_async_resource(di: PyxDI) -> None:
     assert di.get(str) == instance
 
 
-@pytest.mark.anyio
 async def test_get_singleton_scoped_async_and_sync_resources(di: PyxDI) -> None:
     instance_str = "test"
     instance_int = 100
@@ -745,7 +741,6 @@ def test_inject(di: PyxDI) -> None:
     assert result == "service ident = 1000"
 
 
-@pytest.mark.anyio
 async def test_inject_with_sync_and_async_resources(di: PyxDI) -> None:
     def ident_provider() -> t.Iterator[str]:
         yield "1000"
