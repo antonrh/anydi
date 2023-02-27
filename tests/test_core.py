@@ -18,7 +18,7 @@ from tests.fixtures import Service
 
 @pytest.fixture
 def di() -> PyxDI:
-    return PyxDI()
+    return PyxDI(__name__)
 
 
 # Provider
@@ -80,11 +80,24 @@ def test_provider_name() -> None:
 
 
 def test_di_constructor_properties() -> None:
-    di = PyxDI(default_scope="singleton", auto_register=True)
+    di = PyxDI(__name__, default_scope="singleton", auto_register=True)
 
+    assert di.name == "tests.test_core"
     assert di.default_scope == "singleton"
     assert di.auto_register
     assert di.providers == {}
+
+
+def test_di_name_not_defined() -> None:
+    di = PyxDI(None)
+
+    assert di.name is None
+
+
+def test_di_name_main() -> None:
+    di = PyxDI("__main__")
+
+    assert di.name in ["_jb_pytest_runner", "pytest"]
 
 
 def test_has_provider(di: PyxDI) -> None:
@@ -108,7 +121,7 @@ def test_register_provider(di: PyxDI) -> None:
 
 
 def test_register_provider_default_scope() -> None:
-    di = PyxDI(default_scope="singleton")
+    di = PyxDI(__name__, default_scope="singleton")
 
     def provider_obj() -> str:
         return "test"
@@ -396,7 +409,7 @@ def test_validate_unresolved_injected_dependencies_auto_register_class() -> None
     def func1(service: Service = DependencyParam()) -> None:
         return None
 
-    di = PyxDI(auto_register=True)
+    di = PyxDI(__name__, auto_register=True)
     di.inject(func1)
     di.validate()
 
@@ -616,7 +629,7 @@ def test_get_transient_scoped(di: PyxDI) -> None:
 
 
 def test_get_auto_registered_instance() -> None:
-    di = PyxDI(auto_register=True)
+    di = PyxDI(__name__, auto_register=True)
 
     class Service:
         __scope__ = "singleton"

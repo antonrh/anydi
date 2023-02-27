@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import contextlib
 import inspect
+import os
+import sys
 import typing as t
 from collections import defaultdict
 from contextvars import ContextVar
@@ -82,8 +84,12 @@ class UnresolvedDependency:
 
 class PyxDI:
     def __init__(
-        self, default_scope: Scope = "singleton", auto_register: bool = False
+        self,
+        import_name: t.Optional[str] = None,
+        default_scope: Scope = "singleton",
+        auto_register: bool = False,
     ) -> None:
+        self._import_name = import_name
         self._default_scope = default_scope
         self._auto_register = auto_register
         self._providers: t.Dict[t.Type[t.Any], Provider] = {}
@@ -96,6 +102,15 @@ class PyxDI:
         ] = defaultdict(list)
         self._unresolved_dependencies: t.Dict[t.Type[t.Any], UnresolvedDependency] = {}
         self._signature_cache: t.Dict[t.Callable[..., t.Any], inspect.Signature] = {}
+
+    @cached_property
+    def name(self) -> t.Optional[str]:
+        if self._import_name == "__main__":
+            fn = getattr(sys.modules["__main__"], "__file__", None)
+            if fn is None:
+                return "__main__"
+            return t.cast(str, os.path.splitext(os.path.basename(fn))[0])
+        return self._import_name
 
     @property
     def default_scope(self) -> Scope:
