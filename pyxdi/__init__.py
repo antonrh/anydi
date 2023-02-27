@@ -1,24 +1,13 @@
-from ._api import (
-    aclose,
-    arequest_context,
-    close,
-    dep,
-    init,
-    inject,
-    provider,
-    request_context,
-)
-from ._decorators import request, singleton, transient
+from .core import DependencyParam, PyxDI
+from .decorators import inject, provider, request, singleton, transient
+
+dep = DependencyParam()
 
 __all__ = [
-    "aclose",
-    "arequest_context",
-    "close",
+    "PyxDI",
     "dep",
-    "init",
     "inject",
     "provider",
-    "request_context",
     "request",
     "singleton",
     "transient",

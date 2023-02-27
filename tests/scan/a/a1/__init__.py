@@ -1,3 +1,2 @@
-from tests.scan import result
-
-result.add("a1")
+a = 1
+b = 2

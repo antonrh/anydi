@@ -36,15 +36,15 @@ poetry add pyxdi
 ```python
 import pyxdi
 
-pyxdi.init()
+di = pyxdi.PyxDI()
 
 
-@pyxdi.provider
+@di.provider
 def message() -> str:
     return "Hello, world!"
 
 
-@pyxdi.inject
+@di.inject
 def say_hello(message: str = pyxdi.dep) -> None:
     print(message)
 
