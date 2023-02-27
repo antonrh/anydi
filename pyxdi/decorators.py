@@ -1,12 +1,9 @@
-import threading
 import typing as t
 
 from .core import Provider
 from .types import ProviderObj, Scope
 
 T = t.TypeVar("T")
-
-_lock = threading.RLock()
 
 
 def transient(target: T) -> T:
