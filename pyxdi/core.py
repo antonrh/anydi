@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import contextlib
+import functools
 import importlib
 import inspect
 import os
@@ -428,20 +429,25 @@ class PyxDI:
         return register_provider
 
     def inject(self, target: t.Callable[..., t.Any]) -> t.Callable[..., t.Any]:
-        async def wrapped(*args: t.Any, **kwargs: t.Any) -> t.Any:
-            for name, annotation in self._get_injectable_params(target).items():
-                kwargs[name] = self.get(annotation)
-            return await target(*args, **kwargs)
+        injected_params = self._get_injectable_params(target)
 
-        def sync_wrapped(*args: t.Any, **kwargs: t.Any) -> t.Any:
-            for name, annotation in self._get_injectable_params(target).items():
+        if inspect.iscoroutinefunction(target):
+
+            @functools.wraps(target)
+            async def awrapped(*args: t.Any, **kwargs: t.Any) -> t.Any:
+                for name, annotation in injected_params.items():
+                    kwargs[name] = self.get(annotation)
+                return await target(*args, **kwargs)
+
+            return awrapped
+
+        @functools.wraps(target)
+        def wrapped(*args: t.Any, **kwargs: t.Any) -> t.Any:
+            for name, annotation in injected_params.items():
                 kwargs[name] = self.get(annotation)
             return target(*args, **kwargs)
 
-        if inspect.iscoroutinefunction(target):
-            return wrapped
-
-        return sync_wrapped
+        return wrapped
 
     # Scanner
 
