@@ -689,37 +689,6 @@ def test_get_provider_annotation_origin_without_args(di: PyxDI) -> None:
     )
 
 
-def test_get_injectable_params_missing_annotation(di: PyxDI) -> None:
-    def func(name=DependencyParam()) -> str:  # type: ignore[no-untyped-def]
-        return name  # type: ignore[no-any-return]
-
-    with pytest.raises(AnnotationError) as exc_info:
-        di.inject(func)
-
-    assert str(exc_info.value) == (
-        "Missing `tests.test_core.test_get_injectable_params_missing_annotation"
-        ".<locals>.func` parameter annotation."
-    )
-
-
-def test_get_injectable_params(di: PyxDI) -> None:
-    @di.provider
-    def ident() -> str:
-        return "1000"
-
-    @di.provider
-    def service(ident: str) -> Service:
-        return Service(ident=ident)
-
-    @di.inject
-    def func(name: str, service: Service = DependencyParam()) -> str:
-        return f"{name} = {service.ident}"
-
-    result = func(name="service ident")
-
-    assert result == "service ident = 1000"
-
-
 def test_get_provider_arguments(di: PyxDI) -> None:
     def a() -> int:
         return 10
@@ -742,3 +711,81 @@ def test_get_provider_arguments(di: PyxDI) -> None:
 
     assert args == [10]
     assert kwargs == {"b": 1.0, "c": "test"}
+
+
+def test_inject_missing_annotation(di: PyxDI) -> None:
+    def func(name=DependencyParam()) -> str:  # type: ignore[no-untyped-def]
+        return name  # type: ignore[no-any-return]
+
+    with pytest.raises(AnnotationError) as exc_info:
+        di.inject(func)
+
+    assert str(exc_info.value) == (
+        "Missing `tests.test_core.test_inject_missing_annotation.<locals>.func` "
+        "parameter annotation."
+    )
+
+
+def test_inject(di: PyxDI) -> None:
+    def ident_provider() -> str:
+        return "1000"
+
+    def service_provider(ident: str) -> Service:
+        return Service(ident=ident)
+
+    di.register_provider(str, ident_provider)
+    di.register_provider(Service, service_provider)
+
+    @di.inject
+    def func(name: str, service: Service = DependencyParam()) -> str:
+        return f"{name} = {service.ident}"
+
+    result = func(name="service ident")
+
+    assert result == "service ident = 1000"
+
+
+@pytest.mark.anyio
+async def test_inject_with_sync_and_async_resources(di: PyxDI) -> None:
+    def ident_provider() -> t.Iterator[str]:
+        yield "1000"
+
+    async def service_provider(ident: str) -> t.AsyncIterator[Service]:
+        yield Service(ident=ident)
+
+    di.register_provider(str, ident_provider)
+    di.register_provider(Service, service_provider)
+
+    await di.astart()
+
+    @di.inject
+    async def func(name: str, service: Service = DependencyParam()) -> str:
+        return f"{name} = {service.ident}"
+
+    result = await func(name="service ident")
+
+    assert result == "service ident = 1000"
+
+
+def test_provider_decorator_no_args(di: PyxDI) -> None:
+    @di.provider
+    def ident() -> str:
+        return "1000"
+
+    assert di.get_provider(str) == Provider(obj=ident, scope=di.default_scope)
+
+
+def test_provider_decorator_no_args_provided(di: PyxDI) -> None:
+    @di.provider()
+    def ident() -> str:
+        return "1000"
+
+    assert di.get_provider(str) == Provider(obj=ident, scope=di.default_scope)
+
+
+def test_provider_decorator_with_provided_args(di: PyxDI) -> None:
+    @di.provider(scope="singleton")
+    def ident() -> str:
+        return "1000"
+
+    assert di.get_provider(str) == Provider(obj=ident, scope="singleton")

@@ -406,6 +406,7 @@ class PyxDI:
         def register_provider(func: ProviderObj) -> t.Any:
             interface = self._get_provider_annotation(func)
             self.register_provider(interface, func, scope=scope, override=override)
+            return func
 
         return register_provider
 
@@ -514,13 +515,9 @@ class ScopedContext:
     def get(self, interface: t.Type[InterfaceT]) -> InterfaceT:
         instance = self._instances.get(interface)
         if instance is None:
-            try:
-                provider = self._root.get_provider(interface)
-            except ProviderError:
-                raise
-            else:
-                instance = self._root.create_instance(provider)
-                self._instances[interface] = instance
+            provider = self._root.get_provider(interface)
+            instance = self._root.create_instance(provider)
+            self._instances[interface] = instance
         return t.cast(InterfaceT, instance)
 
     def set(self, interface: t.Type[t.Any], instance: t.Any) -> None:
