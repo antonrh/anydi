@@ -71,6 +71,19 @@ class UnresolvedProvider:
     provider: Provider
 
 
+@dataclass(frozen=True)
+class ScannedProvider:
+    target: t.Any
+    scope: Scope
+    override: bool
+
+
+@dataclass(frozen=True)
+class ScannedDependency:
+    module: ModuleType
+    target: t.Any
+
+
 class Dependency:
     __slots__ = ()
 
@@ -110,7 +123,7 @@ class PyxDI:
     def name(self) -> t.Optional[str]:
         if self._import_name == "__main__":
             fn = getattr(sys.modules["__main__"], "__file__", None)
-            if fn is None:
+            if fn is None:  # pragma: no cover
                 return "__main__"
             return t.cast(str, os.path.splitext(os.path.basename(fn))[0])
         return self._import_name
@@ -457,15 +470,37 @@ class PyxDI:
         *,
         categories: t.Optional[t.Iterable[ScanCategory]] = None,
     ) -> None:
+        scanned_providers: t.List[ScannedProvider] = []
+        scanned_dependencies: t.List[ScannedDependency] = []
+
         for package in packages:
-            self._scan_package(package, categories=categories)
+            _scanned_providers, _scanned_dependencies = self._scan_package(
+                package, categories=categories
+            )
+            scanned_providers.extend(_scanned_providers)
+            scanned_dependencies.extend(_scanned_dependencies)
+
+        for scanned_provider in scanned_providers:
+            self.provider(
+                func=scanned_provider.target,
+                scope=scanned_provider.scope,
+                override=scanned_provider.override,
+            )
+
+        for scanned_dependency in scanned_dependencies:
+            decorator = self.inject(scanned_dependency.target)
+            setattr(
+                scanned_dependency.module,
+                scanned_dependency.target.__name__,
+                decorator,
+            )
 
     def _scan_package(
         self,
         package: t.Union[ModuleType, str],
         *,
         categories: t.Optional[t.Iterable[ScanCategory]] = None,
-    ) -> None:
+    ) -> t.Tuple[t.List[ScannedProvider], t.List[ScannedDependency]]:
         categories = categories or t.get_args(ScanCategory)
         if isinstance(package, str):
             if package.startswith("."):
@@ -474,37 +509,57 @@ class PyxDI:
                         f"Please, set instance `{self.__class__.__name__}` "
                         "`import_name` to use relative package names."
                     )
-                package = f"{self.name}.{package}"
+                package = f"{self.name}{package}"
             package = importlib.import_module(package)
+
+        scanned_providers: t.List[ScannedProvider] = []
+        scanned_dependencies: t.List[ScannedDependency] = []
 
         package_path = getattr(package, "__path__")
         for module_info in pkgutil.walk_packages(
             path=package_path, prefix=package.__name__ + "."
         ):
             module = importlib.import_module(module_info.name)
-            for obj in module.__dict__.values():
-                if not callable(obj):
+            for target in module.__dict__.values():
+                if not callable(target):
                     continue
 
-                provided = getattr(obj, "__pyxdi_provider__", None)
+                provided = getattr(target, "__pyxdi_provider__", None)
                 if provided and "provider" in categories:
                     scope, override = provided["scope"], provided["override"]
-                    self.provider(obj, scope=scope, override=override)
+                    scanned_providers.append(
+                        ScannedProvider(target=target, scope=scope, override=override)
+                    )
                     continue
 
                 if "inject" not in categories:
                     continue
 
-                injected = getattr(obj, "__pyxdi_inject__", None)
+                # Get by @inject decorator
+                injected = getattr(target, "__pyxdi_inject__", None)
                 if injected:
-                    self.inject(obj)
+                    scanned_dependencies.append(
+                        self._scanned_dependency(module=module, target=target)
+                    )
                     continue
 
-                signature = self._get_signature(obj)
+                # Get by pyxdi.dep mark
+                signature = self._get_signature(target)
                 for parameter in signature.parameters.values():
                     if isinstance(parameter.default, Dependency):
-                        self.inject(obj)
+                        scanned_dependencies.append(
+                            self._scanned_dependency(module=module, target=target)
+                        )
                         continue
+
+        return scanned_providers, scanned_dependencies
+
+    def _scanned_dependency(
+        self, module: ModuleType, target: t.Any
+    ) -> ScannedDependency:
+        if hasattr(target, "__wrapped__"):
+            target = target.__wrapped__
+        return ScannedDependency(module=module, target=target)
 
     # Inspection
 

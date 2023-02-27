@@ -802,6 +802,24 @@ def test_provider_decorator_with_provided_args(di: PyxDI) -> None:
 # Scanner
 
 
+def test_scan_relative_package() -> None:
+    di = PyxDI("tests")
+    di.scan([".scan.a"], categories=["provider"])
+
+    assert di.providers
+
+
+def test_scan_relative_package_without_import_name() -> None:
+    di = PyxDI()
+
+    with pytest.raises(ValueError) as exc_info:
+        di.scan([".scan.a"])
+
+    assert str(exc_info.value) == (
+        "Please, set instance `PyxDI` `import_name` to use relative package names."
+    )
+
+
 def test_scan_only_provider(di: PyxDI) -> None:
     di.scan(["tests.scan.a"], categories=["provider"])
 
@@ -820,5 +838,5 @@ def test_scan(di: PyxDI) -> None:
 
     from .scan.a.a3.handlers import a_a3_handler_1, a_a3_handler_2
 
-    assert a_a3_handler_1() == ""
-    assert a_a3_handler_2().ident == ""
+    assert a_a3_handler_1() == "a.a1.str_provider"
+    assert a_a3_handler_2().ident == "a.a1.str_provider"
