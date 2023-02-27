@@ -1,15 +1,17 @@
 from __future__ import annotations
 
 import contextlib
+import importlib
 import inspect
 import os
+import pkgutil
 import sys
 import typing as t
 from collections import defaultdict
 from contextvars import ContextVar
 from dataclasses import dataclass
 from functools import cached_property, partial
-from types import TracebackType
+from types import ModuleType, TracebackType
 
 import anyio
 
@@ -20,7 +22,7 @@ from .exceptions import (
     ScopeMismatch,
     UnknownDependency,
 )
-from .types import InterfaceT, ProviderObj, Scope
+from .types import InterfaceT, ProviderObj, ScanCategory, Scope
 from .utils import get_qualname
 
 ALLOWED_SCOPES: t.Dict[Scope, t.List[Scope]] = {
@@ -335,7 +337,7 @@ class PyxDI:
             provider = self.get_provider(interface)
         except ProviderError:
             if self.auto_register and inspect.isclass(interface):
-                scope = getattr(interface, "__scope__", self._default_scope)
+                scope = getattr(interface, "__pyxdi_scope__", self._default_scope)
                 provider = self.register_provider(interface, interface, scope=scope)
             else:
                 raise
@@ -388,7 +390,7 @@ class PyxDI:
         self,
         func: None = ...,
         *,
-        scope: Scope | None = None,
+        scope: t.Optional[Scope] = None,
         override: bool = False,
     ) -> t.Callable[..., t.Any]:
         ...
@@ -398,7 +400,7 @@ class PyxDI:
         self,
         func: ProviderObj,
         *,
-        scope: Scope | None = None,
+        scope: t.Optional[Scope] = None,
         override: bool = False,
     ) -> t.Callable[[ProviderObj], t.Any]:
         ...
@@ -407,7 +409,7 @@ class PyxDI:
         self,
         func: t.Union[ProviderObj, None] = None,
         *,
-        scope: Scope | None = None,
+        scope: t.Optional[Scope] = None,
         override: bool = False,
     ) -> t.Union[ProviderObj, t.Callable[[Provider], t.Any]]:
         decorator = self._provider_decorator(scope=scope, override=override)
@@ -426,15 +428,13 @@ class PyxDI:
         return register_provider
 
     def inject(self, target: t.Callable[..., t.Any]) -> t.Callable[..., t.Any]:
-        injectable_params = self._get_injectable_params(target)
-
         async def wrapped(*args: t.Any, **kwargs: t.Any) -> t.Any:
-            for name, annotation in injectable_params.items():
+            for name, annotation in self._get_injectable_params(target).items():
                 kwargs[name] = self.get(annotation)
             return await target(*args, **kwargs)
 
         def sync_wrapped(*args: t.Any, **kwargs: t.Any) -> t.Any:
-            for name, annotation in injectable_params.items():
+            for name, annotation in self._get_injectable_params(target).items():
                 kwargs[name] = self.get(annotation)
             return target(*args, **kwargs)
 
@@ -442,6 +442,63 @@ class PyxDI:
             return wrapped
 
         return sync_wrapped
+
+    # Scanner
+
+    def scan(
+        self,
+        packages: t.Iterable[t.Union[ModuleType, str]],
+        *,
+        categories: t.Optional[t.Iterable[ScanCategory]] = None,
+    ) -> None:
+        for package in packages:
+            self._scan_package(package, categories=categories)
+
+    def _scan_package(
+        self,
+        package: t.Union[ModuleType, str],
+        *,
+        categories: t.Optional[t.Iterable[ScanCategory]] = None,
+    ) -> None:
+        categories = categories or t.get_args(ScanCategory)
+        if isinstance(package, str):
+            if package.startswith("."):
+                if not self.name:
+                    raise ValueError(
+                        f"Please, set instance `{self.__class__.__name__}` "
+                        "`import_name` to use relative package names."
+                    )
+                package = f"{self.name}.{package}"
+            package = importlib.import_module(package)
+
+        package_path = getattr(package, "__path__")
+        for module_info in pkgutil.walk_packages(
+            path=package_path, prefix=package.__name__ + "."
+        ):
+            module = importlib.import_module(module_info.name)
+            for obj in module.__dict__.values():
+                if not callable(obj):
+                    continue
+
+                provided = getattr(obj, "__pyxdi_provider__", None)
+                if provided and "provider" in categories:
+                    scope, override = provided["scope"], provided["override"]
+                    self.provider(obj, scope=scope, override=override)
+                    continue
+
+                if "inject" not in categories:
+                    continue
+
+                injected = getattr(obj, "__pyxdi_inject__", None)
+                if injected:
+                    self.inject(obj)
+                    continue
+
+                signature = self._get_signature(obj)
+                for parameter in signature.parameters.values():
+                    if isinstance(parameter.default, Dependency):
+                        self.inject(obj)
+                        continue
 
     # Inspection
 

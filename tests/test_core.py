@@ -797,3 +797,28 @@ def test_provider_decorator_with_provided_args(di: PyxDI) -> None:
         return "1000"
 
     assert di.get_provider(str) == Provider(obj=ident, scope="singleton")
+
+
+# Scanner
+
+
+def test_scan_only_provider(di: PyxDI) -> None:
+    di.scan(["tests.scan.a"], categories=["provider"])
+
+    assert str(di.providers[str]) == "tests.scan.a.a1.providers.a_a1_provider"
+    assert str(di.providers[int]) == "tests.scan.a.a3.providers.a_a3_provider"
+
+
+def test_scan_only_inject(di: PyxDI) -> None:
+    di.scan(["tests.scan.a"], categories=["inject"])
+
+    assert not di.providers
+
+
+def test_scan(di: PyxDI) -> None:
+    di.scan(["tests.scan"])
+
+    from .scan.a.a3.handlers import a_a3_handler_1, a_a3_handler_2
+
+    assert a_a3_handler_1() == ""
+    assert a_a3_handler_2().ident == ""
