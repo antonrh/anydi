@@ -10,11 +10,7 @@ class ScopeMismatch(Exception):
     pass
 
 
-class MissingAnnotation(Exception):
-    pass
-
-
-class NotSupportedAnnotation(Exception):
+class AnnotationError(Exception):
     pass
 
 

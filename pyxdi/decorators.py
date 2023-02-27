@@ -1,4 +1,6 @@
-from .types import ClassT
+import typing as t
+
+ClassT = t.TypeVar("ClassT")
 
 
 def transient(cls: ClassT) -> ClassT:

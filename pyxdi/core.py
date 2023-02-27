@@ -12,14 +12,13 @@ from types import TracebackType
 import anyio
 
 from .exceptions import (
+    AnnotationError,
     InvalidScope,
-    MissingAnnotation,
-    NotSupportedAnnotation,
     ProviderError,
     ScopeMismatch,
     UnknownDependency,
 )
-from .types import InterfaceT, ProviderCallable, Scope
+from .types import InterfaceT, ProviderObj, Scope
 from .utils import get_qualname
 
 ALLOWED_SCOPES: t.Dict[Scope, t.List[Scope]] = {
@@ -29,10 +28,10 @@ ALLOWED_SCOPES: t.Dict[Scope, t.List[Scope]] = {
 }
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, kw_only=True)
 class Provider:
+    obj: ProviderObj
     scope: Scope
-    obj: ProviderCallable
 
     def __str__(self) -> str:
         return self.name
@@ -48,7 +47,7 @@ class Provider:
     @cached_property
     def is_function(self) -> bool:
         return inspect.isfunction(self.obj) and not (
-            self.is_resource or self.is_resource
+            self.is_resource or self.is_async_resource
         )
 
     @cached_property
@@ -112,10 +111,13 @@ class PyxDI:
 
     # Provider
 
+    def has_provider(self, interface: t.Type[t.Any]) -> bool:
+        return interface in self._providers
+
     def register_provider(
         self,
         interface: t.Type[t.Any],
-        obj: ProviderCallable,
+        obj: ProviderObj,
         *,
         scope: t.Optional[Scope] = None,
         override: bool = False,
@@ -133,7 +135,7 @@ class PyxDI:
 
         self._validate_provider_scope(provider)
         self._validate_provider_type(provider)
-        self._validate_sub_providers(interface, provider)
+        self._validate_provider_match_scopes(interface, provider)
 
         self._providers[interface] = provider
         return provider
@@ -143,19 +145,130 @@ class PyxDI:
             return self._providers[interface]
         except KeyError:
             raise ProviderError(
-                f"Provider interface `{get_qualname(interface)}` dependency "
-                "is not registered."
+                f"The provider interface for `{get_qualname(interface)}` has not been "
+                "registered. Please ensure that the provider interface is properly "
+                "registered before attempting to use it."
             )
-
-    def has_provider(self, interface: t.Type[t.Any]) -> bool:
-        return interface in self._providers
 
     def singleton(
         self, interface: t.Type[InterfaceT], instance: t.Any, *, override: bool = False
-    ) -> None:
-        self.register_provider(
+    ) -> Provider:
+        return self.register_provider(
             interface, lambda: instance, scope="singleton", override=override
         )
+
+    # Validators
+    def _validate_provider_scope(self, provider: Provider) -> None:
+        if provider.scope not in t.get_args(Scope):
+            raise InvalidScope(
+                "The scope provided is invalid. Only the following scopes are "
+                f"supported: {', '.join(t.get_args(Scope))}. Please use one of the "
+                "supported scopes when registering a provider."
+            )
+
+    def _validate_provider_type(self, provider: Provider) -> None:
+        if provider.is_function or provider.is_class:
+            return
+
+        if provider.is_resource or provider.is_async_resource:
+            if provider.scope == "transient":
+                raise ProviderError(
+                    f"The resource provider `{provider}` is attempting to register "
+                    "with a transient scope, which is not allowed. Please update the "
+                    "provider's scope to an appropriate value before registering it."
+                )
+            return
+
+        raise ProviderError(
+            f"The provider `{provider.obj}` is invalid because it is not a callable "
+            "object. Only callable providers are allowed. Please update the provider "
+            "to a callable object before attempting to register it."
+        )
+
+    def _validate_provider_match_scopes(
+        self, interface: t.Type[t.Any], provider: Provider
+    ) -> None:
+        related_providers = []
+
+        obj, scope = provider.obj, provider.scope
+
+        for parameter in self._get_signature(obj).parameters.values():
+            if parameter.annotation is inspect._empty:  # noqa
+                raise AnnotationError(
+                    f"Missing provider `{provider}` "
+                    f"dependency `{parameter.name}` annotation."
+                )
+            try:
+                sub_provider = self.get_provider(parameter.annotation)
+                related_providers.append((sub_provider, True))
+            except ProviderError:
+                self._unresolved_providers[parameter.annotation].append(
+                    UnresolvedProvider(
+                        interface=interface,
+                        parameter_name=parameter.name,
+                        provider=provider,
+                    )
+                )
+
+        for unresolved_provider in self._unresolved_providers.pop(interface, []):
+            sub_provider = self.get_provider(unresolved_provider.interface)
+            related_providers.append((sub_provider, False))
+
+        for related_provider, direct in related_providers:
+            if direct:
+                left_scope, right_scope = related_provider.scope, scope
+            else:
+                left_scope, right_scope = scope, related_provider.scope
+            allowed_scopes = ALLOWED_SCOPES.get(right_scope) or []
+            if left_scope not in allowed_scopes:
+                raise ScopeMismatch(
+                    f"The provider `{get_qualname(obj)}` with a {scope} scope was "
+                    f"attempted to be registered with the provider "
+                    f"`{related_provider}` with a `{related_provider.scope}` scope, "
+                    f"which is not allowed. Please ensure that all providers are "
+                    f"registered with matching scopes."
+                )
+
+    def validate(self) -> None:
+        if self._unresolved_providers:
+            errors = []
+            for (
+                unresolved_interface,
+                unresolved_providers,
+            ) in self._unresolved_providers.items():
+                for unresolved_provider in unresolved_providers:
+                    parameter_name = unresolved_provider.parameter_name
+                    provider_name = get_qualname(unresolved_provider.provider.obj)
+                    errors.append(
+                        f"- `{provider_name}` has unknown `{parameter_name}: "
+                        f"{get_qualname(unresolved_interface)}` parameter"
+                    )
+            message = "\n".join(errors)
+            raise UnknownDependency(
+                "The following unknown provided dependencies were detected:"
+                f"\n{message}."
+            )
+        if self._unresolved_dependencies:
+            errors = []
+            for (
+                unresolved_interface,
+                dependency,
+            ) in self._unresolved_dependencies.items():
+                if inspect.isclass(unresolved_interface) and self.auto_register:
+                    continue
+                parameter_name = dependency.parameter_name
+                errors.append(
+                    f"- `{get_qualname(dependency.obj)}` has unknown "
+                    f"`{parameter_name}: {get_qualname(unresolved_interface)}` "
+                    f"injected parameter"
+                )
+            if not errors:
+                return
+            message = "\n".join(errors)
+            raise UnknownDependency(
+                "The following unknown injected dependencies were detected:"
+                f"\n{message}."
+            )
 
     # Lifespan
 
@@ -206,7 +319,7 @@ class PyxDI:
         try:
             provider = self.get_provider(interface)
         except ProviderError:
-            if self._auto_register and inspect.isclass(interface):
+            if self.auto_register and inspect.isclass(interface):
                 scope = getattr(interface, "__scope__", self._default_scope)
                 provider = self.register_provider(interface, interface, scope=scope)
             else:
@@ -217,7 +330,11 @@ class PyxDI:
         elif provider.scope == "request":
             request_context = self._request_context_var.get()
             if request_context is None:
-                raise LookupError("Request context is not started.")
+                raise LookupError(
+                    "The request context has not been started. Please ensure that "
+                    "the request context is properly initialized before attempting "
+                    "to use it."
+                )
             return request_context.get(interface)
 
         return t.cast(InterfaceT, self.create_instance(provider))
@@ -225,11 +342,6 @@ class PyxDI:
     def create_resource(
         self, provider: Provider, *, stack: contextlib.ExitStack
     ) -> t.Any:
-        if not provider.is_resource:
-            raise TypeError(
-                f"Invalid provider `{provider}` type. "
-                "Only generator provider type is supported."
-            )
         args, kwargs = self._get_provider_arguments(provider)
         cm = contextlib.contextmanager(provider.obj)(*args, **kwargs)
         return stack.enter_context(cm)
@@ -240,129 +352,19 @@ class PyxDI:
         *,
         stack: contextlib.AsyncExitStack,
     ) -> t.Any:
-        if not provider.is_async_resource:
-            raise TypeError(
-                f"Invalid provider `{provider}` type. "
-                "Only asynchronous generator provider type is supported."
-            )
         args, kwargs = self._get_provider_arguments(provider)
         cm = contextlib.asynccontextmanager(provider.obj)(*args, **kwargs)
         return await stack.enter_async_context(cm)
 
     def create_instance(self, provider: Provider) -> t.Any:
-        if not (provider.is_function or provider.is_class):
-            raise TypeError(
-                f"Invalid provider `{provider}` type. "
-                "Only function provider type is supported."
+        if provider.is_resource or provider.is_async_resource:
+            raise ProviderError(
+                f"The instance for the resource provider `{provider}` cannot be "
+                "created until the scope context has been started. Please ensure "
+                "that the scope context is started."
             )
         args, kwargs = self._get_provider_arguments(provider)
         return provider.obj(*args, **kwargs)
-
-    # Validators
-
-    def validate(self) -> None:
-        if self._unresolved_providers:
-            errors = []
-            for (
-                unresolved_interface,
-                unresolved_providers,
-            ) in self._unresolved_providers.items():
-                for unresolved_provider in unresolved_providers:
-                    parameter_name = unresolved_provider.parameter_name
-                    provider_name = get_qualname(unresolved_provider.provider.obj)
-                    errors.append(
-                        f"- `{provider_name}` has unknown `{parameter_name}: "
-                        f"{get_qualname(unresolved_interface)}` parameter"
-                    )
-            message = "\n".join(errors)
-            raise UnknownDependency(
-                f"Unknown provided dependencies detected:\n{message}."
-            )
-        if self._unresolved_dependencies:
-            errors = []
-            for (
-                unresolved_interface,
-                dependency,
-            ) in self._unresolved_dependencies.items():
-                if inspect.isclass(unresolved_interface) and self._auto_register:
-                    continue
-                parameter_name = dependency.parameter_name
-                errors.append(
-                    f"- `{get_qualname(dependency.obj)}` has unknown "
-                    f"`{parameter_name}: {get_qualname(unresolved_interface)}` "
-                    f"injected parameter"
-                )
-            if not errors:
-                return
-            message = "\n".join(errors)
-            raise UnknownDependency(
-                f"Unknown injected dependencies detected:\n{message}."
-            )
-
-    def _validate_provider_scope(self, provider: Provider) -> None:
-        if provider.scope not in t.get_args(Scope):
-            raise InvalidScope(
-                f"Invalid scope. Only {', '.join(t.get_args(Scope))} "
-                "scope are supported."
-            )
-
-    def _validate_provider_type(self, provider: Provider) -> None:
-        if provider.is_function or provider.is_class:
-            return
-
-        if provider.is_resource or provider.is_async_resource:
-            if provider.scope == "transient":
-                raise ProviderError(
-                    f"Resource provider `{provider}` cannot have `transient` scope."
-                )
-            return
-
-        raise ProviderError(
-            f"Invalid provider `{provider.obj}` type. "
-            "Only callable providers are allowed."
-        )
-
-    def _validate_sub_providers(
-        self, interface: t.Type[t.Any], provider: Provider
-    ) -> None:
-        related_providers = []
-
-        func, scope = provider.obj, provider.scope
-
-        for parameter in self._get_signature(func).parameters.values():
-            if parameter.annotation is inspect._empty:  # noqa
-                raise MissingAnnotation(
-                    f"Missing provider `{provider}` "
-                    f"dependency `{parameter.name}` annotation."
-                )
-            try:
-                sub_provider = self.get_provider(parameter.annotation)
-                related_providers.append((sub_provider, True))
-            except ProviderError:
-                self._unresolved_providers[parameter.annotation].append(
-                    UnresolvedProvider(
-                        interface=interface,
-                        parameter_name=parameter.name,
-                        provider=provider,
-                    )
-                )
-
-        for unresolved_provider in self._unresolved_providers.pop(interface, []):
-            sub_provider = self.get_provider(unresolved_provider.interface)
-            related_providers.append((sub_provider, False))
-
-        for related_provider, direct in related_providers:
-            if direct:
-                left_scope, right_scope = related_provider.scope, scope
-            else:
-                left_scope, right_scope = scope, related_provider.scope
-            allowed_scopes = ALLOWED_SCOPES.get(right_scope) or []
-            if left_scope not in allowed_scopes:
-                raise ScopeMismatch(
-                    f"You tried to register the `{scope}` scoped provider "
-                    f"`{get_qualname(func)}` with a `{related_provider.scope}` scoped "
-                    f"{related_provider}`."
-                )
 
     # Decorators
 
@@ -379,20 +381,20 @@ class PyxDI:
     @t.overload
     def provider(
         self,
-        func: ProviderCallable,
+        func: ProviderObj,
         *,
         scope: Scope | None = None,
         override: bool = False,
-    ) -> t.Callable[[ProviderCallable], t.Any]:
+    ) -> t.Callable[[ProviderObj], t.Any]:
         ...
 
     def provider(
         self,
-        func: t.Union[ProviderCallable, None] = None,
+        func: t.Union[ProviderObj, None] = None,
         *,
         scope: Scope | None = None,
         override: bool = False,
-    ) -> t.Union[ProviderCallable, t.Callable[[Provider], t.Any]]:
+    ) -> t.Union[ProviderObj, t.Callable[[Provider], t.Any]]:
         decorator = self._provider_decorator(scope=scope, override=override)
         if func is None:
             return decorator
@@ -400,8 +402,8 @@ class PyxDI:
 
     def _provider_decorator(
         self, *, scope: t.Optional[Scope] = None, override: bool = False
-    ) -> t.Callable[[ProviderCallable], t.Any]:
-        def register_provider(func: ProviderCallable) -> t.Any:
+    ) -> t.Callable[[ProviderObj], t.Any]:
+        def register_provider(func: ProviderObj) -> t.Any:
             interface = self._get_provider_annotation(func)
             self.register_provider(interface, func, scope=scope, override=override)
 
@@ -427,11 +429,11 @@ class PyxDI:
 
     # Inspection
 
-    def _get_provider_annotation(self, obj: ProviderCallable) -> t.Any:
+    def _get_provider_annotation(self, obj: ProviderObj) -> t.Any:
         annotation = self._get_signature(obj).return_annotation
 
         if annotation is inspect._empty:  # noqa
-            raise MissingAnnotation(
+            raise AnnotationError(
                 f"Missing `{get_qualname(obj)}` provider return annotation."
             )
 
@@ -443,7 +445,7 @@ class PyxDI:
             if args:
                 return annotation
             else:
-                raise NotSupportedAnnotation(
+                raise AnnotationError(
                     f"Cannot use `{get_qualname(obj)}` generic type annotation "
                     "without actual type."
                 )
@@ -474,7 +476,7 @@ class PyxDI:
         for parameter in parameters.values():
             annotation = parameter.annotation
             if annotation is inspect._empty:  # noqa
-                raise MissingAnnotation(
+                raise AnnotationError(
                     f"Missing `{get_qualname(obj)}` parameter annotation."
                 )
 
@@ -534,8 +536,9 @@ class ScopedContext:
                 self.set(interface, instance)
             elif provider.is_async_resource:
                 raise ProviderError(
-                    f"Cannot start asynchronous provider `{provider}` "
-                    "in synchronous mode."
+                    f"The provider `{provider}` cannot be started in synchronous mode "
+                    "because it is an asynchronous provider. Please start the provider "
+                    "in asynchronous mode before using it."
                 )
 
     def close(self) -> None:
@@ -545,11 +548,7 @@ class ScopedContext:
         for interface, provider in self._iter_providers():
             if provider.is_resource:
                 instance = await anyio.to_thread.run_sync(
-                    partial(
-                        self._root.create_resource,
-                        provider,
-                        stack=self._stack,
-                    )
+                    partial(self._root.create_resource, provider, stack=self._stack)
                 )
                 self.set(interface, instance)
             elif provider.is_async_resource:
