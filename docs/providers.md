@@ -124,6 +124,24 @@ with di.request_context():
 di.get(Request)  # this will raise LookupError
 ```
 
+or using asynchronous request context:
+
+```python
+import pyxdi
+
+di = pyxdi.PyxDI()
+
+
+@di.provider(scope="request")
+def request_provider() -> Request:
+    return Request(path="/")
+
+
+async def main() -> None:
+    async with di.arequest_context():
+        assert di.get(Request).path == "/"
+```
+
 ## Resource providers
 
 Resource providers are special types of providers that need to be started and stopped. PyxDI supports synchronous and asynchronous resource providers.
