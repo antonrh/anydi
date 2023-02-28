@@ -816,7 +816,34 @@ def test_scan_relative_package_without_import_name() -> None:
         di.scan([".scan.a"])
 
     assert str(exc_info.value) == (
-        "Please, set instance `PyxDI` `import_name` to use relative package names."
+        "Please, set `PyxDI` instance `import_name` to use relative package names."
+    )
+
+
+def test_scan_no_packages_defined_without_import_name() -> None:
+    di = PyxDI()
+
+    with pytest.raises(ValueError) as exc_info:
+        di.scan()
+
+    assert str(exc_info.value) == (
+        "Please, set `PyxDI` instance `import_name` to detect scan packages."
+    )
+
+
+def test_scan_no_packages_defined_with_import_name() -> None:
+    di = PyxDI("tests")
+    di.scan()
+
+
+def test_scan_no_packages_defined() -> None:
+    di = PyxDI()
+
+    with pytest.raises(ValueError) as exc_info:
+        di.scan()
+
+    assert str(exc_info.value) == (
+        "Please, set `PyxDI` instance `import_name` to detect scan packages."
     )
 
 
