@@ -33,7 +33,7 @@ ALLOWED_SCOPES: t.Dict[Scope, t.List[Scope]] = {
 }
 
 
-@dataclass(frozen=True, kw_only=True)
+@dataclass(frozen=True)
 class Provider:
     obj: ProviderObj
     scope: Scope
