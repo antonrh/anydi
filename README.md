@@ -56,6 +56,5 @@ if __name__ == "__main__":
 ---
 
 ## TODO
-* Unit tests (in progress)
-* Documentation
-* Examples
+* Documentation (in progress)
+* Examples (in progress)
