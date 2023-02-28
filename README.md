@@ -1,6 +1,6 @@
-# Pyxdi (in development)
+# PyxDI (in development)
 
-`Pyxdi` is a modern, lightweight and async-friendly Python Dependency Injection library that leverages type annotations ([PEP 484](https://peps.python.org/pep-0484/))
+`PyxDI` is a modern, lightweight and async-friendly Python Dependency Injection library that leverages type annotations ([PEP 484](https://peps.python.org/pep-0484/))
 to effortlessly manage dependencies in your applications.
 
 [![CI](https://github.com/antonrh/pyxdi/actions/workflows/ci.yml/badge.svg)](https://github.com/antonrh/pyxdi/actions/workflows/ci.yml)
@@ -15,17 +15,23 @@ http://pyxdi.readthedocs.io/
 
 ---
 
-## Installing
+## Requirements
+
+Python 3.7+
+
+and requires [anyio](https://github.com/agronholm/anyio)
+
+## Installation
 
 Install using `pip`:
 
-```bash
+```shell
 pip install pyxdi
 ```
 
 or using `poetry`:
 
-```bash
+```shell
 poetry add pyxdi
 ```
 
@@ -52,8 +58,6 @@ def say_hello(message: str = pyxdi.dep) -> None:
 if __name__ == "__main__":
     say_hello()
 ```
-
----
 
 ## TODO
 * Documentation (in progress)

@@ -1,4 +1,4 @@
-site_name: Pyxdi
+site_name: PyxDI
 site_description: Dependence Injection library
 site_author: Anton Ruhlov
 site_url: https://github.com/antonrh/pyxdi
@@ -15,6 +15,7 @@ edit_uri: ""
 
 nav:
   - Introduction: index.md
+  - Providers: providers.md
   - Examples:
       - Basic: examples/basic.md
       - Click: examples/click.md
@@ -26,3 +27,9 @@ nav:
       - FastAPI + SQLAlchemy: examples/fastapi_sqlalchemy.md
       - Django: examples/django.md
 
+markdown_extensions:
+  - admonition
+  - pymdownx.highlight
+  - pymdownx.superfences
+  - pymdownx.tabbed:
+      alternate_style: true
