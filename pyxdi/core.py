@@ -316,7 +316,7 @@ class PyxDI:
         return contextlib.contextmanager(self._request_context)()
 
     def _request_context(self) -> t.Iterator["ScopedContext"]:
-        with self._create_request_context() as context:
+        with self.create_request_context() as context:
             token = self._request_context_var.set(context)
             yield context
             self._request_context_var.reset(token)
@@ -336,12 +336,12 @@ class PyxDI:
         return contextlib.asynccontextmanager(self._arequest_context)()
 
     async def _arequest_context(self) -> t.AsyncIterator["ScopedContext"]:
-        async with self._create_request_context() as context:
+        async with self.create_request_context() as context:
             token = self._request_context_var.set(context)
             yield context
             self._request_context_var.reset(token)
 
-    def _create_request_context(self) -> "ScopedContext":
+    def create_request_context(self) -> "ScopedContext":
         return ScopedContext("request", self)
 
     # Instance
@@ -466,10 +466,18 @@ class PyxDI:
 
     def scan(
         self,
-        packages: t.Iterable[t.Union[ModuleType, str]],
+        packages: t.Optional[t.Iterable[t.Union[ModuleType, str]]] = None,
         *,
         categories: t.Optional[t.Iterable[ScanCategory]] = None,
     ) -> None:
+        if packages is None:
+            if self.name is None:
+                raise ValueError(
+                    f"Please, set `{self.__class__.__name__}` instance "
+                    "`import_name` to detect scan packages."
+                )
+            packages = [self.name]
+
         scanned_providers: t.List[ScannedProvider] = []
         scanned_dependencies: t.List[ScannedDependency] = []
 
@@ -506,7 +514,7 @@ class PyxDI:
             if package.startswith("."):
                 if not self.name:
                     raise ValueError(
-                        f"Please, set instance `{self.__class__.__name__}` "
+                        f"Please, set `{self.__class__.__name__}` instance "
                         "`import_name` to use relative package names."
                     )
                 package = f"{self.name}{package}"
@@ -544,7 +552,10 @@ class PyxDI:
                     continue
 
                 # Get by pyxdi.dep mark
-                signature = self._get_signature(target)
+                if inspect.isclass(target):
+                    signature = self._get_signature(target.__init__)
+                else:
+                    signature = self._get_signature(target)
                 for parameter in signature.parameters.values():
                     if isinstance(parameter.default, Dependency):
                         scanned_dependencies.append(
