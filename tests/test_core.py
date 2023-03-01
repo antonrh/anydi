@@ -1,5 +1,6 @@
 import typing as t
 import uuid
+from dataclasses import dataclass
 
 import pytest
 
@@ -18,7 +19,7 @@ from tests.fixtures import Service
 
 @pytest.fixture
 def di() -> PyxDI:
-    return PyxDI(__name__)
+    return PyxDI()
 
 
 # Provider
@@ -80,24 +81,11 @@ def test_provider_name() -> None:
 
 
 def test_di_constructor_properties() -> None:
-    di = PyxDI(__name__, default_scope="singleton", auto_register=True)
+    di = PyxDI(default_scope="singleton", auto_register=True)
 
-    assert di.name == "tests.test_core"
     assert di.default_scope == "singleton"
     assert di.auto_register
     assert di.providers == {}
-
-
-def test_di_name_not_defined() -> None:
-    di = PyxDI(None)
-
-    assert di.name is None
-
-
-def test_di_name_main() -> None:
-    di = PyxDI("__main__")
-
-    assert di.name in ["_jb_pytest_runner", "pytest"]
 
 
 def test_has_provider(di: PyxDI) -> None:
@@ -121,7 +109,7 @@ def test_register_provider(di: PyxDI) -> None:
 
 
 def test_register_provider_default_scope() -> None:
-    di = PyxDI(__name__, default_scope="singleton")
+    di = PyxDI(default_scope="singleton")
 
     def provider_obj() -> str:
         return "test"
@@ -409,7 +397,7 @@ def test_validate_unresolved_injected_dependencies_auto_register_class() -> None
     def func1(service: Service = DependencyParam()) -> None:
         return None
 
-    di = PyxDI(__name__, auto_register=True)
+    di = PyxDI(auto_register=True)
     di.inject(func1)
     di.validate()
 
@@ -629,7 +617,7 @@ def test_get_transient_scoped(di: PyxDI) -> None:
 
 
 def test_get_auto_registered_instance() -> None:
-    di = PyxDI(__name__, auto_register=True)
+    di = PyxDI(auto_register=True)
 
     class Service:
         __scope__ = "singleton"
@@ -699,21 +687,21 @@ def test_get_provider_annotation_origin_without_args(di: PyxDI) -> None:
 
 
 def test_get_provider_arguments(di: PyxDI) -> None:
+    @di.provider
     def a() -> int:
         return 10
 
+    @di.provider
     def b() -> float:
         return 1.0
 
+    @di.provider
     def c() -> str:
         return "test"
 
     def service(a: int, /, b: float, *, c: str) -> Service:
         return Service(ident=f"{a}/{b}/{c}")
 
-    di.register_provider(int, a)
-    di.register_provider(float, b)
-    di.register_provider(str, c)
     provider = di.register_provider(Service, service)
 
     args, kwargs = di._get_provider_arguments(provider)
@@ -736,20 +724,69 @@ def test_inject_missing_annotation(di: PyxDI) -> None:
 
 
 def test_inject(di: PyxDI) -> None:
+    @di.provider
     def ident_provider() -> str:
         return "1000"
 
+    @di.provider
     def service_provider(ident: str) -> Service:
         return Service(ident=ident)
-
-    di.register_provider(str, ident_provider)
-    di.register_provider(Service, service_provider)
 
     @di.inject
     def func(name: str, service: Service = DependencyParam()) -> str:
         return f"{name} = {service.ident}"
 
     result = func(name="service ident")
+
+    assert result == "service ident = 1000"
+
+
+def test_inject_class(di: PyxDI) -> None:
+    @di.provider
+    def ident_provider() -> str:
+        return "1000"
+
+    @di.provider
+    def service_provider(ident: str) -> Service:
+        return Service(ident=ident)
+
+    @di.inject
+    class Handler:
+        def __init__(self, name: str, service: Service = DependencyParam()) -> None:
+            self.name = name
+            self.service = service
+
+        def handle(self) -> str:
+            return f"{self.name} = {self.service.ident}"
+
+    handler = Handler(name="service ident")
+
+    result = handler.handle()
+
+    assert result == "service ident = 1000"
+
+
+def test_inject_dataclass(di: PyxDI) -> None:
+    @di.provider
+    def ident_provider() -> str:
+        return "1000"
+
+    @di.provider
+    def service_provider(ident: str) -> Service:
+        return Service(ident=ident)
+
+    @di.inject
+    @dataclass
+    class Handler:
+        name: str
+        service: Service = DependencyParam()
+
+        def handle(self) -> str:
+            return f"{self.name} = {self.service.ident}"
+
+    handler = Handler(name="service ident")
+
+    result = handler.handle()
 
     assert result == "service ident = 1000"
 
@@ -800,51 +837,6 @@ def test_provider_decorator_with_provided_args(di: PyxDI) -> None:
 
 
 # Scanner
-
-
-def test_scan_relative_package() -> None:
-    di = PyxDI("tests")
-    di.scan([".scan.a"], categories=["provider"])
-
-    assert di.providers
-
-
-def test_scan_relative_package_without_import_name() -> None:
-    di = PyxDI()
-
-    with pytest.raises(ValueError) as exc_info:
-        di.scan([".scan.a"])
-
-    assert str(exc_info.value) == (
-        "Please, set `PyxDI` instance `import_name` to use relative package names."
-    )
-
-
-def test_scan_no_packages_defined_without_import_name() -> None:
-    di = PyxDI()
-
-    with pytest.raises(ValueError) as exc_info:
-        di.scan()
-
-    assert str(exc_info.value) == (
-        "Please, set `PyxDI` instance `import_name` to detect scan packages."
-    )
-
-
-def test_scan_no_packages_defined_with_import_name() -> None:
-    di = PyxDI("tests")
-    di.scan()
-
-
-def test_scan_no_packages_defined() -> None:
-    di = PyxDI()
-
-    with pytest.raises(ValueError) as exc_info:
-        di.scan()
-
-    assert str(exc_info.value) == (
-        "Please, set `PyxDI` instance `import_name` to detect scan packages."
-    )
 
 
 def test_scan_only_provider(di: PyxDI) -> None:

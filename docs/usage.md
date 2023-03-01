@@ -1,9 +1,11 @@
-# Providers
+# Usage
+
+## Providers
 
 Providers are the backbone of PyxDI. A provider is a function or a class that returns an instance of a specific type.
 Once a provider is registered with PyxDI, it can be used to resolve dependencies throughout the application.
 
-## Registering providers
+### Registering Providers
 
 To register a provider, you can use the register_provider method of the PyxDI instance. The method takes
 three arguments: the type of the object to be provided, the provider function or class, and an optional scope.
@@ -14,11 +16,11 @@ import pyxdi
 di = pyxdi.PyxDI()
 
 
-def message_provider() -> str:
+def message() -> str:
     return "Hello, message!"
 
 
-di.register_provider(str, message_provider, scope="singleton")
+di.register_provider(str, message, scope="singleton")
 
 assert di.get(str) == "Hello, world!"
 ```
@@ -28,21 +30,15 @@ Alternatively, you can use the provider decorator to register a provider functio
 ```python
 import pyxdi
 
-
-class Service:
-    def __init__(self, name: str) -> None:
-        self.name = name
-
-
 di = pyxdi.PyxDI()
 
 
 @di.provider
-def service_provider() -> Service:
-    return Service(name="demo")
+def message() -> str:
+    return "Hello, message!"
 
 
-assert di.get(Service).name == "demo"
+assert di.get(str) == "Hello, world!"
 ```
 
 ## Scopes
@@ -142,11 +138,11 @@ async def main() -> None:
         assert di.get(Request).path == "/"
 ```
 
-## Resource providers
+## Resource Providers
 
 Resource providers are special types of providers that need to be started and stopped. PyxDI supports synchronous and asynchronous resource providers.
 
-### Synchronous provider
+### Synchronous Providers
 
 Here is an example of a synchronous resource provider that manages the lifecycle of a Resource object:
 
@@ -178,16 +174,16 @@ def resource_provider() -> t.Iterator[Resource]:
     resource.close()
 
 
-di.start()  # start resource
+di.start()  # start resources
 
 assert di.get(Resource).name == "demo"
 
-di.close()  # close resource
+di.close()  # close resources
 ```
 
-In this example, the resource_provider function returns an iterator that yields a single Resource object. The start method is called when the resource is created, and the close method is called when the resource is released.
+In this example, the resource_provider function returns an iterator that yields a single Resource object. The `.start` method is called when the resource is created, and the `.close` method is called when the resource is released.
 
-### Asynchronous provider
+### Asynchronous Providers
 
 Here is an example of an asynchronous resource provider that manages the lifecycle of an asynchronous Resource object:
 
@@ -221,19 +217,19 @@ async def resource_provider() -> t.AsyncIterator[Resource]:
 
 
 async def main() -> None:
-    await di.astart()  # start resource
+    await di.astart()  # start resources
 
     assert di.get(Resource).name == "demo"
 
-    await di.aclose()  # close resource
+    await di.aclose()  # close resources
 
 
 asyncio.run(main())
 ```
 
-In this example, the resource_provider function returns an asynchronous iterator that yields a single Resource object. The start method is called asynchronously when the resource is created, and the close method is called asynchronously when the resource is released.
+In this example, the resource_provider function returns an asynchronous iterator that yields a single Resource object. The `.astart` method is called asynchronously when the resource is created, and the `.aclose` method is called asynchronously when the resource is released.
 
-## Default scope
+## Default Scope
 
 By default, providers are registered with a `singleton` scope. You can change the default scope by passing the default_scope parameter to the PyxDI constructor. This way, you don't have to specify the scope for each provider.
 
@@ -253,7 +249,7 @@ assert di.get(str) == "Hello, world!"
 
 In this example, the message_provider function is registered as a singleton provider because default_scope is set to `singleton`.
 
-## Singleton provider
+## Singleton Provider
 
 You can register a provider as a singleton by calling the singleton method on the PyxDI instance.
 
@@ -266,7 +262,7 @@ di.singleton(str, "Hello, world!")
 assert di.get(str) == "Hello, world!"
 ```
 
-## Overriding provider
+## Overriding Providers
 
 Sometimes it's necessary to override a provider with a different implementation. To do this, you can call the singleton() or register_provider() method again with the same key.
 
@@ -291,7 +287,7 @@ Note that if you call singleton() without passing the override parameter as True
 di.singleton(str, "Good-bye")  # will raise an error
 ```
 
-## Auto-Register providers
+## Auto-Register Providers
 
 In addition to registering providers manually, you can enable the auto_register feature of the DI container to automatically register providers for classes that have type hints in their constructor parameters.
 
@@ -353,6 +349,118 @@ assert service.get(ident="abc") == ("abc",)
 di.close()
 ```
 
+## Injecting Dependencies
+
+In order to use the dependencies that have been provided to the PyxDI container, they need to be injected into the functions or classes that require them. This can be done by using the @di.inject decorator.
+
+Here's an example of how to use the `@di.inject` decorator:
+
+```python
+import pyxdi
+
+
+class Service:
+    def __init__(self, name: str) -> None:
+        self.name = name
+
+
+di = pyxdi.PyxDI()
+
+
+@di.provider
+def service() -> Service:
+    return Service(name="demo")
+
+
+@di.inject
+def handler(service: Service = pyxdi.dep) -> None:
+    print(f"Hello, from service `{service.name}`")
+```
+
+Note that the service argument in the handler function has been given a default value of pyxdi.dep. This is done so that PyxDI knows which dependency to inject when the handler function is called.
+
+Once the dependencies have been injected, the function can be called as usual, like so:
+
+```python
+handler()
+```
+
+## Application Scan
+
+PyxDI provides a simple way to register providers and inject dependencies by scanning modules or packages. For example, your application might have the following structure:
+
+```
+/app
+  api/
+    handlers.py
+  main.py
+  providers.py
+  services.py
+```
+
+`services.py defines a service class:
+
+```python
+class Service:
+    def __init__(self, name: str) -> None:
+        self.name = name
+```
+
+`providers.py provides a provider for the Service class:
+
+```python
+import pyxdi
+
+from app.services import Service
+
+
+@pyxdi.provider
+def service() -> str:
+    return Service(name="demo")
+```
+
+`handlers.py uses the Service class:
+
+```python
+import pyxdi
+
+from app.services import Service
+
+
+def my_handler(service: Service = pyxdi.dep) -> None:
+    print(f"Hello, from service `{service.name}`")
+```
+
+`main.py` starts the DI container and scans the app directory:
+
+```python
+import pyxdi
+
+di = pyxdi.PyxDI()
+di.scan(["app"])
+di.start()
+
+# application context
+
+di.close()
+```
+
+The scan method takes a list of directory paths as an argument and recursively searches those directories for Python modules containing @pyxdi.provider- or @pyxdi.inject-decorated functions or classes.
+
+### Scan by categories
+
+You can also scan for providers or injectables in specific categories. To do so, you need to use the category argument when registering providers or injectables. For example:
+
+```python
+import pyxdi
+
+di = pyxdi.PyxDI()
+di.scan(["app.providers"], categories=["provider"])
+```
+
+This will scan for `provider` only within the `app.providers` module.
+
+With PyxDI's application scan feature, you can keep your code organized and easily manage your dependencies.
 
 ## Conclusion
 
