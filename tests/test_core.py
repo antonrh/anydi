@@ -1,5 +1,6 @@
 import typing as t
 import uuid
+from dataclasses import dataclass
 
 import pytest
 
@@ -686,21 +687,21 @@ def test_get_provider_annotation_origin_without_args(di: PyxDI) -> None:
 
 
 def test_get_provider_arguments(di: PyxDI) -> None:
+    @di.provider
     def a() -> int:
         return 10
 
+    @di.provider
     def b() -> float:
         return 1.0
 
+    @di.provider
     def c() -> str:
         return "test"
 
     def service(a: int, /, b: float, *, c: str) -> Service:
         return Service(ident=f"{a}/{b}/{c}")
 
-    di.register_provider(int, a)
-    di.register_provider(float, b)
-    di.register_provider(str, c)
     provider = di.register_provider(Service, service)
 
     args, kwargs = di._get_provider_arguments(provider)
@@ -723,20 +724,69 @@ def test_inject_missing_annotation(di: PyxDI) -> None:
 
 
 def test_inject(di: PyxDI) -> None:
+    @di.provider
     def ident_provider() -> str:
         return "1000"
 
+    @di.provider
     def service_provider(ident: str) -> Service:
         return Service(ident=ident)
-
-    di.register_provider(str, ident_provider)
-    di.register_provider(Service, service_provider)
 
     @di.inject
     def func(name: str, service: Service = DependencyParam()) -> str:
         return f"{name} = {service.ident}"
 
     result = func(name="service ident")
+
+    assert result == "service ident = 1000"
+
+
+def test_inject_class(di: PyxDI) -> None:
+    @di.provider
+    def ident_provider() -> str:
+        return "1000"
+
+    @di.provider
+    def service_provider(ident: str) -> Service:
+        return Service(ident=ident)
+
+    @di.inject
+    class Handler:
+        def __init__(self, name: str, service: Service = DependencyParam()) -> None:
+            self.name = name
+            self.service = service
+
+        def handle(self) -> str:
+            return f"{self.name} = {self.service.ident}"
+
+    handler = Handler(name="service ident")
+
+    result = handler.handle()
+
+    assert result == "service ident = 1000"
+
+
+def test_inject_dataclass(di: PyxDI) -> None:
+    @di.provider
+    def ident_provider() -> str:
+        return "1000"
+
+    @di.provider
+    def service_provider(ident: str) -> Service:
+        return Service(ident=ident)
+
+    @di.inject
+    @dataclass
+    class Handler:
+        name: str
+        service: Service = DependencyParam()
+
+        def handle(self) -> str:
+            return f"{self.name} = {self.service.ident}"
+
+    handler = Handler(name="service ident")
+
+    result = handler.handle()
 
     assert result == "service ident = 1000"
 
