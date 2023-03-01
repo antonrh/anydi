@@ -1,21 +1,21 @@
 import typing as t
 from dataclasses import dataclass
 
-from examples.common.domain import User
-from examples.common.repository import UserRepository
+from examples.basic.models import User
+from examples.basic.repositories import UserRepository
 
 
 @dataclass
 class UserService:
-    repository: UserRepository
+    user_repository: UserRepository
 
     def get_users(self) -> t.List[User]:
-        return self.repository.all()
+        return self.user_repository.all()
 
     def create_user(self, email: str) -> User:
         user = User(email=email)
-        self.repository.add(user)
+        self.user_repository.add(user)
         return user
 
-    def get_user(self, user_id: str) -> t.Optional[User]:
-        return self.repository.get(user_id)
+    def get_user(self, email: str) -> t.Optional[User]:
+        return self.user_repository.get_by_email(email)

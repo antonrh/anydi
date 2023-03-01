@@ -1,8 +1,11 @@
+import typing as t
 import uuid
 from dataclasses import dataclass, field
 
+UserId = t.NewType("UserId", uuid.UUID)
 
-@dataclass(kw_only=True)
+
+@dataclass
 class User:
-    id: str = field(default_factory=lambda: str(uuid.uuid4()))
     email: str
+    id: UserId = field(default_factory=lambda: UserId(uuid.uuid4()))

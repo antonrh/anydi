@@ -15,7 +15,7 @@ edit_uri: ""
 
 nav:
   - Introduction: index.md
-  - Providers: providers.md
+  - Usage: usage.md
   - Examples:
       - Basic: examples/basic.md
       - Click: examples/click.md

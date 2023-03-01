@@ -1,12 +1,10 @@
 import pyxdi
-
-di = pyxdi.PyxDI()
-di.scan(["examples.basic"])
+from examples.basic.handlers import create_user, get_user, get_users
 
 
 def main() -> None:
-    from examples.basic.handlers import create_user, get_user, get_users
-
+    di = pyxdi.PyxDI()
+    di.scan(["examples.basic"])
     di.start()
 
     user = create_user(email="demo@mail.com")

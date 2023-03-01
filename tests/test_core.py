@@ -18,7 +18,7 @@ from tests.fixtures import Service
 
 @pytest.fixture
 def di() -> PyxDI:
-    return PyxDI(__name__)
+    return PyxDI()
 
 
 # Provider
@@ -80,24 +80,11 @@ def test_provider_name() -> None:
 
 
 def test_di_constructor_properties() -> None:
-    di = PyxDI(__name__, default_scope="singleton", auto_register=True)
+    di = PyxDI(default_scope="singleton", auto_register=True)
 
-    assert di.name == "tests.test_core"
     assert di.default_scope == "singleton"
     assert di.auto_register
     assert di.providers == {}
-
-
-def test_di_name_not_defined() -> None:
-    di = PyxDI(None)
-
-    assert di.name is None
-
-
-def test_di_name_main() -> None:
-    di = PyxDI("__main__")
-
-    assert di.name in ["_jb_pytest_runner", "pytest"]
 
 
 def test_has_provider(di: PyxDI) -> None:
@@ -121,7 +108,7 @@ def test_register_provider(di: PyxDI) -> None:
 
 
 def test_register_provider_default_scope() -> None:
-    di = PyxDI(__name__, default_scope="singleton")
+    di = PyxDI(default_scope="singleton")
 
     def provider_obj() -> str:
         return "test"
@@ -409,7 +396,7 @@ def test_validate_unresolved_injected_dependencies_auto_register_class() -> None
     def func1(service: Service = DependencyParam()) -> None:
         return None
 
-    di = PyxDI(__name__, auto_register=True)
+    di = PyxDI(auto_register=True)
     di.inject(func1)
     di.validate()
 
@@ -629,7 +616,7 @@ def test_get_transient_scoped(di: PyxDI) -> None:
 
 
 def test_get_auto_registered_instance() -> None:
-    di = PyxDI(__name__, auto_register=True)
+    di = PyxDI(auto_register=True)
 
     class Service:
         __scope__ = "singleton"
@@ -800,51 +787,6 @@ def test_provider_decorator_with_provided_args(di: PyxDI) -> None:
 
 
 # Scanner
-
-
-def test_scan_relative_package() -> None:
-    di = PyxDI("tests")
-    di.scan([".scan.a"], categories=["provider"])
-
-    assert di.providers
-
-
-def test_scan_relative_package_without_import_name() -> None:
-    di = PyxDI()
-
-    with pytest.raises(ValueError) as exc_info:
-        di.scan([".scan.a"])
-
-    assert str(exc_info.value) == (
-        "Please, set `PyxDI` instance `import_name` to use relative package names."
-    )
-
-
-def test_scan_no_packages_defined_without_import_name() -> None:
-    di = PyxDI()
-
-    with pytest.raises(ValueError) as exc_info:
-        di.scan()
-
-    assert str(exc_info.value) == (
-        "Please, set `PyxDI` instance `import_name` to detect scan packages."
-    )
-
-
-def test_scan_no_packages_defined_with_import_name() -> None:
-    di = PyxDI("tests")
-    di.scan()
-
-
-def test_scan_no_packages_defined() -> None:
-    di = PyxDI()
-
-    with pytest.raises(ValueError) as exc_info:
-        di.scan()
-
-    assert str(exc_info.value) == (
-        "Please, set `PyxDI` instance `import_name` to detect scan packages."
-    )
 
 
 def test_scan_only_provider(di: PyxDI) -> None:
