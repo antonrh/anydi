@@ -14,11 +14,11 @@ import pyxdi
 di = pyxdi.PyxDI()
 
 
-def message_provider() -> str:
+def message() -> str:
     return "Hello, message!"
 
 
-di.register_provider(str, message_provider, scope="singleton")
+di.register_provider(str, message, scope="singleton")
 
 assert di.get(str) == "Hello, world!"
 ```
@@ -28,21 +28,15 @@ Alternatively, you can use the provider decorator to register a provider functio
 ```python
 import pyxdi
 
-
-class Service:
-    def __init__(self, name: str) -> None:
-        self.name = name
-
-
 di = pyxdi.PyxDI()
 
 
 @di.provider
-def service_provider() -> Service:
-    return Service(name="demo")
+def message() -> str:
+    return "Hello, message!"
 
 
-assert di.get(Service).name == "demo"
+assert di.get(str) == "Hello, world!"
 ```
 
 ## Scopes
