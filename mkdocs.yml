@@ -6,8 +6,8 @@ site_url: https://github.com/antonrh/pyxdi
 theme:
   name: material
   palette:
-    scheme: default
-    primary: green
+    - scheme: slate
+      primary: red
 
 repo_name: antonrh/pyxdi
 repo_url: https://github.com/antonrh/pyxdi
