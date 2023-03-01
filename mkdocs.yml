@@ -18,9 +18,6 @@ nav:
   - Usage: usage.md
   - Examples:
       - Basic: examples/basic.md
-      - Click: examples/click.md
-      - SQLAlchemy: examples/sqlalchemy.md
-      - SQLAlchemy + Async: examples/sqlalchemy_async.md
       - Flask: examples/flask.md
       - Flask + SQLAlchemy: examples/flask_sqlalchemy.md
       - FastAPI: examples/fastapi.md
