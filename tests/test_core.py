@@ -846,6 +846,18 @@ def test_scan_only_provider(di: PyxDI) -> None:
     assert str(di.providers[int]) == "tests.scan.a.a3.providers.a_a3_provider"
 
 
+def test_scan_only_provider_package(di: PyxDI) -> None:
+    di.scan(["tests.scan.a.a1.providers"], categories=["provider"])
+
+    assert str(di.providers[str]) == "tests.scan.a.a1.providers.a_a1_provider"
+
+
+def test_scan_from_string(di: PyxDI) -> None:
+    di.scan("tests.scan.a.a1", categories=["provider"])
+
+    assert str(di.providers[str]) == "tests.scan.a.a1.providers.a_a1_provider"
+
+
 def test_scan_only_inject(di: PyxDI) -> None:
     di.scan(["tests.scan.a"], categories=["inject"])
 
