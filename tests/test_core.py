@@ -490,19 +490,11 @@ def test_get_singleton_scoped(di: PyxDI) -> None:
 
 
 def test_get_singleton_scoped_not_started(di: PyxDI) -> None:
-    def provider() -> t.Iterator[str]:
+    @di.provider
+    def message() -> t.Iterator[str]:
         yield "test"
 
-    di.register_provider(str, provider, scope="singleton")
-
-    with pytest.raises(ProviderError) as exc_info:
-        di.get(str)
-
-    assert str(exc_info.value) == (
-        "The instance for the resource provider `tests.test_core.test_get_singleton_"
-        "scoped_not_started.<locals>.provider` cannot be created until the scope "
-        "context has been started. Please ensure that the scope context is started."
-    )
+    assert di.get(str) == "test"
 
 
 def test_get_singleton_scoped_resource(di: PyxDI) -> None:

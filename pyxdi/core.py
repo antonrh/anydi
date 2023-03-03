@@ -665,7 +665,10 @@ class ScopedContext:
         instance = self._instances.get(interface)
         if instance is None:
             provider = self._root.get_provider(interface)
-            instance = self._root.create_instance(provider)
+            if provider.is_resource:
+                instance = self._root.create_resource(provider, stack=self._stack)
+            else:
+                instance = self._root.create_instance(provider)
             self._instances[interface] = instance
         return t.cast(InterfaceT, instance)
 
