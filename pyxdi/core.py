@@ -71,15 +71,15 @@ class UnresolvedProvider:
 
 @dataclass(frozen=True)
 class ScannedProvider:
-    target: t.Any
+    member: t.Any
     scope: Scope
     override: bool
 
 
 @dataclass(frozen=True)
 class ScannedDependency:
+    member: t.Any
     module: ModuleType
-    target: t.Any
 
 
 class Dependency:
@@ -429,24 +429,24 @@ class PyxDI:
 
         return register_provider
 
-    def inject(self, target: t.Callable[..., t.Any]) -> t.Callable[..., t.Any]:
-        injected_params = self._get_injectable_params(target)
+    def inject(self, obj: t.Callable[..., t.Any]) -> t.Callable[..., t.Any]:
+        injected_params = self._get_injectable_params(obj)
 
-        if inspect.iscoroutinefunction(target):
+        if inspect.iscoroutinefunction(obj):
 
-            @functools.wraps(target)
+            @functools.wraps(obj)
             async def awrapped(*args: t.Any, **kwargs: t.Any) -> t.Any:
                 for name, annotation in injected_params.items():
                     kwargs[name] = self.get(annotation)
-                return await target(*args, **kwargs)
+                return await obj(*args, **kwargs)
 
             return awrapped
 
-        @functools.wraps(target)
+        @functools.wraps(obj)
         def wrapped(*args: t.Any, **kwargs: t.Any) -> t.Any:
             for name, annotation in injected_params.items():
                 kwargs[name] = self.get(annotation)
-            return target(*args, **kwargs)
+            return obj(*args, **kwargs)
 
         return wrapped
 
@@ -454,14 +454,23 @@ class PyxDI:
 
     def scan(
         self,
-        packages: t.Iterable[t.Union[ModuleType, str]],
+        /,
+        packages: t.Union[
+            t.Union[ModuleType, str],
+            t.Iterable[t.Union[ModuleType, str]],
+        ],
         *,
         categories: t.Optional[t.Iterable[ScanCategory]] = None,
     ) -> None:
         scanned_providers: t.List[ScannedProvider] = []
         scanned_dependencies: t.List[ScannedDependency] = []
 
-        for package in packages:
+        if isinstance(packages, t.Iterable) and not isinstance(packages, str):
+            scan_packages: t.Iterable[t.Union[ModuleType, str]] = packages
+        else:
+            scan_packages = t.cast(t.Iterable[t.Union[ModuleType, str]], [packages])
+
+        for package in scan_packages:
             _scanned_providers, _scanned_dependencies = self._scan_package(
                 package, categories=categories
             )
@@ -470,16 +479,16 @@ class PyxDI:
 
         for scanned_provider in scanned_providers:
             self.provider(
-                func=scanned_provider.target,
+                func=scanned_provider.member,
                 scope=scanned_provider.scope,
                 override=scanned_provider.override,
             )
 
         for scanned_dependency in scanned_dependencies:
-            decorator = self.inject(scanned_dependency.target)
+            decorator = self.inject(scanned_dependency.member)
             setattr(
                 scanned_dependency.module,
-                scanned_dependency.target.__name__,
+                scanned_dependency.member.__name__,
                 decorator,
             )
 
@@ -493,59 +502,80 @@ class PyxDI:
         if isinstance(package, str):
             package = importlib.import_module(package)
 
+        package_path = getattr(package, "__path__", None)
+
+        if not package_path:
+            return self._scan_module(package, categories=categories)
+
         scanned_providers: t.List[ScannedProvider] = []
         scanned_dependencies: t.List[ScannedDependency] = []
 
-        package_path = getattr(package, "__path__")
         for module_info in pkgutil.walk_packages(
             path=package_path, prefix=package.__name__ + "."
         ):
             module = importlib.import_module(module_info.name)
-            for target in module.__dict__.values():
-                if getattr(
-                    target, "__module__", None
-                ) != module.__name__ or not callable(target):
-                    continue
+            _scanned_providers, _scanned_dependencies = self._scan_module(
+                module, categories=categories
+            )
+            scanned_providers.extend(_scanned_providers)
+            scanned_dependencies.extend(_scanned_dependencies)
 
-                provided = getattr(target, "__pyxdi_provider__", None)
-                if provided and "provider" in categories:
-                    scope, override = provided["scope"], provided["override"]
-                    scanned_providers.append(
-                        ScannedProvider(target=target, scope=scope, override=override)
-                    )
-                    continue
+        return scanned_providers, scanned_dependencies
 
-                if "inject" not in categories:
-                    continue
+    def _scan_module(
+        self,
+        module: ModuleType,
+        *,
+        categories: t.Iterable[ScanCategory],
+    ) -> t.Tuple[t.List[ScannedProvider], t.List[ScannedDependency]]:
+        scanned_providers: t.List[ScannedProvider] = []
+        scanned_dependencies: t.List[ScannedDependency] = []
 
-                # Get by @inject decorator
-                injected = getattr(target, "__pyxdi_inject__", None)
-                if injected:
+        for name, member in inspect.getmembers(module):
+            if getattr(member, "__module__", None) != module.__name__ or not callable(
+                member
+            ):
+                continue
+
+            provided = getattr(member, "__pyxdi_provider__", None)
+            if provided and "provider" in categories:
+                scope, override = provided["scope"], provided["override"]
+                scanned_providers.append(
+                    ScannedProvider(member=member, scope=scope, override=override)
+                )
+                continue
+
+            if "inject" not in categories:
+                continue
+
+            # Get by @inject decorator
+            injected = getattr(member, "__pyxdi_inject__", None)
+            if injected:
+                scanned_dependencies.append(
+                    self._scanned_dependency(member=member, module=module)
+                )
+                continue
+
+            # Get by pyxdi.dep mark
+            if inspect.isclass(member):
+                signature = self._get_signature(member.__init__)
+            else:
+                signature = self._get_signature(member)
+            for parameter in signature.parameters.values():
+                if isinstance(parameter.default, Dependency):
                     scanned_dependencies.append(
-                        self._scanned_dependency(module=module, target=target)
+                        self._scanned_dependency(member=member, module=module)
                     )
                     continue
-
-                # Get by pyxdi.dep mark
-                if inspect.isclass(target):
-                    signature = self._get_signature(target.__init__)
-                else:
-                    signature = self._get_signature(target)
-                for parameter in signature.parameters.values():
-                    if isinstance(parameter.default, Dependency):
-                        scanned_dependencies.append(
-                            self._scanned_dependency(module=module, target=target)
-                        )
-                        continue
 
         return scanned_providers, scanned_dependencies
 
     def _scanned_dependency(
-        self, module: ModuleType, target: t.Any
+        self, member: t.Any, module: ModuleType
     ) -> ScannedDependency:
-        if hasattr(target, "__wrapped__"):
-            target = target.__wrapped__
-        return ScannedDependency(module=module, target=target)
+        if hasattr(member, "__wrapped__"):
+            member = member.__wrapped__
+        return ScannedDependency(member=member, module=module)
 
     # Inspection
 
@@ -635,7 +665,10 @@ class ScopedContext:
         instance = self._instances.get(interface)
         if instance is None:
             provider = self._root.get_provider(interface)
-            instance = self._root.create_instance(provider)
+            if provider.is_resource:
+                instance = self._root.create_resource(provider, stack=self._stack)
+            else:
+                instance = self._root.create_instance(provider)
             self._instances[interface] = instance
         return t.cast(InterfaceT, instance)
 
