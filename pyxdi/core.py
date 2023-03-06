@@ -149,7 +149,8 @@ class PyxDI:
                 return provider
 
             raise ProviderError(
-                f"Provider interface `{get_qualname(interface)}` already registered."
+                f"The provider interface `{get_qualname(interface)}` "
+                "already registered."
             )
 
         self._validate_provider_scope(provider)
@@ -158,6 +159,28 @@ class PyxDI:
 
         self._providers[interface] = provider
         return provider
+
+    def unregister_provider(self, interface: t.Type[t.Any]) -> None:
+        if not self.has_provider(interface):
+            raise ProviderError(
+                f"The provider interface `{get_qualname(interface)}` not registered."
+            )
+
+        provider = self.get_provider(interface)
+
+        # Cleanup scoped context instance
+        try:
+            scoped_context = self._get_scoped_context(provider.scope)
+        except LookupError:
+            pass
+        else:
+            if scoped_context:
+                scoped_context.delete(interface)
+
+        # Cleanup provider references
+        self._providers.pop(interface, None)
+        self._unresolved_providers.pop(interface, None)
+        self._unresolved_dependencies.pop(interface, None)
 
     def get_provider(self, interface: t.Type[t.Any]) -> Provider:
         try:
@@ -332,6 +355,16 @@ class PyxDI:
     def create_request_context(self) -> "ScopedContext":
         return ScopedContext("request", self)
 
+    def _get_request_context(self) -> "ScopedContext":
+        request_context = self._request_context_var.get()
+        if request_context is None:
+            raise LookupError(
+                "The request context has not been started. Please ensure that "
+                "the request context is properly initialized before attempting "
+                "to use it."
+            )
+        return request_context
+
     # Instance
 
     def get(self, interface: t.Type[InterfaceT]) -> InterfaceT:
@@ -344,19 +377,51 @@ class PyxDI:
             else:
                 raise
 
-        if provider.scope == "singleton":
-            return self._singleton_context.get(interface)
-        elif provider.scope == "request":
-            request_context = self._request_context_var.get()
-            if request_context is None:
-                raise LookupError(
-                    "The request context has not been started. Please ensure that "
-                    "the request context is properly initialized before attempting "
-                    "to use it."
-                )
-            return request_context.get(interface)
+        scoped_context = self._get_scoped_context(provider.scope)
+        if scoped_context:
+            return scoped_context.get(interface)
 
         return t.cast(InterfaceT, self.create_instance(provider))
+
+    def _get_scoped_context(self, scope: Scope) -> t.Optional["ScopedContext"]:
+        if scope == "singleton":
+            return self._singleton_context
+        elif scope == "request":
+            request_context = self._get_request_context()
+            return request_context
+        return None
+
+    @contextlib.contextmanager
+    def override(
+        self, interface: t.Type[InterfaceT], instance: t.Any
+    ) -> t.Iterator[None]:
+        origin_instance: t.Optional[t.Any] = None
+        origin_provider: t.Optional[Provider] = None
+        scope = self.default_scope
+
+        if self.has_provider(interface):
+            origin_instance = self.get(interface)
+            origin_provider = self.get_provider(interface)
+            scope = origin_provider.scope
+
+        provider = self.register_provider(
+            interface, lambda: instance, scope=scope, override=True
+        )
+
+        scoped_context = self._get_scoped_context(provider.scope)
+        if scoped_context:
+            scoped_context.set(interface, instance=instance)
+
+        yield
+
+        if origin_provider and origin_instance:
+            self.register_provider(
+                interface, lambda: origin_instance, scope=scope, override=True
+            )
+            if scoped_context:
+                scoped_context.set(interface, instance=origin_instance)
+        else:
+            self.unregister_provider(interface)
 
     def create_resource(
         self, provider: Provider, *, stack: contextlib.ExitStack
@@ -677,6 +742,9 @@ class ScopedContext:
         self._root.register_provider(
             interface, lambda: interface, scope=self._scope, override=True
         )
+
+    def delete(self, interface: t.Type[t.Any]) -> None:
+        self._instances.pop(interface, None)
 
     def start(self) -> None:
         for interface, provider in self._iter_providers():
