@@ -126,7 +126,7 @@ def test_register_provider_already_registered(di: PyxDI) -> None:
     with pytest.raises(ProviderError) as exc_info:
         di.register_provider(str, lambda: "other")
 
-    assert str(exc_info.value) == "Provider interface `str` already registered."
+    assert str(exc_info.value) == "The provider interface `str` already registered."
 
 
 def test_register_provider_override(di: PyxDI) -> None:
@@ -138,6 +138,43 @@ def test_register_provider_override(di: PyxDI) -> None:
     provider = di.register_provider(str, overriden_provider_obj, override=True)
 
     assert provider.obj == overriden_provider_obj
+
+
+def test_unregister_singleton_scoped_provider(di: PyxDI) -> None:
+    di.register_provider(str, lambda: "test", scope="singleton")
+
+    assert str in di.providers
+
+    di.unregister_provider(str)
+
+    assert str not in di.providers
+
+
+def test_unregister_request_scoped_provider(di: PyxDI) -> None:
+    di.register_provider(str, lambda: "test", scope="request")
+
+    assert str in di.providers
+
+    di.unregister_provider(str)
+
+    assert str not in di.providers
+
+
+def test_unregister_request_scoped_provider_within_context(di: PyxDI) -> None:
+    assert str not in di.providers
+
+    with di.request_context() as ctx:
+        ctx.set(str, "test")
+        di.unregister_provider(str)
+
+    assert str not in di.providers
+
+
+def test_unregister_not_registered_provider(di: PyxDI) -> None:
+    with pytest.raises(ProviderError) as exc_info:
+        di.unregister_provider(str)
+
+    assert str(exc_info.value) == "The provider interface `str` not registered."
 
 
 def test_singleton(di: PyxDI) -> None:
@@ -625,6 +662,51 @@ def test_get_not_registered_instance(di: PyxDI) -> None:
         "The provider interface for `str` has not been registered. Please ensure that "
         "the provider interface is properly registered before attempting to use it."
     )
+
+
+def test_override(di: PyxDI) -> None:
+    origin = "origin"
+    overriden = "overriden"
+
+    di.register_provider(str, lambda: origin)
+
+    with di.override(str, overriden):
+        assert di.get(str) == overriden
+
+    assert di.get(str) == origin
+
+
+def test_override_auto_registered() -> None:
+    di = PyxDI(auto_register=True)
+
+    origin_name = "test"
+    overriden_name = "overriden"
+
+    @di.provider
+    def name() -> str:
+        return origin_name
+
+    class Service:
+        def __init__(self, name: str) -> None:
+            self.name = name
+
+    with di.override(Service, Service(name=overriden_name)):
+        assert di.get(Service).name == overriden_name
+
+    assert di.get(Service).name == origin_name
+
+
+def test_override_transient_provider(di: PyxDI) -> None:
+    overriden_uuid = uuid.uuid4()
+
+    @di.provider(scope="transient")
+    def uuid_provider() -> uuid.UUID:
+        return uuid.uuid4()
+
+    with di.override(uuid.UUID, overriden_uuid):
+        assert di.get(uuid.UUID) == overriden_uuid
+
+    assert di.get(uuid.UUID) != overriden_uuid
 
 
 # Inspections

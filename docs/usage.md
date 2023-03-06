@@ -7,7 +7,7 @@ Once a provider is registered with PyxDI, it can be used to resolve dependencies
 
 ### Registering Providers
 
-To register a provider, you can use the register_provider method of the PyxDI instance. The method takes
+To register a provider, you can use the `register_provider` method of the `PyxDI` instance. The method takes
 three arguments: the type of the object to be provided, the provider function or class, and an optional scope.
 
 ```python
@@ -40,6 +40,30 @@ def message() -> str:
 
 assert di.get(str) == "Hello, world!"
 ```
+
+### Unregistering Providers
+
+To unregister a provider, you can use the `unregister_provider` method of the `PyxDI` instance. The method takes
+interface of the dependency to be unregistered.
+
+```python
+import pyxdi
+
+di = pyxdi.PyxDI()
+
+
+@di.provider
+def message() -> str:
+    return "Hello, message!"
+
+
+assert di.has_provider(str)
+
+di.unregister_provider(str)
+
+assert not di.has_provider(str)
+```
+
 
 ## Scopes
 
