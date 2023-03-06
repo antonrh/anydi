@@ -4,7 +4,6 @@ from dataclasses import dataclass
 
 import pytest
 
-import pyxdi
 from pyxdi.core import DependencyParam, Provider, PyxDI
 from pyxdi.exceptions import (
     AnnotationError,
