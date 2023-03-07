@@ -7,11 +7,12 @@ import inspect
 import logging
 import pkgutil
 import typing as t
+import uuid
 from collections import defaultdict
 from contextvars import ContextVar
 from dataclasses import dataclass
 from functools import cached_property, partial
-from types import ModuleType, TracebackType
+from types import ModuleType, NoneType, TracebackType
 
 import anyio
 
@@ -145,6 +146,11 @@ class PyxDI:
         ignore: bool = False,
     ) -> Provider:
         provider = Provider(obj=obj, scope=scope or self.default_scope)
+
+        if (provider.is_resource or provider.is_async_resource) and (
+            interface is NoneType or interface is None
+        ):
+            interface = type(f"EventResource_{uuid.uuid4()}", (), {})
 
         try:
             registered_provider = self.get_provider(interface)
