@@ -383,6 +383,16 @@ class PyxDI:
 
         return t.cast(InterfaceT, self.create_instance(provider))
 
+    def has(self, interface: t.Type[InterfaceT]) -> bool:
+        try:
+            provider = self.get_provider(interface)
+        except ProviderError:
+            return False
+        scoped_context = self._get_scoped_context(provider.scope)
+        if scoped_context:
+            return scoped_context.has(interface)
+        return True
+
     def _get_scoped_context(self, scope: Scope) -> t.Optional["ScopedContext"]:
         if scope == "singleton":
             return self._singleton_context
@@ -400,8 +410,11 @@ class PyxDI:
         scope = self.default_scope
 
         if self.has_provider(interface):
-            origin_instance = self.get(interface)
             origin_provider = self.get_provider(interface)
+            if origin_provider.is_async_resource and not self.has(interface):
+                origin_instance = None
+            else:
+                origin_instance = self.get(interface)
             scope = origin_provider.scope
 
         provider = self.register_provider(
@@ -414,11 +427,14 @@ class PyxDI:
 
         yield
 
-        if origin_provider and origin_instance:
+        if origin_provider:
             self.register_provider(
-                interface, lambda: origin_instance, scope=scope, override=True
+                interface,
+                origin_provider.obj,
+                scope=origin_provider.scope,
+                override=True,
             )
-            if scoped_context:
+            if origin_instance and scoped_context:
                 scoped_context.set(interface, instance=origin_instance)
         else:
             self.unregister_provider(interface)
@@ -742,6 +758,9 @@ class ScopedContext:
         self._root.register_provider(
             interface, lambda: interface, scope=self._scope, override=True
         )
+
+    def has(self, interface: t.Type[t.Any]) -> bool:
+        return interface in self._instances
 
     def delete(self, interface: t.Type[t.Any]) -> None:
         self._instances.pop(interface, None)
