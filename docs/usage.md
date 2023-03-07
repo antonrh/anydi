@@ -486,6 +486,47 @@ This will scan for `provider` only within the `app.providers` module.
 
 With PyxDI's application scan feature, you can keep your code organized and easily manage your dependencies.
 
+## Testing
+
+To use `PyxDI` with your testing framework, you can use the `override` context manager to temporarily replace a dependency with an overridden instance
+during testing. This allows you to isolate the code being tested from its dependencies. The with `di.override()` context manager is used to ensure that
+the overridden instance is used only within the context of the with block. Once the block is exited, the original dependency is restored.
+
+```python
+from unittest import mock
+
+import pyxdi
+
+
+class Service:
+    def __init__(self, name: str) -> None:
+        self.name = name
+
+    def say_hello(self) -> str:
+        return f"Hello, from `{self.name}` service!"
+
+
+di = pyxdi.PyxDI()
+
+
+@di.provider
+def service() -> Service:
+    return Service(name="demo")
+
+
+@di.inject
+def hello_handler(service: Service = pyxdi.dep) -> str:
+    return service.say_hello()
+
+
+def test_hello_handler() -> None:
+    service_mock = mock.Mock(spec=Service)
+    service_mock.say_hello.return_value = "Hello, from service mock!"
+
+    with di.override(Service, service_mock):
+        assert hello_handler() == "Hello, from service mock!"
+```
+
 ## Conclusion
 
 Check [examples](examples/basic.md) which shows how to use PyxDI in real-life application.
