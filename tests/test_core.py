@@ -129,6 +129,12 @@ def test_register_provider_already_registered(di: PyxDI) -> None:
     assert str(exc_info.value) == "The provider interface `str` already registered."
 
 
+def test_register_provider_already_registered_ignore(di: PyxDI) -> None:
+    provider = di.register_provider(str, lambda: "test")
+
+    assert di.register_provider(str, lambda: "other", ignore=True) == provider
+
+
 def test_register_provider_override(di: PyxDI) -> None:
     di.register_provider(str, lambda: "test")
 

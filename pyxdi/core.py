@@ -4,6 +4,7 @@ import contextlib
 import functools
 import importlib
 import inspect
+import logging
 import pkgutil
 import typing as t
 from collections import defaultdict
@@ -23,6 +24,8 @@ from .exceptions import (
 )
 from .types import InterfaceT, ProviderObj, ScanCategory, Scope
 from .utils import get_qualname
+
+logger = logging.getLogger(__name__)
 
 ALLOWED_SCOPES: t.Dict[Scope, t.List[Scope]] = {
     "singleton": ["singleton"],
@@ -73,7 +76,6 @@ class UnresolvedProvider:
 class ScannedProvider:
     member: t.Any
     scope: Scope
-    override: bool
 
 
 @dataclass(frozen=True)
@@ -140,13 +142,25 @@ class PyxDI:
         *,
         scope: t.Optional[Scope] = None,
         override: bool = False,
+        ignore: bool = False,
     ) -> Provider:
         provider = Provider(obj=obj, scope=scope or self.default_scope)
 
-        if self.has_provider(interface):
+        try:
+            registered_provider = self.get_provider(interface)
+        except ProviderError:
+            pass
+        else:
             if override:
                 self._providers[interface] = provider
                 return provider
+
+            if ignore:
+                logger.info(
+                    f"Ignoring the `{provider}` provider as it "
+                    "has already been registered."
+                )
+                return registered_provider
 
             raise ProviderError(
                 f"The provider interface `{get_qualname(interface)}` "
@@ -475,6 +489,7 @@ class PyxDI:
         *,
         scope: t.Optional[Scope] = None,
         override: bool = False,
+        ignore: bool = False,
     ) -> t.Callable[..., t.Any]:
         ...
 
@@ -485,6 +500,7 @@ class PyxDI:
         *,
         scope: t.Optional[Scope] = None,
         override: bool = False,
+        ignore: bool = False,
     ) -> t.Callable[[ProviderObj], t.Any]:
         ...
 
@@ -494,18 +510,31 @@ class PyxDI:
         *,
         scope: t.Optional[Scope] = None,
         override: bool = False,
+        ignore: bool = False,
     ) -> t.Union[ProviderObj, t.Callable[[Provider], t.Any]]:
-        decorator = self._provider_decorator(scope=scope, override=override)
+        decorator = self._provider_decorator(
+            scope=scope, override=override, ignore=ignore
+        )
         if func is None:
             return decorator
         return decorator(func)  # type: ignore[no-any-return]
 
     def _provider_decorator(
-        self, *, scope: t.Optional[Scope] = None, override: bool = False
+        self,
+        *,
+        scope: t.Optional[Scope] = None,
+        override: bool = False,
+        ignore: bool = False,
     ) -> t.Callable[[ProviderObj], t.Any]:
         def register_provider(func: ProviderObj) -> t.Any:
             interface = self._get_provider_annotation(func)
-            self.register_provider(interface, func, scope=scope, override=override)
+            self.register_provider(
+                interface,
+                func,
+                scope=scope,
+                override=override,
+                ignore=ignore,
+            )
             return func
 
         return register_provider
@@ -562,7 +591,8 @@ class PyxDI:
             self.provider(
                 func=scanned_provider.member,
                 scope=scanned_provider.scope,
-                override=scanned_provider.override,
+                override=False,
+                ignore=True,
             )
 
         for scanned_dependency in scanned_dependencies:
@@ -620,10 +650,8 @@ class PyxDI:
 
             provided = getattr(member, "__pyxdi_provider__", None)
             if provided and "provider" in categories:
-                scope, override = provided["scope"], provided["override"]
-                scanned_providers.append(
-                    ScannedProvider(member=member, scope=scope, override=override)
-                )
+                scope = provided["scope"]
+                scanned_providers.append(ScannedProvider(member=member, scope=scope))
                 continue
 
             if "inject" not in categories:

@@ -26,7 +26,6 @@ def provider(
     func: None = ...,
     *,
     scope: t.Optional[Scope] = None,
-    override: bool = False,
 ) -> t.Callable[..., t.Any]:
     ...
 
@@ -36,7 +35,6 @@ def provider(
     func: ProviderObj,
     *,
     scope: t.Optional[Scope] = None,
-    override: bool = False,
 ) -> t.Callable[[ProviderObj], t.Any]:
     ...
 
@@ -45,7 +43,6 @@ def provider(
     func: t.Union[ProviderObj, None] = None,
     *,
     scope: t.Optional[Scope] = None,
-    override: bool = False,
 ) -> t.Union[ProviderObj, t.Callable[[Provider], t.Any]]:
     def decorator(target: T) -> T:
         setattr(
@@ -53,7 +50,6 @@ def provider(
             "__pyxdi_provider__",
             {
                 "scope": scope,
-                "override": override,
             },
         )
         return target

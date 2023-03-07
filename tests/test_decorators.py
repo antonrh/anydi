@@ -36,7 +36,6 @@ def test_provider_no_args() -> None:
 
     assert getattr(service_provider, "__pyxdi_provider__") == {
         "scope": None,
-        "override": False,
     }
 
 
@@ -47,16 +46,14 @@ def test_provider_no_args_provided() -> None:
 
     assert getattr(service_provider, "__pyxdi_provider__") == {
         "scope": None,
-        "override": False,
     }
 
 
 def test_provider() -> None:
-    @provider(scope="singleton", override=True)
+    @provider(scope="singleton")
     def service_provider() -> str:
         return "test"
 
     assert getattr(service_provider, "__pyxdi_provider__") == {
         "scope": "singleton",
-        "override": True,
     }
