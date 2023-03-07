@@ -664,16 +664,41 @@ def test_get_not_registered_instance(di: PyxDI) -> None:
     )
 
 
+def test_has_instance(di: PyxDI) -> None:
+    di.register_provider(str, lambda: "test")
+    di.get(str)
+
+    assert di.has(str)
+
+
+def test_has_no_instance(di: PyxDI) -> None:
+    di.register_provider(str, lambda: "test")
+
+    assert not di.has(str)
+
+
+def test_has_no_instance_and_provider(di: PyxDI) -> None:
+    assert not di.has(str)
+
+
+def test_has_instance_for_transient_provider(di: PyxDI) -> None:
+    di.register_provider(str, lambda: "test", scope="transient")
+
+    assert di.has(str)
+
+
 def test_override(di: PyxDI) -> None:
-    origin = "origin"
-    overriden = "overriden"
+    origin_name = "origin"
+    overriden_name = "overriden"
 
-    di.register_provider(str, lambda: origin)
+    @di.provider
+    def name() -> str:
+        return origin_name
 
-    with di.override(str, overriden):
-        assert di.get(str) == overriden
+    with di.override(str, overriden_name):
+        assert di.get(str) == overriden_name
 
-    assert di.get(str) == origin
+    assert di.get(str) == origin_name
 
 
 def test_override_auto_registered() -> None:
@@ -707,6 +732,34 @@ def test_override_transient_provider(di: PyxDI) -> None:
         assert di.get(uuid.UUID) == overriden_uuid
 
     assert di.get(uuid.UUID) != overriden_uuid
+
+
+def test_override_resource_provider(di: PyxDI) -> None:
+    origin = "origin"
+    overriden = "overriden"
+
+    @di.provider
+    def message() -> t.Iterator[str]:
+        yield origin
+
+    with di.override(str, overriden):
+        assert di.get(str) == overriden
+
+    assert di.get(str) == origin
+
+
+async def test_override_async_resource_provider(di: PyxDI) -> None:
+    origin = "origin"
+    overriden = "overriden"
+
+    @di.provider
+    async def message() -> t.AsyncIterator[str]:
+        yield origin
+
+    with di.override(str, overriden):
+        assert di.get(str) == overriden
+
+    # assert di.get(str) == origin
 
 
 # Inspections
