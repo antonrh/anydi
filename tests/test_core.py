@@ -398,6 +398,42 @@ def test_register_provider_without_annotation(di: PyxDI) -> None:
     )
 
 
+def test_register_resource_event(di: PyxDI) -> None:
+    events = []
+
+    @di.provider
+    def message() -> str:
+        return "test"
+
+    @di.provider
+    def event_1(message: str) -> t.Iterator[None]:
+        events.append(f"event_1: before {message}")
+        yield
+        events.append(f"event_1: after {message}")
+
+    @di.provider
+    def event_2(message: str) -> t.Iterator[None]:
+        events.append(f"event_2: before {message}")
+        yield
+        events.append(f"event_2: after {message}")
+
+    di.start()
+
+    assert events == [
+        "event_1: before test",
+        "event_2: before test",
+    ]
+
+    di.close()
+
+    assert events == [
+        "event_1: before test",
+        "event_2: before test",
+        "event_2: after test",
+        "event_1: after test",
+    ]
+
+
 def test_validate_unresolved_provider_dependencies(di: PyxDI) -> None:
     def service(ident: str) -> Service:
         return Service(ident=ident)

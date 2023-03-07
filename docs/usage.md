@@ -166,7 +166,7 @@ async def main() -> None:
 
 Resource providers are special types of providers that need to be started and stopped. PyxDI supports synchronous and asynchronous resource providers.
 
-### Synchronous Providers
+### Synchronous Resources
 
 Here is an example of a synchronous resource provider that manages the lifecycle of a Resource object:
 
@@ -207,7 +207,7 @@ di.close()  # close resources
 
 In this example, the resource_provider function returns an iterator that yields a single Resource object. The `.start` method is called when the resource is created, and the `.close` method is called when the resource is released.
 
-### Asynchronous Providers
+### Asynchronous Resources
 
 Here is an example of an asynchronous resource provider that manages the lifecycle of an asynchronous Resource object:
 
@@ -251,11 +251,70 @@ async def main() -> None:
 asyncio.run(main())
 ```
 
-In this example, the resource_provider function returns an asynchronous iterator that yields a single Resource object. The `.astart` method is called asynchronously when the resource is created, and the `.aclose` method is called asynchronously when the resource is released.
+In this example, the `resource_provider` function returns an asynchronous iterator that yields a single Resource object. The `.astart` method is called asynchronously when the resource is created, and the `.aclose` method is called asynchronously when the resource is released.
+
+### Resource events
+
+Sometimes, it can be useful to split the process of initializing and managing the lifecycle of an instance into separate providers.
+
+```python
+import typing as t
+
+import pyxdi
+
+
+class Client:
+    def __init__(self) -> None:
+        self.started = False
+        self.closed = False
+
+    def start(self) -> None:
+        self.started = True
+
+    def close(self) -> None:
+        self.closed = True
+
+
+di = pyxdi.PyxDI()
+
+
+@di.provider
+def client_provider() -> Client:
+    return Client()
+
+
+@di.provider
+def client_lifespan(client: Client) -> t.Iterator[None]:
+    client.start()
+    yield
+    client.close()
+
+
+client = di.get(Client)
+
+assert not client.started
+assert not client.closed
+
+di.start()
+
+assert client.started
+assert not client.closed
+
+
+di.close()
+
+assert client.started
+assert client.closed
+```
+
+!!! note
+
+    This pattern can be used for both synchronous and asynchronous resources.
+
 
 ## Default Scope
 
-By default, providers are registered with a `singleton` scope. You can change the default scope by passing the default_scope parameter to the PyxDI constructor. This way, you don't have to specify the scope for each provider.
+By default, providers are registered with a `singleton` scope. You can change the default scope by passing the default_scope parameter to the `PyxDI` constructor. This way, you don't have to specify the scope for each provider.
 
 ```python
 import pyxdi
@@ -275,7 +334,7 @@ In this example, the message_provider function is registered as a singleton prov
 
 ## Singleton Provider
 
-You can register a provider as a singleton by calling the singleton method on the PyxDI instance.
+You can register a provider as a singleton by calling the singleton method on the `PyxDI` instance.
 
 ```python
 import pyxdi
@@ -348,7 +407,7 @@ class Service:
         return self.repo.get(ident=ident)
 ```
 
-If you create a PyxDI instance with auto_register=True, it will automatically register a provider for `Service` and `Repository` with provided `Database`:
+If you create a `PyxDI` instance with auto_register=True, it will automatically register a provider for `Service` and `Repository` with provided `Database`:
 
 ```python
 import pyxdi
@@ -375,7 +434,7 @@ di.close()
 
 ## Injecting Dependencies
 
-In order to use the dependencies that have been provided to the PyxDI container, they need to be injected into the functions or classes that require them. This can be done by using the @di.inject decorator.
+In order to use the dependencies that have been provided to the `PyxDI` container, they need to be injected into the functions or classes that require them. This can be done by using the @di.inject decorator.
 
 Here's an example of how to use the `@di.inject` decorator:
 
@@ -401,7 +460,7 @@ def handler(service: Service = pyxdi.dep) -> None:
     print(f"Hello, from service `{service.name}`")
 ```
 
-Note that the service argument in the handler function has been given a default value of pyxdi.dep. This is done so that PyxDI knows which dependency to inject when the handler function is called.
+Note that the service argument in the handler function has been given a default value of pyxdi.dep. This is done so that `PyxDI` knows which dependency to inject when the handler function is called.
 
 Once the dependencies have been injected, the function can be called as usual, like so:
 
@@ -411,7 +470,7 @@ handler()
 
 ## Application Scan
 
-PyxDI provides a simple way to register providers and inject dependencies by scanning modules or packages. For example, your application might have the following structure:
+`PyxDI` provides a simple way to register providers and inject dependencies by scanning modules or packages. For example, your application might have the following structure:
 
 ```
 /app
@@ -488,7 +547,7 @@ di.scan(["app.providers"], categories=["provider"])
 
 This will scan for `provider` only within the `app.providers` module.
 
-With PyxDI's application scan feature, you can keep your code organized and easily manage your dependencies.
+With `PyxDI`'s application scan feature, you can keep your code organized and easily manage your dependencies.
 
 ## Testing
 
@@ -533,4 +592,4 @@ def test_hello_handler() -> None:
 
 ## Conclusion
 
-Check [examples](examples/basic.md) which shows how to use PyxDI in real-life application.
+Check [examples](examples/basic.md) which shows how to use `PyxDI` in real-life application.
