@@ -443,6 +443,10 @@ def service() -> str:
     return Service(name="demo")
 ```
 
+!!! note
+
+    If the provider has already been registered, it will be ignored to prevent duplicate registration.
+
 `handlers.py uses the Service class:
 
 ```python
