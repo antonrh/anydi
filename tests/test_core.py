@@ -706,6 +706,22 @@ def test_get_not_registered_instance(di: PyxDI) -> None:
     )
 
 
+def test_get_auto_registered_with_primitive_class() -> None:
+    di = PyxDI(auto_register=True)
+
+    @dataclass
+    class Service:
+        name: str
+
+    with pytest.raises(ProviderError) as exc_info:
+        di.get(Service)
+
+    assert str(exc_info.value) == (
+        "The provider interface for `str` has not been registered. Please ensure that "
+        "the provider interface is properly registered before attempting to use it."
+    )
+
+
 def test_has_instance(di: PyxDI) -> None:
     di.register_provider(str, lambda: "test")
     di.get(str)

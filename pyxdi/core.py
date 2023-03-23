@@ -12,7 +12,12 @@ from collections import defaultdict
 from contextvars import ContextVar
 from dataclasses import dataclass
 from functools import cached_property, partial
-from types import ModuleType, NoneType, TracebackType
+from types import ModuleType, TracebackType
+
+try:
+    from types import NoneType
+except ImportError:
+    NoneType = type(None)  # type: ignore[assignment,misc]
 
 import anyio
 
@@ -390,8 +395,12 @@ class PyxDI:
     def get(self, interface: t.Type[InterfaceT]) -> InterfaceT:
         try:
             provider = self.get_provider(interface)
-        except ProviderError:
+        except ProviderError as exc:
             if self.auto_register and inspect.isclass(interface):
+                try:
+                    self._get_signature(interface)
+                except ValueError:
+                    raise exc
                 scope = getattr(interface, "__pyxdi_scope__", self._default_scope)
                 provider = self.register_provider(interface, interface, scope=scope)
             else:
