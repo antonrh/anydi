@@ -1024,31 +1024,6 @@ def test_provider_decorator_with_provided_args(di: PyxDI) -> None:
 # Scanner
 
 
-def test_scan_only_provider(di: PyxDI) -> None:
-    di.scan(["tests.scan.a"], categories=["provider"])
-
-    assert str(di.providers[str]) == "tests.scan.a.a1.providers.a_a1_provider"
-    assert str(di.providers[int]) == "tests.scan.a.a3.providers.a_a3_provider"
-
-
-def test_scan_only_provider_package(di: PyxDI) -> None:
-    di.scan(["tests.scan.a.a1.providers"], categories=["provider"])
-
-    assert str(di.providers[str]) == "tests.scan.a.a1.providers.a_a1_provider"
-
-
-def test_scan_from_string(di: PyxDI) -> None:
-    di.scan("tests.scan.a.a1", categories=["provider"])
-
-    assert str(di.providers[str]) == "tests.scan.a.a1.providers.a_a1_provider"
-
-
-def test_scan_only_inject(di: PyxDI) -> None:
-    di.scan(["tests.scan.a"], categories=["inject"])
-
-    assert not di.providers
-
-
 def test_scan(di: PyxDI) -> None:
     di.scan(["tests.scan"])
 
@@ -1056,3 +1031,36 @@ def test_scan(di: PyxDI) -> None:
 
     assert a_a3_handler_1() == "a.a1.str_provider"
     assert a_a3_handler_2().ident == "a.a1.str_provider"
+
+
+def test_scan_non_existing_tag(di: PyxDI) -> None:
+    di.scan(["tests.scan"], tags=["non_existing_tag"])
+
+    assert not di.providers
+
+
+def test_scan_only_provider(di: PyxDI) -> None:
+    di.scan(["tests.scan.a"], tags=["a1"])
+
+    assert str(di.providers[str]) == "tests.scan.a.a1.providers.a_a1_provider"
+    assert int not in di.providers
+
+
+def test_scan_only_provider_package(di: PyxDI) -> None:
+    di.scan(["tests.scan.a.a1.providers"], tags=["a", "provider"])
+
+    assert str(di.providers[str]) == "tests.scan.a.a1.providers.a_a1_provider"
+
+
+def test_scan_from_string(di: PyxDI) -> None:
+    di.scan("tests.scan.a.a1", tags=["provider"])
+
+    assert str(di.providers[str]) == "tests.scan.a.a1.providers.a_a1_provider"
+
+
+def test_scan_only_inject(di: PyxDI) -> None:
+    di.scan(["tests.scan.a"], tags=["provider", "inject"])
+
+    from .scan.a.a3.handlers import a_a3_handler_1
+
+    assert a_a3_handler_1() == "a.a1.str_provider"

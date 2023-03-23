@@ -28,7 +28,7 @@ from .exceptions import (
     ScopeMismatch,
     UnknownDependency,
 )
-from .types import InterfaceT, ProviderObj, ScanCategory, Scope
+from .types import InterfaceT, ProviderObj, Scope
 from .utils import get_qualname
 
 logger = logging.getLogger(__name__)
@@ -585,7 +585,7 @@ class PyxDI:
             t.Iterable[t.Union[ModuleType, str]],
         ],
         *,
-        categories: t.Optional[t.Iterable[ScanCategory]] = None,
+        tags: t.Optional[t.Iterable[str]] = None,
     ) -> None:
         scanned_providers: t.List[ScannedProvider] = []
         scanned_dependencies: t.List[ScannedDependency] = []
@@ -597,7 +597,7 @@ class PyxDI:
 
         for package in scan_packages:
             _scanned_providers, _scanned_dependencies = self._scan_package(
-                package, categories=categories
+                package, tags=tags
             )
             scanned_providers.extend(_scanned_providers)
             scanned_dependencies.extend(_scanned_dependencies)
@@ -622,16 +622,16 @@ class PyxDI:
         self,
         package: t.Union[ModuleType, str],
         *,
-        categories: t.Optional[t.Iterable[ScanCategory]] = None,
+        tags: t.Optional[t.Iterable[str]] = None,
     ) -> t.Tuple[t.List[ScannedProvider], t.List[ScannedDependency]]:
-        categories = categories or t.get_args(ScanCategory)
+        tags = tags or []
         if isinstance(package, str):
             package = importlib.import_module(package)
 
         package_path = getattr(package, "__path__", None)
 
         if not package_path:
-            return self._scan_module(package, categories=categories)
+            return self._scan_module(package, tags=tags)
 
         scanned_providers: t.List[ScannedProvider] = []
         scanned_dependencies: t.List[ScannedDependency] = []
@@ -641,7 +641,7 @@ class PyxDI:
         ):
             module = importlib.import_module(module_info.name)
             _scanned_providers, _scanned_dependencies = self._scan_module(
-                module, categories=categories
+                module, tags=tags
             )
             scanned_providers.extend(_scanned_providers)
             scanned_dependencies.extend(_scanned_dependencies)
@@ -652,7 +652,7 @@ class PyxDI:
         self,
         module: ModuleType,
         *,
-        categories: t.Iterable[ScanCategory],
+        tags: t.Iterable[str],
     ) -> t.Tuple[t.List[ScannedProvider], t.List[ScannedDependency]]:
         scanned_providers: t.List[ScannedProvider] = []
         scanned_dependencies: t.List[ScannedDependency] = []
@@ -663,16 +663,20 @@ class PyxDI:
             ):
                 continue
 
+            member_tags = getattr(member, "__pyxdi_tags__", [])
+            if tags and (
+                member_tags
+                and not set(member_tags).intersection(tags)
+                or not member_tags
+            ):
+                continue
+
             provided = getattr(member, "__pyxdi_provider__", None)
-            if provided and "provider" in categories:
+            if provided:
                 scope = provided["scope"]
                 scanned_providers.append(ScannedProvider(member=member, scope=scope))
                 continue
 
-            if "inject" not in categories:
-                continue
-
-            # Get by @inject decorator
             injected = getattr(member, "__pyxdi_inject__", None)
             if injected:
                 scanned_dependencies.append(

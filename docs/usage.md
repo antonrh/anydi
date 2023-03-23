@@ -2,7 +2,7 @@
 
 ## Providers
 
-Providers are the backbone of PyxDI. A provider is a function or a class that returns an instance of a specific type.
+Providers are the backbone of `PyxDI`. A provider is a function or a class that returns an instance of a specific type.
 Once a provider is registered with PyxDI, it can be used to resolve dependencies throughout the application.
 
 ### Registering Providers
@@ -25,7 +25,7 @@ di.register_provider(str, message, scope="singleton")
 assert di.get(str) == "Hello, world!"
 ```
 
-Alternatively, you can use the provider decorator to register a provider function. The decorator takes care of registering the provider with PyxDI.
+Alternatively, you can use the provider decorator to register a provider function. The decorator takes care of registering the provider with `PyxDI`.
 
 ```python
 import pyxdi
@@ -534,18 +534,18 @@ di.close()
 
 The scan method takes a list of directory paths as an argument and recursively searches those directories for Python modules containing @pyxdi.provider- or @pyxdi.inject-decorated functions or classes.
 
-### Scan by categories
+### Scan by tags
 
-You can also scan for providers or injectables in specific categories. To do so, you need to use the category argument when registering providers or injectables. For example:
+You can also scan for providers or injectables in specific tags. To do so, you need to use the tags argument when registering providers or injectables. For example:
 
 ```python
 import pyxdi
 
 di = pyxdi.PyxDI()
-di.scan(["app.providers"], categories=["provider"])
+di.scan(["app.providers"], tags=["tag1"])
 ```
 
-This will scan for `provider` only within the `app.providers` module.
+This will scan for `@provider` annotated target only with defined `tags` within the `app.providers` module.
 
 With `PyxDI`'s application scan feature, you can keep your code organized and easily manage your dependencies.
 

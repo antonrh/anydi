@@ -10,4 +10,4 @@ exclude_lines =
     if t.TYPE_CHECKING
     @t.overload
     raise NotImplementedError
-
+    except ImportError:

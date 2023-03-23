@@ -3,7 +3,7 @@ import pyxdi
 from tests.fixtures import Service
 
 
-@pyxdi.inject
+@pyxdi.inject(tags=["inject"])
 def a_a3_handler_1(message: str = pyxdi.dep) -> str:
     return message
 
