@@ -71,6 +71,7 @@ def inject(
 ) -> t.Union[T, t.Callable[[T], T]]:
     def decorator(target: T) -> T:
         setattr(target, "__pyxdi_inject__", True)
+        setattr(target, "__pyxdi_tags__", tags)
         return target
 
     if target is None:
