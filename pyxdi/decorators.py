@@ -1,7 +1,6 @@
 import typing as t
 
-from .core import Provider
-from .types import ProviderObj, Scope
+from .types import Scope
 
 T = t.TypeVar("T")
 
@@ -22,31 +21,25 @@ def singleton(target: T) -> T:
 
 
 @t.overload
-def provider(
-    func: None = ...,
-    *,
-    scope: t.Optional[Scope] = None,
-    tags: t.Optional[t.Iterable[str]] = None,
-) -> t.Callable[..., t.Any]:
+def provider(target: T) -> T:
     ...
 
 
 @t.overload
 def provider(
-    func: ProviderObj,
     *,
     scope: t.Optional[Scope] = None,
     tags: t.Optional[t.Iterable[str]] = None,
-) -> t.Callable[[ProviderObj], t.Any]:
+) -> t.Callable[[T], T]:
     ...
 
 
 def provider(
-    func: t.Union[ProviderObj, None] = None,
+    target: t.Optional[T] = None,
     *,
     scope: t.Optional[Scope] = None,
     tags: t.Optional[t.Iterable[str]] = None,
-) -> t.Union[ProviderObj, t.Callable[[Provider], t.Any]]:
+) -> t.Union[T, t.Callable[[T], T]]:
     def decorator(target: T) -> T:
         setattr(
             target,
@@ -58,11 +51,29 @@ def provider(
         setattr(target, "__pyxdi_tags__", tags)
         return target
 
-    if func is None:
+    if target is None:
         return decorator
-    return decorator(func)
+    return decorator(target)
 
 
+@t.overload
 def inject(target: T) -> T:
-    setattr(target, "__pyxdi_inject__", True)
-    return target
+    ...
+
+
+@t.overload
+def inject(*, tags: t.Optional[t.Iterable[str]] = None) -> t.Callable[[T], T]:
+    ...
+
+
+def inject(
+    target: t.Optional[T] = None, *, tags: t.Optional[t.Iterable[str]] = None
+) -> t.Union[T, t.Callable[[T], T]]:
+    def decorator(target: T) -> T:
+        setattr(target, "__pyxdi_inject__", True)
+        return target
+
+    if target is None:
+        return decorator
+
+    return decorator(target)
