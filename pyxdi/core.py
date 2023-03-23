@@ -12,7 +12,12 @@ from collections import defaultdict
 from contextvars import ContextVar
 from dataclasses import dataclass
 from functools import cached_property, partial
-from types import ModuleType, NoneType, TracebackType
+from types import ModuleType, TracebackType
+
+try:
+    from types import NoneType
+except ImportError:
+    NoneType = type(None)  # type: ignore[assignment,misc]
 
 import anyio
 
