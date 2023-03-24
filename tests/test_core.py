@@ -4,7 +4,7 @@ from dataclasses import dataclass
 
 import pytest
 
-from pyxdi.core import DependencyParam, Provider, PyxDI
+from pyxdi.core import Dependency, Provider, PyxDI
 from pyxdi.exceptions import (
     AnnotationError,
     InvalidScope,
@@ -451,10 +451,10 @@ def test_validate_unresolved_provider_dependencies(di: PyxDI) -> None:
 
 
 def test_validate_unresolved_injected_dependencies(di: PyxDI) -> None:
-    def func1(service: Service = DependencyParam()) -> None:
+    def func1(service: Service = Dependency()) -> None:
         return None
 
-    def func2(message: str = DependencyParam()) -> None:
+    def func2(message: str = Dependency()) -> None:
         return None
 
     di.inject(func1)
@@ -473,7 +473,7 @@ def test_validate_unresolved_injected_dependencies(di: PyxDI) -> None:
 
 
 def test_validate_unresolved_injected_dependencies_auto_register_class() -> None:
-    def func1(service: Service = DependencyParam()) -> None:
+    def func1(service: Service = Dependency()) -> None:
         return None
 
     di = PyxDI(auto_register=True)
@@ -896,7 +896,7 @@ def test_get_provider_arguments(di: PyxDI) -> None:
 
 
 def test_inject_missing_annotation(di: PyxDI) -> None:
-    def func(name=DependencyParam()) -> str:  # type: ignore[no-untyped-def]
+    def func(name=Dependency()) -> str:  # type: ignore[no-untyped-def]
         return name  # type: ignore[no-any-return]
 
     with pytest.raises(AnnotationError) as exc_info:
@@ -918,7 +918,7 @@ def test_inject(di: PyxDI) -> None:
         return Service(ident=ident)
 
     @di.inject
-    def func(name: str, service: Service = DependencyParam()) -> str:
+    def func(name: str, service: Service = Dependency()) -> str:
         return f"{name} = {service.ident}"
 
     result = func(name="service ident")
@@ -937,7 +937,7 @@ def test_inject_class(di: PyxDI) -> None:
 
     @di.inject
     class Handler:
-        def __init__(self, name: str, service: Service = DependencyParam()) -> None:
+        def __init__(self, name: str, service: Service = Dependency()) -> None:
             self.name = name
             self.service = service
 
@@ -964,7 +964,7 @@ def test_inject_dataclass(di: PyxDI) -> None:
     @dataclass
     class Handler:
         name: str
-        service: Service = DependencyParam()
+        service: Service = Dependency()
 
         def handle(self) -> str:
             return f"{self.name} = {self.service.ident}"
@@ -989,7 +989,7 @@ async def test_inject_with_sync_and_async_resources(di: PyxDI) -> None:
     await di.astart()
 
     @di.inject
-    async def func(name: str, service: Service = DependencyParam()) -> str:
+    async def func(name: str, service: Service = Dependency()) -> str:
         return f"{name} = {service.ident}"
 
     result = await func(name="service ident")

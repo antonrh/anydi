@@ -90,12 +90,12 @@ class ScannedDependency:
     module: ModuleType
 
 
-class Dependency:
+class DependencyMark:
     __slots__ = ()
 
 
-def DependencyParam() -> t.Any:  # noqa
-    return Dependency()
+def Dependency() -> t.Any:  # noqa
+    return DependencyMark()
 
 
 @dataclass(frozen=True)
@@ -690,7 +690,7 @@ class PyxDI:
             else:
                 signature = self._get_signature(member)
             for parameter in signature.parameters.values():
-                if isinstance(parameter.default, Dependency):
+                if isinstance(parameter.default, DependencyMark):
                     scanned_dependencies.append(
                         self._scanned_dependency(member=member, module=module)
                     )
@@ -758,7 +758,7 @@ class PyxDI:
                     f"Missing `{get_qualname(obj)}` parameter annotation."
                 )
 
-            if not isinstance(parameter.default, Dependency):
+            if not isinstance(parameter.default, DependencyMark):
                 continue
 
             if (
