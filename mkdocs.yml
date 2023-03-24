@@ -16,13 +16,15 @@ edit_uri: ""
 nav:
   - Introduction: index.md
   - Usage: usage.md
+  - Extension
+    - FastAPI: extensions/fastapi.md
   - Examples:
-      - Basic: examples/basic.md
-      - Flask: examples/flask.md
-      - Flask + SQLAlchemy: examples/flask_sqlalchemy.md
-      - FastAPI: examples/fastapi.md
-      - FastAPI + SQLAlchemy: examples/fastapi_sqlalchemy.md
-      - Django: examples/django.md
+    - Basic: examples/basic.md
+    - Flask: examples/flask.md
+    - Flask + SQLAlchemy: examples/flask_sqlalchemy.md
+    - FastAPI: examples/fastapi.md
+    - FastAPI + SQLAlchemy: examples/fastapi_sqlalchemy.md
+    - Django: examples/django.md
 
 markdown_extensions:
   - admonition
