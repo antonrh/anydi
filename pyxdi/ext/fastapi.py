@@ -24,9 +24,10 @@ def install(app: fastapi.FastAPI, di: pyxdi.PyxDI) -> None:
         for dependant in iter_dependencies(route.dependant):
             if dependant.cache_key not in patched:
                 patched.append(dependant.cache_key)
-                if not dependant.call:
+                call, *params = dependant.cache_key
+                if not call:
                     continue  # pragma: no cover
-                for param in inspect.signature(dependant.call).parameters.values():
+                for param in inspect.signature(call).parameters.values():
                     if isinstance(param.default, InjectParam):
                         if param.annotation is inspect._empty:  # noqa
                             raise TypeError(
