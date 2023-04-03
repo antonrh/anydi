@@ -27,7 +27,7 @@ def install(app: fastapi.FastAPI, di: pyxdi.PyxDI) -> None:
                 call, *params = dependant.cache_key
                 if not call:
                     continue  # pragma: no cover
-                for param in inspect.signature(call).parameters.values():
+                for param in inspect.signature(call, eval_str=True).parameters.values():
                     if isinstance(param.default, InjectParam):
                         if param.annotation is inspect._empty:  # noqa
                             raise TypeError(

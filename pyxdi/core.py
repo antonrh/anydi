@@ -776,7 +776,7 @@ class PyxDI:
     def _get_signature(self, obj: t.Callable[..., t.Any]) -> inspect.Signature:
         signature = self._signature_cache.get(obj)
         if signature is None:
-            signature = inspect.signature(obj)
+            signature = inspect.signature(obj, eval_str=True)
             self._signature_cache[obj] = signature
         return signature
 
