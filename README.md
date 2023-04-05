@@ -1,4 +1,4 @@
-# PyxDI (in development)
+# PyxDI
 
 `PyxDI` is a modern, lightweight and async-friendly Python Dependency Injection library that leverages type annotations ([PEP 484](https://peps.python.org/pep-0484/))
 to effortlessly manage dependencies in your applications.

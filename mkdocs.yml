@@ -16,7 +16,7 @@ edit_uri: ""
 nav:
   - Introduction: index.md
   - Usage: usage.md
-  - Extension:
+  - Extensions:
     - FastAPI: extensions/fastapi.md
   - Examples:
     - Basic: examples/basic.md
