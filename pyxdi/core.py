@@ -210,12 +210,12 @@ class PyxDI:
     def get_provider(self, interface: t.Type[t.Any]) -> Provider:
         try:
             return self._providers[interface]
-        except KeyError:
+        except KeyError as exc:
             raise ProviderError(
                 f"The provider interface for `{get_qualname(interface)}` has not been "
                 "registered. Please ensure that the provider interface is properly "
                 "registered before attempting to use it."
-            )
+            ) from exc
 
     def singleton(
         self, interface: t.Type[InterfaceT], instance: t.Any, *, override: bool = False
@@ -657,7 +657,7 @@ class PyxDI:
         scanned_providers: t.List[ScannedProvider] = []
         scanned_dependencies: t.List[ScannedDependency] = []
 
-        for name, member in inspect.getmembers(module):
+        for _, member in inspect.getmembers(module):
             if getattr(member, "__module__", None) != module.__name__ or not callable(
                 member
             ):
