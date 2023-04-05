@@ -24,8 +24,7 @@ docs = ["mkdocs", "mkdocs-material"]
 black = "^23.1.0"
 isort = "^5.11.5"
 mypy = "^1.0"
-flake8 = "^3.9.2"
-flake8-tidy-imports = "^4.8.0"
+ruff = "^0.0.261"
 pytest = "^7.2.1"
 pytest-cov = "^4.0.0"
 sqlalchemy = "^2.0.3"
@@ -47,6 +46,17 @@ sections = ["FUTURE", "STDLIB", "THIRDPARTY", "FIRSTPARTY", "TESTS", "LOCALFOLDE
 [tool.mypy]
 python_version = "3.10"
 strict = true
+
+[tool.ruff]
+line-length = 88
+select = ["C", "E", "F", "W", "B", "TID252", "T20"]
+ignore = ["B008", "B009", "B010"]
+exclude = [
+    ".git",
+    "__pycache__",
+    ".history"
+]
+
 
 [tool.pytest.ini_options]
 addopts = [
