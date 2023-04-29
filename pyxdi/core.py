@@ -529,13 +529,13 @@ class PyxDI:
         scope: t.Optional[Scope] = None,
         override: bool = False,
         ignore: bool = False,
-    ) -> t.Union[ProviderObj, t.Callable[[Provider], t.Any]]:
+    ) -> t.Union[ProviderObj, t.Callable[[Provider], ProviderObj]]:
         decorator = self._provider_decorator(
             scope=scope, override=override, ignore=ignore
         )
         if func is None:
             return decorator
-        return decorator(func)  # type: ignore[no-any-return]
+        return decorator(func)
 
     def _provider_decorator(
         self,
@@ -543,8 +543,8 @@ class PyxDI:
         scope: t.Optional[Scope] = None,
         override: bool = False,
         ignore: bool = False,
-    ) -> t.Callable[[ProviderObj], t.Any]:
-        def register_provider(func: ProviderObj) -> t.Any:
+    ) -> t.Callable[[ProviderObj], ProviderObj]:
+        def register_provider(func: ProviderObj) -> ProviderObj:
             interface = self._get_provider_annotation(func)
             self.register_provider(
                 interface,
