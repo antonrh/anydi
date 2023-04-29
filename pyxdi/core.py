@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import sys
 import contextlib
 import functools
 import importlib
@@ -30,6 +31,8 @@ from .exceptions import (
 )
 from .types import InterfaceT, ProviderObj, Scope
 from .utils import get_qualname
+
+SUPPORT_SIGNATURE_EVAL_STR = sys.version_info > (3, 9)
 
 logger = logging.getLogger(__name__)
 
@@ -774,7 +777,10 @@ class PyxDI:
     def _get_signature(self, obj: t.Callable[..., t.Any]) -> inspect.Signature:
         signature = self._signature_cache.get(obj)
         if signature is None:
-            signature = inspect.signature(obj, eval_str=True)
+            signature_kwargs: t.Dict[str, t.Any] = {}
+            if SUPPORT_SIGNATURE_EVAL_STR:
+                signature_kwargs["eval_str"] = True
+            signature = inspect.signature(obj, **signature_kwargs)
             self._signature_cache[obj] = signature
         return signature
 
