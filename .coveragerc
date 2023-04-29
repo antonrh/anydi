@@ -11,3 +11,4 @@ exclude_lines =
     @t.overload
     raise NotImplementedError
     except ImportError:
+    if SUPPORT_SIGNATURE_EVAL_STR

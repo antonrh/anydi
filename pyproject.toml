@@ -22,26 +22,17 @@ docs = ["mkdocs", "mkdocs-material"]
 
 [tool.poetry.group.dev.dependencies]
 black = "^23.1.0"
-isort = "^5.11.5"
-mypy = "^1.0"
-ruff = "^0.0.261"
+mypy = "^1.2.0"
+ruff = "^0.0.263"
 pytest = "^7.2.1"
 pytest-cov = "^4.0.0"
-sqlalchemy = "^2.0.3"
-flask = "^2.2.2"
-fastapi = "^0.95.0"
-httpx = "^0.23.3"
+fastapi = "^0.95.1"
+httpx = "^0.24.0"
 
 [tool.black]
 line-length = 88
 target-version = ['py310']
 include = '\.pyi?$'
-
-[tool.isort]
-profile = "black"
-combine_as_imports = true
-known_tests = "tests"
-sections = ["FUTURE", "STDLIB", "THIRDPARTY", "FIRSTPARTY", "TESTS", "LOCALFOLDER"]
 
 [tool.mypy]
 python_version = "3.10"
@@ -57,6 +48,9 @@ exclude = [
     ".history"
 ]
 
+[tool.ruff.isort]
+combine-as-imports = true
+forced-separate = ["tests"]
 
 [tool.pytest.ini_options]
 addopts = [

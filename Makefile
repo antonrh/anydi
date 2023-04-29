@@ -6,13 +6,12 @@ help:
 
 lint: ## Run code linters
 	poetry run black pyxdi/ tests/ --check
-	poetry run isort pyxdi/ tests/ --check
 	poetry run ruff check pyxdi/ tests/
 	poetry run mypy pyxdi/ tests/
 
 fmt: ## Run code formatters
+	poetry run ruff check pyxdi/ tests/ --fix
 	poetry run black pyxdi/ tests/
-	poetry run isort pyxdi/ tests/
 
 
 test:  ## Run unit tests

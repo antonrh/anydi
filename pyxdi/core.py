@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import sys
 import contextlib
 import functools
 import importlib
@@ -30,6 +31,8 @@ from .exceptions import (
 )
 from .types import InterfaceT, ProviderObj, Scope
 from .utils import get_qualname
+
+SUPPORT_SIGNATURE_EVAL_STR = sys.version_info > (3, 9)
 
 logger = logging.getLogger(__name__)
 
@@ -748,18 +751,16 @@ class PyxDI:
         return args, kwargs
 
     def _get_injectable_params(self, obj: t.Callable[..., t.Any]) -> t.Dict[str, t.Any]:
-        signature = self._get_signature(obj)
-        parameters = signature.parameters
-        params = {}
-        for parameter in parameters.values():
+        injectable_params = {}
+        for parameter in self._get_signature(obj).parameters.values():
+            if not isinstance(parameter.default, DependencyMark):
+                continue
+
             annotation = parameter.annotation
             if annotation is inspect._empty:  # noqa
                 raise AnnotationError(
                     f"Missing `{get_qualname(obj)}` parameter annotation."
                 )
-
-            if not isinstance(parameter.default, DependencyMark):
-                continue
 
             if (
                 not self.has_provider(annotation)
@@ -770,13 +771,16 @@ class PyxDI:
                     parameter_name=parameter.name, obj=obj
                 )
 
-            params[parameter.name] = annotation
-        return params
+            injectable_params[parameter.name] = annotation
+        return injectable_params
 
     def _get_signature(self, obj: t.Callable[..., t.Any]) -> inspect.Signature:
         signature = self._signature_cache.get(obj)
         if signature is None:
-            signature = inspect.signature(obj, eval_str=True)
+            signature_kwargs: t.Dict[str, t.Any] = {}
+            if SUPPORT_SIGNATURE_EVAL_STR:
+                signature_kwargs["eval_str"] = True
+            signature = inspect.signature(obj, **signature_kwargs)
             self._signature_cache[obj] = signature
         return signature
 
