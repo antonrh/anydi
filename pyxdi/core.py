@@ -748,18 +748,16 @@ class PyxDI:
         return args, kwargs
 
     def _get_injectable_params(self, obj: t.Callable[..., t.Any]) -> t.Dict[str, t.Any]:
-        signature = self._get_signature(obj)
-        parameters = signature.parameters
-        params = {}
-        for parameter in parameters.values():
+        injectable_params = {}
+        for parameter in self._get_signature(obj).parameters.values():
+            if not isinstance(parameter.default, DependencyMark):
+                continue
+
             annotation = parameter.annotation
             if annotation is inspect._empty:  # noqa
                 raise AnnotationError(
                     f"Missing `{get_qualname(obj)}` parameter annotation."
                 )
-
-            if not isinstance(parameter.default, DependencyMark):
-                continue
 
             if (
                 not self.has_provider(annotation)
@@ -770,8 +768,8 @@ class PyxDI:
                     parameter_name=parameter.name, obj=obj
                 )
 
-            params[parameter.name] = annotation
-        return params
+            injectable_params[parameter.name] = annotation
+        return injectable_params
 
     def _get_signature(self, obj: t.Callable[..., t.Any]) -> inspect.Signature:
         signature = self._signature_cache.get(obj)
