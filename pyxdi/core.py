@@ -15,6 +15,8 @@ from dataclasses import dataclass
 from functools import cached_property, partial
 from types import ModuleType, TracebackType
 
+from typing_extensions import ParamSpec
+
 try:
     from types import NoneType
 except ImportError:
@@ -29,12 +31,14 @@ from .exceptions import (
     ScopeMismatch,
     UnknownDependency,
 )
-from .types import InterfaceT, ProviderObj, Scope
+from .types import InterfaceT, Scope
 from .utils import get_qualname
 
-SUPPORT_SIGNATURE_EVAL_STR = sys.version_info > (3, 9)
+T = t.TypeVar("T", bound=t.Any)
+P = ParamSpec("P")
 
-logger = logging.getLogger(__name__)
+
+SUPPORT_SIGNATURE_EVAL_STR = sys.version_info > (3, 9)
 
 ALLOWED_SCOPES: t.Dict[Scope, t.List[Scope]] = {
     "singleton": ["singleton"],
@@ -42,10 +46,12 @@ ALLOWED_SCOPES: t.Dict[Scope, t.List[Scope]] = {
     "transient": ["transient", "singleton", "request"],
 }
 
+logger = logging.getLogger(__name__)
+
 
 @dataclass(frozen=True)
 class Provider:
-    obj: ProviderObj
+    obj: t.Callable[..., t.Any]
     scope: Scope
 
     def __str__(self) -> str:
@@ -91,6 +97,7 @@ class ScannedProvider:
 class ScannedDependency:
     member: t.Any
     module: ModuleType
+    lazy: t.Optional[bool] = None
 
 
 class DependencyMark:
@@ -147,7 +154,7 @@ class PyxDI:
     def register_provider(
         self,
         interface: t.Type[t.Any],
-        obj: ProviderObj,
+        obj: t.Callable[..., t.Any],
         *,
         scope: t.Optional[Scope] = None,
         override: bool = False,
@@ -501,50 +508,28 @@ class PyxDI:
     # Decorators
 
     @t.overload
-    def provider(
-        self,
-        func: None = ...,
-        *,
-        scope: t.Optional[Scope] = None,
-        override: bool = False,
-        ignore: bool = False,
-    ) -> t.Callable[..., t.Any]:
+    def provider(self, func: t.Callable[P, T]) -> t.Callable[P, T]:
         ...
 
     @t.overload
     def provider(
         self,
-        func: ProviderObj,
         *,
         scope: t.Optional[Scope] = None,
         override: bool = False,
         ignore: bool = False,
-    ) -> t.Callable[[ProviderObj], t.Any]:
+    ) -> t.Callable[[t.Callable[P, T]], t.Callable[P, T]]:
         ...
 
     def provider(
         self,
-        func: t.Union[ProviderObj, None] = None,
+        func: t.Optional[t.Callable[P, T]] = None,
         *,
         scope: t.Optional[Scope] = None,
         override: bool = False,
         ignore: bool = False,
-    ) -> t.Union[ProviderObj, t.Callable[[Provider], ProviderObj]]:
-        decorator = self._provider_decorator(
-            scope=scope, override=override, ignore=ignore
-        )
-        if func is None:
-            return decorator
-        return decorator(func)
-
-    def _provider_decorator(
-        self,
-        *,
-        scope: t.Optional[Scope] = None,
-        override: bool = False,
-        ignore: bool = False,
-    ) -> t.Callable[[ProviderObj], ProviderObj]:
-        def register_provider(func: ProviderObj) -> ProviderObj:
+    ) -> t.Union[t.Callable[P, T], t.Callable[[t.Callable[P, T]], t.Callable[P, T]]]:
+        def decorator(func: t.Callable[P, T]) -> t.Callable[P, T]:
             interface = self._get_provider_annotation(func)
             self.register_provider(
                 interface,
@@ -555,28 +540,66 @@ class PyxDI:
             )
             return func
 
-        return register_provider
+        if func is None:
+            return decorator
+        return decorator(func)
 
-    def inject(self, obj: t.Callable[..., t.Any]) -> t.Callable[..., t.Any]:
-        injected_params = self._get_injectable_params(obj)
+    @t.overload
+    def inject(self, obj: t.Callable[P, T]) -> t.Callable[P, T]:
+        ...
 
-        if inspect.iscoroutinefunction(obj):
+    @t.overload
+    def inject(
+        self, obj: t.Callable[P, t.Awaitable[T]]
+    ) -> t.Callable[P, t.Awaitable[T]]:
+        ...
+
+    @t.overload
+    def inject(
+        self, *, lazy: t.Optional[bool] = None
+    ) -> t.Callable[
+        [t.Callable[P, t.Union[T, t.Awaitable[T]]]],
+        t.Callable[P, t.Union[T, t.Awaitable[T]]],
+    ]:
+        ...
+
+    def inject(
+        self,
+        obj: t.Union[t.Callable[P, t.Union[T, t.Awaitable[T]]], None] = None,
+        lazy: t.Optional[bool] = None,
+    ) -> t.Union[
+        t.Callable[
+            [t.Callable[P, t.Union[T, t.Awaitable[T]]]],
+            t.Callable[P, t.Union[T, t.Awaitable[T]]],
+        ],
+        t.Callable[P, t.Union[T, t.Awaitable[T]]],
+    ]:
+        def decorator(
+            obj: t.Callable[P, t.Union[T, t.Awaitable[T]]]
+        ) -> t.Callable[P, t.Union[T, t.Awaitable[T]]]:
+            injected_params = self._get_injectable_params(obj)
+
+            if inspect.iscoroutinefunction(obj):
+
+                @functools.wraps(obj)
+                async def awrapped(*args: P.args, **kwargs: P.kwargs) -> T:
+                    for name, annotation in injected_params.items():
+                        kwargs[name] = self.get(annotation)
+                    return t.cast(T, await obj(*args, **kwargs))
+
+                return awrapped
 
             @functools.wraps(obj)
-            async def awrapped(*args: t.Any, **kwargs: t.Any) -> t.Any:
+            def wrapped(*args: P.args, **kwargs: P.kwargs) -> T:
                 for name, annotation in injected_params.items():
                     kwargs[name] = self.get(annotation)
-                return await obj(*args, **kwargs)
+                return t.cast(T, obj(*args, **kwargs))
 
-            return awrapped
+            return wrapped
 
-        @functools.wraps(obj)
-        def wrapped(*args: t.Any, **kwargs: t.Any) -> t.Any:
-            for name, annotation in injected_params.items():
-                kwargs[name] = self.get(annotation)
-            return obj(*args, **kwargs)
-
-        return wrapped
+        if obj is None:
+            return decorator
+        return decorator(obj)
 
     # Scanner
 
@@ -607,14 +630,15 @@ class PyxDI:
 
         for scanned_provider in scanned_providers:
             self.provider(
-                func=scanned_provider.member,
                 scope=scanned_provider.scope,
                 override=False,
                 ignore=True,
-            )
+            )(scanned_provider.member)
 
         for scanned_dependency in scanned_dependencies:
-            decorator = self.inject(scanned_dependency.member)
+            decorator = self.inject(lazy=scanned_dependency.lazy)(
+                scanned_dependency.member
+            )
             setattr(
                 scanned_dependency.module,
                 scanned_dependency.member.__name__,
@@ -682,8 +706,9 @@ class PyxDI:
 
             injected = getattr(member, "__pyxdi_inject__", None)
             if injected:
+                lazy = injected["lazy"]
                 scanned_dependencies.append(
-                    self._scanned_dependency(member=member, module=module)
+                    self._scanned_dependency(member=member, module=module, lazy=lazy)
                 )
                 continue
 
@@ -702,15 +727,15 @@ class PyxDI:
         return scanned_providers, scanned_dependencies
 
     def _scanned_dependency(
-        self, member: t.Any, module: ModuleType
+        self, member: t.Any, module: ModuleType, lazy: t.Optional[bool] = None
     ) -> ScannedDependency:
         if hasattr(member, "__wrapped__"):
             member = member.__wrapped__
-        return ScannedDependency(member=member, module=module)
+        return ScannedDependency(member=member, module=module, lazy=lazy)
 
     # Inspection
 
-    def _get_provider_annotation(self, obj: ProviderObj) -> t.Any:
+    def _get_provider_annotation(self, obj: t.Callable[..., t.Any]) -> t.Any:
         annotation = self._get_signature(obj).return_annotation
 
         if annotation is inspect._empty:  # noqa
