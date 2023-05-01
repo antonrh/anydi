@@ -20,7 +20,7 @@ mkdocs-material = { version = "^9.0.12", optional = true }
 
 [tool.poetry.extras]
 docs = ["mkdocs", "mkdocs-material"]
-full = ["anyio", "lazy-object-proxy"]
+all = ["anyio", "lazy-object-proxy"]
 
 [tool.poetry.group.dev.dependencies]
 black = "^23.1.0"
