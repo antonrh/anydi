@@ -468,6 +468,10 @@ Once the dependencies have been injected, the function can be called as usual, l
 handler()
 ```
 
+### Lazy dependencies
+
+TODO:
+
 ## Application Scan
 
 `PyxDI` provides a simple way to register providers and inject dependencies by scanning modules or packages. For example, your application might have the following structure:
