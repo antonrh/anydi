@@ -74,6 +74,17 @@ di = pyxdi.PyxDI()
 app = fastapi.FastAPI(on_startup=[di.astart], on_shutdown=[di.aclose])
 ```
 
+## Lazy injections
+
+```python
+import pyxdi.ext.fastapi
+
+
+di = pyxdi.PyxDI(lazy_inject=True)
+```
+
+TODO: Inject(lazy=True)
+
 ## Request Scope
 
 To utilize `request` scoped dependencies in your `FastAPI` application with `PyxDI`, you can make use of the

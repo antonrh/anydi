@@ -468,7 +468,7 @@ Once the dependencies have been injected, the function can be called as usual, l
 handler()
 ```
 
-### Lazy dependencies
+### Lazy injections
 
 TODO:
 
