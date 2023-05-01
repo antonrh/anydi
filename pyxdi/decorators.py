@@ -2,7 +2,7 @@ import typing as t
 
 from typing_extensions import ParamSpec
 
-from .types import Scope
+from .core import Scope
 
 T = t.TypeVar("T", bound=t.Any)
 P = ParamSpec("P")

@@ -14,6 +14,7 @@ packages = [
 [tool.poetry.dependencies]
 python = ">=3.7,<3.12"
 anyio = "^3.6.2"
+lazy-object-proxy = "^1.9.0"
 mkdocs = { version = "^1.4.2", optional = true }
 mkdocs-material = { version = "^9.0.12", optional = true }
 
@@ -34,14 +35,10 @@ line-length = 88
 target-version = ['py310']
 include = '\.pyi?$'
 
-[tool.mypy]
-python_version = "3.10"
-strict = true
-
 [tool.ruff]
 line-length = 88
-select = ["C", "E", "F", "W", "B", "TID252", "T20"]
-ignore = ["B008", "B009", "B010"]
+select = ["A", "B", "C", "E", "F", "I", "W", "TID252", "T20"]
+ignore = ["A003", "B008", "B009", "B010"]
 exclude = [
     ".git",
     "__pycache__",
@@ -51,6 +48,17 @@ exclude = [
 [tool.ruff.isort]
 combine-as-imports = true
 forced-separate = ["tests"]
+
+
+[tool.mypy]
+python_version = "3.10"
+strict = true
+
+[[tool.mypy.overrides]]
+module = [
+    "lazy_object_proxy.*",
+]
+ignore_missing_imports = true
 
 [tool.pytest.ini_options]
 addopts = [

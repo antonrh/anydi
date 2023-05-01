@@ -5,10 +5,12 @@ import fastapi
 from fastapi import params
 from fastapi.dependencies.models import Dependant
 from fastapi.routing import APIRoute
+from lazy_object_proxy import Proxy
 from starlette.requests import Request
 
 import pyxdi
 from pyxdi.ext.starlette.middleware import RequestScopedMiddleware
+from pyxdi.utils import get_signature
 
 __all__ = ["RequestScopedMiddleware", "install", "get_di", "Inject"]
 
@@ -27,7 +29,7 @@ def install(app: fastapi.FastAPI, di: pyxdi.PyxDI) -> None:
                 call, *params = dependant.cache_key
                 if not call:
                     continue  # pragma: no cover
-                for param in inspect.signature(call, eval_str=True).parameters.values():
+                for param in get_signature(call).parameters.values():
                     if isinstance(param.default, InjectParam):
                         if param.annotation is inspect._empty:  # noqa
                             raise TypeError(
@@ -45,9 +47,10 @@ def get_di(request: Request) -> pyxdi.PyxDI:
 
 
 class InjectParam(params.Depends):
-    def __init__(self) -> None:
+    def __init__(self, lazy: t.Optional[bool] = None) -> None:
         super().__init__(dependency=self._dependency, use_cache=True)
         self._interface: t.Any = None
+        self._lazy = lazy
 
     @property
     def interface(self) -> t.Any:
@@ -60,11 +63,14 @@ class InjectParam(params.Depends):
         self._interface = val
 
     def _dependency(self, di: pyxdi.PyxDI = fastapi.Depends(get_di)) -> t.Any:
+        lazy = di.lazy_inject if self._lazy is None else self._lazy
+        if lazy:
+            return Proxy(lambda: di.get(self.interface))
         return di.get(self.interface)
 
 
-def Inject() -> t.Any:  # noqa
-    return InjectParam()
+def Inject(*, lazy: t.Optional[bool] = None) -> t.Any:  # noqa
+    return InjectParam(lazy=lazy)
 
 
 def iter_dependencies(dependant: Dependant) -> t.Iterator[Dependant]:

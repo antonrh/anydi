@@ -4,7 +4,7 @@ from dataclasses import dataclass
 
 import pytest
 
-from pyxdi.core import Dependency, Provider, PyxDI
+from pyxdi.core import Dependency, Provider, PyxDI, Scope
 from pyxdi.exceptions import (
     AnnotationError,
     InvalidScope,
@@ -12,7 +12,6 @@ from pyxdi.exceptions import (
     ScopeMismatch,
     UnknownDependency,
 )
-from pyxdi.types import Scope
 
 from tests.fixtures import Service
 

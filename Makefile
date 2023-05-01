@@ -10,8 +10,8 @@ lint: ## Run code linters
 	poetry run mypy pyxdi/ tests/
 
 fmt: ## Run code formatters
-	poetry run ruff check pyxdi/ tests/ --fix
 	poetry run black pyxdi/ tests/
+	poetry run ruff check pyxdi/ tests/ --fix
 
 
 test:  ## Run unit tests
