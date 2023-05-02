@@ -6,9 +6,9 @@ import typing as t
 try:
     import anyio  # noqa
 
-    any_installed = True
+    anyio_installed = True
 except ImportError:
-    any_installed = False
+    anyio_installed = False
 
 
 try:
@@ -52,7 +52,7 @@ def make_lazy(func: t.Callable[..., T], /, *args: t.Any, **kwargs: t.Any) -> T:
 
 
 async def run_async(func: t.Callable[..., T], /, *args: t.Any, **kwargs: t.Any) -> T:
-    if not any_installed:
+    if not anyio_installed:
         raise ImportError(
             "`anyio` library is not currently installed. Please make sure to install "
             "it first, or consider using `pyxdi[full]` instead."
