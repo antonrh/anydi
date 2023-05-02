@@ -5,12 +5,11 @@ import fastapi
 from fastapi import params
 from fastapi.dependencies.models import Dependant
 from fastapi.routing import APIRoute
-from lazy_object_proxy import Proxy
 from starlette.requests import Request
 
 import pyxdi
 from pyxdi.ext.starlette.middleware import RequestScopedMiddleware
-from pyxdi.utils import get_signature
+from pyxdi.utils import get_signature, make_lazy
 
 __all__ = ["RequestScopedMiddleware", "install", "get_di", "Inject"]
 
@@ -65,7 +64,7 @@ class InjectParam(params.Depends):
     def _dependency(self, di: pyxdi.PyxDI = fastapi.Depends(get_di)) -> t.Any:
         lazy = di.lazy_inject if self._lazy is None else self._lazy
         if lazy:
-            return Proxy(lambda: di.get(self.interface))
+            return make_lazy(di.get, self.interface)
         return di.get(self.interface)
 
 

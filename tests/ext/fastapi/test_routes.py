@@ -19,6 +19,23 @@ def test_send_mail(client: TestClient) -> None:
     }
 
 
+def test_send_mail_lazy(client: TestClient, di: pyxdi.PyxDI) -> None:
+    message = "lazy"
+
+    mail_service_mock = mock.MagicMock(spec=MailService)
+
+    with di.override(MailService, instance=mail_service_mock):
+        response = client.post("/send-mail-lazy", json={"message": message})
+
+    assert response.status_code == 200
+    assert response.json() == {
+        "email": TEST_EMAIL,
+        "message": message,
+    }
+
+    mail_service_mock.send_mail.assert_not_called()
+
+
 def test_send_mail_mock_mail_service(client: TestClient, di: pyxdi.PyxDI) -> None:
     mail = Mail(email="mock@mail.com", message="mock")
 

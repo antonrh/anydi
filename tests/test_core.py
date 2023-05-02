@@ -1,9 +1,11 @@
 import typing as t
 import uuid
 from dataclasses import dataclass
+from unittest import mock
 
 import pytest
 
+import pyxdi
 from pyxdi.core import Dependency, Provider, PyxDI, Scope
 from pyxdi.exceptions import (
     AnnotationError,
@@ -994,6 +996,23 @@ async def test_inject_with_sync_and_async_resources(di: PyxDI) -> None:
     result = await func(name="service ident")
 
     assert result == "service ident = 1000"
+
+
+def test_inject_lazy(di: pyxdi.PyxDI) -> None:
+    service_init = mock.Mock()
+
+    @di.provider
+    def service() -> Service:
+        service_init()
+        return Service(ident="test")
+
+    @di.inject(lazy=True)
+    def func(service: Service = Dependency()) -> None:
+        pass
+
+    func()
+
+    service_init.assert_not_called()
 
 
 def test_provider_decorator_no_args(di: PyxDI) -> None:
