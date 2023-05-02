@@ -52,7 +52,6 @@ exclude = [
 combine-as-imports = true
 forced-separate = ["tests"]
 
-
 [tool.mypy]
 python_version = "3.10"
 strict = true
