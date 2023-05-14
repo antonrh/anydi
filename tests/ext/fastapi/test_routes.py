@@ -22,10 +22,14 @@ def test_send_mail(client: TestClient) -> None:
 def test_send_mail_lazy(client: TestClient, di: pyxdi.PyxDI) -> None:
     message = "lazy"
 
-    mail_service_mock = mock.MagicMock(spec=MailService)
+    mail_service_init = mock.Mock()
 
-    with di.override(MailService, instance=mail_service_mock):
-        response = client.post("/send-mail-lazy", json={"message": message})
+    @di.provider(scope="singleton", override=True)
+    def mail_service() -> MailService:
+        mail_service_init()
+        return mock.MagicMock(spec=MailService)
+
+    response = client.post("/send-mail-lazy", json={"message": message})
 
     assert response.status_code == 200
     assert response.json() == {
@@ -33,7 +37,7 @@ def test_send_mail_lazy(client: TestClient, di: pyxdi.PyxDI) -> None:
         "message": message,
     }
 
-    mail_service_mock.send_mail.assert_not_called()
+    mail_service_init.assert_not_called()
 
 
 def test_send_mail_mock_mail_service(client: TestClient, di: pyxdi.PyxDI) -> None:
