@@ -109,7 +109,7 @@ dep = t.cast(t.Any, _DependencyMark())
 
 def named(tp: t.Type[T], name: str) -> Annotated[t.Type[T], str]:
     """
-    Cast annotated type.
+    Cast annotated type helper.
     """
     return t.cast(Annotated[t.Type[T], str], Annotated[tp, name])
 
