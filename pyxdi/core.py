@@ -13,7 +13,7 @@ from dataclasses import dataclass
 from functools import cached_property, wraps
 from types import ModuleType, TracebackType
 
-from typing_extensions import ParamSpec
+from typing_extensions import Annotated, ParamSpec
 
 try:
     from types import NoneType
@@ -100,12 +100,18 @@ class ScannedDependency:
     lazy: t.Optional[bool] = None
 
 
-class DependencyMark:
+class _DependencyMark:
     __slots__ = ()
 
 
-def Dependency() -> t.Any:  # noqa
-    return DependencyMark()
+dep = t.cast(t.Any, _DependencyMark())
+
+
+def named(tp: t.Type[T], name: str) -> Annotated[t.Type[T], str]:
+    """
+    Cast annotated type.
+    """
+    return t.cast(Annotated[t.Type[T], str], Annotated[tp, name])
 
 
 @dataclass(frozen=True)
@@ -728,7 +734,7 @@ class PyxDI:
             else:
                 signature = get_signature(member)
             for parameter in signature.parameters.values():
-                if isinstance(parameter.default, DependencyMark):
+                if isinstance(parameter.default, _DependencyMark):
                     scanned_dependencies.append(
                         self._scanned_dependency(member=member, module=module)
                     )
@@ -757,7 +763,7 @@ class PyxDI:
         args = t.get_args(annotation)
 
         # Supported generic types
-        if origin in (list, dict, tuple):
+        if origin in (list, dict, tuple, Annotated):
             if args:
                 return annotation
             else:
@@ -788,7 +794,7 @@ class PyxDI:
     def _get_injectable_params(self, obj: t.Callable[..., t.Any]) -> t.Dict[str, t.Any]:
         injectable_params = {}
         for parameter in get_signature(obj).parameters.values():
-            if not isinstance(parameter.default, DependencyMark):
+            if not isinstance(parameter.default, _DependencyMark):
                 continue
 
             annotation = parameter.annotation
