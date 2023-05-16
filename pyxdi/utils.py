@@ -19,7 +19,7 @@ except ImportError:
     lazy_object_proxy_installed = False
 
 
-HAS_SIGNATURE_EVAL_STR_ARG = sys.version_info > (3, 9)
+HAS_SIGNATURE_EVAL_STR_ARG = sys.version_info >= (3, 10)
 
 T = t.TypeVar("T")
 
@@ -27,7 +27,9 @@ T = t.TypeVar("T")
 def get_full_qualname(obj: t.Any) -> str:
     qualname = getattr(obj, "__qualname__", f"unknown[{type(obj).__qualname__}]")
     module_name = getattr(obj, "__module__", "__main__")
-    return f"{module_name}.{qualname}".removeprefix("builtins.")
+    if module_name == "builtins":
+        return qualname
+    return f"{module_name}.{qualname}"
 
 
 @functools.lru_cache(maxsize=None)
