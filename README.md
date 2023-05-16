@@ -17,7 +17,7 @@ http://pyxdi.readthedocs.io/
 
 ## Requirements
 
-Python 3.7+
+Python 3.8+
 
 and optional dependencies:
 
