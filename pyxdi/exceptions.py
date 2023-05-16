@@ -1,18 +1,22 @@
-class ProviderError(Exception):
+class PyxDIError(Exception):
     pass
 
 
-class InvalidScope(Exception):
+class ProviderError(PyxDIError):
     pass
 
 
-class ScopeMismatch(Exception):
+class InvalidScope(PyxDIError):
     pass
 
 
-class AnnotationError(Exception):
+class ScopeMismatch(PyxDIError):
     pass
 
 
-class UnknownDependency(Exception):
+class AnnotationError(PyxDIError):
+    pass
+
+
+class UnknownDependency(PyxDIError):
     pass

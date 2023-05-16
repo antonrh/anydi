@@ -1,8 +1,6 @@
 from __future__ import annotations
 
-import sys
 import contextlib
-import functools
 import importlib
 import inspect
 import logging
@@ -12,15 +10,16 @@ import uuid
 from collections import defaultdict
 from contextvars import ContextVar
 from dataclasses import dataclass
-from functools import cached_property, partial
+from functools import cached_property, wraps
 from types import ModuleType, TracebackType
+
+from typing_extensions import Annotated, ParamSpec
 
 try:
     from types import NoneType
 except ImportError:
     NoneType = type(None)  # type: ignore[assignment,misc]
 
-import anyio
 
 from .exceptions import (
     AnnotationError,
@@ -29,12 +28,17 @@ from .exceptions import (
     ScopeMismatch,
     UnknownDependency,
 )
-from .types import InterfaceT, ProviderObj, Scope
-from .utils import get_qualname
+from .utils import (
+    get_full_qualname,
+    get_signature,
+    is_builtin_type,
+    make_lazy,
+    run_async,
+)
 
-SUPPORT_SIGNATURE_EVAL_STR = sys.version_info > (3, 9)
-
-logger = logging.getLogger(__name__)
+Scope = t.Literal["transient", "singleton", "request"]
+T = t.TypeVar("T", bound=t.Any)
+P = ParamSpec("P")
 
 ALLOWED_SCOPES: t.Dict[Scope, t.List[Scope]] = {
     "singleton": ["singleton"],
@@ -42,10 +46,12 @@ ALLOWED_SCOPES: t.Dict[Scope, t.List[Scope]] = {
     "transient": ["transient", "singleton", "request"],
 }
 
+logger = logging.getLogger(__name__)
+
 
 @dataclass(frozen=True)
 class Provider:
-    obj: ProviderObj
+    obj: t.Callable[..., t.Any]
     scope: Scope
 
     def __str__(self) -> str:
@@ -53,7 +59,7 @@ class Provider:
 
     @cached_property
     def name(self) -> str:
-        return get_qualname(self.obj)
+        return get_full_qualname(self.obj)
 
     @cached_property
     def is_class(self) -> bool:
@@ -91,14 +97,21 @@ class ScannedProvider:
 class ScannedDependency:
     member: t.Any
     module: ModuleType
+    lazy: t.Optional[bool] = None
 
 
-class DependencyMark:
+class _DependencyMark:
     __slots__ = ()
 
 
-def Dependency() -> t.Any:  # noqa
-    return DependencyMark()
+dep = t.cast(t.Any, _DependencyMark())
+
+
+def named(tp: t.Type[T], name: str) -> Annotated[t.Type[T], str]:
+    """
+    Cast annotated type helper.
+    """
+    return t.cast(Annotated[t.Type[T], str], Annotated[tp, name])
 
 
 @dataclass(frozen=True)
@@ -113,9 +126,11 @@ class PyxDI:
         *,
         default_scope: Scope = "singleton",
         auto_register: bool = False,
+        lazy_inject: bool = False,
     ) -> None:
         self._default_scope = default_scope
         self._auto_register = auto_register
+        self._lazy_inject = lazy_inject
         self._providers: t.Dict[t.Type[t.Any], Provider] = {}
         self._singleton_context = ScopedContext("singleton", self)
         self._request_context_var: ContextVar[t.Optional[ScopedContext]] = ContextVar(
@@ -125,7 +140,6 @@ class PyxDI:
             t.Type[t.Any], t.List[UnresolvedProvider]
         ] = defaultdict(list)
         self._unresolved_dependencies: t.Dict[t.Type[t.Any], UnresolvedDependency] = {}
-        self._signature_cache: t.Dict[t.Callable[..., t.Any], inspect.Signature] = {}
 
     @property
     def default_scope(self) -> Scope:
@@ -134,6 +148,10 @@ class PyxDI:
     @property
     def auto_register(self) -> bool:
         return self._auto_register
+
+    @property
+    def lazy_inject(self) -> bool:
+        return self._lazy_inject
 
     @property
     def providers(self) -> t.Dict[t.Type[t.Any], Provider]:
@@ -147,7 +165,7 @@ class PyxDI:
     def register_provider(
         self,
         interface: t.Type[t.Any],
-        obj: ProviderObj,
+        obj: t.Callable[..., t.Any],
         *,
         scope: t.Optional[Scope] = None,
         override: bool = False,
@@ -177,7 +195,7 @@ class PyxDI:
                 return registered_provider
 
             raise ProviderError(
-                f"The provider interface `{get_qualname(interface)}` "
+                f"The provider interface `{get_full_qualname(interface)}` "
                 "already registered."
             )
 
@@ -191,7 +209,8 @@ class PyxDI:
     def unregister_provider(self, interface: t.Type[t.Any]) -> None:
         if not self.has_provider(interface):
             raise ProviderError(
-                f"The provider interface `{get_qualname(interface)}` not registered."
+                "The provider interface "
+                f"`{get_full_qualname(interface)}` not registered."
             )
 
         provider = self.get_provider(interface)
@@ -215,13 +234,13 @@ class PyxDI:
             return self._providers[interface]
         except KeyError as exc:
             raise ProviderError(
-                f"The provider interface for `{get_qualname(interface)}` has not been "
-                "registered. Please ensure that the provider interface is properly "
-                "registered before attempting to use it."
+                f"The provider interface for `{get_full_qualname(interface)}` has "
+                "not been registered. Please ensure that the provider interface is "
+                "properly registered before attempting to use it."
             ) from exc
 
     def singleton(
-        self, interface: t.Type[InterfaceT], instance: t.Any, *, override: bool = False
+        self, interface: t.Type[T], instance: t.Any, *, override: bool = False
     ) -> Provider:
         return self.register_provider(
             interface, lambda: instance, scope="singleton", override=override
@@ -262,7 +281,7 @@ class PyxDI:
 
         obj, scope = provider.obj, provider.scope
 
-        for parameter in self._get_signature(obj).parameters.values():
+        for parameter in get_signature(obj).parameters.values():
             if parameter.annotation is inspect._empty:  # noqa
                 raise AnnotationError(
                     f"Missing provider `{provider}` "
@@ -292,7 +311,7 @@ class PyxDI:
             allowed_scopes = ALLOWED_SCOPES.get(right_scope) or []
             if left_scope not in allowed_scopes:
                 raise ScopeMismatch(
-                    f"The provider `{get_qualname(obj)}` with a {scope} scope was "
+                    f"The provider `{get_full_qualname(obj)}` with a {scope} scope was "
                     f"attempted to be registered with the provider "
                     f"`{related_provider}` with a `{related_provider.scope}` scope, "
                     f"which is not allowed. Please ensure that all providers are "
@@ -308,10 +327,10 @@ class PyxDI:
             ) in self._unresolved_providers.items():
                 for unresolved_provider in unresolved_providers:
                     parameter_name = unresolved_provider.parameter_name
-                    provider_name = get_qualname(unresolved_provider.provider.obj)
+                    provider_name = get_full_qualname(unresolved_provider.provider.obj)
                     errors.append(
                         f"- `{provider_name}` has unknown `{parameter_name}: "
-                        f"{get_qualname(unresolved_interface)}` parameter"
+                        f"{get_full_qualname(unresolved_interface)}` parameter"
                     )
             message = "\n".join(errors)
             raise UnknownDependency(
@@ -328,8 +347,8 @@ class PyxDI:
                     continue
                 parameter_name = dependency.parameter_name
                 errors.append(
-                    f"- `{get_qualname(dependency.obj)}` has unknown "
-                    f"`{parameter_name}: {get_qualname(unresolved_interface)}` "
+                    f"- `{get_full_qualname(dependency.obj)}` has unknown "
+                    f"`{parameter_name}: {get_full_qualname(unresolved_interface)}` "
                     f"injected parameter"
                 )
             if not errors:
@@ -395,15 +414,15 @@ class PyxDI:
 
     # Instance
 
-    def get(self, interface: t.Type[InterfaceT]) -> InterfaceT:
+    def get(self, interface: t.Type[T]) -> T:
         try:
             provider = self.get_provider(interface)
-        except ProviderError as exc:
-            if self.auto_register and inspect.isclass(interface):
-                try:
-                    self._get_signature(interface)
-                except ValueError:
-                    raise exc
+        except ProviderError:
+            if (
+                self.auto_register
+                and inspect.isclass(interface)
+                and not is_builtin_type(interface)
+            ):
                 scope = getattr(interface, "__pyxdi_scope__", self._default_scope)
                 provider = self.register_provider(interface, interface, scope=scope)
             else:
@@ -413,9 +432,9 @@ class PyxDI:
         if scoped_context:
             return scoped_context.get(interface)
 
-        return t.cast(InterfaceT, self.create_instance(provider))
+        return t.cast(T, self.create_instance(provider))
 
-    def has(self, interface: t.Type[InterfaceT]) -> bool:
+    def has(self, interface: t.Type[T]) -> bool:
         try:
             provider = self.get_provider(interface)
         except ProviderError:
@@ -434,9 +453,7 @@ class PyxDI:
         return None
 
     @contextlib.contextmanager
-    def override(
-        self, interface: t.Type[InterfaceT], instance: t.Any
-    ) -> t.Iterator[None]:
+    def override(self, interface: t.Type[T], instance: t.Any) -> t.Iterator[None]:
         origin_instance: t.Optional[t.Any] = None
         origin_provider: t.Optional[Provider] = None
         scope = self.default_scope
@@ -501,50 +518,28 @@ class PyxDI:
     # Decorators
 
     @t.overload
-    def provider(
-        self,
-        func: None = ...,
-        *,
-        scope: t.Optional[Scope] = None,
-        override: bool = False,
-        ignore: bool = False,
-    ) -> t.Callable[..., t.Any]:
+    def provider(self, func: t.Callable[P, T]) -> t.Callable[P, T]:
         ...
 
     @t.overload
     def provider(
         self,
-        func: ProviderObj,
         *,
         scope: t.Optional[Scope] = None,
         override: bool = False,
         ignore: bool = False,
-    ) -> t.Callable[[ProviderObj], t.Any]:
+    ) -> t.Callable[[t.Callable[P, T]], t.Callable[P, T]]:
         ...
 
     def provider(
         self,
-        func: t.Union[ProviderObj, None] = None,
+        func: t.Optional[t.Callable[P, T]] = None,
         *,
         scope: t.Optional[Scope] = None,
         override: bool = False,
         ignore: bool = False,
-    ) -> t.Union[ProviderObj, t.Callable[[Provider], t.Any]]:
-        decorator = self._provider_decorator(
-            scope=scope, override=override, ignore=ignore
-        )
-        if func is None:
-            return decorator
-        return decorator(func)  # type: ignore[no-any-return]
-
-    def _provider_decorator(
-        self,
-        *,
-        scope: t.Optional[Scope] = None,
-        override: bool = False,
-        ignore: bool = False,
-    ) -> t.Callable[[ProviderObj], t.Any]:
-        def register_provider(func: ProviderObj) -> t.Any:
+    ) -> t.Union[t.Callable[P, T], t.Callable[[t.Callable[P, T]], t.Callable[P, T]]]:
+        def decorator(func: t.Callable[P, T]) -> t.Callable[P, T]:
             interface = self._get_provider_annotation(func)
             self.register_provider(
                 interface,
@@ -555,28 +550,72 @@ class PyxDI:
             )
             return func
 
-        return register_provider
+        if func is None:
+            return decorator
+        return decorator(func)
 
-    def inject(self, obj: t.Callable[..., t.Any]) -> t.Callable[..., t.Any]:
-        injected_params = self._get_injectable_params(obj)
+    @t.overload
+    def inject(self, obj: t.Callable[P, T]) -> t.Callable[P, T]:
+        ...
 
-        if inspect.iscoroutinefunction(obj):
+    @t.overload
+    def inject(
+        self, obj: t.Callable[P, t.Awaitable[T]]
+    ) -> t.Callable[P, t.Awaitable[T]]:
+        ...
 
-            @functools.wraps(obj)
-            async def awrapped(*args: t.Any, **kwargs: t.Any) -> t.Any:
+    @t.overload
+    def inject(
+        self, *, lazy: t.Optional[bool] = None
+    ) -> t.Callable[
+        [t.Callable[P, t.Union[T, t.Awaitable[T]]]],
+        t.Callable[P, t.Union[T, t.Awaitable[T]]],
+    ]:
+        ...
+
+    def inject(
+        self,
+        obj: t.Union[t.Callable[P, t.Union[T, t.Awaitable[T]]], None] = None,
+        lazy: t.Optional[bool] = None,
+    ) -> t.Union[
+        t.Callable[
+            [t.Callable[P, t.Union[T, t.Awaitable[T]]]],
+            t.Callable[P, t.Union[T, t.Awaitable[T]]],
+        ],
+        t.Callable[P, t.Union[T, t.Awaitable[T]]],
+    ]:
+        lazy = self.lazy_inject if lazy is None else lazy
+
+        def decorator(
+            obj: t.Callable[P, t.Union[T, t.Awaitable[T]]]
+        ) -> t.Callable[P, t.Union[T, t.Awaitable[T]]]:
+            injected_params = self._get_injectable_params(obj)
+
+            def _inject_kwargs(**kwargs: P.kwargs) -> t.Dict[str, t.Any]:
                 for name, annotation in injected_params.items():
-                    kwargs[name] = self.get(annotation)
-                return await obj(*args, **kwargs)
+                    if lazy:
+                        kwargs[name] = make_lazy(self.get, annotation)
+                    else:
+                        kwargs[name] = self.get(annotation)
+                return kwargs
 
-            return awrapped
+            if inspect.iscoroutinefunction(obj):
 
-        @functools.wraps(obj)
-        def wrapped(*args: t.Any, **kwargs: t.Any) -> t.Any:
-            for name, annotation in injected_params.items():
-                kwargs[name] = self.get(annotation)
-            return obj(*args, **kwargs)
+                @wraps(obj)
+                async def awrapped(*args: P.args, **kwargs: P.kwargs) -> T:
+                    return t.cast(T, await obj(*args, **_inject_kwargs(**kwargs)))
 
-        return wrapped
+                return awrapped
+
+            @wraps(obj)
+            def wrapped(*args: P.args, **kwargs: P.kwargs) -> T:
+                return t.cast(T, obj(*args, **_inject_kwargs(**kwargs)))
+
+            return wrapped
+
+        if obj is None:
+            return decorator
+        return decorator(obj)
 
     # Scanner
 
@@ -607,14 +646,15 @@ class PyxDI:
 
         for scanned_provider in scanned_providers:
             self.provider(
-                func=scanned_provider.member,
                 scope=scanned_provider.scope,
                 override=False,
                 ignore=True,
-            )
+            )(scanned_provider.member)
 
         for scanned_dependency in scanned_dependencies:
-            decorator = self.inject(scanned_dependency.member)
+            decorator = self.inject(lazy=scanned_dependency.lazy)(
+                scanned_dependency.member
+            )
             setattr(
                 scanned_dependency.module,
                 scanned_dependency.member.__name__,
@@ -682,18 +722,19 @@ class PyxDI:
 
             injected = getattr(member, "__pyxdi_inject__", None)
             if injected:
+                lazy = injected["lazy"]
                 scanned_dependencies.append(
-                    self._scanned_dependency(member=member, module=module)
+                    self._scanned_dependency(member=member, module=module, lazy=lazy)
                 )
                 continue
 
             # Get by pyxdi.dep mark
             if inspect.isclass(member):
-                signature = self._get_signature(member.__init__)
+                signature = get_signature(member.__init__)
             else:
-                signature = self._get_signature(member)
+                signature = get_signature(member)
             for parameter in signature.parameters.values():
-                if isinstance(parameter.default, DependencyMark):
+                if isinstance(parameter.default, _DependencyMark):
                     scanned_dependencies.append(
                         self._scanned_dependency(member=member, module=module)
                     )
@@ -702,32 +743,32 @@ class PyxDI:
         return scanned_providers, scanned_dependencies
 
     def _scanned_dependency(
-        self, member: t.Any, module: ModuleType
+        self, member: t.Any, module: ModuleType, lazy: t.Optional[bool] = None
     ) -> ScannedDependency:
         if hasattr(member, "__wrapped__"):
             member = member.__wrapped__
-        return ScannedDependency(member=member, module=module)
+        return ScannedDependency(member=member, module=module, lazy=lazy)
 
     # Inspection
 
-    def _get_provider_annotation(self, obj: ProviderObj) -> t.Any:
-        annotation = self._get_signature(obj).return_annotation
+    def _get_provider_annotation(self, obj: t.Callable[..., t.Any]) -> t.Any:
+        annotation = get_signature(obj).return_annotation
 
         if annotation is inspect._empty:  # noqa
             raise AnnotationError(
-                f"Missing `{get_qualname(obj)}` provider return annotation."
+                f"Missing `{get_full_qualname(obj)}` provider return annotation."
             )
 
         origin = t.get_origin(annotation) or annotation
         args = t.get_args(annotation)
 
         # Supported generic types
-        if origin in (list, dict, tuple):
+        if origin in (list, dict, tuple, Annotated):
             if args:
                 return annotation
             else:
                 raise AnnotationError(
-                    f"Cannot use `{get_qualname(obj)}` generic type annotation "
+                    f"Cannot use `{get_full_qualname(obj)}` generic type annotation "
                     "without actual type."
                 )
 
@@ -741,7 +782,7 @@ class PyxDI:
     ) -> t.Tuple[t.List[t.Any], t.Dict[str, t.Any]]:
         args = []
         kwargs = {}
-        signature = self._get_signature(provider.obj)
+        signature = get_signature(provider.obj)
         for parameter in signature.parameters.values():
             instance = self.get(parameter.annotation)
             if parameter.kind == parameter.POSITIONAL_ONLY:
@@ -752,14 +793,14 @@ class PyxDI:
 
     def _get_injectable_params(self, obj: t.Callable[..., t.Any]) -> t.Dict[str, t.Any]:
         injectable_params = {}
-        for parameter in self._get_signature(obj).parameters.values():
-            if not isinstance(parameter.default, DependencyMark):
+        for parameter in get_signature(obj).parameters.values():
+            if not isinstance(parameter.default, _DependencyMark):
                 continue
 
             annotation = parameter.annotation
             if annotation is inspect._empty:  # noqa
                 raise AnnotationError(
-                    f"Missing `{get_qualname(obj)}` parameter annotation."
+                    f"Missing `{get_full_qualname(obj)}` parameter annotation."
                 )
 
             if (
@@ -774,16 +815,6 @@ class PyxDI:
             injectable_params[parameter.name] = annotation
         return injectable_params
 
-    def _get_signature(self, obj: t.Callable[..., t.Any]) -> inspect.Signature:
-        signature = self._signature_cache.get(obj)
-        if signature is None:
-            signature_kwargs: t.Dict[str, t.Any] = {}
-            if SUPPORT_SIGNATURE_EVAL_STR:
-                signature_kwargs["eval_str"] = True
-            signature = inspect.signature(obj, **signature_kwargs)
-            self._signature_cache[obj] = signature
-        return signature
-
 
 class ScopedContext:
     def __init__(self, scope: Scope, root: PyxDI) -> None:
@@ -793,7 +824,7 @@ class ScopedContext:
         self._stack = contextlib.ExitStack()
         self._async_stack = contextlib.AsyncExitStack()
 
-    def get(self, interface: t.Type[InterfaceT]) -> InterfaceT:
+    def get(self, interface: t.Type[T]) -> T:
         instance = self._instances.get(interface)
         if instance is None:
             provider = self._root.get_provider(interface)
@@ -802,7 +833,7 @@ class ScopedContext:
             else:
                 instance = self._root.create_instance(provider)
             self._instances[interface] = instance
-        return t.cast(InterfaceT, instance)
+        return t.cast(T, instance)
 
     def set(self, interface: t.Type[t.Any], instance: t.Any) -> None:
         self._instances[interface] = instance
@@ -834,8 +865,8 @@ class ScopedContext:
     async def astart(self) -> None:
         for interface, provider in self._iter_providers():
             if provider.is_resource:
-                instance = await anyio.to_thread.run_sync(
-                    partial(self._root.create_resource, provider, stack=self._stack)
+                instance = await run_async(
+                    self._root.create_resource, provider, stack=self._stack
                 )
                 self.set(interface, instance)
             elif provider.is_async_resource:
@@ -846,7 +877,7 @@ class ScopedContext:
 
     async def aclose(self) -> None:
         await self._async_stack.aclose()
-        await anyio.to_thread.run_sync(self._stack.close)
+        await run_async(self._stack.close)
 
     def __enter__(self) -> ScopedContext:
         self.start()

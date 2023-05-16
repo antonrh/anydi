@@ -416,7 +416,7 @@ di = pyxdi.PyxDI(auto_register=True)
 
 
 @di.provider
-def db_provider() -> t.Iterator[Database]:
+def db() -> t.Iterator[Database]:
     db = Database()
     db.connect()
     yield db
@@ -467,6 +467,58 @@ Once the dependencies have been injected, the function can be called as usual, l
 ```python
 handler()
 ```
+
+### Lazy Injections
+
+Lazy injections allows you to defer the creation of an object until it is actually required, instead of creating it
+immediately at the start of the application. This can lead to better application performance by minimizing the number
+of unnecessary object creations, resulting in reduced memory consumption.
+
+Here's an example of how to use the `@di.inject(lazy=True)` decorator:
+
+```python
+import typing as t
+from collections.abc import Iterable
+
+import pyxdi
+
+
+class Database:
+    def connect(self) -> None:
+        ...
+
+    def disconnect(self) -> None:
+        ...
+
+    def execute(self, query: str, **params: t.Any) -> t.Any:
+        ...
+
+
+di = pyxdi.PyxDI()
+
+
+@di.provider
+def db() -> Iterable[Database]:
+    db = Database()
+    db.connect()
+    yield db
+    db.disconnect()
+
+
+@di.inject(lazy=True)
+def handler(object_id: t.Optional[int], db: Database = pyxdi.dep) -> None:
+    if not object_id:
+        raise Exception("Object id cannot be empty.")
+    db.execute("SELECT name FROM object WHERE id = :id", id=object_id)
+
+
+handler(object_id=None)
+```
+
+In this example, the `Database` object is only instantiated and connected when the `db` parameter is actually used in the handler function.
+
+By using `lazy=True`, you can avoid unnecessary object creation and improve the performance of your application.
+
 
 ## Application Scan
 

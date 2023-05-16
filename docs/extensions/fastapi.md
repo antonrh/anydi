@@ -74,6 +74,67 @@ di = pyxdi.PyxDI()
 app = fastapi.FastAPI(on_startup=[di.astart], on_shutdown=[di.aclose])
 ```
 
+## Lazy Dependencies
+
+To use lazy injection, you can pass `lazy=True` to the `Inject` parameter.
+
+```python
+from collections.abc import AsyncIterator
+
+import fastapi
+from fastapi import Path
+
+import pyxdi.ext.fastapi
+from pyxdi.ext.fastapi import Inject
+
+
+class Database:
+    async def connect(self) -> None:
+        ...
+
+    async def disconnect(self) -> None:
+        ...
+
+    async def execute(self, query: str) -> None:
+        ...
+
+
+di = pyxdi.PyxDI()
+
+
+@di.provider
+async def db() -> AsyncIterator[Database]:
+    db = Database()
+    await db.connect()
+    yield db
+    await db.disconnect()
+
+
+app = fastapi.FastAPI()
+
+
+@app.get("/db/{index}")
+async def say_hello(index: int = Path(), db: Database = Inject(lazy=True)) -> None:
+    if index < 1:
+        return None
+    await db.execute("SELECT 1")
+
+
+pyxdi.ext.fastapi.install(app, di)
+```
+
+In this example, the `Database` object is only instantiated and connected when the `db` parameter is actually used in the handler function.
+By using `lazy=True`, you can avoid unnecessary object creation and improve the performance of your application.
+
+Another way is to initialize `PyxDI` with `lazy_inject=True` and enable lazy injections by default:
+
+```python
+import pyxdi.ext.fastapi
+
+
+di = pyxdi.PyxDI(lazy_inject=True)
+```
+
 ## Request Scope
 
 To utilize `request` scoped dependencies in your `FastAPI` application with `PyxDI`, you can make use of the

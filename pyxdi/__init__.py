@@ -1,10 +1,9 @@
-from .core import Dependency, PyxDI
+from .core import PyxDI, dep, named
 from .decorators import inject, provider, request, singleton, transient
-
-dep = Dependency()
 
 __all__ = [
     "PyxDI",
+    "named",
     "dep",
     "inject",
     "provider",

@@ -1,10 +1,12 @@
 import typing as t
 import uuid
 from dataclasses import dataclass
+from unittest import mock
 
 import pytest
 
-from pyxdi.core import Dependency, Provider, PyxDI
+import pyxdi
+from pyxdi.core import Provider, PyxDI, Scope, dep
 from pyxdi.exceptions import (
     AnnotationError,
     InvalidScope,
@@ -12,7 +14,6 @@ from pyxdi.exceptions import (
     ScopeMismatch,
     UnknownDependency,
 )
-from pyxdi.types import Scope
 
 from tests.fixtures import Service
 
@@ -451,10 +452,10 @@ def test_validate_unresolved_provider_dependencies(di: PyxDI) -> None:
 
 
 def test_validate_unresolved_injected_dependencies(di: PyxDI) -> None:
-    def func1(service: Service = Dependency()) -> None:
+    def func1(service: Service = dep) -> None:
         return None
 
-    def func2(message: str = Dependency()) -> None:
+    def func2(message: str = dep) -> None:
         return None
 
     di.inject(func1)
@@ -473,7 +474,7 @@ def test_validate_unresolved_injected_dependencies(di: PyxDI) -> None:
 
 
 def test_validate_unresolved_injected_dependencies_auto_register_class() -> None:
-    def func1(service: Service = Dependency()) -> None:
+    def func1(service: Service = dep) -> None:
         return None
 
     di = PyxDI(auto_register=True)
@@ -896,7 +897,7 @@ def test_get_provider_arguments(di: PyxDI) -> None:
 
 
 def test_inject_missing_annotation(di: PyxDI) -> None:
-    def func(name=Dependency()) -> str:  # type: ignore[no-untyped-def]
+    def func(name=dep) -> str:  # type: ignore[no-untyped-def]
         return name  # type: ignore[no-any-return]
 
     with pytest.raises(AnnotationError) as exc_info:
@@ -918,7 +919,7 @@ def test_inject(di: PyxDI) -> None:
         return Service(ident=ident)
 
     @di.inject
-    def func(name: str, service: Service = Dependency()) -> str:
+    def func(name: str, service: Service = dep) -> str:
         return f"{name} = {service.ident}"
 
     result = func(name="service ident")
@@ -937,7 +938,7 @@ def test_inject_class(di: PyxDI) -> None:
 
     @di.inject
     class Handler:
-        def __init__(self, name: str, service: Service = Dependency()) -> None:
+        def __init__(self, name: str, service: Service = dep) -> None:
             self.name = name
             self.service = service
 
@@ -964,7 +965,7 @@ def test_inject_dataclass(di: PyxDI) -> None:
     @dataclass
     class Handler:
         name: str
-        service: Service = Dependency()
+        service: Service = dep
 
         def handle(self) -> str:
             return f"{self.name} = {self.service.ident}"
@@ -989,12 +990,29 @@ async def test_inject_with_sync_and_async_resources(di: PyxDI) -> None:
     await di.astart()
 
     @di.inject
-    async def func(name: str, service: Service = Dependency()) -> str:
+    async def func(name: str, service: Service = dep) -> str:
         return f"{name} = {service.ident}"
 
     result = await func(name="service ident")
 
     assert result == "service ident = 1000"
+
+
+def test_inject_lazy(di: pyxdi.PyxDI) -> None:
+    service_init = mock.Mock()
+
+    @di.provider
+    def service() -> Service:
+        service_init()
+        return Service(ident="test")
+
+    @di.inject(lazy=True)
+    def func(service: Service = dep) -> None:
+        pass
+
+    func()
+
+    service_init.assert_not_called()
 
 
 def test_provider_decorator_no_args(di: PyxDI) -> None:

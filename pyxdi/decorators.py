@@ -1,8 +1,11 @@
 import typing as t
 
-from .types import Scope
+from typing_extensions import ParamSpec
 
-T = t.TypeVar("T")
+from .core import Scope
+
+T = t.TypeVar("T", bound=t.Any)
+P = ParamSpec("P")
 
 
 def transient(target: T) -> T:
@@ -21,7 +24,7 @@ def singleton(target: T) -> T:
 
 
 @t.overload
-def provider(target: T) -> T:
+def provider(target: t.Callable[P, T]) -> t.Callable[P, T]:
     ...
 
 
@@ -30,17 +33,17 @@ def provider(
     *,
     scope: t.Optional[Scope] = None,
     tags: t.Optional[t.Iterable[str]] = None,
-) -> t.Callable[[T], T]:
+) -> t.Callable[[t.Callable[P, T]], t.Callable[P, T]]:
     ...
 
 
 def provider(
-    target: t.Optional[T] = None,
+    target: t.Optional[t.Callable[P, T]] = None,
     *,
     scope: t.Optional[Scope] = None,
     tags: t.Optional[t.Iterable[str]] = None,
-) -> t.Union[T, t.Callable[[T], T]]:
-    def decorator(target: T) -> T:
+) -> t.Union[t.Callable[P, T], t.Callable[[t.Callable[P, T]], t.Callable[P, T]]]:
+    def decorator(target: t.Callable[P, T]) -> t.Callable[P, T]:
         setattr(
             target,
             "__pyxdi_provider__",
@@ -57,24 +60,50 @@ def provider(
 
 
 @t.overload
-def inject(target: T) -> T:
+def inject(obj: t.Callable[P, T]) -> t.Callable[P, T]:
     ...
 
 
 @t.overload
-def inject(*, tags: t.Optional[t.Iterable[str]] = None) -> t.Callable[[T], T]:
+def inject(obj: t.Callable[P, t.Awaitable[T]]) -> t.Callable[P, t.Awaitable[T]]:
+    ...
+
+
+@t.overload
+def inject(
+    *, lazy: t.Optional[bool] = None, tags: t.Optional[t.Iterable[str]] = None
+) -> t.Callable[
+    [t.Callable[P, t.Union[T, t.Awaitable[T]]]],
+    t.Callable[P, t.Union[T, t.Awaitable[T]]],
+]:
     ...
 
 
 def inject(
-    target: t.Optional[T] = None, *, tags: t.Optional[t.Iterable[str]] = None
-) -> t.Union[T, t.Callable[[T], T]]:
-    def decorator(target: T) -> T:
-        setattr(target, "__pyxdi_inject__", True)
-        setattr(target, "__pyxdi_tags__", tags)
-        return target
+    obj: t.Union[t.Callable[P, t.Union[T, t.Awaitable[T]]], None] = None,
+    lazy: t.Optional[bool] = None,
+    tags: t.Optional[t.Iterable[str]] = None,
+) -> t.Union[
+    t.Callable[
+        [t.Callable[P, t.Union[T, t.Awaitable[T]]]],
+        t.Callable[P, t.Union[T, t.Awaitable[T]]],
+    ],
+    t.Callable[P, t.Union[T, t.Awaitable[T]]],
+]:
+    def decorator(
+        obj: t.Callable[P, t.Union[T, t.Awaitable[T]]]
+    ) -> t.Callable[P, t.Union[T, t.Awaitable[T]]]:
+        setattr(
+            obj,
+            "__pyxdi_inject__",
+            {
+                "lazy": lazy,
+            },
+        )
+        setattr(obj, "__pyxdi_tags__", tags)
+        return obj
 
-    if target is None:
+    if obj is None:
         return decorator
 
-    return decorator(target)
+    return decorator(obj)

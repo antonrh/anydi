@@ -36,4 +36,15 @@ async def send_email(
     return await mail_service.send_mail(email=user.email, message=message)
 
 
+@app.post("/send-mail-lazy", response_model=Mail)
+async def send_email_lazy(
+    user: User = fastapi.Depends(get_user),
+    mail_service: MailService = Inject(lazy=True),
+    message: str = fastapi.Body(embed=True),
+) -> t.Any:
+    if message == "lazy":
+        return Mail(email=user.email, message=message)
+    return await mail_service.send_mail(email=user.email, message=message)
+
+
 pyxdi.ext.fastapi.install(app, di)
