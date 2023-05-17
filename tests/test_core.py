@@ -6,7 +6,8 @@ from unittest import mock
 import pytest
 
 import pyxdi
-from pyxdi.core import Provider, PyxDI, Scope, dep
+from pyxdi import provider
+from pyxdi.core import Module, Provider, PyxDI, Scope, dep, named
 from pyxdi.exceptions import (
     AnnotationError,
     InvalidScope,
@@ -475,6 +476,48 @@ def test_validate_unresolved_injected_dependencies_auto_register_class() -> None
     di = PyxDI(auto_register=True)
     di.inject(func1)
     di.validate()
+
+
+# Module
+
+
+class TestModule(Module):
+    def configure(self, di: PyxDI) -> None:
+        di.singleton(named(str, "msg1"), "Message 1")
+
+    @provider
+    def provide_msg2(self) -> t.Annotated[str, "msg2"]:
+        return "Message 2"
+
+
+def test_register_modules() -> None:
+    di = PyxDI(modules=[TestModule])
+
+    assert di.has_provider(named(str, "msg1"))
+    assert di.has_provider(named(str, "msg2"))
+
+
+def test_register_module_class(di: PyxDI) -> None:
+    di.register_module(TestModule)
+
+    assert di.has_provider(named(str, "msg1"))
+    assert di.has_provider(named(str, "msg2"))
+
+
+def test_register_module_instance(di: PyxDI) -> None:
+    di.register_module(TestModule())
+
+    assert di.has_provider(named(str, "msg1"))
+    assert di.has_provider(named(str, "msg2"))
+
+
+def test_register_module_function(di: PyxDI) -> None:
+    def configure(di: PyxDI) -> None:
+        di.singleton(str, "Message")
+
+    di.register_module(configure)
+
+    assert di.has_provider(str)
 
 
 # Lifespan

@@ -114,11 +114,6 @@ class UnresolvedDependency:
     obj: t.Callable[..., t.Any]
 
 
-class Module:
-    def configure(self, di: "PyxDI") -> None:
-        ...
-
-
 class PyxDI:
     def __init__(
         self,
@@ -900,3 +895,8 @@ class ScopedContext:
         for interface, provider in self._root.providers.items():
             if provider.scope == self._scope:
                 yield interface, provider
+
+
+class Module:
+    def configure(self, di: PyxDI) -> None:
+        ...
