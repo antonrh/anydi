@@ -94,11 +94,12 @@ class ScannedDependency:
     lazy: t.Optional[bool] = None
 
 
-class _DependencyMark:
+class DependencyMark:
     __slots__ = ()
 
 
-dep = t.cast(t.Any, _DependencyMark())
+# Dependency mark with Any type
+dep = t.cast(t.Any, DependencyMark())
 
 
 def named(tp: t.Type[T], name: str) -> Annotated[t.Type[T], str]:
@@ -121,9 +122,8 @@ class PyxDI:
         default_scope: Scope = "singleton",
         auto_register: bool = False,
         lazy_inject: bool = False,
-        modules: t.Union[
+        modules: t.Optional[
             t.Sequence[t.Union[Module, t.Type[Module], t.Callable[["PyxDI"], None]]],
-            None,
         ] = None,
     ) -> None:
         self._default_scope = default_scope
@@ -202,6 +202,9 @@ class PyxDI:
         return provider
 
     def unregister_provider(self, interface: t.Type[t.Any]) -> None:
+        """
+        Unregister provider by interface.
+        """
         if not self.has_provider(interface):
             raise ProviderError(
                 "The provider interface "
@@ -225,6 +228,9 @@ class PyxDI:
         self._unresolved_dependencies.pop(interface, None)
 
     def get_provider(self, interface: t.Type[t.Any]) -> Provider:
+        """
+        Get provider by interface.
+        """
         try:
             return self._providers[interface]
         except KeyError as exc:
@@ -237,6 +243,9 @@ class PyxDI:
     def singleton(
         self, interface: t.Type[T], instance: t.Any, *, override: bool = False
     ) -> Provider:
+        """
+        Register singleton instance provider.
+        """
         return self.register_provider(
             interface, lambda: instance, scope="singleton", override=override
         )
@@ -393,7 +402,7 @@ class PyxDI:
         return contextlib.contextmanager(self._request_context)()
 
     def _request_context(self) -> t.Iterator["ScopedContext"]:
-        with self.create_request_context() as context:
+        with self._create_request_context() as context:
             token = self._request_context_var.set(context)
             yield context
             self._request_context_var.reset(token)
@@ -413,12 +422,12 @@ class PyxDI:
         return contextlib.asynccontextmanager(self._arequest_context)()
 
     async def _arequest_context(self) -> t.AsyncIterator["ScopedContext"]:
-        async with self.create_request_context() as context:
+        async with self._create_request_context() as context:
             token = self._request_context_var.set(context)
             yield context
             self._request_context_var.reset(token)
 
-    def create_request_context(self) -> "ScopedContext":
+    def _create_request_context(self) -> "ScopedContext":
         return ScopedContext("request", self)
 
     def _get_request_context(self) -> "ScopedContext":
@@ -434,6 +443,9 @@ class PyxDI:
     # Instance
 
     def get(self, interface: t.Type[T]) -> T:
+        """
+        Get instance by interface.
+        """
         try:
             provider = self.get_provider(interface)
         except ProviderError:
@@ -454,6 +466,9 @@ class PyxDI:
         return t.cast(T, self.create_instance(provider))
 
     def has(self, interface: t.Type[T]) -> bool:
+        """
+        Check that container contains instance by interface.
+        """
         try:
             provider = self.get_provider(interface)
         except ProviderError:
@@ -719,7 +734,7 @@ class PyxDI:
             else:
                 signature = get_signature(member)
             for parameter in signature.parameters.values():
-                if isinstance(parameter.default, _DependencyMark):
+                if isinstance(parameter.default, DependencyMark):
                     dependencies.append(
                         self._create_scanned_dependency(member=member, module=module)
                     )
@@ -779,7 +794,7 @@ class PyxDI:
     def _get_injectable_params(self, obj: t.Callable[..., t.Any]) -> t.Dict[str, t.Any]:
         injectable_params = {}
         for parameter in get_signature(obj).parameters.values():
-            if not isinstance(parameter.default, _DependencyMark):
+            if not isinstance(parameter.default, DependencyMark):
                 continue
 
             annotation = parameter.annotation
@@ -897,5 +912,9 @@ class ScopedContext:
 
 
 class Module:
+    """
+    Module base class.
+    """
+
     def configure(self, di: PyxDI) -> None:
         ...

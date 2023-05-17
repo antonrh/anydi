@@ -521,9 +521,45 @@ By using `lazy=True`, you can avoid unnecessary object creation and improve the 
 
 ## Modules
 
+`PyxDI` provides a way to organize your code and configure dependencies for the dependency injection container.
+A module is a class that extends the `pyxdi.Module` base class and contains the configuration for the container.
+
+Here's an example how to create and register simple module:
+
+```python
+import pyxdi
+
+
+class Repository:
+    pass
+
+
+class Service:
+    def __init__(self, repo: Repository) -> None:
+        self.repo = repo
+
+
+class AppModule(pyxdi.Module):
+    def configure(self, di: pyxdi.PyxDI) -> None:
+        di.singleton(Repository, Repository())
+
+    @pyxdi.provider(scope="singleton")
+    def configure_service(self, repo: Repository) -> Service:
+        return Service(repo=repo)
+
+
+di = pyxdi.PyxDI(modules=[AppModule()])
+
+# or
+# di.register_module(AppModule())
+
+assert di.has_provider(Service)
+assert di.has_provider(Repository)
+```
+
 ## Application Scan
 
-`PyxDI` provides a simple way to inject dependencies by scanning modules or packages. For example, your application might have the following structure:
+`PyxDI` provides a simple way to inject dependencies by scanning Python modules or packages. For example, your application might have the following structure:
 
 ```
 /app
@@ -550,6 +586,7 @@ import pyxdi
 from app.services import Service
 
 
+# Or use `pyxdi.Module` for defining modules.
 def register_providers(di: pyxdi.PyxDI) -> None:
 
     @di.provider
@@ -590,7 +627,7 @@ di.start()
 di.close()
 ```
 
-The scan method takes a list of directory paths as an argument and recursively searches those directories for Python modules containing @pyxdi.inject-decorated functions or classes.
+The scan method takes a list of directory paths as an argument and recursively searches those directories for Python modules containing `@pyxdi.inject`-decorated functions or classes.
 
 ### Scan by tags
 
