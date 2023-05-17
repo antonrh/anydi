@@ -177,7 +177,6 @@ class PyxDI:
         *,
         scope: t.Optional[Scope] = None,
         override: bool = False,
-        ignore: bool = False,
     ) -> Provider:
         provider = Provider(obj=obj, scope=scope or self.default_scope)
 
@@ -187,20 +186,13 @@ class PyxDI:
             interface = type(f"EventResource_{uuid.uuid4()}", (), {})
 
         try:
-            registered_provider = self.get_provider(interface)
+            self.get_provider(interface)
         except ProviderError:
             pass
         else:
             if override:
                 self._providers[interface] = provider
                 return provider
-
-            if ignore:
-                logger.info(
-                    f"Ignoring the `{provider}` provider as it "
-                    "has already been registered."
-                )
-                return registered_provider
 
             raise ProviderError(
                 f"The provider interface `{get_full_qualname(interface)}` "
@@ -386,7 +378,7 @@ class PyxDI:
                 if not provided:
                     continue
                 scope = provided.get("scope")
-                self.provider(scope=scope)(method)
+                self.provider(scope=scope, override=True)(method)
 
     # Lifespan
 
@@ -556,7 +548,6 @@ class PyxDI:
         *,
         scope: t.Optional[Scope] = None,
         override: bool = False,
-        ignore: bool = False,
     ) -> t.Callable[[t.Callable[P, T]], t.Callable[P, T]]:
         ...
 
@@ -566,17 +557,10 @@ class PyxDI:
         *,
         scope: t.Optional[Scope] = None,
         override: bool = False,
-        ignore: bool = False,
     ) -> t.Union[t.Callable[P, T], t.Callable[[t.Callable[P, T]], t.Callable[P, T]]]:
         def decorator(func: t.Callable[P, T]) -> t.Callable[P, T]:
             interface = self._get_provider_annotation(func)
-            self.register_provider(
-                interface,
-                func,
-                scope=scope,
-                override=override,
-                ignore=ignore,
-            )
+            self.register_provider(interface, func, scope=scope, override=override)
             return func
 
         if func is None:
