@@ -16,6 +16,7 @@ from pyxdi.exceptions import (
 )
 
 from tests.fixtures import Service
+from tests.scan import ScanModule
 
 
 @pytest.fixture
@@ -1043,6 +1044,7 @@ def test_provider_decorator_with_provided_args(di: PyxDI) -> None:
 
 
 def test_scan(di: PyxDI) -> None:
+    di.register_module(ScanModule)
     di.scan(["tests.scan"])
 
     from .scan.a.a3.handlers import a_a3_handler_1, a_a3_handler_2
@@ -1057,8 +1059,9 @@ def test_scan_non_existing_tag(di: PyxDI) -> None:
     assert not di.providers
 
 
-def test_scan_only_inject(di: PyxDI) -> None:
-    di.scan(["tests.scan.a"], tags=["provider", "inject"])
+def test_scan_tagged(di: PyxDI) -> None:
+    di.register_module(ScanModule)
+    di.scan(["tests.scan.a"], tags=["inject"])
 
     from .scan.a.a3.handlers import a_a3_handler_1
 

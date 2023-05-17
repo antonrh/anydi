@@ -32,7 +32,6 @@ def provider(target: t.Callable[P, T]) -> t.Callable[P, T]:
 def provider(
     *,
     scope: t.Optional[Scope] = None,
-    tags: t.Optional[t.Iterable[str]] = None,
 ) -> t.Callable[[t.Callable[P, T]], t.Callable[P, T]]:
     ...
 
@@ -41,7 +40,6 @@ def provider(
     target: t.Optional[t.Callable[P, T]] = None,
     *,
     scope: t.Optional[Scope] = None,
-    tags: t.Optional[t.Iterable[str]] = None,
 ) -> t.Union[t.Callable[P, T], t.Callable[[t.Callable[P, T]], t.Callable[P, T]]]:
     def decorator(target: t.Callable[P, T]) -> t.Callable[P, T]:
         setattr(
@@ -51,7 +49,6 @@ def provider(
                 "scope": scope,
             },
         )
-        setattr(target, "__pyxdi_tags__", tags)
         return target
 
     if target is None:

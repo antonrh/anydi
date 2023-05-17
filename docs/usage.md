@@ -407,7 +407,7 @@ class Service:
         return self.repo.get(ident=ident)
 ```
 
-If you create a `PyxDI` instance with auto_register=True, it will automatically register a provider for `Service` and `Repository` with provided `Database`:
+If you create a `PyxDI` instance with `auto_register=True`, it will automatically register a provider for `Service` and `Repository` with provided `Database`:
 
 ```python
 import pyxdi
@@ -519,10 +519,11 @@ In this example, the `Database` object is only instantiated and connected when t
 
 By using `lazy=True`, you can avoid unnecessary object creation and improve the performance of your application.
 
+## Modules
 
 ## Application Scan
 
-`PyxDI` provides a simple way to register providers and inject dependencies by scanning modules or packages. For example, your application might have the following structure:
+`PyxDI` provides a simple way to inject dependencies by scanning modules or packages. For example, your application might have the following structure:
 
 ```
 /app
@@ -549,9 +550,11 @@ import pyxdi
 from app.services import Service
 
 
-@pyxdi.provider
-def service() -> str:
-    return Service(name="demo")
+def register_providers(di: pyxdi.PyxDI) -> None:
+
+    @di.provider
+    def service() -> str:
+        return Service(name="demo")
 ```
 
 !!! note
@@ -570,13 +573,16 @@ def my_handler(service: Service = pyxdi.dep) -> None:
     print(f"Hello, from service `{service.name}`")
 ```
 
-`main.py` starts the DI container and scans the app directory:
+`main.py` starts the DI container and scans the app `handlers.py` module:
 
 ```python
 import pyxdi
 
-di = pyxdi.PyxDI()
-di.scan(["app"])
+from app.providers import register_providers
+
+
+di = pyxdi.PyxDI(modules=[register_providers])
+di.scan(["app.handlers"])
 di.start()
 
 # application context
@@ -584,7 +590,7 @@ di.start()
 di.close()
 ```
 
-The scan method takes a list of directory paths as an argument and recursively searches those directories for Python modules containing @pyxdi.provider- or @pyxdi.inject-decorated functions or classes.
+The scan method takes a list of directory paths as an argument and recursively searches those directories for Python modules containing @pyxdi.inject-decorated functions or classes.
 
 ### Scan by tags
 
@@ -594,10 +600,10 @@ You can also scan for providers or injectables in specific tags. To do so, you n
 import pyxdi
 
 di = pyxdi.PyxDI()
-di.scan(["app.providers"], tags=["tag1"])
+di.scan(["app.handlers"], tags=["tag1"])
 ```
 
-This will scan for `@provider` annotated target only with defined `tags` within the `app.providers` module.
+This will scan for `@inject` annotated target only with defined `tags` within the `app.handlers` module.
 
 With `PyxDI`'s application scan feature, you can keep your code organized and easily manage your dependencies.
 
