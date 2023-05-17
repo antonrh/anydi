@@ -784,7 +784,7 @@ class PyxDI:
         kwargs = {}
         signature = get_signature(provider.obj)
         for parameter in signature.parameters.values():
-            instance = self.get(parameter.annotation)
+            instance = make_lazy(self.get, parameter.annotation)
             if parameter.kind == parameter.POSITIONAL_ONLY:
                 args.append(instance)
             else:

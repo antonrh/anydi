@@ -13,14 +13,13 @@ packages = [
 
 [tool.poetry.dependencies]
 python = ">=3.8,<3.12"
+lazy-object-proxy = "^1.9.0"
 anyio = { version = "^3.6.2", optional = true }
-lazy-object-proxy = { version = "^1.9.0", optional = true }
 mkdocs = { version = "^1.4.2", optional = true }
 mkdocs-material = { version = "^9.1.13", optional = true }
 
 [tool.poetry.extras]
 docs = ["mkdocs", "mkdocs-material"]
-all = ["anyio", "lazy-object-proxy"]
 
 [tool.poetry.group.dev.dependencies]
 black = "^23.1.0"
@@ -29,9 +28,9 @@ ruff = "^0.0.267"
 pytest = "^7.2.1"
 pytest-cov = "^4.0.0"
 anyio = "^3.6.2"
-lazy-object-proxy = "^1.9.0"
 fastapi = "^0.95.1"
 httpx = "^0.24.0"
+sqlalchemy = "^2.0.13"
 
 [tool.black]
 line-length = 88

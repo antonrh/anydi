@@ -3,20 +3,14 @@ import inspect
 import sys
 import typing as t
 
+import lazy_object_proxy
+
 try:
     import anyio  # noqa
 
     anyio_installed = True
 except ImportError:
     anyio_installed = False
-
-
-try:
-    import lazy_object_proxy  # noqa
-
-    lazy_object_proxy_installed = True
-except ImportError:
-    lazy_object_proxy_installed = False
 
 
 HAS_SIGNATURE_EVAL_STR_ARG = sys.version_info >= (3, 10)
@@ -45,11 +39,6 @@ def is_builtin_type(tp: t.Type[t.Any]) -> bool:
 
 
 def make_lazy(func: t.Callable[..., T], /, *args: t.Any, **kwargs: t.Any) -> T:
-    if not lazy_object_proxy_installed:
-        raise ImportError(
-            "`lazy-object-proxy` library is not currently installed. Please make sure "
-            "to install it first, or consider using `pyxdi[full]` instead."
-        )
     return t.cast(T, lazy_object_proxy.Proxy(functools.partial(func, *args, **kwargs)))
 
 
