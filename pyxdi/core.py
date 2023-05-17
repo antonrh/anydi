@@ -358,17 +358,20 @@ class PyxDI:
     def register_module(
         self, module: t.Union[Module, t.Type[Module], t.Callable[["PyxDI"], None]]
     ) -> None:
-        # Function base module
+        """
+        Register module as callable, Module type or Module instance.
+        """
+        # Callable Module
         if inspect.isfunction(module):
             module(self)
             return
 
-        # Class based module or module type
+        # Class based Module or Module type
         if inspect.isclass(module) and issubclass(module, Module):
             module = module()
         if isinstance(module, Module):
             module.configure(self)
-            for _name, method in inspect.getmembers(module):
+            for _, method in inspect.getmembers(module):
                 provided = getattr(method, "__pyxdi_provider__", None)
                 if not provided:
                     continue
@@ -637,7 +640,7 @@ class PyxDI:
         *,
         tags: t.Optional[t.Iterable[str]] = None,
     ) -> None:
-        scanned_dependencies: t.List[ScannedDependency] = []
+        dependencies: t.List[ScannedDependency] = []
 
         if isinstance(packages, t.Iterable) and not isinstance(packages, str):
             scan_packages: t.Iterable[t.Union[types.ModuleType, str]] = packages
@@ -647,17 +650,11 @@ class PyxDI:
             )
 
         for package in scan_packages:
-            scanned_dependencies.extend(self._scan_package(package, tags=tags))
+            dependencies.extend(self._scan_package(package, tags=tags))
 
-        for scanned_dependency in scanned_dependencies:
-            decorator = self.inject(lazy=scanned_dependency.lazy)(
-                scanned_dependency.member
-            )
-            setattr(
-                scanned_dependency.module,
-                scanned_dependency.member.__name__,
-                decorator,
-            )
+        for dependency in dependencies:
+            decorator = self.inject(lazy=dependency.lazy)(dependency.member)
+            setattr(dependency.module, dependency.member.__name__, decorator)
 
     def _scan_package(
         self,
@@ -710,7 +707,9 @@ class PyxDI:
             if injected:
                 lazy = injected["lazy"]
                 dependencies.append(
-                    self._scanned_dependency(member=member, module=module, lazy=lazy)
+                    self._create_scanned_dependency(
+                        member=member, module=module, lazy=lazy
+                    )
                 )
                 continue
 
@@ -722,13 +721,13 @@ class PyxDI:
             for parameter in signature.parameters.values():
                 if isinstance(parameter.default, _DependencyMark):
                     dependencies.append(
-                        self._scanned_dependency(member=member, module=module)
+                        self._create_scanned_dependency(member=member, module=module)
                     )
                     continue
 
         return dependencies
 
-    def _scanned_dependency(
+    def _create_scanned_dependency(
         self, member: t.Any, module: types.ModuleType, lazy: t.Optional[bool] = None
     ) -> ScannedDependency:
         if hasattr(member, "__wrapped__"):
