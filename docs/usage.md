@@ -519,6 +519,80 @@ In this example, the `Database` object is only instantiated and connected when t
 
 By using `lazy=True`, you can avoid unnecessary object creation and improve the performance of your application.
 
+
+### Scanning Injection
+
+`PyxDI` provides a simple way to inject dependencies by scanning Python modules or packages.
+For example, your application might have the following structure:
+
+```
+/app
+  api/
+    handlers.py
+  main.py
+  services.py
+```
+
+`services.py` defines a service class:
+
+```python
+class Service:
+    def __init__(self, name: str) -> None:
+        self.name = name
+```
+
+`handlers.py` uses the Service class:
+
+```python
+import pyxdi
+
+from app.services import Service
+
+
+@pyxdi.inject
+def my_handler(service: Service = pyxdi.dep) -> None:
+    print(f"Hello, from service `{service.name}`")
+```
+
+`main.py` starts the DI container and scans the app `handlers.py` module:
+
+```python
+from app.services import Service
+
+import pyxdi
+
+di = pyxdi.PyxDI()
+
+
+@di.provider
+def service() -> str:
+    return Service(name="demo")
+
+
+di.scan(["app.handlers"])
+di.start()
+
+# application context
+
+di.close()
+```
+
+The scan method takes a list of directory paths as an argument and recursively searches those directories for Python modules containing `@pyxdi.inject`-decorated functions or classes.
+
+### Scanning Injection by tags
+
+You can also scan for providers or injectables in specific tags. To do so, you need to use the tags argument when registering providers or injectables. For example:
+
+```python
+import pyxdi
+
+di = pyxdi.PyxDI()
+di.scan(["app.handlers"], tags=["tag1"])
+```
+
+This will scan for `@inject` annotated target only with defined `tags` within the `app.handlers` module.
+
+
 ## Modules
 
 `PyxDI` provides a way to organize your code and configure dependencies for the dependency injection container.
@@ -557,92 +631,13 @@ assert di.has_provider(Service)
 assert di.has_provider(Repository)
 ```
 
-## Application Scan
-
-`PyxDI` provides a simple way to inject dependencies by scanning Python modules or packages. For example, your application might have the following structure:
-
-```
-/app
-  api/
-    handlers.py
-  main.py
-  providers.py
-  services.py
-```
-
-`services.py defines a service class:
-
-```python
-class Service:
-    def __init__(self, name: str) -> None:
-        self.name = name
-```
-
-`providers.py provides a provider for the Service class:
-
-```python
-import pyxdi
-
-from app.services import Service
-
-
-# Or use `pyxdi.Module` for defining modules.
-def register_providers(di: pyxdi.PyxDI) -> None:
-
-    @di.provider
-    def service() -> str:
-        return Service(name="demo")
-```
-
 !!! note
 
     If the provider has already been registered, it will be overridden.
 
-`handlers.py uses the Service class:
 
-```python
-import pyxdi
+With `PyxDI`'s application Modules, you can keep your code organized and easily manage your dependencies.
 
-from app.services import Service
-
-
-def my_handler(service: Service = pyxdi.dep) -> None:
-    print(f"Hello, from service `{service.name}`")
-```
-
-`main.py` starts the DI container and scans the app `handlers.py` module:
-
-```python
-import pyxdi
-
-from app.providers import register_providers
-
-
-di = pyxdi.PyxDI(modules=[register_providers])
-di.scan(["app.handlers"])
-di.start()
-
-# application context
-
-di.close()
-```
-
-The scan method takes a list of directory paths as an argument and recursively searches those directories for Python modules containing `@pyxdi.inject`-decorated functions or classes.
-
-### Scan by tags
-
-You can also scan for providers or injectables in specific tags. To do so, you need to use the tags argument when registering providers or injectables. For example:
-
-```python
-import pyxdi
-
-di = pyxdi.PyxDI()
-di.scan(["app.handlers"], tags=["tag1"])
-```
-
-This will scan for `@inject` annotated target only with defined `tags` within the `app.handlers` module.
-
-With `PyxDI`'s application scan feature, you can keep your code organized and easily manage your dependencies.
 
 ## Testing
 
