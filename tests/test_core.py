@@ -1090,6 +1090,15 @@ def test_scan(di: PyxDI) -> None:
     assert a_a3_handler_2().ident == "a.a1.str_provider"
 
 
+def test_scan_single_package(di: PyxDI) -> None:
+    di.register_module(ScanModule)
+    di.scan("tests.scan.a.a3.handlers")
+
+    from .scan.a.a3.handlers import a_a3_handler_1
+
+    assert a_a3_handler_1() == "a.a1.str_provider"
+
+
 def test_scan_non_existing_tag(di: PyxDI) -> None:
     di.scan(["tests.scan"], tags=["non_existing_tag"])
 
