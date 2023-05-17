@@ -559,7 +559,7 @@ def register_providers(di: pyxdi.PyxDI) -> None:
 
 !!! note
 
-    If the provider has already been registered, it will be ignored to prevent duplicate registration.
+    If the provider has already been registered, it will be overridden.
 
 `handlers.py uses the Service class:
 
