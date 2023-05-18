@@ -416,7 +416,7 @@ class PyxDI:
     async def aclose(self) -> None:
         await self._singleton_context.aclose()
 
-    async def arequest_context(
+    def arequest_context(
         self,
     ) -> t.AsyncContextManager["ScopedContext"]:
         return contextlib.asynccontextmanager(self._arequest_context)()
@@ -784,7 +784,7 @@ class PyxDI:
         kwargs = {}
         signature = get_signature(provider.obj)
         for parameter in signature.parameters.values():
-            instance = make_lazy(self.get, parameter.annotation)
+            instance = self.get(parameter.annotation)
             if parameter.kind == parameter.POSITIONAL_ONLY:
                 args.append(instance)
             else:
