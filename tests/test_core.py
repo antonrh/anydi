@@ -6,7 +6,8 @@ from unittest import mock
 import pytest
 
 import pyxdi
-from pyxdi.core import Provider, PyxDI, Scope, dep
+from pyxdi import provider
+from pyxdi.core import Module, Provider, PyxDI, Scope, dep, named
 from pyxdi.exceptions import (
     AnnotationError,
     InvalidScope,
@@ -16,6 +17,7 @@ from pyxdi.exceptions import (
 )
 
 from tests.fixtures import Service
+from tests.scan import ScanModule
 
 
 @pytest.fixture
@@ -128,12 +130,6 @@ def test_register_provider_already_registered(di: PyxDI) -> None:
         di.register_provider(str, lambda: "other")
 
     assert str(exc_info.value) == "The provider interface `str` already registered."
-
-
-def test_register_provider_already_registered_ignore(di: PyxDI) -> None:
-    provider = di.register_provider(str, lambda: "test")
-
-    assert di.register_provider(str, lambda: "other", ignore=True) == provider
 
 
 def test_register_provider_override(di: PyxDI) -> None:
@@ -482,6 +478,48 @@ def test_validate_unresolved_injected_dependencies_auto_register_class() -> None
     di.validate()
 
 
+# Module
+
+
+class TestModule(Module):
+    def configure(self, di: PyxDI) -> None:
+        di.singleton(named(str, "msg1"), "Message 1")
+
+    @provider
+    def provide_msg2(self) -> t.Annotated[str, "msg2"]:
+        return "Message 2"
+
+
+def test_register_modules() -> None:
+    di = PyxDI(modules=[TestModule])
+
+    assert di.has_provider(named(str, "msg1"))
+    assert di.has_provider(named(str, "msg2"))
+
+
+def test_register_module_class(di: PyxDI) -> None:
+    di.register_module(TestModule)
+
+    assert di.has_provider(named(str, "msg1"))
+    assert di.has_provider(named(str, "msg2"))
+
+
+def test_register_module_instance(di: PyxDI) -> None:
+    di.register_module(TestModule())
+
+    assert di.has_provider(named(str, "msg1"))
+    assert di.has_provider(named(str, "msg2"))
+
+
+def test_register_module_function(di: PyxDI) -> None:
+    def configure(di: PyxDI) -> None:
+        di.singleton(str, "Message")
+
+    di.register_module(configure)
+
+    assert di.has_provider(str)
+
+
 # Lifespan
 
 
@@ -552,7 +590,7 @@ async def test_arequest_context(di: PyxDI) -> None:
 
     di.register_provider(str, dep1, scope="request")
 
-    async with await di.arequest_context():
+    async with di.arequest_context():
         assert di.get(str) == "test"
 
     assert events == ["dep1:before", "dep1:after"]
@@ -1043,6 +1081,7 @@ def test_provider_decorator_with_provided_args(di: PyxDI) -> None:
 
 
 def test_scan(di: PyxDI) -> None:
+    di.register_module(ScanModule)
     di.scan(["tests.scan"])
 
     from .scan.a.a3.handlers import a_a3_handler_1, a_a3_handler_2
@@ -1051,33 +1090,24 @@ def test_scan(di: PyxDI) -> None:
     assert a_a3_handler_2().ident == "a.a1.str_provider"
 
 
+def test_scan_single_package(di: PyxDI) -> None:
+    di.register_module(ScanModule)
+    di.scan("tests.scan.a.a3.handlers")
+
+    from .scan.a.a3.handlers import a_a3_handler_1
+
+    assert a_a3_handler_1() == "a.a1.str_provider"
+
+
 def test_scan_non_existing_tag(di: PyxDI) -> None:
     di.scan(["tests.scan"], tags=["non_existing_tag"])
 
     assert not di.providers
 
 
-def test_scan_only_provider(di: PyxDI) -> None:
-    di.scan(["tests.scan.a"], tags=["a1"])
-
-    assert str(di.providers[str]) == "tests.scan.a.a1.providers.a_a1_provider"
-    assert int not in di.providers
-
-
-def test_scan_only_provider_package(di: PyxDI) -> None:
-    di.scan(["tests.scan.a.a1.providers"], tags=["a", "provider"])
-
-    assert str(di.providers[str]) == "tests.scan.a.a1.providers.a_a1_provider"
-
-
-def test_scan_from_string(di: PyxDI) -> None:
-    di.scan("tests.scan.a.a1", tags=["provider"])
-
-    assert str(di.providers[str]) == "tests.scan.a.a1.providers.a_a1_provider"
-
-
-def test_scan_only_inject(di: PyxDI) -> None:
-    di.scan(["tests.scan.a"], tags=["provider", "inject"])
+def test_scan_tagged(di: PyxDI) -> None:
+    di.register_module(ScanModule)
+    di.scan(["tests.scan.a"], tags=["inject"])
 
     from .scan.a.a3.handlers import a_a3_handler_1
 

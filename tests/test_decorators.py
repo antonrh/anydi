@@ -29,7 +29,6 @@ def test_provider_no_args() -> None:
     assert getattr(service_provider, "__pyxdi_provider__") == {
         "scope": None,
     }
-    assert getattr(service_provider, "__pyxdi_tags__") is None
 
 
 def test_provider_no_args_provided() -> None:
@@ -44,14 +43,13 @@ def test_provider_no_args_provided() -> None:
 
 
 def test_provider() -> None:
-    @provider(scope="singleton", tags=["tag1", "tag2"])
+    @provider(scope="singleton")
     def service_provider() -> str:
         return "test"
 
     assert getattr(service_provider, "__pyxdi_provider__") == {
         "scope": "singleton",
     }
-    assert getattr(service_provider, "__pyxdi_tags__") == ["tag1", "tag2"]
 
 
 def test_inject_no_args() -> None:

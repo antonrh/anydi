@@ -407,7 +407,7 @@ class Service:
         return self.repo.get(ident=ident)
 ```
 
-If you create a `PyxDI` instance with auto_register=True, it will automatically register a provider for `Service` and `Repository` with provided `Database`:
+If you create a `PyxDI` instance with `auto_register=True`, it will automatically register a provider for `Service` and `Repository` with provided `Database`:
 
 ```python
 import pyxdi
@@ -520,20 +520,20 @@ In this example, the `Database` object is only instantiated and connected when t
 By using `lazy=True`, you can avoid unnecessary object creation and improve the performance of your application.
 
 
-## Application Scan
+### Scanning Injection
 
-`PyxDI` provides a simple way to register providers and inject dependencies by scanning modules or packages. For example, your application might have the following structure:
+`PyxDI` provides a simple way to inject dependencies by scanning Python modules or packages.
+For example, your application might have the following structure:
 
 ```
 /app
   api/
     handlers.py
   main.py
-  providers.py
   services.py
 ```
 
-`services.py defines a service class:
+`services.py` defines a service class:
 
 ```python
 class Service:
@@ -541,7 +541,7 @@ class Service:
         self.name = name
 ```
 
-`providers.py provides a provider for the Service class:
+`handlers.py` uses the Service class:
 
 ```python
 import pyxdi
@@ -549,34 +549,27 @@ import pyxdi
 from app.services import Service
 
 
-@pyxdi.provider
-def service() -> str:
-    return Service(name="demo")
-```
-
-!!! note
-
-    If the provider has already been registered, it will be ignored to prevent duplicate registration.
-
-`handlers.py uses the Service class:
-
-```python
-import pyxdi
-
-from app.services import Service
-
-
+@pyxdi.inject
 def my_handler(service: Service = pyxdi.dep) -> None:
     print(f"Hello, from service `{service.name}`")
 ```
 
-`main.py` starts the DI container and scans the app directory:
+`main.py` starts the DI container and scans the app `handlers.py` module:
 
 ```python
+from app.services import Service
+
 import pyxdi
 
 di = pyxdi.PyxDI()
-di.scan(["app"])
+
+
+@di.provider
+def service() -> str:
+    return Service(name="demo")
+
+
+di.scan(["app.handlers"])
 di.start()
 
 # application context
@@ -584,9 +577,9 @@ di.start()
 di.close()
 ```
 
-The scan method takes a list of directory paths as an argument and recursively searches those directories for Python modules containing @pyxdi.provider- or @pyxdi.inject-decorated functions or classes.
+The scan method takes a list of directory paths as an argument and recursively searches those directories for Python modules containing `@pyxdi.inject`-decorated functions or classes.
 
-### Scan by tags
+### Scanning Injection by tags
 
 You can also scan for providers or injectables in specific tags. To do so, you need to use the tags argument when registering providers or injectables. For example:
 
@@ -594,12 +587,57 @@ You can also scan for providers or injectables in specific tags. To do so, you n
 import pyxdi
 
 di = pyxdi.PyxDI()
-di.scan(["app.providers"], tags=["tag1"])
+di.scan(["app.handlers"], tags=["tag1"])
 ```
 
-This will scan for `@provider` annotated target only with defined `tags` within the `app.providers` module.
+This will scan for `@inject` annotated target only with defined `tags` within the `app.handlers` module.
 
-With `PyxDI`'s application scan feature, you can keep your code organized and easily manage your dependencies.
+
+## Modules
+
+`PyxDI` provides a way to organize your code and configure dependencies for the dependency injection container.
+A module is a class that extends the `pyxdi.Module` base class and contains the configuration for the container.
+
+Here's an example how to create and register simple module:
+
+```python
+import pyxdi
+
+
+class Repository:
+    pass
+
+
+class Service:
+    def __init__(self, repo: Repository) -> None:
+        self.repo = repo
+
+
+class AppModule(pyxdi.Module):
+    def configure(self, di: pyxdi.PyxDI) -> None:
+        di.singleton(Repository, Repository())
+
+    @pyxdi.provider(scope="singleton")
+    def configure_service(self, repo: Repository) -> Service:
+        return Service(repo=repo)
+
+
+di = pyxdi.PyxDI(modules=[AppModule()])
+
+# or
+# di.register_module(AppModule())
+
+assert di.has_provider(Service)
+assert di.has_provider(Repository)
+```
+
+!!! note
+
+    If the provider has already been registered, it will be overridden.
+
+
+With `PyxDI`'s application Modules, you can keep your code organized and easily manage your dependencies.
+
 
 ## Testing
 

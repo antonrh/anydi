@@ -5,13 +5,13 @@ import importlib
 import inspect
 import logging
 import pkgutil
+import types
 import typing as t
 import uuid
 from collections import defaultdict
 from contextvars import ContextVar
 from dataclasses import dataclass
 from functools import cached_property, wraps
-from types import ModuleType, TracebackType
 
 from typing_extensions import Annotated, ParamSpec
 
@@ -67,7 +67,7 @@ class Provider:
 
     @cached_property
     def is_function(self) -> bool:
-        return inspect.isfunction(self.obj) and not (
+        return (inspect.isfunction(self.obj) or inspect.ismethod(self.obj)) and not (
             self.is_resource or self.is_async_resource
         )
 
@@ -88,23 +88,18 @@ class UnresolvedProvider:
 
 
 @dataclass(frozen=True)
-class ScannedProvider:
-    member: t.Any
-    scope: Scope
-
-
-@dataclass(frozen=True)
 class ScannedDependency:
     member: t.Any
-    module: ModuleType
+    module: types.ModuleType
     lazy: t.Optional[bool] = None
 
 
-class _DependencyMark:
+class DependencyMark:
     __slots__ = ()
 
 
-dep = t.cast(t.Any, _DependencyMark())
+# Dependency mark with Any type
+dep = t.cast(t.Any, DependencyMark())
 
 
 def named(tp: t.Type[T], name: str) -> Annotated[t.Type[T], str]:
@@ -127,6 +122,9 @@ class PyxDI:
         default_scope: Scope = "singleton",
         auto_register: bool = False,
         lazy_inject: bool = False,
+        modules: t.Optional[
+            t.Sequence[t.Union[Module, t.Type[Module], t.Callable[["PyxDI"], None]]],
+        ] = None,
     ) -> None:
         self._default_scope = default_scope
         self._auto_register = auto_register
@@ -140,6 +138,11 @@ class PyxDI:
             t.Type[t.Any], t.List[UnresolvedProvider]
         ] = defaultdict(list)
         self._unresolved_dependencies: t.Dict[t.Type[t.Any], UnresolvedDependency] = {}
+
+        # Register modules
+        modules = modules or []
+        for module in modules:
+            self.register_module(module)
 
     @property
     def default_scope(self) -> Scope:
@@ -169,7 +172,6 @@ class PyxDI:
         *,
         scope: t.Optional[Scope] = None,
         override: bool = False,
-        ignore: bool = False,
     ) -> Provider:
         provider = Provider(obj=obj, scope=scope or self.default_scope)
 
@@ -179,20 +181,13 @@ class PyxDI:
             interface = type(f"EventResource_{uuid.uuid4()}", (), {})
 
         try:
-            registered_provider = self.get_provider(interface)
+            self.get_provider(interface)
         except ProviderError:
             pass
         else:
             if override:
                 self._providers[interface] = provider
                 return provider
-
-            if ignore:
-                logger.info(
-                    f"Ignoring the `{provider}` provider as it "
-                    "has already been registered."
-                )
-                return registered_provider
 
             raise ProviderError(
                 f"The provider interface `{get_full_qualname(interface)}` "
@@ -207,6 +202,9 @@ class PyxDI:
         return provider
 
     def unregister_provider(self, interface: t.Type[t.Any]) -> None:
+        """
+        Unregister provider by interface.
+        """
         if not self.has_provider(interface):
             raise ProviderError(
                 "The provider interface "
@@ -230,6 +228,9 @@ class PyxDI:
         self._unresolved_dependencies.pop(interface, None)
 
     def get_provider(self, interface: t.Type[t.Any]) -> Provider:
+        """
+        Get provider by interface.
+        """
         try:
             return self._providers[interface]
         except KeyError as exc:
@@ -242,6 +243,9 @@ class PyxDI:
     def singleton(
         self, interface: t.Type[T], instance: t.Any, *, override: bool = False
     ) -> Provider:
+        """
+        Register singleton instance provider.
+        """
         return self.register_provider(
             interface, lambda: instance, scope="singleton", override=override
         )
@@ -359,6 +363,30 @@ class PyxDI:
                 f"\n{message}."
             )
 
+    # Modules
+    def register_module(
+        self, module: t.Union[Module, t.Type[Module], t.Callable[["PyxDI"], None]]
+    ) -> None:
+        """
+        Register module as callable, Module type or Module instance.
+        """
+        # Callable Module
+        if inspect.isfunction(module):
+            module(self)
+            return
+
+        # Class based Module or Module type
+        if inspect.isclass(module) and issubclass(module, Module):
+            module = module()
+        if isinstance(module, Module):
+            module.configure(self)
+            for _, method in inspect.getmembers(module):
+                provided = getattr(method, "__pyxdi_provider__", None)
+                if not provided:
+                    continue
+                scope = provided.get("scope")
+                self.provider(scope=scope, override=True)(method)
+
     # Lifespan
 
     def start(self) -> None:
@@ -374,7 +402,7 @@ class PyxDI:
         return contextlib.contextmanager(self._request_context)()
 
     def _request_context(self) -> t.Iterator["ScopedContext"]:
-        with self.create_request_context() as context:
+        with self._create_request_context() as context:
             token = self._request_context_var.set(context)
             yield context
             self._request_context_var.reset(token)
@@ -388,18 +416,18 @@ class PyxDI:
     async def aclose(self) -> None:
         await self._singleton_context.aclose()
 
-    async def arequest_context(
+    def arequest_context(
         self,
     ) -> t.AsyncContextManager["ScopedContext"]:
         return contextlib.asynccontextmanager(self._arequest_context)()
 
     async def _arequest_context(self) -> t.AsyncIterator["ScopedContext"]:
-        async with self.create_request_context() as context:
+        async with self._create_request_context() as context:
             token = self._request_context_var.set(context)
             yield context
             self._request_context_var.reset(token)
 
-    def create_request_context(self) -> "ScopedContext":
+    def _create_request_context(self) -> "ScopedContext":
         return ScopedContext("request", self)
 
     def _get_request_context(self) -> "ScopedContext":
@@ -415,6 +443,9 @@ class PyxDI:
     # Instance
 
     def get(self, interface: t.Type[T]) -> T:
+        """
+        Get instance by interface.
+        """
         try:
             provider = self.get_provider(interface)
         except ProviderError:
@@ -435,6 +466,9 @@ class PyxDI:
         return t.cast(T, self.create_instance(provider))
 
     def has(self, interface: t.Type[T]) -> bool:
+        """
+        Check that container contains instance by interface.
+        """
         try:
             provider = self.get_provider(interface)
         except ProviderError:
@@ -527,7 +561,6 @@ class PyxDI:
         *,
         scope: t.Optional[Scope] = None,
         override: bool = False,
-        ignore: bool = False,
     ) -> t.Callable[[t.Callable[P, T]], t.Callable[P, T]]:
         ...
 
@@ -537,17 +570,10 @@ class PyxDI:
         *,
         scope: t.Optional[Scope] = None,
         override: bool = False,
-        ignore: bool = False,
     ) -> t.Union[t.Callable[P, T], t.Callable[[t.Callable[P, T]], t.Callable[P, T]]]:
         def decorator(func: t.Callable[P, T]) -> t.Callable[P, T]:
             interface = self._get_provider_annotation(func)
-            self.register_provider(
-                interface,
-                func,
-                scope=scope,
-                override=override,
-                ignore=ignore,
-            )
+            self.register_provider(interface, func, scope=scope, override=override)
             return func
 
         if func is None:
@@ -623,50 +649,34 @@ class PyxDI:
         self,
         /,
         packages: t.Union[
-            t.Union[ModuleType, str],
-            t.Iterable[t.Union[ModuleType, str]],
+            t.Union[types.ModuleType, str],
+            t.Iterable[t.Union[types.ModuleType, str]],
         ],
         *,
         tags: t.Optional[t.Iterable[str]] = None,
     ) -> None:
-        scanned_providers: t.List[ScannedProvider] = []
-        scanned_dependencies: t.List[ScannedDependency] = []
+        dependencies: t.List[ScannedDependency] = []
 
         if isinstance(packages, t.Iterable) and not isinstance(packages, str):
-            scan_packages: t.Iterable[t.Union[ModuleType, str]] = packages
+            scan_packages: t.Iterable[t.Union[types.ModuleType, str]] = packages
         else:
-            scan_packages = t.cast(t.Iterable[t.Union[ModuleType, str]], [packages])
+            scan_packages = t.cast(
+                t.Iterable[t.Union[types.ModuleType, str]], [packages]
+            )
 
         for package in scan_packages:
-            _scanned_providers, _scanned_dependencies = self._scan_package(
-                package, tags=tags
-            )
-            scanned_providers.extend(_scanned_providers)
-            scanned_dependencies.extend(_scanned_dependencies)
+            dependencies.extend(self._scan_package(package, tags=tags))
 
-        for scanned_provider in scanned_providers:
-            self.provider(
-                scope=scanned_provider.scope,
-                override=False,
-                ignore=True,
-            )(scanned_provider.member)
-
-        for scanned_dependency in scanned_dependencies:
-            decorator = self.inject(lazy=scanned_dependency.lazy)(
-                scanned_dependency.member
-            )
-            setattr(
-                scanned_dependency.module,
-                scanned_dependency.member.__name__,
-                decorator,
-            )
+        for dependency in dependencies:
+            decorator = self.inject(lazy=dependency.lazy)(dependency.member)
+            setattr(dependency.module, dependency.member.__name__, decorator)
 
     def _scan_package(
         self,
-        package: t.Union[ModuleType, str],
+        package: t.Union[types.ModuleType, str],
         *,
         tags: t.Optional[t.Iterable[str]] = None,
-    ) -> t.Tuple[t.List[ScannedProvider], t.List[ScannedDependency]]:
+    ) -> t.List[ScannedDependency]:
         tags = tags or []
         if isinstance(package, str):
             package = importlib.import_module(package)
@@ -676,29 +686,23 @@ class PyxDI:
         if not package_path:
             return self._scan_module(package, tags=tags)
 
-        scanned_providers: t.List[ScannedProvider] = []
-        scanned_dependencies: t.List[ScannedDependency] = []
+        dependencies: t.List[ScannedDependency] = []
 
         for module_info in pkgutil.walk_packages(
             path=package_path, prefix=package.__name__ + "."
         ):
             module = importlib.import_module(module_info.name)
-            _scanned_providers, _scanned_dependencies = self._scan_module(
-                module, tags=tags
-            )
-            scanned_providers.extend(_scanned_providers)
-            scanned_dependencies.extend(_scanned_dependencies)
+            dependencies.extend(self._scan_module(module, tags=tags))
 
-        return scanned_providers, scanned_dependencies
+        return dependencies
 
     def _scan_module(
         self,
-        module: ModuleType,
+        module: types.ModuleType,
         *,
         tags: t.Iterable[str],
-    ) -> t.Tuple[t.List[ScannedProvider], t.List[ScannedDependency]]:
-        scanned_providers: t.List[ScannedProvider] = []
-        scanned_dependencies: t.List[ScannedDependency] = []
+    ) -> t.List[ScannedDependency]:
+        dependencies: t.List[ScannedDependency] = []
 
         for _, member in inspect.getmembers(module):
             if getattr(member, "__module__", None) != module.__name__ or not callable(
@@ -714,17 +718,13 @@ class PyxDI:
             ):
                 continue
 
-            provided = getattr(member, "__pyxdi_provider__", None)
-            if provided:
-                scope = provided["scope"]
-                scanned_providers.append(ScannedProvider(member=member, scope=scope))
-                continue
-
             injected = getattr(member, "__pyxdi_inject__", None)
             if injected:
                 lazy = injected["lazy"]
-                scanned_dependencies.append(
-                    self._scanned_dependency(member=member, module=module, lazy=lazy)
+                dependencies.append(
+                    self._create_scanned_dependency(
+                        member=member, module=module, lazy=lazy
+                    )
                 )
                 continue
 
@@ -734,16 +734,16 @@ class PyxDI:
             else:
                 signature = get_signature(member)
             for parameter in signature.parameters.values():
-                if isinstance(parameter.default, _DependencyMark):
-                    scanned_dependencies.append(
-                        self._scanned_dependency(member=member, module=module)
+                if isinstance(parameter.default, DependencyMark):
+                    dependencies.append(
+                        self._create_scanned_dependency(member=member, module=module)
                     )
                     continue
 
-        return scanned_providers, scanned_dependencies
+        return dependencies
 
-    def _scanned_dependency(
-        self, member: t.Any, module: ModuleType, lazy: t.Optional[bool] = None
+    def _create_scanned_dependency(
+        self, member: t.Any, module: types.ModuleType, lazy: t.Optional[bool] = None
     ) -> ScannedDependency:
         if hasattr(member, "__wrapped__"):
             member = member.__wrapped__
@@ -794,7 +794,7 @@ class PyxDI:
     def _get_injectable_params(self, obj: t.Callable[..., t.Any]) -> t.Dict[str, t.Any]:
         injectable_params = {}
         for parameter in get_signature(obj).parameters.values():
-            if not isinstance(parameter.default, _DependencyMark):
+            if not isinstance(parameter.default, DependencyMark):
                 continue
 
             annotation = parameter.annotation
@@ -887,7 +887,7 @@ class ScopedContext:
         self,
         exc_type: t.Type[BaseException] | None,
         exc_val: BaseException | None,
-        exc_tb: TracebackType | None,
+        exc_tb: types.TracebackType | None,
     ) -> None:
         self.close()
         return
@@ -900,7 +900,7 @@ class ScopedContext:
         self,
         exc_type: t.Type[BaseException] | None,
         exc_val: BaseException | None,
-        exc_tb: TracebackType | None,
+        exc_tb: types.TracebackType | None,
     ) -> None:
         await self.aclose()
         return
@@ -909,3 +909,12 @@ class ScopedContext:
         for interface, provider in self._root.providers.items():
             if provider.scope == self._scope:
                 yield interface, provider
+
+
+class Module:
+    """
+    Module base class.
+    """
+
+    def configure(self, di: PyxDI) -> None:
+        ...

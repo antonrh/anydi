@@ -12,5 +12,4 @@ exclude_lines =
     raise NotImplementedError
     except ImportError:
     if HAS_SIGNATURE_EVAL_STR_ARG
-    if not lazy_object_proxy_installed:
     if not anyio_installed:
