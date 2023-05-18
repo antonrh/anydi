@@ -753,7 +753,7 @@ def test_get_auto_registered_with_primitive_class() -> None:
         name: str
 
     with pytest.raises(ProviderError) as exc_info:
-        di.get(Service)
+        _ = f"{di.get(Service).name}"
 
     assert str(exc_info.value) == (
         "The provider interface for `str` has not been registered. Please ensure that "

@@ -171,7 +171,7 @@ class PyxDI:
         if (provider.is_resource or provider.is_async_resource) and (
             interface is NoneType or interface is None
         ):
-            interface = type(f"EventResource_{uuid.uuid4()}", (), {})
+            interface = type(f"Event{uuid.uuid4()}", (), {"__pyxdi_event__": True})
 
         try:
             self.get_provider(interface)
@@ -835,7 +835,12 @@ class ScopedContext:
     def start(self) -> None:
         for interface, provider in self._iter_providers():
             if provider.is_resource:
-                instance = self._root.create_resource(provider, stack=self._stack)
+                if hasattr(interface, "__pyxdi_event__"):
+                    instance = self._root.create_resource(provider, stack=self._stack)
+                else:
+                    instance = make_lazy(
+                        self._root.create_resource, provider, stack=self._stack
+                    )
                 self.set(interface, instance)
             elif provider.is_async_resource:
                 raise ProviderError(
