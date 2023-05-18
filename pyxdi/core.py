@@ -121,7 +121,7 @@ class PyxDI:
         default_scope: Scope = "singleton",
         auto_register: bool = False,
         modules: t.Optional[
-            t.Sequence[t.Union[Module, t.Type[Module], t.Callable[["PyxDI"], None]]],
+            t.Sequence[t.Union[Module, t.Type[Module], t.Callable[[PyxDI], None]]],
         ] = None,
     ) -> None:
         self._default_scope = default_scope
@@ -358,7 +358,7 @@ class PyxDI:
 
     # Modules
     def register_module(
-        self, module: t.Union[Module, t.Type[Module], t.Callable[["PyxDI"], None]]
+        self, module: t.Union[Module, t.Type[Module], t.Callable[[PyxDI], None]]
     ) -> None:
         """
         Register module as callable, Module type or Module instance.
@@ -391,10 +391,10 @@ class PyxDI:
 
     def request_context(
         self,
-    ) -> t.ContextManager["ScopedContext"]:
+    ) -> t.ContextManager[ScopedContext]:
         return contextlib.contextmanager(self._request_context)()
 
-    def _request_context(self) -> t.Iterator["ScopedContext"]:
+    def _request_context(self) -> t.Iterator[ScopedContext]:
         with self._create_request_context() as context:
             token = self._request_context_var.set(context)
             yield context
@@ -411,19 +411,19 @@ class PyxDI:
 
     def arequest_context(
         self,
-    ) -> t.AsyncContextManager["ScopedContext"]:
+    ) -> t.AsyncContextManager[ScopedContext]:
         return contextlib.asynccontextmanager(self._arequest_context)()
 
-    async def _arequest_context(self) -> t.AsyncIterator["ScopedContext"]:
+    async def _arequest_context(self) -> t.AsyncIterator[ScopedContext]:
         async with self._create_request_context() as context:
             token = self._request_context_var.set(context)
             yield context
             self._request_context_var.reset(token)
 
-    def _create_request_context(self) -> "ScopedContext":
+    def _create_request_context(self) -> ScopedContext:
         return ScopedContext("request", self)
 
-    def _get_request_context(self) -> "ScopedContext":
+    def _get_request_context(self) -> ScopedContext:
         request_context = self._request_context_var.get()
         if request_context is None:
             raise LookupError(
@@ -471,7 +471,7 @@ class PyxDI:
             return scoped_context.has(interface)
         return True
 
-    def _get_scoped_context(self, scope: Scope) -> t.Optional["ScopedContext"]:
+    def _get_scoped_context(self, scope: Scope) -> t.Optional[ScopedContext]:
         if scope == "singleton":
             return self._singleton_context
         elif scope == "request":
