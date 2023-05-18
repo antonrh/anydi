@@ -57,7 +57,7 @@ def test_inject_no_args() -> None:
     def my_func() -> None:
         pass
 
-    assert getattr(my_func, "__pyxdi_inject__") == {"lazy": None}
+    assert getattr(my_func, "__pyxdi_inject__") is True
     assert getattr(my_func, "__pyxdi_tags__") is None
 
 
@@ -66,14 +66,14 @@ def test_inject_no_args_provided() -> None:
     def my_func() -> None:
         pass
 
-    assert getattr(my_func, "__pyxdi_inject__") == {"lazy": None}
+    assert getattr(my_func, "__pyxdi_inject__") is True
     assert getattr(my_func, "__pyxdi_tags__") is None
 
 
 def test_inject() -> None:
-    @inject(lazy=True, tags=["tag1", "tag2"])
+    @inject(tags=["tag1", "tag2"])
     def my_func() -> None:
         pass
 
-    assert getattr(my_func, "__pyxdi_inject__") == {"lazy": True}
+    assert getattr(my_func, "__pyxdi_inject__") is True
     assert getattr(my_func, "__pyxdi_tags__") == ["tag1", "tag2"]

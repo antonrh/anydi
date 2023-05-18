@@ -91,7 +91,6 @@ class UnresolvedProvider:
 class ScannedDependency:
     member: t.Any
     module: types.ModuleType
-    lazy: t.Optional[bool] = None
 
 
 class DependencyMark:
@@ -121,14 +120,12 @@ class PyxDI:
         *,
         default_scope: Scope = "singleton",
         auto_register: bool = False,
-        lazy_inject: bool = False,
         modules: t.Optional[
             t.Sequence[t.Union[Module, t.Type[Module], t.Callable[["PyxDI"], None]]],
         ] = None,
     ) -> None:
         self._default_scope = default_scope
         self._auto_register = auto_register
-        self._lazy_inject = lazy_inject
         self._providers: t.Dict[t.Type[t.Any], Provider] = {}
         self._singleton_context = ScopedContext("singleton", self)
         self._request_context_var: ContextVar[t.Optional[ScopedContext]] = ContextVar(
@@ -151,10 +148,6 @@ class PyxDI:
     @property
     def auto_register(self) -> bool:
         return self._auto_register
-
-    @property
-    def lazy_inject(self) -> bool:
-        return self._lazy_inject
 
     @property
     def providers(self) -> t.Dict[t.Type[t.Any], Provider]:
@@ -592,7 +585,7 @@ class PyxDI:
 
     @t.overload
     def inject(
-        self, *, lazy: t.Optional[bool] = None
+        self,
     ) -> t.Callable[
         [t.Callable[P, t.Union[T, t.Awaitable[T]]]],
         t.Callable[P, t.Union[T, t.Awaitable[T]]],
@@ -602,7 +595,6 @@ class PyxDI:
     def inject(
         self,
         obj: t.Union[t.Callable[P, t.Union[T, t.Awaitable[T]]], None] = None,
-        lazy: t.Optional[bool] = None,
     ) -> t.Union[
         t.Callable[
             [t.Callable[P, t.Union[T, t.Awaitable[T]]]],
@@ -610,8 +602,6 @@ class PyxDI:
         ],
         t.Callable[P, t.Union[T, t.Awaitable[T]]],
     ]:
-        lazy = self.lazy_inject if lazy is None else lazy
-
         def decorator(
             obj: t.Callable[P, t.Union[T, t.Awaitable[T]]]
         ) -> t.Callable[P, t.Union[T, t.Awaitable[T]]]:
@@ -619,10 +609,7 @@ class PyxDI:
 
             def _inject_kwargs(**kwargs: P.kwargs) -> t.Dict[str, t.Any]:
                 for name, annotation in injected_params.items():
-                    if lazy:
-                        kwargs[name] = make_lazy(self.get, annotation)
-                    else:
-                        kwargs[name] = self.get(annotation)
+                    kwargs[name] = make_lazy(self.get, annotation)
                 return kwargs
 
             if inspect.iscoroutinefunction(obj):
@@ -668,7 +655,7 @@ class PyxDI:
             dependencies.extend(self._scan_package(package, tags=tags))
 
         for dependency in dependencies:
-            decorator = self.inject(lazy=dependency.lazy)(dependency.member)
+            decorator = self.inject()(dependency.member)
             setattr(dependency.module, dependency.member.__name__, decorator)
 
     def _scan_package(
@@ -720,11 +707,8 @@ class PyxDI:
 
             injected = getattr(member, "__pyxdi_inject__", None)
             if injected:
-                lazy = injected["lazy"]
                 dependencies.append(
-                    self._create_scanned_dependency(
-                        member=member, module=module, lazy=lazy
-                    )
+                    self._create_scanned_dependency(member=member, module=module)
                 )
                 continue
 
@@ -743,11 +727,11 @@ class PyxDI:
         return dependencies
 
     def _create_scanned_dependency(
-        self, member: t.Any, module: types.ModuleType, lazy: t.Optional[bool] = None
+        self, member: t.Any, module: types.ModuleType
     ) -> ScannedDependency:
         if hasattr(member, "__wrapped__"):
             member = member.__wrapped__
-        return ScannedDependency(member=member, module=module, lazy=lazy)
+        return ScannedDependency(member=member, module=module)
 
     # Inspection
 

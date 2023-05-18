@@ -1044,7 +1044,7 @@ def test_inject_lazy(di: pyxdi.PyxDI) -> None:
         service_init()
         return Service(ident="test")
 
-    @di.inject(lazy=True)
+    @di.inject()
     def func(service: Service = dep) -> None:
         pass
 
