@@ -454,7 +454,7 @@ class PyxDI:
                 and inspect.isclass(interface)
                 and not is_builtin_type(interface)
             ):
-                scope = getattr(interface, "__pyxdi_scope__", self._default_scope)
+                scope = getattr(interface, "__pyxdi_scope__", self.default_scope)
                 provider = self.register_provider(interface, interface, scope=scope)
             else:
                 raise
