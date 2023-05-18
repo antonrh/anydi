@@ -3,7 +3,6 @@ from __future__ import annotations
 import contextlib
 import importlib
 import inspect
-import logging
 import pkgutil
 import types
 import typing as t
@@ -45,8 +44,6 @@ ALLOWED_SCOPES: t.Dict[Scope, t.List[Scope]] = {
     "request": ["request", "singleton"],
     "transient": ["transient", "singleton", "request"],
 }
-
-logger = logging.getLogger(__name__)
 
 
 @dataclass(frozen=True)
@@ -114,6 +111,7 @@ class UnresolvedDependency:
     obj: t.Callable[..., t.Any]
 
 
+@t.final
 class PyxDI:
     def __init__(
         self,
@@ -234,7 +232,7 @@ class PyxDI:
             ) from exc
 
     def singleton(
-        self, interface: t.Type[T], instance: t.Any, *, override: bool = False
+        self, interface: t.Type[t.Any], instance: t.Any, *, override: bool = False
     ) -> Provider:
         """
         Register singleton instance provider.
