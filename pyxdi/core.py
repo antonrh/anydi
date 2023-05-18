@@ -442,6 +442,7 @@ class PyxDI:
         try:
             provider = self.get_provider(interface)
         except ProviderError:
+            # Try to auto register instance class, or raise ProviderError
             if (
                 self.auto_register
                 and inspect.isclass(interface)
@@ -768,7 +769,7 @@ class PyxDI:
         kwargs = {}
         signature = get_signature(provider.obj)
         for parameter in signature.parameters.values():
-            instance = self.get(parameter.annotation)
+            instance = make_lazy(self.get, parameter.annotation)
             if parameter.kind == parameter.POSITIONAL_ONLY:
                 args.append(instance)
             else:
