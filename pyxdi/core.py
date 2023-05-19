@@ -171,11 +171,7 @@ class PyxDI:
         ):
             interface = type(f"Event{uuid.uuid4()}", (), {"__pyxdi_event__": True})
 
-        try:
-            self.get_provider(interface)
-        except ProviderError:
-            pass
-        else:
+        if interface in self._providers:
             if override:
                 self._providers[interface] = provider
                 return provider
@@ -225,6 +221,14 @@ class PyxDI:
         try:
             return self._providers[interface]
         except KeyError as exc:
+            # Try to auto register instance class, or raise ProviderError
+            if (
+                self.auto_register
+                and inspect.isclass(interface)
+                and not is_builtin_type(interface)
+            ):
+                scope = getattr(interface, "__pyxdi_scope__", self.default_scope)
+                return self.register_provider(interface, interface, scope=scope)
             raise ProviderError(
                 f"The provider interface for `{get_full_qualname(interface)}` has "
                 "not been registered. Please ensure that the provider interface is "
@@ -437,19 +441,7 @@ class PyxDI:
         """
         Get instance by interface.
         """
-        try:
-            provider = self.get_provider(interface)
-        except ProviderError:
-            # Try to auto register instance class, or raise ProviderError
-            if (
-                self.auto_register
-                and inspect.isclass(interface)
-                and not is_builtin_type(interface)
-            ):
-                scope = getattr(interface, "__pyxdi_scope__", self.default_scope)
-                provider = self.register_provider(interface, interface, scope=scope)
-            else:
-                raise
+        provider = self.get_provider(interface)
 
         scoped_context = self._get_scoped_context(provider.scope)
         if scoped_context:
