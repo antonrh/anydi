@@ -169,7 +169,7 @@ class PyxDI:
         if (provider.is_resource or provider.is_async_resource) and (
             interface is NoneType or interface is None
         ):
-            interface = type(f"Event{uuid.uuid4()}", (), {"__pyxdi_event__": True})
+            interface = type(f"Event{uuid.uuid4()}", (), {})
 
         if interface in self._providers:
             if override:
@@ -593,24 +593,23 @@ class PyxDI:
         def decorator(
             obj: t.Callable[P, t.Union[T, t.Awaitable[T]]]
         ) -> t.Callable[P, t.Union[T, t.Awaitable[T]]]:
-            injected_params = self._get_injectable_params(obj)
-
-            def _inject_kwargs(**kwargs: P.kwargs) -> t.Dict[str, t.Any]:
-                for name, annotation in injected_params.items():
-                    kwargs[name] = make_lazy(self.get, annotation)
-                return kwargs
+            injected_params = self._get_injected_params(obj)
 
             if inspect.iscoroutinefunction(obj):
 
                 @wraps(obj)
                 async def awrapped(*args: P.args, **kwargs: P.kwargs) -> T:
-                    return t.cast(T, await obj(*args, **_inject_kwargs(**kwargs)))
+                    for name, annotation in injected_params.items():
+                        kwargs[name] = self.get(annotation)
+                    return t.cast(T, await obj(*args, **kwargs))
 
                 return awrapped
 
             @wraps(obj)
             def wrapped(*args: P.args, **kwargs: P.kwargs) -> T:
-                return t.cast(T, obj(*args, **_inject_kwargs(**kwargs)))
+                for name, annotation in injected_params.items():
+                    kwargs[name] = make_lazy(self.get, annotation)
+                return t.cast(T, obj(*args, **kwargs))
 
             return wrapped
 
@@ -763,8 +762,8 @@ class PyxDI:
                 kwargs[parameter.name] = instance
         return args, kwargs
 
-    def _get_injectable_params(self, obj: t.Callable[..., t.Any]) -> t.Dict[str, t.Any]:
-        injectable_params = {}
+    def _get_injected_params(self, obj: t.Callable[..., t.Any]) -> t.Dict[str, t.Any]:
+        injected_params = {}
         for parameter in get_signature(obj).parameters.values():
             if not isinstance(parameter.default, DependencyMark):
                 continue
@@ -784,8 +783,8 @@ class PyxDI:
                     parameter_name=parameter.name, obj=obj
                 )
 
-            injectable_params[parameter.name] = annotation
-        return injectable_params
+            injected_params[parameter.name] = annotation
+        return injected_params
 
 
 class ScopedContext:
@@ -822,13 +821,9 @@ class ScopedContext:
     def start(self) -> None:
         for interface, provider in self._iter_providers():
             if provider.is_resource:
-                if hasattr(interface, "__pyxdi_event__"):
-                    instance = self._root.create_resource(provider, stack=self._stack)
-                else:
-                    instance = make_lazy(
-                        self._root.create_resource, provider, stack=self._stack
-                    )
-                self.set(interface, instance)
+                self._instances[interface] = self._root.create_resource(
+                    provider, stack=self._stack
+                )
             elif provider.is_async_resource:
                 raise ProviderError(
                     f"The provider `{provider}` cannot be started in synchronous mode "
@@ -842,15 +837,13 @@ class ScopedContext:
     async def astart(self) -> None:
         for interface, provider in self._iter_providers():
             if provider.is_resource:
-                instance = await run_async(
+                self._instances[interface] = await run_async(
                     self._root.create_resource, provider, stack=self._stack
                 )
-                self.set(interface, instance)
             elif provider.is_async_resource:
-                instance = await self._root.acreate_resource(
+                self._instances[interface] = await self._root.acreate_resource(
                     provider, stack=self._async_stack
                 )
-                self.set(interface, instance)
 
     async def aclose(self) -> None:
         await self._async_stack.aclose()
