@@ -12,7 +12,7 @@ from contextvars import ContextVar
 from dataclasses import dataclass
 from functools import cached_property, wraps
 
-from typing_extensions import Annotated, ParamSpec
+from typing_extensions import Annotated, ParamSpec, Self
 
 try:
     from types import NoneType
@@ -125,8 +125,8 @@ class PyxDI:
         self._default_scope = default_scope
         self._auto_register = auto_register
         self._providers: t.Dict[t.Type[t.Any], Provider] = {}
-        self._singleton_context = ScopedContext("singleton", self)
-        self._request_context_var: ContextVar[t.Optional[ScopedContext]] = ContextVar(
+        self._singleton_context = SingletonContext(self)
+        self._request_context_var: ContextVar[t.Optional[RequestContext]] = ContextVar(
             "request_context", default=None
         )
         self._unresolved_providers: t.Dict[
@@ -393,11 +393,11 @@ class PyxDI:
 
     def request_context(
         self,
-    ) -> t.ContextManager[ScopedContext]:
+    ) -> t.ContextManager[RequestContext]:
         return contextlib.contextmanager(self._request_context)()
 
-    def _request_context(self) -> t.Iterator[ScopedContext]:
-        with self._create_request_context() as context:
+    def _request_context(self) -> t.Iterator[RequestContext]:
+        with RequestContext(self) as context:
             token = self._request_context_var.set(context)
             yield context
             self._request_context_var.reset(token)
@@ -413,19 +413,16 @@ class PyxDI:
 
     def arequest_context(
         self,
-    ) -> t.AsyncContextManager[ScopedContext]:
+    ) -> t.AsyncContextManager[RequestContext]:
         return contextlib.asynccontextmanager(self._arequest_context)()
 
-    async def _arequest_context(self) -> t.AsyncIterator[ScopedContext]:
-        async with self._create_request_context() as context:
+    async def _arequest_context(self) -> t.AsyncIterator[RequestContext]:
+        async with RequestContext(self) as context:
             token = self._request_context_var.set(context)
             yield context
             self._request_context_var.reset(token)
 
-    def _create_request_context(self) -> ScopedContext:
-        return ScopedContext("request", self)
-
-    def _get_request_context(self) -> ScopedContext:
+    def _get_request_context(self) -> RequestContext:
         request_context = self._request_context_var.get()
         if request_context is None:
             raise LookupError(
@@ -859,7 +856,7 @@ class ScopedContext:
         await self._async_stack.aclose()
         await run_async(self._stack.close)
 
-    def __enter__(self) -> ScopedContext:
+    def __enter__(self) -> Self:
         self.start()
         return self
 
@@ -872,7 +869,7 @@ class ScopedContext:
         self.close()
         return
 
-    async def __aenter__(self) -> ScopedContext:
+    async def __aenter__(self) -> Self:
         await self.astart()
         return self
 
@@ -889,6 +886,18 @@ class ScopedContext:
         for interface, provider in self._root.providers.items():
             if provider.scope == self._scope:
                 yield interface, provider
+
+
+@t.final
+class SingletonContext(ScopedContext):
+    def __init__(self, root: PyxDI):
+        super().__init__("singleton", root)
+
+
+@t.final
+class RequestContext(ScopedContext):
+    def __init__(self, root: PyxDI):
+        super().__init__("request", root)
 
 
 class Module:
