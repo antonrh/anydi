@@ -166,6 +166,7 @@ class PyxDI:
     ) -> Provider:
         provider = Provider(obj=obj, scope=scope or self.default_scope)
 
+        # Create Event type
         if (provider.is_resource or provider.is_async_resource) and (
             interface is NoneType or interface is None
         ):
@@ -181,6 +182,7 @@ class PyxDI:
                 "already registered."
             )
 
+        # Validate provider
         self._validate_provider_scope(provider)
         self._validate_provider_type(provider)
         self._validate_provider_match_scopes(interface, provider)
@@ -397,8 +399,9 @@ class PyxDI:
         return contextlib.contextmanager(self._request_context)()
 
     def _request_context(self) -> t.Iterator[RequestContext]:
-        with RequestContext(self) as context:
-            token = self._request_context_var.set(context)
+        context = RequestContext(self)
+        token = self._request_context_var.set(context)
+        with context:
             yield context
             self._request_context_var.reset(token)
 
@@ -417,8 +420,9 @@ class PyxDI:
         return contextlib.asynccontextmanager(self._arequest_context)()
 
     async def _arequest_context(self) -> t.AsyncIterator[RequestContext]:
-        async with RequestContext(self) as context:
-            token = self._request_context_var.set(context)
+        context = RequestContext(self)
+        token = self._request_context_var.set(context)
+        async with context:
             yield context
             self._request_context_var.reset(token)
 
@@ -445,6 +449,18 @@ class PyxDI:
             return scoped_context.get(interface)
 
         return t.cast(T, self.create_instance(provider))
+
+    async def aget(self, interface: t.Type[T]) -> T:
+        """
+        Get instance by interface.
+        """
+        provider = self.get_provider(interface)
+
+        scoped_context = self._get_scoped_context(provider.scope)
+        if scoped_context:
+            return await scoped_context.aget(interface)
+
+        return t.cast(T, await self.acreate_instance(provider))
 
     def has(self, interface: t.Type[T]) -> bool:
         """
@@ -516,19 +532,27 @@ class PyxDI:
         *,
         stack: contextlib.AsyncExitStack,
     ) -> t.Any:
-        args, kwargs = self._get_provider_arguments(provider)
+        args, kwargs = await self._aget_provider_arguments(provider)
         cm = contextlib.asynccontextmanager(provider.obj)(*args, **kwargs)
         return await stack.enter_async_context(cm)
 
     def create_instance(self, provider: Provider) -> t.Any:
+        self._validate_instance_provider_type(provider)
+        args, kwargs = self._get_provider_arguments(provider)
+        return provider.obj(*args, **kwargs)
+
+    async def acreate_instance(self, provider: Provider) -> t.Any:
+        self._validate_instance_provider_type(provider)
+        args, kwargs = await self._aget_provider_arguments(provider)
+        return provider.obj(*args, **kwargs)
+
+    def _validate_instance_provider_type(self, provider: Provider) -> None:
         if provider.is_resource or provider.is_async_resource:
             raise ProviderError(
                 f"The instance for the resource provider `{provider}` cannot be "
                 "created until the scope context has been started. Please ensure "
                 "that the scope context is started."
             )
-        args, kwargs = self._get_provider_arguments(provider)
-        return provider.obj(*args, **kwargs)
 
     # Decorators
 
@@ -600,7 +624,7 @@ class PyxDI:
                 @wraps(obj)
                 async def awrapped(*args: P.args, **kwargs: P.kwargs) -> T:
                     for name, annotation in injected_params.items():
-                        kwargs[name] = self.get(annotation)
+                        kwargs[name] = await self.aget(annotation)
                     return t.cast(T, await obj(*args, **kwargs))
 
                 return awrapped
@@ -753,9 +777,21 @@ class PyxDI:
     ) -> t.Tuple[t.List[t.Any], t.Dict[str, t.Any]]:
         args = []
         kwargs = {}
-        signature = get_signature(provider.obj)
-        for parameter in signature.parameters.values():
+        for parameter in get_signature(provider.obj).parameters.values():
             instance = make_lazy(self.get, parameter.annotation)
+            if parameter.kind == parameter.POSITIONAL_ONLY:
+                args.append(instance)
+            else:
+                kwargs[parameter.name] = instance
+        return args, kwargs
+
+    async def _aget_provider_arguments(
+        self, provider: Provider
+    ) -> t.Tuple[t.List[t.Any], t.Dict[str, t.Any]]:
+        args = []
+        kwargs = {}
+        for parameter in get_signature(provider.obj).parameters.values():
+            instance = await self.aget(parameter.annotation)
             if parameter.kind == parameter.POSITIONAL_ONLY:
                 args.append(instance)
             else:
@@ -806,6 +842,23 @@ class ScopedContext:
             self._instances[interface] = instance
         return t.cast(T, instance)
 
+    async def aget(self, interface: t.Type[T]) -> T:
+        instance = self._instances.get(interface)
+        if instance is None:
+            provider = self._root.get_provider(interface)
+            if provider.is_resource:
+                instance = await run_async(
+                    self._root.create_resource(provider, stack=self._stack)
+                )
+            elif provider.is_async_resource:
+                instance = await self._root.acreate_resource(
+                    provider, stack=self._async_stack
+                )
+            else:
+                instance = await self._root.acreate_instance(provider)
+            self._instances[interface] = instance
+        return t.cast(T, instance)
+
     def set(self, interface: t.Type[t.Any], instance: t.Any) -> None:
         self._instances[interface] = instance
         self._root.register_provider(
@@ -819,31 +872,13 @@ class ScopedContext:
         self._instances.pop(interface, None)
 
     def start(self) -> None:
-        for interface, provider in self._iter_providers():
-            if provider.is_resource:
-                self._instances[interface] = self._root.create_resource(
-                    provider, stack=self._stack
-                )
-            elif provider.is_async_resource:
-                raise ProviderError(
-                    f"The provider `{provider}` cannot be started in synchronous mode "
-                    "because it is an asynchronous provider. Please start the provider "
-                    "in asynchronous mode before using it."
-                )
+        """Scope Context start event."""
 
     def close(self) -> None:
         self._stack.close()
 
     async def astart(self) -> None:
-        for interface, provider in self._iter_providers():
-            if provider.is_resource:
-                self._instances[interface] = await run_async(
-                    self._root.create_resource, provider, stack=self._stack
-                )
-            elif provider.is_async_resource:
-                self._instances[interface] = await self._root.acreate_resource(
-                    provider, stack=self._async_stack
-                )
+        """Scope Context start asynchronous event."""
 
     async def aclose(self) -> None:
         await self._async_stack.aclose()
@@ -875,16 +910,40 @@ class ScopedContext:
         await self.aclose()
         return
 
-    def _iter_providers(self) -> t.Iterator[t.Tuple[t.Type[t.Any], Provider]]:
-        for interface, provider in self._root.providers.items():
-            if provider.scope == self._scope:
-                yield interface, provider
-
 
 @t.final
 class SingletonContext(ScopedContext):
     def __init__(self, root: PyxDI):
         super().__init__("singleton", root)
+
+    def start(self) -> None:
+        for interface, provider in self._iter_providers():
+            if provider.is_resource:
+                self._instances[interface] = self._root.create_resource(
+                    provider, stack=self._stack
+                )
+            elif provider.is_async_resource:
+                raise ProviderError(
+                    f"The provider `{provider}` cannot be started in synchronous mode "
+                    "because it is an asynchronous provider. Please start the provider "
+                    "in asynchronous mode before using it."
+                )
+
+    async def astart(self) -> None:
+        for interface, provider in self._iter_providers():
+            if provider.is_resource:
+                self._instances[interface] = await run_async(
+                    self._root.create_resource, provider, stack=self._stack
+                )
+            elif provider.is_async_resource:
+                self._instances[interface] = await self._root.acreate_resource(
+                    provider, stack=self._async_stack
+                )
+
+    def _iter_providers(self) -> t.Iterator[t.Tuple[t.Type[t.Any], Provider]]:
+        for interface, provider in self._root.providers.items():
+            if provider.scope == self._scope:
+                yield interface, provider
 
 
 @t.final

@@ -591,7 +591,7 @@ async def test_arequest_context(di: PyxDI) -> None:
     di.register_provider(str, dep1, scope="request")
 
     async with di.arequest_context():
-        assert di.get(str) == "test"
+        assert await di.aget(str) == "test"
 
     assert events == ["dep1:before", "dep1:after"]
 
