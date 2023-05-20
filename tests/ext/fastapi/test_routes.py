@@ -29,7 +29,7 @@ def test_send_mail_lazy(client: TestClient, di: pyxdi.PyxDI) -> None:
         mail_service_init()
         return mock.MagicMock(spec=MailService)
 
-    response = client.post("/send-mail-lazy", json={"message": message})
+    response = client.post("/send-mail", json={"message": message})
 
     assert response.status_code == 200
     assert response.json() == {

@@ -68,7 +68,7 @@ def inject(obj: t.Callable[P, t.Awaitable[T]]) -> t.Callable[P, t.Awaitable[T]]:
 
 @t.overload
 def inject(
-    *, lazy: t.Optional[bool] = None, tags: t.Optional[t.Iterable[str]] = None
+    *, tags: t.Optional[t.Iterable[str]] = None
 ) -> t.Callable[
     [t.Callable[P, t.Union[T, t.Awaitable[T]]]],
     t.Callable[P, t.Union[T, t.Awaitable[T]]],
@@ -78,7 +78,6 @@ def inject(
 
 def inject(
     obj: t.Union[t.Callable[P, t.Union[T, t.Awaitable[T]]], None] = None,
-    lazy: t.Optional[bool] = None,
     tags: t.Optional[t.Iterable[str]] = None,
 ) -> t.Union[
     t.Callable[
@@ -93,9 +92,7 @@ def inject(
         setattr(
             obj,
             "__pyxdi_inject__",
-            {
-                "lazy": lazy,
-            },
+            True,
         )
         setattr(obj, "__pyxdi_tags__", tags)
         return obj

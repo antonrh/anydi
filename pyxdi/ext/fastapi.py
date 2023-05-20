@@ -46,10 +46,9 @@ def get_di(request: Request) -> pyxdi.PyxDI:
 
 
 class InjectParam(params.Depends):
-    def __init__(self, lazy: t.Optional[bool] = None) -> None:
+    def __init__(self) -> None:
         super().__init__(dependency=self._dependency, use_cache=True)
         self._interface: t.Any = None
-        self._lazy = lazy
 
     @property
     def interface(self) -> t.Any:
@@ -62,14 +61,11 @@ class InjectParam(params.Depends):
         self._interface = val
 
     def _dependency(self, di: pyxdi.PyxDI = fastapi.Depends(get_di)) -> t.Any:
-        lazy = di.lazy_inject if self._lazy is None else self._lazy
-        if lazy:
-            return make_lazy(di.get, self.interface)
-        return di.get(self.interface)
+        return make_lazy(di.get, self.interface)
 
 
-def Inject(*, lazy: t.Optional[bool] = None) -> t.Any:  # noqa
-    return InjectParam(lazy=lazy)
+def Inject() -> t.Any:  # noqa
+    return InjectParam()
 
 
 def iter_dependencies(dependant: Dependant) -> t.Iterator[Dependant]:
