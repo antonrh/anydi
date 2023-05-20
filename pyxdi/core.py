@@ -22,10 +22,10 @@ except ImportError:
 
 from .exceptions import (
     AnnotationError,
-    InvalidScope,
+    InvalidScopeError,
     ProviderError,
-    ScopeMismatch,
-    UnknownDependency,
+    ScopeMismatchError,
+    UnknownDependencyError,
 )
 from .utils import (
     get_full_qualname,
@@ -67,6 +67,10 @@ class Provider:
         return (inspect.isfunction(self.obj) or inspect.ismethod(self.obj)) and not (
             self.is_resource or self.is_async_resource
         )
+
+    @cached_property
+    def is_coroutine(self) -> bool:
+        return inspect.iscoroutinefunction(self.obj)
 
     @cached_property
     def is_resource(self) -> bool:
@@ -170,7 +174,7 @@ class PyxDI:
         if (provider.is_resource or provider.is_async_resource) and (
             interface is NoneType or interface is None
         ):
-            interface = type(f"Event{uuid.uuid4()}", (), {})
+            interface = type(f"Event{uuid.uuid4().hex}", (), {})
 
         if interface in self._providers:
             if override:
@@ -250,7 +254,7 @@ class PyxDI:
     # Validators
     def _validate_provider_scope(self, provider: Provider) -> None:
         if provider.scope not in t.get_args(Scope):
-            raise InvalidScope(
+            raise InvalidScopeError(
                 "The scope provided is invalid. Only the following scopes are "
                 f"supported: {', '.join(t.get_args(Scope))}. Please use one of the "
                 "supported scopes when registering a provider."
@@ -311,7 +315,7 @@ class PyxDI:
                 left_scope, right_scope = scope, related_provider.scope
             allowed_scopes = ALLOWED_SCOPES.get(right_scope) or []
             if left_scope not in allowed_scopes:
-                raise ScopeMismatch(
+                raise ScopeMismatchError(
                     f"The provider `{get_full_qualname(obj)}` with a {scope} scope was "
                     f"attempted to be registered with the provider "
                     f"`{related_provider}` with a `{related_provider.scope}` scope, "
@@ -334,7 +338,7 @@ class PyxDI:
                         f"{get_full_qualname(unresolved_interface)}` parameter"
                     )
             message = "\n".join(errors)
-            raise UnknownDependency(
+            raise UnknownDependencyError(
                 "The following unknown provided dependencies were detected:"
                 f"\n{message}."
             )
@@ -355,7 +359,7 @@ class PyxDI:
             if not errors:
                 return
             message = "\n".join(errors)
-            raise UnknownDependency(
+            raise UnknownDependencyError(
                 "The following unknown injected dependencies were detected:"
                 f"\n{message}."
             )
@@ -537,16 +541,23 @@ class PyxDI:
         return await stack.enter_async_context(cm)
 
     def create_instance(self, provider: Provider) -> t.Any:
-        self._validate_instance_provider_type(provider)
+        self._validate_instance_is_not_resource(provider)
+        if provider.is_coroutine:
+            raise ProviderError(
+                f"The instance for the coroutine provider `{provider}` cannot be "
+                "created in synchronous mode."
+            )
         args, kwargs = self._get_provider_arguments(provider)
         return provider.obj(*args, **kwargs)
 
     async def acreate_instance(self, provider: Provider) -> t.Any:
-        self._validate_instance_provider_type(provider)
+        self._validate_instance_is_not_resource(provider)
         args, kwargs = await self._aget_provider_arguments(provider)
+        if provider.is_coroutine:
+            return await provider.obj(*args, **kwargs)
         return provider.obj(*args, **kwargs)
 
-    def _validate_instance_provider_type(self, provider: Provider) -> None:
+    def _validate_instance_is_not_resource(self, provider: Provider) -> None:
         if provider.is_resource or provider.is_async_resource:
             raise ProviderError(
                 f"The instance for the resource provider `{provider}` cannot be "
@@ -848,7 +859,7 @@ class ScopedContext:
             provider = self._root.get_provider(interface)
             if provider.is_resource:
                 instance = await run_async(
-                    self._root.create_resource(provider, stack=self._stack)
+                    self._root.create_resource, provider, stack=self._stack
                 )
             elif provider.is_async_resource:
                 instance = await self._root.acreate_resource(
@@ -881,8 +892,8 @@ class ScopedContext:
         """Scope Context start asynchronous event."""
 
     async def aclose(self) -> None:
-        await self._async_stack.aclose()
         await run_async(self._stack.close)
+        await self._async_stack.aclose()
 
     def __enter__(self) -> Self:
         self.start()

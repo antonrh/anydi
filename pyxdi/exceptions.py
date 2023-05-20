@@ -6,11 +6,11 @@ class ProviderError(PyxDIError):
     pass
 
 
-class InvalidScope(PyxDIError):
+class InvalidScopeError(PyxDIError):
     pass
 
 
-class ScopeMismatch(PyxDIError):
+class ScopeMismatchError(PyxDIError):
     pass
 
 
@@ -18,5 +18,5 @@ class AnnotationError(PyxDIError):
     pass
 
 
-class UnknownDependency(PyxDIError):
+class UnknownDependencyError(PyxDIError):
     pass
