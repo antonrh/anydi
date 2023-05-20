@@ -802,7 +802,6 @@ async def test_async_get_synchronous_resource(di: PyxDI) -> None:
     assert await di.aget(str) == "test"
 
 
-
 def test_get_auto_registered_instance() -> None:
     di = PyxDI(auto_register=True)
 
@@ -1033,6 +1032,7 @@ async def test_async_get_provider_arguments(di: PyxDI) -> None:
 
     assert args == [10]
     assert kwargs == {"b": 1.0, "c": "test"}
+
 
 def test_inject_missing_annotation(di: PyxDI) -> None:
     def func(name=dep) -> str:  # type: ignore[no-untyped-def]
