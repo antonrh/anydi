@@ -468,7 +468,7 @@ Once the dependencies have been injected, the function can be called as usual, l
 handler()
 ```
 
-### Scanning Injection
+### Scanning Injections
 
 `PyxDI` provides a simple way to inject dependencies by scanning Python modules or packages.
 For example, your application might have the following structure:
@@ -527,7 +527,7 @@ di.close()
 
 The scan method takes a list of directory paths as an argument and recursively searches those directories for Python modules containing `@pyxdi.inject`-decorated functions or classes.
 
-### Scanning Injection by tags
+### Scanning Injections by tags
 
 You can also scan for providers or injectables in specific tags. To do so, you need to use the tags argument when registering providers or injectables. For example:
 
