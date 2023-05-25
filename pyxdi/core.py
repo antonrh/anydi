@@ -365,11 +365,12 @@ class PyxDI:
             )
 
     # Modules
+
     def register_module(
         self, module: t.Union[Module, t.Type[Module], t.Callable[[PyxDI], None]]
     ) -> None:
         """
-        Register module as callable, Module type or Module instance.
+        Register module as callable, module type or module instance.
         """
         # Callable Module
         if inspect.isfunction(module):
@@ -456,7 +457,7 @@ class PyxDI:
 
     async def aget(self, interface: t.Type[T]) -> T:
         """
-        Get instance by interface.
+        Get instance by interface asynchronously.
         """
         provider = self.get_provider(interface)
 
@@ -786,8 +787,7 @@ class PyxDI:
     def _get_provider_arguments(
         self, provider: Provider
     ) -> t.Tuple[t.List[t.Any], t.Dict[str, t.Any]]:
-        args = []
-        kwargs = {}
+        args, kwargs = [], {}
         for parameter in get_signature(provider.obj).parameters.values():
             instance = make_lazy(self.get, parameter.annotation)
             if parameter.kind == parameter.POSITIONAL_ONLY:
@@ -799,8 +799,7 @@ class PyxDI:
     async def _aget_provider_arguments(
         self, provider: Provider
     ) -> t.Tuple[t.List[t.Any], t.Dict[str, t.Any]]:
-        args = []
-        kwargs = {}
+        args, kwargs = [], {}
         for parameter in get_signature(provider.obj).parameters.values():
             instance = await self.aget(parameter.annotation)
             if parameter.kind == parameter.POSITIONAL_ONLY:
