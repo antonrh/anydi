@@ -9,7 +9,7 @@ from starlette.requests import Request
 
 import pyxdi
 from pyxdi.ext.starlette.middleware import RequestScopedMiddleware
-from pyxdi.utils import get_signature, make_lazy
+from pyxdi.utils import get_signature
 
 __all__ = ["RequestScopedMiddleware", "install", "get_di", "Inject"]
 
@@ -60,8 +60,8 @@ class InjectParam(params.Depends):
     def interface(self, val: t.Any) -> None:
         self._interface = val
 
-    def _dependency(self, di: pyxdi.PyxDI = fastapi.Depends(get_di)) -> t.Any:
-        return make_lazy(di.get, self.interface)
+    async def _dependency(self, di: pyxdi.PyxDI = fastapi.Depends(get_di)) -> t.Any:
+        return await di.aget(self.interface)
 
 
 def Inject() -> t.Any:  # noqa

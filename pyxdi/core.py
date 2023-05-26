@@ -9,7 +9,7 @@ import typing as t
 import uuid
 from collections import defaultdict
 from contextvars import ContextVar
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from functools import cached_property, wraps
 
 from typing_extensions import Annotated, ParamSpec, Self
@@ -31,7 +31,6 @@ from .utils import (
     get_full_qualname,
     get_signature,
     is_builtin_type,
-    make_lazy,
     run_async,
 )
 
@@ -46,10 +45,11 @@ ALLOWED_SCOPES: t.Dict[Scope, t.List[Scope]] = {
 }
 
 
-@dataclass(frozen=True)
+@dataclass
 class Provider:
     obj: t.Callable[..., t.Any]
     scope: Scope
+    has_async_sub_providers: t.Optional[bool] = field(default=None, hash=False)
 
     def __str__(self) -> str:
         return self.name
@@ -57,6 +57,10 @@ class Provider:
     @cached_property
     def name(self) -> str:
         return get_full_qualname(self.obj)
+
+    @cached_property
+    def parameters(self) -> types.MappingProxyType[str, inspect.Parameter]:
+        return get_signature(self.obj).parameters
 
     @cached_property
     def is_class(self) -> bool:
@@ -452,7 +456,6 @@ class PyxDI:
         scoped_context = self._get_scoped_context(provider.scope)
         if scoped_context:
             return scoped_context.get(interface)
-
         return t.cast(T, self.create_instance(provider))
 
     async def aget(self, interface: t.Type[T]) -> T:
@@ -464,7 +467,6 @@ class PyxDI:
         scoped_context = self._get_scoped_context(provider.scope)
         if scoped_context:
             return await scoped_context.aget(interface)
-
         return t.cast(T, await self.acreate_instance(provider))
 
     def has(self, interface: t.Type[T]) -> bool:
@@ -644,7 +646,7 @@ class PyxDI:
             @wraps(obj)
             def wrapped(*args: P.args, **kwargs: P.kwargs) -> T:
                 for name, annotation in injected_params.items():
-                    kwargs[name] = make_lazy(self.get, annotation)
+                    kwargs[name] = self.get(annotation)
                 return t.cast(T, obj(*args, **kwargs))
 
             return wrapped
@@ -788,8 +790,8 @@ class PyxDI:
         self, provider: Provider
     ) -> t.Tuple[t.List[t.Any], t.Dict[str, t.Any]]:
         args, kwargs = [], {}
-        for parameter in get_signature(provider.obj).parameters.values():
-            instance = make_lazy(self.get, parameter.annotation)
+        for parameter in provider.parameters.values():
+            instance = self.get(parameter.annotation)
             if parameter.kind == parameter.POSITIONAL_ONLY:
                 args.append(instance)
             else:
@@ -800,7 +802,7 @@ class PyxDI:
         self, provider: Provider
     ) -> t.Tuple[t.List[t.Any], t.Dict[str, t.Any]]:
         args, kwargs = [], {}
-        for parameter in get_signature(provider.obj).parameters.values():
+        for parameter in provider.parameters.values():
             instance = await self.aget(parameter.annotation)
             if parameter.kind == parameter.POSITIONAL_ONLY:
                 args.append(instance)

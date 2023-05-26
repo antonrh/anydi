@@ -13,7 +13,6 @@ packages = [
 
 [tool.poetry.dependencies]
 python = ">=3.8,<3.12"
-lazy-object-proxy = "^1.9.0"
 anyio = { version = "^3.6.2", optional = true }
 mkdocs = { version = "^1.4.2", optional = true }
 mkdocs-material = { version = "^9.1.13", optional = true }
@@ -56,9 +55,7 @@ python_version = "3.10"
 strict = true
 
 [[tool.mypy.overrides]]
-module = [
-    "lazy_object_proxy.*",
-]
+module = []
 ignore_missing_imports = true
 
 [tool.pytest.ini_options]

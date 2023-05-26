@@ -3,8 +3,6 @@ import inspect
 import sys
 import typing as t
 
-import lazy_object_proxy
-
 try:
     import anyio  # noqa
 
@@ -36,10 +34,6 @@ def get_signature(obj: t.Callable[..., t.Any]) -> inspect.Signature:
 
 def is_builtin_type(tp: t.Type[t.Any]) -> bool:
     return tp.__module__ == "builtins"
-
-
-def make_lazy(func: t.Callable[..., T], /, *args: t.Any, **kwargs: t.Any) -> T:
-    return t.cast(T, lazy_object_proxy.Proxy(functools.partial(func, *args, **kwargs)))
 
 
 async def run_async(func: t.Callable[..., T], /, *args: t.Any, **kwargs: t.Any) -> T:
