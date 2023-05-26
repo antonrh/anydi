@@ -45,11 +45,10 @@ ALLOWED_SCOPES: t.Dict[Scope, t.List[Scope]] = {
 }
 
 
-@dataclass
+@dataclass(frozen=True)
 class Provider:
     obj: t.Callable[..., t.Any]
     scope: Scope
-    has_async_sub_providers: t.Optional[bool] = field(default=None, hash=False)
 
     def __str__(self) -> str:
         return self.name
