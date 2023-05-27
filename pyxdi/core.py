@@ -9,7 +9,7 @@ import typing as t
 import uuid
 from collections import defaultdict
 from contextvars import ContextVar
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from functools import cached_property, wraps
 
 from typing_extensions import Annotated, ParamSpec, Self
