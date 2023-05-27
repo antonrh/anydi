@@ -31,7 +31,6 @@ from .utils import (
     get_full_qualname,
     get_signature,
     is_builtin_type,
-    make_lazy,
     run_async,
 )
 
@@ -57,6 +56,10 @@ class Provider:
     @cached_property
     def name(self) -> str:
         return get_full_qualname(self.obj)
+
+    @cached_property
+    def parameters(self) -> types.MappingProxyType[str, inspect.Parameter]:
+        return get_signature(self.obj).parameters
 
     @cached_property
     def is_class(self) -> bool:
@@ -365,11 +368,12 @@ class PyxDI:
             )
 
     # Modules
+
     def register_module(
         self, module: t.Union[Module, t.Type[Module], t.Callable[[PyxDI], None]]
     ) -> None:
         """
-        Register module as callable, Module type or Module instance.
+        Register module as callable, module type or module instance.
         """
         # Callable Module
         if inspect.isfunction(module):
@@ -451,19 +455,17 @@ class PyxDI:
         scoped_context = self._get_scoped_context(provider.scope)
         if scoped_context:
             return scoped_context.get(interface)
-
         return t.cast(T, self.create_instance(provider))
 
     async def aget(self, interface: t.Type[T]) -> T:
         """
-        Get instance by interface.
+        Get instance by interface asynchronously.
         """
         provider = self.get_provider(interface)
 
         scoped_context = self._get_scoped_context(provider.scope)
         if scoped_context:
             return await scoped_context.aget(interface)
-
         return t.cast(T, await self.acreate_instance(provider))
 
     def has(self, interface: t.Type[T]) -> bool:
@@ -643,7 +645,7 @@ class PyxDI:
             @wraps(obj)
             def wrapped(*args: P.args, **kwargs: P.kwargs) -> T:
                 for name, annotation in injected_params.items():
-                    kwargs[name] = make_lazy(self.get, annotation)
+                    kwargs[name] = self.get(annotation)
                 return t.cast(T, obj(*args, **kwargs))
 
             return wrapped
@@ -786,10 +788,9 @@ class PyxDI:
     def _get_provider_arguments(
         self, provider: Provider
     ) -> t.Tuple[t.List[t.Any], t.Dict[str, t.Any]]:
-        args = []
-        kwargs = {}
-        for parameter in get_signature(provider.obj).parameters.values():
-            instance = make_lazy(self.get, parameter.annotation)
+        args, kwargs = [], {}
+        for parameter in provider.parameters.values():
+            instance = self.get(parameter.annotation)
             if parameter.kind == parameter.POSITIONAL_ONLY:
                 args.append(instance)
             else:
@@ -799,9 +800,8 @@ class PyxDI:
     async def _aget_provider_arguments(
         self, provider: Provider
     ) -> t.Tuple[t.List[t.Any], t.Dict[str, t.Any]]:
-        args = []
-        kwargs = {}
-        for parameter in get_signature(provider.obj).parameters.values():
+        args, kwargs = [], {}
+        for parameter in provider.parameters.values():
             instance = await self.aget(parameter.annotation)
             if parameter.kind == parameter.POSITIONAL_ONLY:
                 args.append(instance)

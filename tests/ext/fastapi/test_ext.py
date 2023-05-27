@@ -4,7 +4,7 @@ import fastapi
 import pytest
 
 import pyxdi
-from pyxdi.ext.fastapi import Inject, InjectParam, install
+from pyxdi.ext.fastapi import Inject, InjectParam, install  # noqa
 
 
 def test_inject_param_missing_interface() -> None:

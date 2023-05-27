@@ -14,8 +14,6 @@ to effortlessly manage dependencies in your applications.
 
 Python 3.8+
 
-* [lazy-object-proxy](https://github.com/ionelmc/python-lazy-object-proxy) (for supporting lazy injections)
-
 and optional dependencies:
 
 * [anyio](https://github.com/agronholm/anyio) (for supporting synchronous resources with an asynchronous runtime)
