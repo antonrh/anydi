@@ -1,10 +1,11 @@
 import typing as t
 
-from typing_extensions import ParamSpec
+from typing_extensions import Concatenate, ParamSpec
 
-from .core import Scope
+from .core import Module, Scope
 
 T = t.TypeVar("T", bound=t.Any)
+M = t.TypeVar("M", bound=Module)
 P = ParamSpec("P")
 
 
@@ -24,7 +25,9 @@ def singleton(target: T) -> T:
 
 
 @t.overload
-def provider(target: t.Callable[P, T]) -> t.Callable[P, T]:
+def provider(
+    target: t.Callable[Concatenate[M, P], T]
+) -> t.Callable[Concatenate[M, P], T]:
     ...
 
 
@@ -33,17 +36,22 @@ def provider(
     *,
     scope: t.Optional[Scope] = None,
     override: t.Optional[bool] = None,
-) -> t.Callable[[t.Callable[P, T]], t.Callable[P, T]]:
+) -> t.Callable[[t.Callable[Concatenate[M, P], T]], t.Callable[Concatenate[M, P], T]]:
     ...
 
 
 def provider(
-    target: t.Optional[t.Callable[P, T]] = None,
+    target: t.Optional[t.Callable[Concatenate[M, P], T]] = None,
     *,
     scope: t.Optional[Scope] = None,
     override: t.Optional[bool] = None,
-) -> t.Union[t.Callable[P, T], t.Callable[[t.Callable[P, T]], t.Callable[P, T]]]:
-    def decorator(target: t.Callable[P, T]) -> t.Callable[P, T]:
+) -> t.Union[
+    t.Callable[Concatenate[M, P], T],
+    t.Callable[[t.Callable[Concatenate[M, P], T]], t.Callable[Concatenate[M, P], T]],
+]:
+    def decorator(
+        target: t.Callable[Concatenate[M, P], T]
+    ) -> t.Callable[Concatenate[M, P], T]:
         setattr(
             target,
             "__pyxdi_provider__",

@@ -1,3 +1,4 @@
+from pyxdi.core import Module
 from pyxdi.decorators import inject, provider, request, singleton, transient
 
 from tests.fixtures import Service
@@ -22,33 +23,36 @@ def test_singleton() -> None:
 
 
 def test_provider_no_args() -> None:
-    @provider
-    def service_provider() -> str:
-        return "test"
+    class TestModule(Module):
+        @provider
+        def provider(self) -> str:
+            return "test"
 
-    assert getattr(service_provider, "__pyxdi_provider__") == {
+    assert getattr(TestModule.provider, "__pyxdi_provider__") == {
         "scope": None,
         "override": None,
     }
 
 
 def test_provider_no_args_provided() -> None:
-    @provider()
-    def service_provider() -> str:
-        return "test"
+    class TestModule(Module):
+        @provider()
+        def provider(self) -> str:
+            return "test"
 
-    assert getattr(service_provider, "__pyxdi_provider__") == {
+    assert getattr(TestModule.provider, "__pyxdi_provider__") == {
         "scope": None,
         "override": None,
     }
 
 
 def test_provider() -> None:
-    @provider(scope="singleton", override=True)
-    def service_provider() -> str:
-        return "test"
+    class TestModule(Module):
+        @provider(scope="singleton", override=True)
+        def provider(self) -> str:
+            return "test"
 
-    assert getattr(service_provider, "__pyxdi_provider__") == {
+    assert getattr(TestModule.provider, "__pyxdi_provider__") == {
         "scope": "singleton",
         "override": True,
     }
