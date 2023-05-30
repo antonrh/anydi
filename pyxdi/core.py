@@ -223,7 +223,9 @@ class PyxDI:
         self._unresolved_providers.pop(interface, None)
         self._unresolved_dependencies.pop(interface, None)
 
-    def get_provider(self, interface: t.Type[t.Any]) -> Provider:
+    def get_provider(
+        self, interface: t.Type[t.Any], *, _parent_provider: t.Optional[Provider] = None
+    ) -> Provider:
         """
         Get provider by interface.
         """
@@ -236,7 +238,13 @@ class PyxDI:
                 and inspect.isclass(interface)
                 and not is_builtin_type(interface)
             ):
-                scope = getattr(interface, "__pyxdi_scope__", self.default_scope)
+                scope = getattr(interface, "__pyxdi_scope__", None)
+                if scope is None:
+                    scope = (
+                        _parent_provider.scope
+                        if _parent_provider
+                        else self.default_scope
+                    )
                 return self.register_provider(interface, interface, scope=scope)
             raise ProviderError(
                 f"The provider interface for `{get_full_qualname(interface)}` has "
@@ -287,9 +295,7 @@ class PyxDI:
     ) -> None:
         related_providers = []
 
-        obj, scope = provider.obj, provider.scope
-
-        for parameter in get_signature(obj).parameters.values():
+        for parameter in provider.parameters.values():
             if parameter.annotation is inspect._empty:  # noqa
                 raise AnnotationError(
                     f"Missing provider `{provider}` "
@@ -313,13 +319,13 @@ class PyxDI:
 
         for related_provider, direct in related_providers:
             if direct:
-                left_scope, right_scope = related_provider.scope, scope
+                left_scope, right_scope = related_provider.scope, provider.scope
             else:
-                left_scope, right_scope = scope, related_provider.scope
+                left_scope, right_scope = provider.scope, related_provider.scope
             allowed_scopes = ALLOWED_SCOPES.get(right_scope) or []
             if left_scope not in allowed_scopes:
                 raise ScopeMismatchError(
-                    f"The provider `{get_full_qualname(obj)}` with a {scope} scope was "
+                    f"The provider `{provider}` with a {provider.scope} scope was "
                     f"attempted to be registered with the provider "
                     f"`{related_provider}` with a `{related_provider.scope}` scope, "
                     f"which is not allowed. Please ensure that all providers are "
@@ -385,7 +391,7 @@ class PyxDI:
             module = module()
         if isinstance(module, Module):
             module.configure(self)
-            for provider_name, scope in getattr(module, "_providers", []):
+            for provider_name, scope in module.providers:
                 obj = getattr(module, provider_name)
                 self.provider(scope=scope, override=True)(obj)
 
@@ -443,22 +449,26 @@ class PyxDI:
 
     # Instance
 
-    def get(self, interface: t.Type[T]) -> T:
+    def get(
+        self, interface: t.Type[T], *, _parent_provider: t.Optional[Provider] = None
+    ) -> T:
         """
         Get instance by interface.
         """
-        provider = self.get_provider(interface)
+        provider = self.get_provider(interface, _parent_provider=_parent_provider)
 
         scoped_context = self._get_scoped_context(provider.scope)
         if scoped_context:
             return scoped_context.get(interface)
         return t.cast(T, self.create_instance(provider))
 
-    async def aget(self, interface: t.Type[T]) -> T:
+    async def aget(
+        self, interface: t.Type[T], *, _parent_provider: t.Optional[Provider] = None
+    ) -> T:
         """
         Get instance by interface asynchronously.
         """
-        provider = self.get_provider(interface)
+        provider = self.get_provider(interface, _parent_provider=_parent_provider)
 
         scoped_context = self._get_scoped_context(provider.scope)
         if scoped_context:
@@ -787,7 +797,7 @@ class PyxDI:
     ) -> t.Tuple[t.List[t.Any], t.Dict[str, t.Any]]:
         args, kwargs = [], {}
         for parameter in provider.parameters.values():
-            instance = self.get(parameter.annotation)
+            instance = self.get(parameter.annotation, _parent_provider=provider)
             if parameter.kind == parameter.POSITIONAL_ONLY:
                 args.append(instance)
             else:
@@ -799,7 +809,7 @@ class PyxDI:
     ) -> t.Tuple[t.List[t.Any], t.Dict[str, t.Any]]:
         args, kwargs = [], {}
         for parameter in provider.parameters.values():
-            instance = await self.aget(parameter.annotation)
+            instance = await self.aget(parameter.annotation, _parent_provider=provider)
             if parameter.kind == parameter.POSITIONAL_ONLY:
                 args.append(instance)
             else:
@@ -967,7 +977,7 @@ class ModuleMeta(type):
         bases: t.Tuple[type, ...],
         attrs: t.Dict[str, t.Any],
     ) -> t.Any:
-        attrs["_providers"] = [
+        attrs["providers"] = [
             (name, getattr(value, "__pyxdi_provider__").get("scope"))
             for name, value in attrs.items()
             if hasattr(value, "__pyxdi_provider__")
@@ -979,6 +989,8 @@ class Module(metaclass=ModuleMeta):
     """
     Module base class.
     """
+
+    providers: t.List[t.Tuple[str, t.Optional[Scope]]]
 
     def configure(self, di: PyxDI) -> None:
         ...
