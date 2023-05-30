@@ -385,12 +385,9 @@ class PyxDI:
             module = module()
         if isinstance(module, Module):
             module.configure(self)
-            for _, method in inspect.getmembers(module):
-                provided = getattr(method, "__pyxdi_provider__", None)
-                if not provided:
-                    continue
-                scope = provided.get("scope")
-                self.provider(scope=scope, override=True)(method)
+            for provider_name, scope in getattr(module, "_providers", []):
+                obj = getattr(module, provider_name)
+                self.provider(scope=scope, override=True)(obj)
 
     # Lifespan
 
@@ -963,7 +960,22 @@ class RequestContext(ScopedContext):
         super().__init__("request", root)
 
 
-class Module:
+class ModuleMeta(type):
+    def __new__(
+        cls,
+        name: str,
+        bases: t.Tuple[type, ...],
+        attrs: t.Dict[str, t.Any],
+    ) -> t.Any:
+        attrs["_providers"] = [
+            (name, getattr(value, "__pyxdi_provider__").get("scope"))
+            for name, value in attrs.items()
+            if hasattr(value, "__pyxdi_provider__")
+        ]
+        return super().__new__(cls, name, bases, attrs)
+
+
+class Module(metaclass=ModuleMeta):
     """
     Module base class.
     """
