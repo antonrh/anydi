@@ -563,6 +563,30 @@ def test_register_module_function(di: PyxDI) -> None:
     assert di.has_provider(str)
 
 
+class OrderedModule(Module):
+    @provider
+    def dep3(self) -> Annotated[str, "dep3"]:
+        return "dep3"
+
+    @provider
+    def dep1(self) -> Annotated[str, "dep1"]:
+        return "dep1"
+
+    @provider
+    def dep2(self) -> Annotated[str, "dep2"]:
+        return "dep2"
+
+
+def test_register_module_ordered_providers(di: PyxDI) -> None:
+    di.register_module(OrderedModule)
+
+    assert list(di.providers.keys()) == [
+        Annotated[str, "dep3"],
+        Annotated[str, "dep1"],
+        Annotated[str, "dep2"],
+    ]
+
+
 # Lifespan
 
 
