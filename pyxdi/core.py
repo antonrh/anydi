@@ -239,7 +239,7 @@ class PyxDI:
                 # Try to get defined scope
                 scope = getattr(interface, "__pyxdi_scope__", None)
                 if scope is None:
-                    scope = self._detect_class_scope(interface)
+                    scope = self._detect_auto_scope(interface)
                 return self.register_provider(interface, interface, scope=scope)
             raise ProviderError(
                 f"The provider interface for `{get_full_qualname(interface)}` has "
@@ -247,10 +247,8 @@ class PyxDI:
                 "properly registered before attempting to use it."
             ) from exc
 
-    def _detect_class_scope(self, obj: t.Callable[..., t.Any]) -> t.Optional[Scope]:
-        has_transient = False
-        has_request = False
-        has_singleton = False
+    def _detect_auto_scope(self, obj: t.Callable[..., t.Any]) -> t.Optional[Scope]:
+        has_transient, has_request, has_singleton = False, False, False
         for parameter in get_signature(obj).parameters.values():
             sub_provider = self.get_provider(parameter.annotation)
             if not has_transient and sub_provider.scope == "transient":
