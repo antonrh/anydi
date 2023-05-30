@@ -223,9 +223,7 @@ class PyxDI:
         self._unresolved_providers.pop(interface, None)
         self._unresolved_dependencies.pop(interface, None)
 
-    def get_provider(
-        self, interface: t.Type[t.Any], *, _parent_provider: t.Optional[Provider] = None
-    ) -> Provider:
+    def get_provider(self, interface: t.Type[t.Any]) -> Provider:
         """
         Get provider by interface.
         """
@@ -238,19 +236,36 @@ class PyxDI:
                 and inspect.isclass(interface)
                 and not is_builtin_type(interface)
             ):
+                # Try to get defined scope
                 scope = getattr(interface, "__pyxdi_scope__", None)
                 if scope is None:
-                    scope = (
-                        _parent_provider.scope
-                        if _parent_provider
-                        else self.default_scope
-                    )
+                    scope = self._detect_class_scope(interface)
                 return self.register_provider(interface, interface, scope=scope)
             raise ProviderError(
                 f"The provider interface for `{get_full_qualname(interface)}` has "
                 "not been registered. Please ensure that the provider interface is "
                 "properly registered before attempting to use it."
             ) from exc
+
+    def _detect_class_scope(self, obj: t.Callable[..., t.Any]) -> t.Optional[Scope]:
+        has_transient = False
+        has_request = False
+        has_singleton = False
+        for parameter in get_signature(obj).parameters.values():
+            sub_provider = self.get_provider(parameter.annotation)
+            if not has_transient and sub_provider.scope == "transient":
+                has_transient = True
+            if not has_request and sub_provider.scope == "request":
+                has_request = True
+            if not has_singleton and sub_provider.scope == "singleton":
+                has_singleton = True
+        if has_transient:
+            return "transient"
+        if has_request:
+            return "request"
+        if has_singleton:
+            return "singleton"
+        return None
 
     def singleton(
         self, interface: t.Type[t.Any], instance: t.Any, *, override: bool = False
@@ -263,6 +278,7 @@ class PyxDI:
         )
 
     # Validators
+
     def _validate_provider_scope(self, provider: Provider) -> None:
         if provider.scope not in t.get_args(Scope):
             raise InvalidScopeError(
@@ -449,26 +465,22 @@ class PyxDI:
 
     # Instance
 
-    def get(
-        self, interface: t.Type[T], *, _parent_provider: t.Optional[Provider] = None
-    ) -> T:
+    def get(self, interface: t.Type[T]) -> T:
         """
         Get instance by interface.
         """
-        provider = self.get_provider(interface, _parent_provider=_parent_provider)
+        provider = self.get_provider(interface)
 
         scoped_context = self._get_scoped_context(provider.scope)
         if scoped_context:
             return scoped_context.get(interface)
         return t.cast(T, self.create_instance(provider))
 
-    async def aget(
-        self, interface: t.Type[T], *, _parent_provider: t.Optional[Provider] = None
-    ) -> T:
+    async def aget(self, interface: t.Type[T]) -> T:
         """
         Get instance by interface asynchronously.
         """
-        provider = self.get_provider(interface, _parent_provider=_parent_provider)
+        provider = self.get_provider(interface)
 
         scoped_context = self._get_scoped_context(provider.scope)
         if scoped_context:
@@ -797,7 +809,7 @@ class PyxDI:
     ) -> t.Tuple[t.List[t.Any], t.Dict[str, t.Any]]:
         args, kwargs = [], {}
         for parameter in provider.parameters.values():
-            instance = self.get(parameter.annotation, _parent_provider=provider)
+            instance = self.get(parameter.annotation)
             if parameter.kind == parameter.POSITIONAL_ONLY:
                 args.append(instance)
             else:
@@ -809,7 +821,7 @@ class PyxDI:
     ) -> t.Tuple[t.List[t.Any], t.Dict[str, t.Any]]:
         args, kwargs = [], {}
         for parameter in provider.parameters.values():
-            instance = await self.aget(parameter.annotation, _parent_provider=provider)
+            instance = await self.aget(parameter.annotation)
             if parameter.kind == parameter.POSITIONAL_ONLY:
                 args.append(instance)
             else:
