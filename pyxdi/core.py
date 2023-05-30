@@ -407,9 +407,12 @@ class PyxDI:
             module = module()
         if isinstance(module, Module):
             module.configure(self)
-            for provider_name, scope in module.providers:
+            for provider_name, params in module.providers:
                 obj = getattr(module, provider_name)
-                self.provider(scope=scope, override=True)(obj)
+                scope = params.get("scope")
+                # Override module providers by default
+                override = params.get("override", True)
+                self.provider(scope=scope, override=override)(obj)
 
     # Lifespan
 
@@ -990,7 +993,7 @@ class ModuleMeta(type):
         attrs: t.Dict[str, t.Any],
     ) -> t.Any:
         attrs["providers"] = [
-            (name, getattr(value, "__pyxdi_provider__").get("scope"))
+            (name, getattr(value, "__pyxdi_provider__", {}))
             for name, value in attrs.items()
             if hasattr(value, "__pyxdi_provider__")
         ]
@@ -1002,7 +1005,7 @@ class Module(metaclass=ModuleMeta):
     Module base class.
     """
 
-    providers: t.List[t.Tuple[str, t.Optional[Scope]]]
+    providers: t.List[t.Tuple[str, t.Dict[str, t.Any]]]
 
     def configure(self, di: PyxDI) -> None:
         ...
