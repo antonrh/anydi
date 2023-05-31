@@ -866,6 +866,31 @@ def test_get_auto_registered_provider_scope_from_sub_provider_transient() -> Non
     assert di.get_provider(Entity).scope == "transient"
 
 
+def test_get_auto_registered_sub_provider() -> None:
+    di = PyxDI(default_scope="singleton", auto_register=True)
+
+    @di.provider(scope="request")
+    def connection() -> str:
+        return "connection"
+
+    @dataclass
+    class Repository:
+        connection: str
+
+    @dataclass
+    class Service:
+        repository: Repository
+
+    @dataclass
+    class Handler:
+        service: Service
+
+    with di.request_context():
+        _ = di.get(Handler)
+
+    assert di.get_provider(Handler).scope == "request"
+
+
 def test_get_not_registered_instance(di: PyxDI) -> None:
     with pytest.raises(Exception) as exc_info:
         di.get(str)
