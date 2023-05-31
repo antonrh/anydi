@@ -866,7 +866,7 @@ def test_get_auto_registered_provider_scope_from_sub_provider_transient() -> Non
     assert di.get_provider(Entity).scope == "transient"
 
 
-def test_get_auto_registered_sub_provider() -> None:
+def test_get_auto_registered_nester_provider() -> None:
     di = PyxDI(default_scope="singleton", auto_register=True)
 
     @di.provider(scope="request")

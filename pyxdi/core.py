@@ -509,42 +509,6 @@ class PyxDI:
             return request_context
         return None
 
-    @contextlib.contextmanager
-    def override(self, interface: t.Type[T], instance: t.Any) -> t.Iterator[None]:
-        origin_instance: t.Optional[t.Any] = None
-        origin_provider: t.Optional[Provider] = None
-        scope = self.default_scope
-
-        if self.has_provider(interface):
-            origin_provider = self.get_provider(interface)
-            if origin_provider.is_async_resource and not self.has(interface):
-                origin_instance = None
-            else:
-                origin_instance = self.get(interface)
-            scope = origin_provider.scope
-
-        provider = self.register_provider(
-            interface, lambda: instance, scope=scope, override=True
-        )
-
-        scoped_context = self._get_scoped_context(provider.scope)
-        if scoped_context:
-            scoped_context.set(interface, instance=instance)
-
-        yield
-
-        if origin_provider:
-            self.register_provider(
-                interface,
-                origin_provider.obj,
-                scope=origin_provider.scope,
-                override=True,
-            )
-            if origin_instance and scoped_context:
-                scoped_context.set(interface, instance=origin_instance)
-        else:
-            self.unregister_provider(interface)
-
     def create_resource(
         self, provider: Provider, *, stack: contextlib.ExitStack
     ) -> t.Any:
@@ -586,6 +550,42 @@ class PyxDI:
                 "created until the scope context has been started. Please ensure "
                 "that the scope context is started."
             )
+
+    @contextlib.contextmanager
+    def override(self, interface: t.Type[T], instance: t.Any) -> t.Iterator[None]:
+        origin_instance: t.Optional[t.Any] = None
+        origin_provider: t.Optional[Provider] = None
+        scope = self.default_scope
+
+        if self.has_provider(interface):
+            origin_provider = self.get_provider(interface)
+            if origin_provider.is_async_resource and not self.has(interface):
+                origin_instance = None
+            else:
+                origin_instance = self.get(interface)
+            scope = origin_provider.scope
+
+        provider = self.register_provider(
+            interface, lambda: instance, scope=scope, override=True
+        )
+
+        scoped_context = self._get_scoped_context(provider.scope)
+        if scoped_context:
+            scoped_context.set(interface, instance=instance)
+
+        yield
+
+        if origin_provider:
+            self.register_provider(
+                interface,
+                origin_provider.obj,
+                scope=origin_provider.scope,
+                override=True,
+            )
+            if origin_instance and scoped_context:
+                scoped_context.set(interface, instance=origin_instance)
+        else:
+            self.unregister_provider(interface)
 
     # Decorators
 
