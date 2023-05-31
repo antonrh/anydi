@@ -236,13 +236,34 @@ class PyxDI:
                 and inspect.isclass(interface)
                 and not is_builtin_type(interface)
             ):
-                scope = getattr(interface, "__pyxdi_scope__", self.default_scope)
+                # Try to get defined scope
+                scope = getattr(interface, "__pyxdi_scope__", None)
+                if scope is None:
+                    scope = self._detect_auto_scope(interface)
                 return self.register_provider(interface, interface, scope=scope)
             raise ProviderError(
                 f"The provider interface for `{get_full_qualname(interface)}` has "
                 "not been registered. Please ensure that the provider interface is "
                 "properly registered before attempting to use it."
             ) from exc
+
+    def _detect_auto_scope(self, obj: t.Callable[..., t.Any]) -> t.Optional[Scope]:
+        has_transient, has_request, has_singleton = False, False, False
+        for parameter in get_signature(obj).parameters.values():
+            sub_provider = self.get_provider(parameter.annotation)
+            if not has_transient and sub_provider.scope == "transient":
+                has_transient = True
+            if not has_request and sub_provider.scope == "request":
+                has_request = True
+            if not has_singleton and sub_provider.scope == "singleton":
+                has_singleton = True
+        if has_transient:
+            return "transient"
+        if has_request:
+            return "request"
+        if has_singleton:
+            return "singleton"
+        return None
 
     def singleton(
         self, interface: t.Type[t.Any], instance: t.Any, *, override: bool = False
@@ -255,6 +276,7 @@ class PyxDI:
         )
 
     # Validators
+
     def _validate_provider_scope(self, provider: Provider) -> None:
         if provider.scope not in t.get_args(Scope):
             raise InvalidScopeError(
@@ -287,9 +309,7 @@ class PyxDI:
     ) -> None:
         related_providers = []
 
-        obj, scope = provider.obj, provider.scope
-
-        for parameter in get_signature(obj).parameters.values():
+        for parameter in provider.parameters.values():
             if parameter.annotation is inspect._empty:  # noqa
                 raise AnnotationError(
                     f"Missing provider `{provider}` "
@@ -313,13 +333,13 @@ class PyxDI:
 
         for related_provider, direct in related_providers:
             if direct:
-                left_scope, right_scope = related_provider.scope, scope
+                left_scope, right_scope = related_provider.scope, provider.scope
             else:
-                left_scope, right_scope = scope, related_provider.scope
+                left_scope, right_scope = provider.scope, related_provider.scope
             allowed_scopes = ALLOWED_SCOPES.get(right_scope) or []
             if left_scope not in allowed_scopes:
                 raise ScopeMismatchError(
-                    f"The provider `{get_full_qualname(obj)}` with a {scope} scope was "
+                    f"The provider `{provider}` with a {provider.scope} scope was "
                     f"attempted to be registered with the provider "
                     f"`{related_provider}` with a `{related_provider.scope}` scope, "
                     f"which is not allowed. Please ensure that all providers are "
@@ -385,9 +405,12 @@ class PyxDI:
             module = module()
         if isinstance(module, Module):
             module.configure(self)
-            for provider_name, scope in getattr(module, "_providers", []):
+            for provider_name, params in module.providers:
                 obj = getattr(module, provider_name)
-                self.provider(scope=scope, override=True)(obj)
+                scope = params.get("scope")
+                # Override module providers by default
+                override = params.get("override", True)
+                self.provider(scope=scope, override=override)(obj)
 
     # Lifespan
 
@@ -486,42 +509,6 @@ class PyxDI:
             return request_context
         return None
 
-    @contextlib.contextmanager
-    def override(self, interface: t.Type[T], instance: t.Any) -> t.Iterator[None]:
-        origin_instance: t.Optional[t.Any] = None
-        origin_provider: t.Optional[Provider] = None
-        scope = self.default_scope
-
-        if self.has_provider(interface):
-            origin_provider = self.get_provider(interface)
-            if origin_provider.is_async_resource and not self.has(interface):
-                origin_instance = None
-            else:
-                origin_instance = self.get(interface)
-            scope = origin_provider.scope
-
-        provider = self.register_provider(
-            interface, lambda: instance, scope=scope, override=True
-        )
-
-        scoped_context = self._get_scoped_context(provider.scope)
-        if scoped_context:
-            scoped_context.set(interface, instance=instance)
-
-        yield
-
-        if origin_provider:
-            self.register_provider(
-                interface,
-                origin_provider.obj,
-                scope=origin_provider.scope,
-                override=True,
-            )
-            if origin_instance and scoped_context:
-                scoped_context.set(interface, instance=origin_instance)
-        else:
-            self.unregister_provider(interface)
-
     def create_resource(
         self, provider: Provider, *, stack: contextlib.ExitStack
     ) -> t.Any:
@@ -563,6 +550,42 @@ class PyxDI:
                 "created until the scope context has been started. Please ensure "
                 "that the scope context is started."
             )
+
+    @contextlib.contextmanager
+    def override(self, interface: t.Type[T], instance: t.Any) -> t.Iterator[None]:
+        origin_instance: t.Optional[t.Any] = None
+        origin_provider: t.Optional[Provider] = None
+        scope = self.default_scope
+
+        if self.has_provider(interface):
+            origin_provider = self.get_provider(interface)
+            if origin_provider.is_async_resource and not self.has(interface):
+                origin_instance = None
+            else:
+                origin_instance = self.get(interface)
+            scope = origin_provider.scope
+
+        provider = self.register_provider(
+            interface, lambda: instance, scope=scope, override=True
+        )
+
+        scoped_context = self._get_scoped_context(provider.scope)
+        if scoped_context:
+            scoped_context.set(interface, instance=instance)
+
+        yield
+
+        if origin_provider:
+            self.register_provider(
+                interface,
+                origin_provider.obj,
+                scope=origin_provider.scope,
+                override=True,
+            )
+            if origin_instance and scoped_context:
+                scoped_context.set(interface, instance=origin_instance)
+        else:
+            self.unregister_provider(interface)
 
     # Decorators
 
@@ -967,8 +990,8 @@ class ModuleMeta(type):
         bases: t.Tuple[type, ...],
         attrs: t.Dict[str, t.Any],
     ) -> t.Any:
-        attrs["_providers"] = [
-            (name, getattr(value, "__pyxdi_provider__").get("scope"))
+        attrs["providers"] = [
+            (name, getattr(value, "__pyxdi_provider__", {}))
             for name, value in attrs.items()
             if hasattr(value, "__pyxdi_provider__")
         ]
@@ -979,6 +1002,8 @@ class Module(metaclass=ModuleMeta):
     """
     Module base class.
     """
+
+    providers: t.List[t.Tuple[str, t.Dict[str, t.Any]]]
 
     def configure(self, di: PyxDI) -> None:
         ...

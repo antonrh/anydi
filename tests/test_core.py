@@ -824,13 +824,71 @@ async def test_async_get_synchronous_resource(di: PyxDI) -> None:
     assert await di.aget(str) == "test"
 
 
-def test_get_auto_registered_instance() -> None:
+def test_get_auto_registered_provider_scope_defined() -> None:
     di = PyxDI(auto_register=True)
 
     class Service:
         __scope__ = "singleton"
 
-    assert di.get(Service).__scope__ == "singleton"
+    assert di.get_provider(Service).scope == "singleton"
+
+
+def test_get_auto_registered_provider_scope_from_sub_provider_request() -> None:
+    di = PyxDI(default_scope="singleton", auto_register=True)
+
+    @di.provider(scope="request")
+    def message() -> str:
+        return "test"
+
+    @dataclass
+    class Service:
+        message: str
+
+    with di.request_context():
+        _ = di.get(Service)
+
+    assert di.get_provider(Service).scope == "request"
+
+
+def test_get_auto_registered_provider_scope_from_sub_provider_transient() -> None:
+    di = PyxDI(default_scope="singleton", auto_register=True)
+
+    @di.provider(scope="transient")
+    def uuid_generator() -> Annotated[str, "uuid_generator"]:
+        return str(uuid.uuid4())
+
+    @dataclass
+    class Entity:
+        id: Annotated[str, "uuid_generator"]
+
+    _ = di.get(Entity)
+
+    assert di.get_provider(Entity).scope == "transient"
+
+
+def test_get_auto_registered_nested_provider() -> None:
+    di = PyxDI(default_scope="singleton", auto_register=True)
+
+    @di.provider(scope="request")
+    def connection() -> str:
+        return "connection"
+
+    @dataclass
+    class Repository:
+        connection: str
+
+    @dataclass
+    class Service:
+        repository: Repository
+
+    @dataclass
+    class Handler:
+        service: Service
+
+    with di.request_context():
+        _ = di.get(Handler)
+
+    assert di.get_provider(Handler).scope == "request"
 
 
 def test_get_not_registered_instance(di: PyxDI) -> None:
