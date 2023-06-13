@@ -529,7 +529,7 @@ class TestModule(Module):
         di.singleton(named(str, "msg1"), "Message 1")
 
     @provider
-    def provide_msg2(self) -> t.Annotated[str, "msg2"]:
+    def provide_msg2(self) -> Annotated[str, "msg2"]:
         return "Message 2"
 
 
