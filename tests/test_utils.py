@@ -8,17 +8,20 @@ from tests.fixtures import Service
 
 
 @pytest.mark.parametrize(
-    "obj, expected",
+    "obj, expected_qualname",
     [
-        (str, "str"),
+        (int, "int"),
         (Service, "tests.fixtures.Service"),
-        ("test", "__main__.unknown[str]"),
+        (Service(ident="test"), "tests.fixtures.Service"),
+        (lambda x: x, "tests.test_utils.<lambda>"),
+        (123, "int"),
+        ("hello", "str"),
     ],
 )
-def test_get_full_qualname(obj: t.Any, expected: str) -> None:
-    name = get_full_qualname(obj)
+def test_get_full_qualname(obj: t.Any, expected_qualname: str) -> None:
+    qualname = get_full_qualname(obj)
 
-    assert name == expected
+    assert qualname == expected_qualname
 
 
 @pytest.mark.parametrize(
