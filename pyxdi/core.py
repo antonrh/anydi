@@ -750,12 +750,6 @@ class ScopedContext:
             self._instances[interface] = instance
         return t.cast(T, instance)
 
-    def set(self, interface: t.Type[t.Any], instance: t.Any) -> None:
-        self._instances[interface] = instance
-        self._root.register_provider(
-            interface, lambda: interface, scope=self._scope, override=True
-        )
-
     def has(self, interface: t.Type[t.Any]) -> bool:
         return interface in self._instances
 

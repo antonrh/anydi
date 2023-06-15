@@ -813,6 +813,14 @@ def test_override(di: PyxDI) -> None:
     assert di.get_instance(str) == origin_name
 
 
+def test_override_provider_not_registered(di: PyxDI) -> None:
+    with pytest.raises(ProviderError) as exc_info:
+        with di.override(str, "test"):
+            pass
+
+    assert str(exc_info.value) == "The provider interface `str` not registered."
+
+
 def test_override_transient_provider(di: PyxDI) -> None:
     overriden_uuid = uuid.uuid4()
 
@@ -850,8 +858,6 @@ async def test_override_async_resource_provider(di: PyxDI) -> None:
 
     with di.override(str, overriden):
         assert di.get_instance(str) == overriden
-
-    # assert di.get(str) == origin
 
 
 # Inspections
