@@ -370,68 +370,6 @@ Note that if you call singleton() without passing the override parameter as True
 di.singleton(str, "Good-bye")  # will raise an error
 ```
 
-## Auto-Register Providers
-
-In addition to registering providers manually, you can enable the auto_register feature of the DI container to automatically register providers for classes that have type hints in their constructor parameters.
-
-For example, suppose you have a class that depends on another class:
-
-```python
-import typing as t
-
-
-class Database:
-    def execute(self, *args: t.Any) -> t.Any:
-        return args
-
-    def connect(self) -> None:
-        print("connected")
-
-    def disconnect(self) -> None:
-        print("disconnected")
-
-
-class Repository:
-    def __init__(self, db: Database) -> None:
-        self.db = db
-
-    def get(self, ident: str) -> t.Any:
-        return self.db.execute(ident)
-
-
-class Service:
-    def __init__(self, repo: Repository) -> None:
-        self.repo = repo
-
-    def get(self, ident: str) -> t.Any:
-        return self.repo.get(ident=ident)
-```
-
-If you create a `PyxDI` instance with `auto_register=True`, it will automatically register a provider for `Service` and `Repository` with provided `Database`:
-
-```python
-import pyxdi
-
-di = pyxdi.PyxDI(auto_register=True)
-
-
-@di.provider
-def db() -> t.Iterator[Database]:
-    db = Database()
-    db.connect()
-    yield db
-    db.disconnect()
-
-
-di.start()
-
-service = di.get(Service)
-
-assert service.get(ident="abc") == ("abc",)
-
-di.close()
-```
-
 ## Injecting Dependencies
 
 In order to use the dependencies that have been provided to the `PyxDI` container, they need to be injected into the functions or classes that require them. This can be done by using the @di.inject decorator.

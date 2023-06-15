@@ -30,7 +30,6 @@ from .exceptions import (
 from .utils import (
     get_full_qualname,
     get_signature,
-    is_builtin_type,
     run_async,
 )
 
@@ -124,13 +123,11 @@ class PyxDI:
         self,
         *,
         default_scope: Scope = "singleton",
-        auto_register: bool = False,
         modules: t.Optional[
             t.Sequence[t.Union[Module, t.Type[Module], t.Callable[[PyxDI], None]]],
         ] = None,
     ) -> None:
         self._default_scope = default_scope
-        self._auto_register = auto_register
         self._providers: t.Dict[t.Type[t.Any], Provider] = {}
         self._singleton_context = SingletonContext(self)
         self._request_context_var: ContextVar[t.Optional[RequestContext]] = ContextVar(
@@ -149,10 +146,6 @@ class PyxDI:
     @property
     def default_scope(self) -> Scope:
         return self._default_scope
-
-    @property
-    def auto_register(self) -> bool:
-        return self._auto_register
 
     @property
     def providers(self) -> t.Dict[t.Type[t.Any], Provider]:
@@ -230,40 +223,11 @@ class PyxDI:
         try:
             return self._providers[interface]
         except KeyError as exc:
-            # Try to auto register instance class, or raise ProviderError
-            if (
-                self.auto_register
-                and inspect.isclass(interface)
-                and not is_builtin_type(interface)
-            ):
-                # Try to get defined scope
-                scope = getattr(interface, "__pyxdi_scope__", None)
-                if scope is None:
-                    scope = self._detect_auto_scope(interface)
-                return self.register_provider(interface, interface, scope=scope)
             raise ProviderError(
                 f"The provider interface for `{get_full_qualname(interface)}` has "
                 "not been registered. Please ensure that the provider interface is "
                 "properly registered before attempting to use it."
             ) from exc
-
-    def _detect_auto_scope(self, obj: t.Callable[..., t.Any]) -> t.Optional[Scope]:
-        has_transient, has_request, has_singleton = False, False, False
-        for parameter in get_signature(obj).parameters.values():
-            sub_provider = self.get_provider(parameter.annotation)
-            if not has_transient and sub_provider.scope == "transient":
-                has_transient = True
-            if not has_request and sub_provider.scope == "request":
-                has_request = True
-            if not has_singleton and sub_provider.scope == "singleton":
-                has_singleton = True
-        if has_transient:
-            return "transient"
-        if has_request:
-            return "request"
-        if has_singleton:
-            return "singleton"
-        return None
 
     def singleton(
         self, interface: t.Type[t.Any], instance: t.Any, *, override: bool = False
@@ -371,8 +335,6 @@ class PyxDI:
                 unresolved_interface,
                 dependency,
             ) in self._unresolved_dependencies.items():
-                if inspect.isclass(unresolved_interface) and self.auto_register:
-                    continue
                 parameter_name = dependency.parameter_name
                 errors.append(
                     f"- `{get_full_qualname(dependency.obj)}` has unknown "
