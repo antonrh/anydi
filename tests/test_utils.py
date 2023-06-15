@@ -2,7 +2,7 @@ import typing as t
 
 import pytest
 
-from pyxdi.utils import get_full_qualname, is_builtin_type
+from pyxdi.utils import get_full_qualname
 
 from tests.fixtures import Service
 
@@ -22,17 +22,3 @@ def test_get_full_qualname(obj: t.Any, expected_qualname: str) -> None:
     qualname = get_full_qualname(obj)
 
     assert qualname == expected_qualname
-
-
-@pytest.mark.parametrize(
-    "tp, expected",
-    [
-        (bool, True),
-        (str, True),
-        (int, True),
-        (float, True),
-        (Service, False),
-    ],
-)
-def test_is_builtin_type(tp: t.Type[t.Any], expected: bool) -> None:
-    assert is_builtin_type(tp) == expected
