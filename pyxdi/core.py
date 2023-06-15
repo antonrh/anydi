@@ -261,23 +261,20 @@ class PyxDI:
                 )
             try:
                 sub_provider = self.get_provider(parameter.annotation)
-                related_providers.append((sub_provider, True))
+                related_providers.append(sub_provider)
             except ProviderError:
                 pass
 
-        for related_provider, direct in related_providers:
-            if direct:
-                left_scope, right_scope = related_provider.scope, provider.scope
-            else:
-                left_scope, right_scope = provider.scope, related_provider.scope
+        for related_provider in related_providers:
+            left_scope, right_scope = related_provider.scope, provider.scope
             allowed_scopes = ALLOWED_SCOPES.get(right_scope) or []
             if left_scope not in allowed_scopes:
                 raise ScopeMismatchError(
                     f"The provider `{provider}` with a {provider.scope} scope was "
-                    f"attempted to be registered with the provider "
+                    "attempted to be registered with the provider "
                     f"`{related_provider}` with a `{related_provider.scope}` scope, "
-                    f"which is not allowed. Please ensure that all providers are "
-                    f"registered with matching scopes."
+                    "which is not allowed. Please ensure that all providers are "
+                    "registered with matching scopes."
                 )
 
     # Modules
