@@ -61,7 +61,7 @@ class InjectParam(params.Depends):
         self._interface = val
 
     async def _dependency(self, di: pyxdi.PyxDI = fastapi.Depends(get_di)) -> t.Any:
-        return await di.aget(self.interface)
+        return await di.aget_instance(self.interface)
 
 
 def Inject() -> t.Any:  # noqa

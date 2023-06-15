@@ -22,7 +22,7 @@ def message() -> str:
 
 di.register_provider(str, message, scope="singleton")
 
-assert di.get(str) == "Hello, world!"
+assert di.get_instance(str) == "Hello, world!"
 ```
 
 Alternatively, you can use the provider decorator to register a provider function. The decorator takes care of registering the provider with `PyxDI`.
@@ -38,7 +38,7 @@ def message() -> str:
     return "Hello, message!"
 
 
-assert di.get(str) == "Hello, world!"
+assert di.get_instance(str) == "Hello, world!"
 ```
 
 ### Unregistering Providers
@@ -90,7 +90,7 @@ def message() -> str:
     return random.choice(["hello", "hola", "ciao"])
 
 
-print(di.get(str))  # will print random message
+print(di.get_instance(str))  # will print random message
 ```
 
 ### `singleton` scope
@@ -114,7 +114,7 @@ def service() -> Service:
     return Service(name="demo")
 
 
-assert di.get(Service) == di.get(Service)
+assert di.get_instance(Service) == di.get_instance(Service)
 ```
 
 ### `request` scope
@@ -139,9 +139,9 @@ def request_provider() -> Request:
 
 
 with di.request_context():
-    assert di.get(Request).path == "/"
+    assert di.get_instance(Request).path == "/"
 
-di.get(Request)  # this will raise LookupError
+di.get_instance(Request)  # this will raise LookupError
 ```
 
 or using asynchronous request context:
@@ -159,7 +159,7 @@ def request_provider() -> Request:
 
 async def main() -> None:
     async with di.arequest_context():
-        assert di.get(Request).path == "/"
+        assert di.get_instance(Request).path == "/"
 ```
 
 ## Resource Providers
@@ -200,7 +200,7 @@ def resource_provider() -> t.Iterator[Resource]:
 
 di.start()  # start resources
 
-assert di.get(Resource).name == "demo"
+assert di.get_instance(Resource).name == "demo"
 
 di.close()  # close resources
 ```
@@ -243,7 +243,7 @@ async def resource_provider() -> t.AsyncIterator[Resource]:
 async def main() -> None:
     await di.astart()  # start resources
 
-    assert di.get(Resource).name == "demo"
+    assert di.get_instance(Resource).name == "demo"
 
     await di.aclose()  # close resources
 
@@ -290,7 +290,7 @@ def client_lifespan(client: Client) -> t.Iterator[None]:
     client.close()
 
 
-client = di.get(Client)
+client = di.get_instance(Client)
 
 assert not client.started
 assert not client.closed
@@ -327,7 +327,7 @@ def message_provider() -> str:
     return "Hello, message!"
 
 
-assert di.get(str) == "Hello, world!"
+assert di.get_instance(str) == "Hello, world!"
 ```
 
 In this example, the message_provider function is registered as a singleton provider because default_scope is set to `singleton`.
@@ -342,7 +342,7 @@ import pyxdi
 di = pyxdi.PyxDI()
 di.singleton(str, "Hello, world!")
 
-assert di.get(str) == "Hello, world!"
+assert di.get_instance(str) == "Hello, world!"
 ```
 
 ## Overriding Providers

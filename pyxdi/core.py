@@ -133,6 +133,7 @@ class PyxDI:
             t.Type[t.Any], t.List[UnresolvedProvider]
         ] = defaultdict(list)
         self._unresolved_dependencies: t.Dict[t.Type[t.Any], UnresolvedDependency] = {}
+        self._override_instances: t.Dict[t.Type[t.Any], t.Any] = {}
 
         # Register modules
         modules = modules or []
@@ -424,10 +425,13 @@ class PyxDI:
 
     # Instance
 
-    def get(self, interface: t.Type[T]) -> T:
+    def get_instance(self, interface: t.Type[T]) -> T:
         """
         Get instance by interface.
         """
+        if interface in self._override_instances:
+            return t.cast(T, self._override_instances[interface])
+
         provider = self.get_provider(interface)
 
         scoped_context = self._get_scoped_context(provider.scope)
@@ -435,10 +439,13 @@ class PyxDI:
             return scoped_context.get(interface)
         return t.cast(T, self.create_instance(provider))
 
-    async def aget(self, interface: t.Type[T]) -> T:
+    async def aget_instance(self, interface: t.Type[T]) -> T:
         """
         Get instance by interface asynchronously.
         """
+        if interface in self._override_instances:
+            return t.cast(T, self._override_instances[interface])
+
         provider = self.get_provider(interface)
 
         scoped_context = self._get_scoped_context(provider.scope)
@@ -446,7 +453,7 @@ class PyxDI:
             return await scoped_context.aget(interface)
         return t.cast(T, await self.acreate_instance(provider))
 
-    def has(self, interface: t.Type[T]) -> bool:
+    def has_instance(self, interface: t.Type[T]) -> bool:
         """
         Check that container contains instance by interface.
         """
@@ -511,39 +518,14 @@ class PyxDI:
 
     @contextlib.contextmanager
     def override(self, interface: t.Type[T], instance: t.Any) -> t.Iterator[None]:
-        origin_instance: t.Optional[t.Any] = None
-        origin_provider: t.Optional[Provider] = None
-        scope = self.default_scope
-
-        if self.has_provider(interface):
-            origin_provider = self.get_provider(interface)
-            if origin_provider.is_async_resource and not self.has(interface):
-                origin_instance = None
-            else:
-                origin_instance = self.get(interface)
-            scope = origin_provider.scope
-
-        provider = self.register_provider(
-            interface, lambda: instance, scope=scope, override=True
-        )
-
-        scoped_context = self._get_scoped_context(provider.scope)
-        if scoped_context:
-            scoped_context.set(interface, instance=instance)
-
-        yield
-
-        if origin_provider:
-            self.register_provider(
-                interface,
-                origin_provider.obj,
-                scope=origin_provider.scope,
-                override=True,
+        if not self.has_provider(interface):
+            raise ProviderError(
+                f"The provider interface `{get_full_qualname(interface)}` "
+                "not registered."
             )
-            if origin_instance and scoped_context:
-                scoped_context.set(interface, instance=origin_instance)
-        else:
-            self.unregister_provider(interface)
+        self._override_instances[interface] = instance
+        yield
+        del self._override_instances[interface]
 
     # Decorators
 
@@ -615,7 +597,7 @@ class PyxDI:
                 @wraps(obj)
                 async def awrapped(*args: P.args, **kwargs: P.kwargs) -> T:
                     for name, annotation in injected_params.items():
-                        kwargs[name] = await self.aget(annotation)
+                        kwargs[name] = await self.aget_instance(annotation)
                     return t.cast(T, await obj(*args, **kwargs))
 
                 return awrapped
@@ -623,7 +605,7 @@ class PyxDI:
             @wraps(obj)
             def wrapped(*args: P.args, **kwargs: P.kwargs) -> T:
                 for name, annotation in injected_params.items():
-                    kwargs[name] = self.get(annotation)
+                    kwargs[name] = self.get_instance(annotation)
                 return t.cast(T, obj(*args, **kwargs))
 
             return wrapped
@@ -768,7 +750,7 @@ class PyxDI:
     ) -> t.Tuple[t.List[t.Any], t.Dict[str, t.Any]]:
         args, kwargs = [], {}
         for parameter in provider.parameters.values():
-            instance = self.get(parameter.annotation)
+            instance = self.get_instance(parameter.annotation)
             if parameter.kind == parameter.POSITIONAL_ONLY:
                 args.append(instance)
             else:
@@ -780,7 +762,7 @@ class PyxDI:
     ) -> t.Tuple[t.List[t.Any], t.Dict[str, t.Any]]:
         args, kwargs = [], {}
         for parameter in provider.parameters.values():
-            instance = await self.aget(parameter.annotation)
+            instance = await self.aget_instance(parameter.annotation)
             if parameter.kind == parameter.POSITIONAL_ONLY:
                 args.append(instance)
             else:
