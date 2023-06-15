@@ -88,7 +88,7 @@ from starlette.middleware import Middleware
 from starlette.requests import Request
 
 import pyxdi.ext.fastapi
-from pyxdi.ext.fastapi import Inject, RequestScopedMiddleware, get_request
+from pyxdi.ext.fastapi import Inject, RequestScopedMiddleware, get_current_request
 
 
 @dataclass
@@ -104,7 +104,7 @@ di = pyxdi.PyxDI()
 
 @di.provider(scope="request")
 def request() -> Request:
-    return get_request()
+    return get_current_request()
 
 
 @di.provider(scope="request")

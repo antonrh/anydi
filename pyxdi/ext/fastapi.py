@@ -8,12 +8,12 @@ from starlette.requests import Request
 
 import pyxdi
 from pyxdi.exceptions import AnnotationError
-from pyxdi.ext.starlette.middleware import RequestScopedMiddleware, get_request
+from pyxdi.ext.starlette.middleware import RequestScopedMiddleware, get_current_request
 from pyxdi.utils import get_signature
 
 __all__ = [
     "RequestScopedMiddleware",
-    "get_request",
+    "get_current_request",
     "install",
     "get_di",
     "Inject",

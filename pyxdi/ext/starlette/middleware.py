@@ -7,7 +7,7 @@ from starlette.types import ASGIApp
 
 import pyxdi
 
-_request_context: ContextVar[Request] = ContextVar("request_context")
+_current_request_var: ContextVar[Request] = ContextVar("current_request")
 
 
 class RequestScopedMiddleware(BaseHTTPMiddleware):
@@ -18,13 +18,13 @@ class RequestScopedMiddleware(BaseHTTPMiddleware):
     async def dispatch(
         self, request: Request, call_next: RequestResponseEndpoint
     ) -> Response:
-        token = _request_context.set(request)
+        token = _current_request_var.set(request)
         async with self._di.arequest_context():
             try:
                 return await call_next(request)
             finally:
-                _request_context.reset(token)
+                _current_request_var.reset(token)
 
 
-def get_request() -> Request:
-    return _request_context.get()
+def get_current_request() -> Request:
+    return _current_request_var.get()
