@@ -592,7 +592,7 @@ def test_start_and_close_singleton_context(di: PyxDI) -> None:
 
     di.start()
 
-    assert di.get(str) == "test"
+    assert di.get_instance(str) == "test"
 
     di.close()
 
@@ -610,7 +610,7 @@ def test_request_context(di: PyxDI) -> None:
     di.register_provider(str, dep1, scope="request")
 
     with di.request_context():
-        assert di.get(str) == "test"
+        assert di.get_instance(str) == "test"
 
     assert events == ["dep1:before", "dep1:after"]
 
@@ -630,7 +630,7 @@ async def test_astart_and_aclose_singleton_context(di: PyxDI) -> None:
 
     await di.astart()
 
-    assert di.get(str) == "test"
+    assert di.get_instance(str) == "test"
 
     await di.aclose()
 
@@ -648,7 +648,7 @@ async def test_arequest_context(di: PyxDI) -> None:
     di.register_provider(str, dep1, scope="request")
 
     async with di.arequest_context():
-        assert await di.aget(str) == "test"
+        assert await di.aget_instance(str) == "test"
 
     assert events == ["dep1:before", "dep1:after"]
 
@@ -661,7 +661,7 @@ def test_get_singleton_scoped(di: PyxDI) -> None:
 
     di.register_provider(str, lambda: instance, scope="singleton")
 
-    assert di.get(str) == instance
+    assert di.get_instance(str) == instance
 
 
 def test_get_singleton_scoped_not_started(di: PyxDI) -> None:
@@ -669,7 +669,7 @@ def test_get_singleton_scoped_not_started(di: PyxDI) -> None:
     def message() -> t.Iterator[str]:
         yield "test"
 
-    assert di.get(str) == "test"
+    assert di.get_instance(str) == "test"
 
 
 def test_get_singleton_scoped_resource(di: PyxDI) -> None:
@@ -681,7 +681,7 @@ def test_get_singleton_scoped_resource(di: PyxDI) -> None:
     di.register_provider(str, provide, scope="singleton")
     di.start()
 
-    assert di.get(str) == instance
+    assert di.get_instance(str) == instance
 
 
 def test_get_singleton_scoped_started_with_async_resource_provider(di: PyxDI) -> None:
@@ -713,7 +713,7 @@ async def test_get_singleton_scoped_async_resource(di: PyxDI) -> None:
 
     await di.astart()
 
-    assert di.get(str) == instance
+    assert di.get_instance(str) == instance
 
 
 async def test_get_singleton_scoped_async_and_sync_resources(di: PyxDI) -> None:
@@ -731,8 +731,8 @@ async def test_get_singleton_scoped_async_and_sync_resources(di: PyxDI) -> None:
 
     await di.astart()
 
-    assert di.get(str) == instance_str
-    assert di.get(int) == instance_int
+    assert di.get_instance(str) == instance_str
+    assert di.get_instance(int) == instance_int
 
 
 async def test_get_singleton_scoped_async_resource_not_started(di: PyxDI) -> None:
@@ -744,7 +744,7 @@ async def test_get_singleton_scoped_async_resource_not_started(di: PyxDI) -> Non
     di.register_provider(str, provide, scope="singleton")
 
     with pytest.raises(ProviderError) as exc_info:
-        di.get(str)
+        di.get_instance(str)
 
     assert str(exc_info.value) == (
         "The instance for the resource provider "
@@ -760,7 +760,7 @@ def test_get_request_scoped(di: PyxDI) -> None:
     di.register_provider(str, lambda: instance, scope="request")
 
     with di.request_context():
-        assert di.get(str) == instance
+        assert di.get_instance(str) == instance
 
 
 def test_get_request_scoped_not_started(di: PyxDI) -> None:
@@ -769,7 +769,7 @@ def test_get_request_scoped_not_started(di: PyxDI) -> None:
     di.register_provider(str, lambda: instance, scope="request")
 
     with pytest.raises(LookupError) as exc_info:
-        assert di.get(str)
+        assert di.get_instance(str)
 
     assert str(exc_info.value) == (
         "The request context has not been started. Please ensure that the request "
@@ -780,7 +780,7 @@ def test_get_request_scoped_not_started(di: PyxDI) -> None:
 def test_get_transient_scoped(di: PyxDI) -> None:
     di.register_provider(uuid.UUID, uuid.uuid4, scope="transient")
 
-    assert di.get(uuid.UUID) != di.get(uuid.UUID)
+    assert di.get_instance(uuid.UUID) != di.get_instance(uuid.UUID)
 
 
 def test_get_async_transient_scoped(di: PyxDI) -> None:
@@ -789,7 +789,7 @@ def test_get_async_transient_scoped(di: PyxDI) -> None:
         return uuid.uuid4()
 
     with pytest.raises(ProviderError) as exc_info:
-        di.get(uuid.UUID)
+        di.get_instance(uuid.UUID)
 
     assert str(exc_info.value) == (
         "The instance for the coroutine provider "
@@ -803,7 +803,7 @@ async def test_async_get_transient_scoped(di: PyxDI) -> None:
     async def get_uuid() -> uuid.UUID:
         return uuid.uuid4()
 
-    assert await di.aget(uuid.UUID) != await di.aget(uuid.UUID)
+    assert await di.aget_instance(uuid.UUID) != await di.aget_instance(uuid.UUID)
 
 
 async def test_async_get_synchronous_resource(di: PyxDI) -> None:
@@ -811,12 +811,12 @@ async def test_async_get_synchronous_resource(di: PyxDI) -> None:
     def msg() -> t.Iterator[str]:
         yield "test"
 
-    assert await di.aget(str) == "test"
+    assert await di.aget_instance(str) == "test"
 
 
 def test_get_not_registered_instance(di: PyxDI) -> None:
     with pytest.raises(Exception) as exc_info:
-        di.get(str)
+        di.get_instance(str)
 
     assert str(exc_info.value) == (
         "The provider interface for `str` has not been registered. Please ensure that "
@@ -826,25 +826,25 @@ def test_get_not_registered_instance(di: PyxDI) -> None:
 
 def test_has_instance(di: PyxDI) -> None:
     di.register_provider(str, lambda: "test")
-    di.get(str)
+    di.get_instance(str)
 
-    assert di.has(str)
+    assert di.has_instance(str)
 
 
 def test_has_no_instance(di: PyxDI) -> None:
     di.register_provider(str, lambda: "test")
 
-    assert not di.has(str)
+    assert not di.has_instance(str)
 
 
 def test_has_no_instance_and_provider(di: PyxDI) -> None:
-    assert not di.has(str)
+    assert not di.has_instance(str)
 
 
 def test_has_instance_for_transient_provider(di: PyxDI) -> None:
     di.register_provider(str, lambda: "test", scope="transient")
 
-    assert di.has(str)
+    assert di.has_instance(str)
 
 
 def test_override(di: PyxDI) -> None:
@@ -856,9 +856,9 @@ def test_override(di: PyxDI) -> None:
         return origin_name
 
     with di.override(str, overriden_name):
-        assert di.get(str) == overriden_name
+        assert di.get_instance(str) == overriden_name
 
-    assert di.get(str) == origin_name
+    assert di.get_instance(str) == origin_name
 
 
 def test_override_transient_provider(di: PyxDI) -> None:
@@ -869,9 +869,9 @@ def test_override_transient_provider(di: PyxDI) -> None:
         return uuid.uuid4()
 
     with di.override(uuid.UUID, overriden_uuid):
-        assert di.get(uuid.UUID) == overriden_uuid
+        assert di.get_instance(uuid.UUID) == overriden_uuid
 
-    assert di.get(uuid.UUID) != overriden_uuid
+    assert di.get_instance(uuid.UUID) != overriden_uuid
 
 
 def test_override_resource_provider(di: PyxDI) -> None:
@@ -883,9 +883,9 @@ def test_override_resource_provider(di: PyxDI) -> None:
         yield origin
 
     with di.override(str, overriden):
-        assert di.get(str) == overriden
+        assert di.get_instance(str) == overriden
 
-    assert di.get(str) == origin
+    assert di.get_instance(str) == origin
 
 
 async def test_override_async_resource_provider(di: PyxDI) -> None:
@@ -897,7 +897,7 @@ async def test_override_async_resource_provider(di: PyxDI) -> None:
         yield origin
 
     with di.override(str, overriden):
-        assert di.get(str) == overriden
+        assert di.get_instance(str) == overriden
 
     # assert di.get(str) == origin
 
