@@ -27,7 +27,7 @@ jobs:
           python-version: "3.10"
           cache: "poetry"
       - name: Install dependencies
-        run: poetry install --no-interaction
+        run: poetry install
       - name: Code formatting
         run: poetry run black --check pyxdi/ tests/
       - name: Code style
@@ -62,7 +62,7 @@ jobs:
           python-version: ${{ matrix.python }}
           cache: "poetry"
       - name: Install dependencies
-        run: poetry install --no-interaction
+        run: poetry install
       - name: Run tests
         run: poetry run pytest -vv --cov=pyxdi/ --cov-report=xml
       - name: Upload coverage to Codecov
