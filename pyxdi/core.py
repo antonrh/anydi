@@ -11,7 +11,7 @@ from contextvars import ContextVar
 from dataclasses import dataclass
 from functools import cached_property, wraps
 
-from typing_extensions import Annotated, ParamSpec, Self
+from typing_extensions import Annotated, ParamSpec, Self, get_args, get_origin
 
 try:
     from types import NoneType
@@ -678,8 +678,8 @@ class PyxDI:
                 f"Missing `{get_full_qualname(obj)}` provider return annotation."
             )
 
-        origin = t.get_origin(annotation) or annotation
-        args = t.get_args(annotation)
+        origin = get_origin(annotation) or annotation
+        args = get_args(annotation)
 
         # Supported generic types
         if origin in (list, dict, tuple, Annotated):
