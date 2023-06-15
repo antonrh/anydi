@@ -83,10 +83,9 @@ def test_provider_name() -> None:
 
 
 def test_di_constructor_properties() -> None:
-    di = PyxDI(default_scope="singleton", auto_register=True)
+    di = PyxDI(default_scope="singleton")
 
     assert di.default_scope == "singleton"
-    assert di.auto_register
     assert di.providers == {}
 
 
@@ -512,15 +511,6 @@ def test_validate_unresolved_injected_dependencies(di: PyxDI) -> None:
     )
 
 
-def test_validate_unresolved_injected_dependencies_auto_register_class() -> None:
-    def func1(service: Service = dep) -> None:
-        return None
-
-    di = PyxDI(auto_register=True)
-    di.inject(func1)
-    di.validate()
-
-
 # Module
 
 
@@ -824,92 +814,9 @@ async def test_async_get_synchronous_resource(di: PyxDI) -> None:
     assert await di.aget(str) == "test"
 
 
-def test_get_auto_registered_provider_scope_defined() -> None:
-    di = PyxDI(auto_register=True)
-
-    class Service:
-        __scope__ = "singleton"
-
-    assert di.get_provider(Service).scope == "singleton"
-
-
-def test_get_auto_registered_provider_scope_from_sub_provider_request() -> None:
-    di = PyxDI(default_scope="singleton", auto_register=True)
-
-    @di.provider(scope="request")
-    def message() -> str:
-        return "test"
-
-    @dataclass
-    class Service:
-        message: str
-
-    with di.request_context():
-        _ = di.get(Service)
-
-    assert di.get_provider(Service).scope == "request"
-
-
-def test_get_auto_registered_provider_scope_from_sub_provider_transient() -> None:
-    di = PyxDI(default_scope="singleton", auto_register=True)
-
-    @di.provider(scope="transient")
-    def uuid_generator() -> Annotated[str, "uuid_generator"]:
-        return str(uuid.uuid4())
-
-    @dataclass
-    class Entity:
-        id: Annotated[str, "uuid_generator"]
-
-    _ = di.get(Entity)
-
-    assert di.get_provider(Entity).scope == "transient"
-
-
-def test_get_auto_registered_nested_provider() -> None:
-    di = PyxDI(default_scope="singleton", auto_register=True)
-
-    @di.provider(scope="request")
-    def connection() -> str:
-        return "connection"
-
-    @dataclass
-    class Repository:
-        connection: str
-
-    @dataclass
-    class Service:
-        repository: Repository
-
-    @dataclass
-    class Handler:
-        service: Service
-
-    with di.request_context():
-        _ = di.get(Handler)
-
-    assert di.get_provider(Handler).scope == "request"
-
-
 def test_get_not_registered_instance(di: PyxDI) -> None:
     with pytest.raises(Exception) as exc_info:
         di.get(str)
-
-    assert str(exc_info.value) == (
-        "The provider interface for `str` has not been registered. Please ensure that "
-        "the provider interface is properly registered before attempting to use it."
-    )
-
-
-def test_get_auto_registered_with_primitive_class() -> None:
-    di = PyxDI(auto_register=True)
-
-    @dataclass
-    class Service:
-        name: str
-
-    with pytest.raises(ProviderError) as exc_info:
-        _ = f"{di.get(Service).name}"
 
     assert str(exc_info.value) == (
         "The provider interface for `str` has not been registered. Please ensure that "
@@ -952,26 +859,6 @@ def test_override(di: PyxDI) -> None:
         assert di.get(str) == overriden_name
 
     assert di.get(str) == origin_name
-
-
-def test_override_auto_registered() -> None:
-    di = PyxDI(auto_register=True)
-
-    origin_name = "test"
-    overriden_name = "overriden"
-
-    @di.provider
-    def name() -> str:
-        return origin_name
-
-    class Service:
-        def __init__(self, name: str) -> None:
-            self.name = name
-
-    with di.override(Service, Service(name=overriden_name)):
-        assert di.get(Service).name == overriden_name
-
-    assert di.get(Service).name == origin_name
 
 
 def test_override_transient_provider(di: PyxDI) -> None:

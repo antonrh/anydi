@@ -65,19 +65,6 @@ def get_signature(obj: t.Callable[..., t.Any]) -> inspect.Signature:
     return inspect.signature(obj, **signature_kwargs)
 
 
-def is_builtin_type(tp: t.Type[t.Any]) -> bool:
-    """
-    Check if the given type is a built-in type.
-
-    Args:
-        tp (type): The type to check.
-
-    Returns:
-        bool: True if the type is a built-in type, False otherwise.
-    """
-    return tp.__module__ == builtins.__name__
-
-
 async def run_async(func: t.Callable[..., T], /, *args: t.Any, **kwargs: t.Any) -> T:
     """
     Runs the given function asynchronously using the `anyio` library.

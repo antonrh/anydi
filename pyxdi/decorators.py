@@ -9,21 +9,6 @@ M = t.TypeVar("M", bound=Module)
 P = ParamSpec("P")
 
 
-def transient(target: T) -> T:
-    setattr(target, "__pyxdi_scope__", "transient")
-    return target
-
-
-def request(target: T) -> T:
-    setattr(target, "__pyxdi_scope__", "request")
-    return target
-
-
-def singleton(target: T) -> T:
-    setattr(target, "__pyxdi_scope__", "singleton")
-    return target
-
-
 @t.overload
 def provider(
     target: t.Callable[Concatenate[M, P], T]

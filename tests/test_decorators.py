@@ -1,25 +1,5 @@
 from pyxdi.core import Module
-from pyxdi.decorators import inject, provider, request, singleton, transient
-
-from tests.fixtures import Service
-
-
-def test_request() -> None:
-    request(Service)
-
-    assert getattr(Service, "__pyxdi_scope__") == "request"
-
-
-def test_transient() -> None:
-    transient(Service)
-
-    assert getattr(Service, "__pyxdi_scope__") == "transient"
-
-
-def test_singleton() -> None:
-    singleton(Service)
-
-    assert getattr(Service, "__pyxdi_scope__") == "singleton"
+from pyxdi.decorators import inject, provider
 
 
 def test_provider_no_args() -> None:
