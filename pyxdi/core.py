@@ -7,7 +7,6 @@ import pkgutil
 import types
 import typing as t
 import uuid
-from collections import defaultdict
 from contextvars import ContextVar
 from dataclasses import dataclass
 from functools import cached_property, wraps
@@ -133,9 +132,6 @@ class PyxDI:
         self._request_context_var: ContextVar[t.Optional[RequestContext]] = ContextVar(
             "request_context", default=None
         )
-        self._unresolved_providers: t.Dict[
-            t.Type[t.Any], t.List[UnresolvedProvider]
-        ] = defaultdict(list)
         self._unresolved_dependencies: t.Dict[t.Type[t.Any], UnresolvedDependency] = {}
 
         # Register modules
@@ -213,7 +209,6 @@ class PyxDI:
 
         # Cleanup provider references
         self._providers.pop(interface, None)
-        self._unresolved_providers.pop(interface, None)
         self._unresolved_dependencies.pop(interface, None)
 
     def get_provider(self, interface: t.Type[t.Any]) -> Provider:
@@ -283,17 +278,7 @@ class PyxDI:
                 sub_provider = self.get_provider(parameter.annotation)
                 related_providers.append((sub_provider, True))
             except ProviderError:
-                self._unresolved_providers[parameter.annotation].append(
-                    UnresolvedProvider(
-                        interface=interface,
-                        parameter_name=parameter.name,
-                        provider=provider,
-                    )
-                )
-
-        for unresolved_provider in self._unresolved_providers.pop(interface, []):
-            sub_provider = self.get_provider(unresolved_provider.interface)
-            related_providers.append((sub_provider, False))
+                pass
 
         for related_provider, direct in related_providers:
             if direct:
@@ -311,24 +296,6 @@ class PyxDI:
                 )
 
     def validate(self) -> None:
-        if self._unresolved_providers:
-            errors = []
-            for (
-                unresolved_interface,
-                unresolved_providers,
-            ) in self._unresolved_providers.items():
-                for unresolved_provider in unresolved_providers:
-                    parameter_name = unresolved_provider.parameter_name
-                    provider_name = get_full_qualname(unresolved_provider.provider.obj)
-                    errors.append(
-                        f"- `{provider_name}` has unknown `{parameter_name}: "
-                        f"{get_full_qualname(unresolved_interface)}` parameter"
-                    )
-            message = "\n".join(errors)
-            raise UnknownDependencyError(
-                "The following unknown provided dependencies were detected:"
-                f"\n{message}."
-            )
         if self._unresolved_dependencies:
             errors = []
             for (
@@ -805,7 +772,6 @@ class PyxDI:
 
             if (
                 not self.has_provider(annotation)
-                and annotation not in self._unresolved_providers
                 and annotation not in self._unresolved_dependencies
             ):
                 self._unresolved_dependencies[annotation] = UnresolvedDependency(
