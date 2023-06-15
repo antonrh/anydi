@@ -989,7 +989,7 @@ def test_inject_missing_annotation(di: PyxDI) -> None:
 
     assert str(exc_info.value) == (
         "Missing `tests.test_core.test_inject_missing_annotation.<locals>.handler` "
-        "parameter annotation."
+        "parameter `name` annotation."
     )
 
 

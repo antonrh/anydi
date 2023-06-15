@@ -35,7 +35,7 @@ def test_install_without_annotation() -> None:
 
     assert str(exc_info.value) == (
         "Missing `tests.ext.fastapi.test_ext.test_install_without_annotation"
-        ".<locals>.say_hello` parameter annotation."
+        ".<locals>.say_hello` parameter `message` annotation."
     )
 
 

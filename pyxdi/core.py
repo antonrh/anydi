@@ -734,7 +734,8 @@ class PyxDI:
     ) -> None:
         if parameter.annotation is inspect._empty:  # noqa
             raise AnnotationError(
-                f"Missing `{get_full_qualname(obj)}` parameter annotation."
+                f"Missing `{get_full_qualname(obj)}` parameter "
+                f"`{parameter.name}` annotation."
             )
 
         if not self.has_provider(parameter.annotation):
