@@ -169,16 +169,6 @@ def test_unregister_request_scoped_provider(di: PyxDI) -> None:
     assert str not in di.providers
 
 
-def test_unregister_request_scoped_provider_within_context(di: PyxDI) -> None:
-    assert str not in di.providers
-
-    with di.request_context() as ctx:
-        ctx.set(str, "test")
-        di.unregister_provider(str)
-
-    assert str not in di.providers
-
-
 def test_unregister_not_registered_provider(di: PyxDI) -> None:
     with pytest.raises(ProviderError) as exc_info:
         di.unregister_provider(str)
@@ -339,19 +329,19 @@ def test_register_valid_class_provider(di: PyxDI) -> None:
 def test_register_provider_match_scopes(
     di: PyxDI, scope1: Scope, scope2: Scope, scope3: Scope, valid: bool
 ) -> None:
-    def mixed(a: int, b: float) -> str:
-        return f"{a} * {b} = {a * b}"
-
     def a() -> int:
         return 2
 
     def b(a: int) -> float:
         return a * 2.5
 
+    def mixed(a: int, b: float) -> str:
+        return f"{a} * {b} = {a * b}"
+
     try:
-        di.register_provider(str, mixed, scope=scope1)
         di.register_provider(int, a, scope=scope3)
         di.register_provider(float, b, scope=scope2)
+        di.register_provider(str, mixed, scope=scope1)
     except ScopeMismatchError:
         result = False
     else:
@@ -471,22 +461,6 @@ async def test_register_async_events(di: PyxDI) -> None:
         "event_2: after test",
         "event_1: after test",
     ]
-
-
-def test_validate_unresolved_provider_dependencies(di: PyxDI) -> None:
-    def service(ident: str) -> Service:
-        return Service(ident=ident)
-
-    di.register_provider(Service, service)
-
-    with pytest.raises(UnknownDependencyError) as exc_info:
-        di.validate()
-
-    assert str(exc_info.value) == (
-        "The following unknown provided dependencies were detected:\n"
-        "- `tests.test_core.test_validate_unresolved_provider_dependencies"
-        ".<locals>.service` has unknown `ident: str` parameter."
-    )
 
 
 # Module

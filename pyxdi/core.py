@@ -7,7 +7,6 @@ import pkgutil
 import types
 import typing as t
 import uuid
-from collections import defaultdict
 from contextvars import ContextVar
 from dataclasses import dataclass
 from functools import cached_property, wraps
@@ -80,13 +79,6 @@ class Provider:
 
 
 @dataclass(frozen=True)
-class UnresolvedProvider:
-    interface: t.Type[t.Any]
-    parameter_name: str
-    provider: Provider
-
-
-@dataclass(frozen=True)
 class ScannedDependency:
     member: t.Any
     module: types.ModuleType
@@ -123,9 +115,6 @@ class PyxDI:
         self._request_context_var: ContextVar[t.Optional[RequestContext]] = ContextVar(
             "request_context", default=None
         )
-        self._unresolved_providers: t.Dict[
-            t.Type[t.Any], t.List[UnresolvedProvider]
-        ] = defaultdict(list)
         self._override_instances: t.Dict[t.Type[t.Any], t.Any] = {}
 
         # Register modules
@@ -203,7 +192,6 @@ class PyxDI:
 
         # Cleanup provider references
         self._providers.pop(interface, None)
-        self._unresolved_providers.pop(interface, None)
 
     def get_provider(self, interface: t.Type[t.Any]) -> Provider:
         """
@@ -268,27 +256,11 @@ class PyxDI:
                     f"Missing provider `{provider}` "
                     f"dependency `{parameter.name}` annotation."
                 )
-            try:
-                sub_provider = self.get_provider(parameter.annotation)
-                related_providers.append((sub_provider, True))
-            except ProviderError:
-                self._unresolved_providers[parameter.annotation].append(
-                    UnresolvedProvider(
-                        interface=interface,
-                        parameter_name=parameter.name,
-                        provider=provider,
-                    )
-                )
+            sub_provider = self.get_provider(parameter.annotation)
+            related_providers.append(sub_provider)
 
-        for unresolved_provider in self._unresolved_providers.pop(interface, []):
-            sub_provider = self.get_provider(unresolved_provider.interface)
-            related_providers.append((sub_provider, False))
-
-        for related_provider, direct in related_providers:
-            if direct:
-                left_scope, right_scope = related_provider.scope, provider.scope
-            else:
-                left_scope, right_scope = provider.scope, related_provider.scope
+        for related_provider in related_providers:
+            left_scope, right_scope = related_provider.scope, provider.scope
             allowed_scopes = ALLOWED_SCOPES.get(right_scope) or []
             if left_scope not in allowed_scopes:
                 raise ScopeMismatchError(
@@ -298,26 +270,6 @@ class PyxDI:
                     f"which is not allowed. Please ensure that all providers are "
                     f"registered with matching scopes."
                 )
-
-    def validate(self) -> None:
-        if self._unresolved_providers:
-            errors = []
-            for (
-                unresolved_interface,
-                unresolved_providers,
-            ) in self._unresolved_providers.items():
-                for unresolved_provider in unresolved_providers:
-                    parameter_name = unresolved_provider.parameter_name
-                    provider_name = get_full_qualname(unresolved_provider.provider.obj)
-                    errors.append(
-                        f"- `{provider_name}` has unknown `{parameter_name}: "
-                        f"{get_full_qualname(unresolved_interface)}` parameter"
-                    )
-            message = "\n".join(errors)
-            raise UnknownDependencyError(
-                "The following unknown provided dependencies were detected:"
-                f"\n{message}."
-            )
 
     # Modules
 
@@ -347,43 +299,37 @@ class PyxDI:
     # Lifespan
 
     def start(self) -> None:
-        self.validate()
         self._singleton_context.start()
 
     def close(self) -> None:
         self._singleton_context.close()
 
-    def request_context(
-        self,
-    ) -> t.ContextManager[RequestContext]:
+    def request_context(self) -> t.ContextManager[None]:
         return contextlib.contextmanager(self._request_context)()
 
-    def _request_context(self) -> t.Iterator[RequestContext]:
+    def _request_context(self) -> t.Iterator[None]:
         context = RequestContext(self)
         token = self._request_context_var.set(context)
         with context:
-            yield context
+            yield
             self._request_context_var.reset(token)
 
     # Asynchronous lifespan
 
     async def astart(self) -> None:
-        self.validate()
         await self._singleton_context.astart()
 
     async def aclose(self) -> None:
         await self._singleton_context.aclose()
 
-    def arequest_context(
-        self,
-    ) -> t.AsyncContextManager[RequestContext]:
+    def arequest_context(self) -> t.AsyncContextManager[None]:
         return contextlib.asynccontextmanager(self._arequest_context)()
 
-    async def _arequest_context(self) -> t.AsyncIterator[RequestContext]:
+    async def _arequest_context(self) -> t.AsyncIterator[None]:
         context = RequestContext(self)
         token = self._request_context_var.set(context)
         async with context:
-            yield context
+            yield
             self._request_context_var.reset(token)
 
     def _get_request_context(self) -> RequestContext:
