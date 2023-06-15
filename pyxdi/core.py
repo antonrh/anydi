@@ -107,12 +107,6 @@ def named(tp: t.Type[T], name: str) -> Annotated[t.Type[T], str]:
     return t.cast(Annotated[t.Type[T], str], Annotated[tp, name])
 
 
-@dataclass(frozen=True)
-class UnresolvedDependency:
-    parameter_name: str
-    obj: t.Callable[..., t.Any]
-
-
 @t.final
 class PyxDI:
     def __init__(
@@ -132,7 +126,6 @@ class PyxDI:
         self._unresolved_providers: t.Dict[
             t.Type[t.Any], t.List[UnresolvedProvider]
         ] = defaultdict(list)
-        self._unresolved_dependencies: t.Dict[t.Type[t.Any], UnresolvedDependency] = {}
         self._override_instances: t.Dict[t.Type[t.Any], t.Any] = {}
 
         # Register modules
@@ -211,7 +204,6 @@ class PyxDI:
         # Cleanup provider references
         self._providers.pop(interface, None)
         self._unresolved_providers.pop(interface, None)
-        self._unresolved_dependencies.pop(interface, None)
 
     def get_provider(self, interface: t.Type[t.Any]) -> Provider:
         """
@@ -324,25 +316,6 @@ class PyxDI:
             message = "\n".join(errors)
             raise UnknownDependencyError(
                 "The following unknown provided dependencies were detected:"
-                f"\n{message}."
-            )
-        if self._unresolved_dependencies:
-            errors = []
-            for (
-                unresolved_interface,
-                dependency,
-            ) in self._unresolved_dependencies.items():
-                parameter_name = dependency.parameter_name
-                errors.append(
-                    f"- `{get_full_qualname(dependency.obj)}` has unknown "
-                    f"`{parameter_name}: {get_full_qualname(unresolved_interface)}` "
-                    f"injected parameter"
-                )
-            if not errors:
-                return
-            message = "\n".join(errors)
-            raise UnknownDependencyError(
-                "The following unknown injected dependencies were detected:"
                 f"\n{message}."
             )
 
@@ -774,24 +747,25 @@ class PyxDI:
         for parameter in get_signature(obj).parameters.values():
             if not isinstance(parameter.default, DependencyMark):
                 continue
-
-            annotation = parameter.annotation
-            if annotation is inspect._empty:  # noqa
-                raise AnnotationError(
-                    f"Missing `{get_full_qualname(obj)}` parameter annotation."
-                )
-
-            if (
-                not self.has_provider(annotation)
-                and annotation not in self._unresolved_providers
-                and annotation not in self._unresolved_dependencies
-            ):
-                self._unresolved_dependencies[annotation] = UnresolvedDependency(
-                    parameter_name=parameter.name, obj=obj
-                )
-
-            injected_params[parameter.name] = annotation
+            self._validate_injected_parameter(obj, parameter)
+            injected_params[parameter.name] = parameter.annotation
         return injected_params
+
+    def _validate_injected_parameter(
+        self, obj: t.Callable[..., t.Any], parameter: inspect.Parameter
+    ) -> None:
+        if parameter.annotation is inspect._empty:  # noqa
+            raise AnnotationError(
+                f"Missing `{get_full_qualname(obj)}` parameter "
+                f"`{parameter.name}` annotation."
+            )
+
+        if not self.has_provider(parameter.annotation):
+            raise UnknownDependencyError(
+                f"`{get_full_qualname(obj)}` includes an unrecognized parameter "
+                f"`{parameter.name}` with a dependency "
+                f"annotation of `{get_full_qualname(parameter.annotation)}`."
+            )
 
 
 class ScopedContext:

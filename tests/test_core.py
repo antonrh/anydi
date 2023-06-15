@@ -489,28 +489,6 @@ def test_validate_unresolved_provider_dependencies(di: PyxDI) -> None:
     )
 
 
-def test_validate_unresolved_injected_dependencies(di: PyxDI) -> None:
-    def func1(service: Service = dep) -> None:
-        return None
-
-    def func2(message: str = dep) -> None:
-        return None
-
-    di.inject(func1)
-    di.inject(func2)
-
-    with pytest.raises(UnknownDependencyError) as exc_info:
-        di.validate()
-
-    assert str(exc_info.value) == (
-        "The following unknown injected dependencies were detected:\n"
-        "- `tests.test_core.test_validate_unresolved_injected_dependencies.<locals>"
-        ".func1` has unknown `service: tests.fixtures.Service` injected parameter\n"
-        "- `tests.test_core.test_validate_unresolved_injected_dependencies.<locals>"
-        ".func2` has unknown `message: str` injected parameter."
-    )
-
-
 # Module
 
 
@@ -1002,15 +980,29 @@ async def test_async_get_provider_arguments(di: PyxDI) -> None:
 
 
 def test_inject_missing_annotation(di: PyxDI) -> None:
-    def func(name=dep) -> str:  # type: ignore[no-untyped-def]
+    def handler(name=dep) -> str:  # type: ignore[no-untyped-def]
         return name  # type: ignore[no-any-return]
 
     with pytest.raises(AnnotationError) as exc_info:
-        di.inject(func)
+        di.inject(handler)
 
     assert str(exc_info.value) == (
-        "Missing `tests.test_core.test_inject_missing_annotation.<locals>.func` "
-        "parameter annotation."
+        "Missing `tests.test_core.test_inject_missing_annotation.<locals>.handler` "
+        "parameter `name` annotation."
+    )
+
+
+def test_inject_unknown_dependency(di: PyxDI) -> None:
+    def handler(message: str = dep) -> None:
+        pass
+
+    with pytest.raises(UnknownDependencyError) as exc_info:
+        di.inject(handler)
+
+    assert str(exc_info.value) == (
+        "`tests.test_core.test_inject_unknown_dependency.<locals>.handler` "
+        "includes an unrecognized parameter `message` "
+        "with a dependency annotation of `str`."
     )
 
 
