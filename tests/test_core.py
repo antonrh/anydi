@@ -12,7 +12,6 @@ from pyxdi.exceptions import (
     InvalidScopeError,
     ProviderError,
     ScopeMismatchError,
-    UnknownDependencyError,
 )
 
 from tests.fixtures import Service
@@ -471,28 +470,6 @@ async def test_register_async_events(di: PyxDI) -> None:
         "event_2: after test",
         "event_1: after test",
     ]
-
-
-def test_validate_unresolved_injected_dependencies(di: PyxDI) -> None:
-    def func1(service: Service = dep) -> None:
-        return None
-
-    def func2(message: str = dep) -> None:
-        return None
-
-    di.inject(func1)
-    di.inject(func2)
-
-    with pytest.raises(UnknownDependencyError) as exc_info:
-        di.validate()
-
-    assert str(exc_info.value) == (
-        "The following unknown injected dependencies were detected:\n"
-        "- `tests.test_core.test_validate_unresolved_injected_dependencies.<locals>"
-        ".func1` has unknown `service: tests.fixtures.Service` injected parameter\n"
-        "- `tests.test_core.test_validate_unresolved_injected_dependencies.<locals>"
-        ".func2` has unknown `message: str` injected parameter."
-    )
 
 
 # Module
@@ -985,19 +962,6 @@ async def test_async_get_provider_arguments(di: PyxDI) -> None:
     assert kwargs == {"b": 1.0, "c": "test"}
 
 
-def test_inject_missing_annotation(di: PyxDI) -> None:
-    def func(name=dep) -> str:  # type: ignore[no-untyped-def]
-        return name  # type: ignore[no-any-return]
-
-    with pytest.raises(AnnotationError) as exc_info:
-        di.inject(func)
-
-    assert str(exc_info.value) == (
-        "Missing `tests.test_core.test_inject_missing_annotation.<locals>.func` "
-        "parameter annotation."
-    )
-
-
 def test_inject(di: PyxDI) -> None:
     @di.provider
     def ident_provider() -> str:
@@ -1014,6 +978,33 @@ def test_inject(di: PyxDI) -> None:
     result = func(name="service ident")
 
     assert result == "service ident = 1000"
+
+
+def test_inject_missing_annotation(di: PyxDI) -> None:
+    def handler(name=dep) -> str:  # type: ignore[no-untyped-def]
+        return name  # type: ignore[no-any-return]
+
+    with pytest.raises(AnnotationError) as exc_info:
+        di.inject(handler)
+
+    assert str(exc_info.value) == (
+        "Missing `tests.test_core.test_inject_missing_annotation.<locals>.handler` "
+        "parameter annotation."
+    )
+
+
+def test_inject_unknown_dependency(di: PyxDI) -> None:
+    def handler(message: str = dep) -> None:
+        pass
+
+    with pytest.raises(Exception) as exc_info:
+        di.inject(handler)
+
+    assert str(exc_info.value) == (
+        "`tests.test_core.test_inject_unknown_dependency.<locals>.handler` "
+        "includes an unrecognized parameter `message` "
+        "with a dependency annotation of `str`."
+    )
 
 
 def test_inject_class(di: PyxDI) -> None:

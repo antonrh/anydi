@@ -1,4 +1,3 @@
-import inspect
 import typing as t
 
 import fastapi
@@ -8,6 +7,7 @@ from fastapi.routing import APIRoute
 from starlette.requests import Request
 
 import pyxdi
+from pyxdi.exceptions import AnnotationError
 from pyxdi.ext.starlette.middleware import RequestScopedMiddleware
 from pyxdi.utils import get_signature
 
@@ -28,17 +28,11 @@ def install(app: fastapi.FastAPI, di: pyxdi.PyxDI) -> None:
                 call, *params = dependant.cache_key
                 if not call:
                     continue  # pragma: no cover
-                for param in get_signature(call).parameters.values():
-                    if isinstance(param.default, InjectParam):
-                        if param.annotation is inspect._empty:  # noqa
-                            raise TypeError(
-                                f"The endpoint for the `{route.methods} {route.path}` "
-                                "route is missing a type annotation for the "
-                                f"`{param.name}` parameter. Please add a type "
-                                "annotation to the parameter to resolve this issue."
-                            )
-
-                        param.default.interface = param.annotation
+                for parameter in get_signature(call).parameters.values():
+                    if not isinstance(parameter.default, InjectParam):
+                        continue
+                    di._validate_injected_parameter(call, parameter)  # noqa
+                    parameter.default.interface = parameter.annotation
 
 
 def get_di(request: Request) -> pyxdi.PyxDI:
@@ -53,7 +47,7 @@ class InjectParam(params.Depends):
     @property
     def interface(self) -> t.Any:
         if self._interface is None:
-            raise TypeError("Interface is not set.")
+            raise AnnotationError("Interface is not set.")
         return self._interface
 
     @interface.setter
