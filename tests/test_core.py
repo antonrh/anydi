@@ -168,16 +168,6 @@ def test_unregister_request_scoped_provider(di: PyxDI) -> None:
     assert str not in di.providers
 
 
-def test_unregister_request_scoped_provider_within_context(di: PyxDI) -> None:
-    assert str not in di.providers
-
-    with di.request_context() as ctx:
-        ctx.set(str, "test")
-        di.unregister_provider(str)
-
-    assert str not in di.providers
-
-
 def test_unregister_not_registered_provider(di: PyxDI) -> None:
     with pytest.raises(ProviderError) as exc_info:
         di.unregister_provider(str)

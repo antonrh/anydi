@@ -88,7 +88,7 @@ from starlette.middleware import Middleware
 from starlette.requests import Request
 
 import pyxdi.ext.fastapi
-from pyxdi.ext.fastapi import Inject, RequestScopedMiddleware
+from pyxdi.ext.fastapi import Inject, RequestScopedMiddleware, get_request
 
 
 @dataclass
@@ -103,6 +103,11 @@ di = pyxdi.PyxDI()
 
 
 @di.provider(scope="request")
+def request() -> Request:
+    return get_request()
+
+
+@di.provider(scope="request")
 def request_service(request: Request) -> RequestService:
     return RequestService(request=request)
 
@@ -114,7 +119,7 @@ app = fastapi.FastAPI(
 
 @app.get("/request-info")
 async def get_request_info(
-    request_service: RequestService = Inject(),
+        request_service: RequestService = Inject(),
 ) -> str:
     return await request_service.get_info()
 

@@ -8,7 +8,7 @@ from starlette.responses import JSONResponse
 from starlette.routing import Route
 
 import pyxdi
-from pyxdi.ext.starlette.middleware import RequestScopedMiddleware
+from pyxdi.ext.starlette.middleware import RequestScopedMiddleware, get_request
 
 from tests.ext.fixtures import MailService, UserService
 
@@ -32,6 +32,11 @@ def user_service() -> UserService:
 @di.provider(scope="singleton")
 def mail_service() -> MailService:
     return MailService()
+
+
+@di.provider(scope="request")
+def request() -> Request:
+    return get_request()
 
 
 @di.provider(scope="request")

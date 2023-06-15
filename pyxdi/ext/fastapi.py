@@ -8,10 +8,16 @@ from starlette.requests import Request
 
 import pyxdi
 from pyxdi.exceptions import AnnotationError
-from pyxdi.ext.starlette.middleware import RequestScopedMiddleware
+from pyxdi.ext.starlette.middleware import RequestScopedMiddleware, get_request
 from pyxdi.utils import get_signature
 
-__all__ = ["RequestScopedMiddleware", "install", "get_di", "Inject"]
+__all__ = [
+    "RequestScopedMiddleware",
+    "get_request",
+    "install",
+    "get_di",
+    "Inject",
+]
 
 
 def install(app: fastapi.FastAPI, di: pyxdi.PyxDI) -> None:

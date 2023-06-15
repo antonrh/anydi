@@ -259,11 +259,9 @@ class PyxDI:
                     f"Missing provider `{provider}` "
                     f"dependency `{parameter.name}` annotation."
                 )
-            try:
-                sub_provider = self.get_provider(parameter.annotation)
-                related_providers.append(sub_provider)
-            except ProviderError:
-                pass
+
+            sub_provider = self.get_provider(parameter.annotation)
+            related_providers.append(sub_provider)
 
         for related_provider in related_providers:
             left_scope, right_scope = related_provider.scope, provider.scope
@@ -312,14 +310,14 @@ class PyxDI:
 
     def request_context(
         self,
-    ) -> t.ContextManager[RequestContext]:
+    ) -> t.ContextManager[None]:
         return contextlib.contextmanager(self._request_context)()
 
-    def _request_context(self) -> t.Iterator[RequestContext]:
+    def _request_context(self) -> t.Iterator[None]:
         context = RequestContext(self)
         token = self._request_context_var.set(context)
         with context:
-            yield context
+            yield
             self._request_context_var.reset(token)
 
     # Asynchronous lifespan
@@ -332,14 +330,14 @@ class PyxDI:
 
     def arequest_context(
         self,
-    ) -> t.AsyncContextManager[RequestContext]:
+    ) -> t.AsyncContextManager[None]:
         return contextlib.asynccontextmanager(self._arequest_context)()
 
-    async def _arequest_context(self) -> t.AsyncIterator[RequestContext]:
+    async def _arequest_context(self) -> t.AsyncIterator[None]:
         context = RequestContext(self)
         token = self._request_context_var.set(context)
         async with context:
-            yield context
+            yield None
             self._request_context_var.reset(token)
 
     def _get_request_context(self) -> RequestContext:
@@ -441,39 +439,37 @@ class PyxDI:
 
     @contextlib.contextmanager
     def override(self, interface: t.Type[T], instance: t.Any) -> t.Iterator[None]:
+        origin_provider = self.get_provider(interface)
         origin_instance: t.Optional[t.Any] = None
-        origin_provider: t.Optional[Provider] = None
-        scope = self.default_scope
 
-        if self.has_provider(interface):
-            origin_provider = self.get_provider(interface)
-            if origin_provider.is_async_resource and not self.has(interface):
-                origin_instance = None
-            else:
-                origin_instance = self.get(interface)
-            scope = origin_provider.scope
+        if origin_provider.is_async_resource and not self.has(interface):
+            origin_instance = None
+        else:
+            origin_instance = self.get(interface)
 
         provider = self.register_provider(
-            interface, lambda: instance, scope=scope, override=True
+            interface,
+            lambda: instance,
+            scope=origin_provider.scope,
+            override=True,
         )
 
         scoped_context = self._get_scoped_context(provider.scope)
+
         if scoped_context:
             scoped_context.set(interface, instance=instance)
 
         yield
 
-        if origin_provider:
-            self.register_provider(
-                interface,
-                origin_provider.obj,
-                scope=origin_provider.scope,
-                override=True,
-            )
-            if origin_instance and scoped_context:
-                scoped_context.set(interface, instance=origin_instance)
-        else:
-            self.unregister_provider(interface)
+        self.register_provider(
+            interface,
+            origin_provider.obj,
+            scope=origin_provider.scope,
+            override=True,
+        )
+
+        if origin_instance and scoped_context:
+            scoped_context.set(interface, instance=origin_instance)
 
     # Decorators
 
@@ -781,9 +777,6 @@ class ScopedContext:
 
     def set(self, interface: t.Type[t.Any], instance: t.Any) -> None:
         self._instances[interface] = instance
-        self._root.register_provider(
-            interface, lambda: interface, scope=self._scope, override=True
-        )
 
     def has(self, interface: t.Type[t.Any]) -> bool:
         return interface in self._instances
