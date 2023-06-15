@@ -1,5 +1,5 @@
 from .core import Module, PyxDI, dep, named
-from .decorators import inject, provider, request, singleton, transient
+from .decorators import inject, provider
 
 __all__ = [
     "PyxDI",
@@ -8,7 +8,4 @@ __all__ = [
     "dep",
     "inject",
     "provider",
-    "request",
-    "singleton",
-    "transient",
 ]
