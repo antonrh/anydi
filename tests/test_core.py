@@ -82,15 +82,8 @@ def test_provider_name() -> None:
     )
 
 
-def test_di_constructor_properties() -> None:
-    di = PyxDI(default_scope="singleton")
-
-    assert di.default_scope == "singleton"
-    assert di.providers == {}
-
-
 def test_has_provider(di: PyxDI) -> None:
-    di.register_provider(str, lambda: "test")
+    di.register_provider(str, lambda: "test", scope="singleton")
 
     assert di.has_provider(str)
 
@@ -109,41 +102,31 @@ def test_register_provider(di: PyxDI) -> None:
     assert provider.scope == "transient"
 
 
-def test_register_provider_default_scope() -> None:
-    di = PyxDI(default_scope="singleton")
-
-    def provider_obj() -> str:
-        return "test"
-
-    provider = di.register_provider(str, provider_obj)
-
-    assert provider.obj == provider_obj
-    assert provider.scope == di.default_scope
-
-
 def test_register_provider_already_registered(di: PyxDI) -> None:
-    di.register_provider(str, lambda: "test")
+    di.register_provider(str, lambda: "test", scope="singleton")
 
     with pytest.raises(ProviderError) as exc_info:
-        di.register_provider(str, lambda: "other")
+        di.register_provider(str, lambda: "other", scope="singleton")
 
     assert str(exc_info.value) == "The provider interface `str` already registered."
 
 
 def test_register_provider_override(di: PyxDI) -> None:
-    di.register_provider(str, lambda: "test")
+    di.register_provider(str, lambda: "test", scope="singleton")
 
     def overriden_provider_obj() -> str:
         return "test"
 
-    provider = di.register_provider(str, overriden_provider_obj, override=True)
+    provider = di.register_provider(
+        str, overriden_provider_obj, scope="singleton", override=True
+    )
 
     assert provider.obj == overriden_provider_obj
 
 
 def test_register_annotated_type(di: PyxDI) -> None:
-    di.register_provider(named(str, "msg1"), lambda: "test1")
-    di.register_provider(named(str, "msg2"), lambda: "test2")
+    di.register_provider(named(str, "msg1"), lambda: "test1", scope="singleton")
+    di.register_provider(named(str, "msg2"), lambda: "test2", scope="singleton")
 
     assert Annotated[str, "msg1"] in di.providers
     assert Annotated[str, "msg2"] in di.providers
@@ -176,18 +159,8 @@ def test_unregister_not_registered_provider(di: PyxDI) -> None:
     assert str(exc_info.value) == "The provider interface `str` not registered."
 
 
-def test_singleton(di: PyxDI) -> None:
-    instance = "test"
-
-    provider = di.singleton(str, instance)
-
-    assert provider.scope == "singleton"
-    assert callable(provider.obj)
-    assert provider.obj() == instance
-
-
 def test_get_provider(di: PyxDI) -> None:
-    provider = di.register_provider(str, lambda: "str")
+    provider = di.register_provider(str, lambda: "str", scope="singleton")
 
     assert di.get_provider(str) == provider
 
@@ -275,7 +248,7 @@ def test_register_provider_valid_async_resource(di: PyxDI) -> None:
 
 def test_register_invalid_provider_type(di: PyxDI) -> None:
     with pytest.raises(ProviderError) as exc_info:
-        di.register_provider(str, "Test")  # type: ignore[arg-type]
+        di.register_provider(str, "Test", scope="singleton")  # type: ignore[arg-type]
 
     assert str(exc_info.value) == (
         "The provider `Test` is invalid because it is not a callable object. Only "
@@ -288,7 +261,7 @@ def test_register_valid_class_provider(di: PyxDI) -> None:
     class Klass:
         pass
 
-    provider = di.register_provider(str, Klass)
+    provider = di.register_provider(str, Klass, scope="singleton")
 
     assert provider.is_class
 
@@ -296,7 +269,6 @@ def test_register_valid_class_provider(di: PyxDI) -> None:
 @pytest.mark.parametrize(
     "scope1, scope2, scope3, valid",
     [
-        (None, None, None, True),
         ("transient", "transient", "transient", True),
         ("transient", "transient", "singleton", True),
         ("transient", "transient", "request", True),
@@ -379,10 +351,10 @@ def test_register_provider_without_annotation(di: PyxDI) -> None:
     def service(ident) -> Service:  # type: ignore[no-untyped-def]
         return Service(ident=ident)
 
-    di.register_provider(str, service_ident)
+    di.register_provider(str, service_ident, scope="singleton")
 
     with pytest.raises(AnnotationError) as exc_info:
-        di.register_provider(Service, service)
+        di.register_provider(Service, service, scope="singleton")
 
     assert str(exc_info.value) == (
         "Missing provider "
@@ -394,17 +366,17 @@ def test_register_provider_without_annotation(di: PyxDI) -> None:
 def test_register_events(di: PyxDI) -> None:
     events = []
 
-    @di.provider
+    @di.provider(scope="singleton")
     def message() -> str:
         return "test"
 
-    @di.provider
+    @di.provider(scope="singleton")
     def event_1(message: str) -> t.Iterator[None]:
         events.append(f"event_1: before {message}")
         yield
         events.append(f"event_1: after {message}")
 
-    @di.provider
+    @di.provider(scope="singleton")
     def event_2(message: str) -> t.Iterator[None]:
         events.append(f"event_2: before {message}")
         yield
@@ -430,17 +402,17 @@ def test_register_events(di: PyxDI) -> None:
 async def test_register_async_events(di: PyxDI) -> None:
     events = []
 
-    @di.provider
+    @di.provider(scope="singleton")
     def message() -> str:
         return "test"
 
-    @di.provider
+    @di.provider(scope="singleton")
     async def event_1(message: str) -> t.AsyncIterator[None]:
         events.append(f"event_1: before {message}")
         yield
         events.append(f"event_1: after {message}")
 
-    @di.provider
+    @di.provider(scope="singleton")
     def event_2(message: str) -> t.Iterator[None]:
         events.append(f"event_2: before {message}")
         yield
@@ -468,9 +440,9 @@ async def test_register_async_events(di: PyxDI) -> None:
 
 class TestModule(Module):
     def configure(self, di: PyxDI) -> None:
-        di.singleton(named(str, "msg1"), "Message 1")
+        di.register_provider(named(str, "msg1"), lambda: "Message 1", scope="singleton")
 
-    @provider
+    @provider(scope="singleton")
     def provide_msg2(self) -> Annotated[str, "msg2"]:
         return "Message 2"
 
@@ -498,7 +470,7 @@ def test_register_module_instance(di: PyxDI) -> None:
 
 def test_register_module_function(di: PyxDI) -> None:
     def configure(di: PyxDI) -> None:
-        di.singleton(str, "Message")
+        di.register_provider(str, lambda: "Message 1", scope="singleton")
 
     di.register_module(configure)
 
@@ -506,15 +478,15 @@ def test_register_module_function(di: PyxDI) -> None:
 
 
 class OrderedModule(Module):
-    @provider
+    @provider(scope="singleton")
     def dep3(self) -> Annotated[str, "dep3"]:
         return "dep3"
 
-    @provider
+    @provider(scope="singleton")
     def dep1(self) -> Annotated[str, "dep1"]:
         return "dep1"
 
-    @provider
+    @provider(scope="singleton")
     def dep2(self) -> Annotated[str, "dep2"]:
         return "dep2"
 
@@ -617,7 +589,7 @@ def test_get_singleton_scoped(di: PyxDI) -> None:
 
 
 def test_get_singleton_scoped_not_started(di: PyxDI) -> None:
-    @di.provider
+    @di.provider(scope="singleton")
     def message() -> t.Iterator[str]:
         yield "test"
 
@@ -759,7 +731,7 @@ async def test_async_get_transient_scoped(di: PyxDI) -> None:
 
 
 async def test_async_get_synchronous_resource(di: PyxDI) -> None:
-    @di.provider
+    @di.provider(scope="singleton")
     def msg() -> t.Iterator[str]:
         yield "test"
 
@@ -777,14 +749,14 @@ def test_get_not_registered_instance(di: PyxDI) -> None:
 
 
 def test_has_instance(di: PyxDI) -> None:
-    di.register_provider(str, lambda: "test")
+    di.register_provider(str, lambda: "test", scope="singleton")
     di.get_instance(str)
 
     assert di.has_instance(str)
 
 
 def test_has_no_instance(di: PyxDI) -> None:
-    di.register_provider(str, lambda: "test")
+    di.register_provider(str, lambda: "test", scope="singleton")
 
     assert not di.has_instance(str)
 
@@ -803,7 +775,7 @@ def test_override(di: PyxDI) -> None:
     origin_name = "origin"
     overriden_name = "overriden"
 
-    @di.provider
+    @di.provider(scope="singleton")
     def name() -> str:
         return origin_name
 
@@ -838,7 +810,7 @@ def test_override_resource_provider(di: PyxDI) -> None:
     origin = "origin"
     overriden = "overriden"
 
-    @di.provider
+    @di.provider(scope="singleton")
     def message() -> t.Iterator[str]:
         yield origin
 
@@ -852,7 +824,7 @@ async def test_override_async_resource_provider(di: PyxDI) -> None:
     origin = "origin"
     overriden = "overriden"
 
-    @di.provider
+    @di.provider(scope="singleton")
     async def message() -> t.AsyncIterator[str]:
         yield origin
 
@@ -912,22 +884,22 @@ def test_get_provider_annotation_origin_without_args(di: PyxDI) -> None:
 
 
 def test_get_provider_arguments(di: PyxDI) -> None:
-    @di.provider
+    @di.provider(scope="singleton")
     def a() -> int:
         return 10
 
-    @di.provider
+    @di.provider(scope="singleton")
     def b() -> float:
         return 1.0
 
-    @di.provider
+    @di.provider(scope="singleton")
     def c() -> str:
         return "test"
 
     def service(a: int, /, b: float, *, c: str) -> Service:
         return Service(ident=f"{a}/{b}/{c}")
 
-    provider = di.register_provider(Service, service)
+    provider = di.register_provider(Service, service, scope="singleton")
 
     args, kwargs = di._get_provider_arguments(provider)
 
@@ -936,22 +908,22 @@ def test_get_provider_arguments(di: PyxDI) -> None:
 
 
 async def test_async_get_provider_arguments(di: PyxDI) -> None:
-    @di.provider
+    @di.provider(scope="singleton")
     async def a() -> int:
         return 10
 
-    @di.provider
+    @di.provider(scope="singleton")
     async def b() -> float:
         return 1.0
 
-    @di.provider
+    @di.provider(scope="singleton")
     async def c() -> str:
         return "test"
 
     async def service(a: int, /, b: float, *, c: str) -> Service:
         return Service(ident=f"{a}/{b}/{c}")
 
-    provider = di.register_provider(Service, service)
+    provider = di.register_provider(Service, service, scope="singleton")
 
     args, kwargs = await di._aget_provider_arguments(provider)
 
@@ -987,11 +959,11 @@ def test_inject_unknown_dependency(di: PyxDI) -> None:
 
 
 def test_inject(di: PyxDI) -> None:
-    @di.provider
+    @di.provider(scope="singleton")
     def ident_provider() -> str:
         return "1000"
 
-    @di.provider
+    @di.provider(scope="singleton")
     def service_provider(ident: str) -> Service:
         return Service(ident=ident)
 
@@ -1005,11 +977,11 @@ def test_inject(di: PyxDI) -> None:
 
 
 def test_inject_class(di: PyxDI) -> None:
-    @di.provider
+    @di.provider(scope="singleton")
     def ident_provider() -> str:
         return "1000"
 
-    @di.provider
+    @di.provider(scope="singleton")
     def service_provider(ident: str) -> Service:
         return Service(ident=ident)
 
@@ -1030,11 +1002,11 @@ def test_inject_class(di: PyxDI) -> None:
 
 
 def test_inject_dataclass(di: PyxDI) -> None:
-    @di.provider
+    @di.provider(scope="singleton")
     def ident_provider() -> str:
         return "1000"
 
-    @di.provider
+    @di.provider(scope="singleton")
     def service_provider(ident: str) -> Service:
         return Service(ident=ident)
 
@@ -1061,8 +1033,8 @@ async def test_inject_with_sync_and_async_resources(di: PyxDI) -> None:
     async def service_provider(ident: str) -> t.AsyncIterator[Service]:
         yield Service(ident=ident)
 
-    di.register_provider(str, ident_provider)
-    di.register_provider(Service, service_provider)
+    di.register_provider(str, ident_provider, scope="singleton")
+    di.register_provider(Service, service_provider, scope="singleton")
 
     await di.astart()
 
@@ -1075,23 +1047,7 @@ async def test_inject_with_sync_and_async_resources(di: PyxDI) -> None:
     assert result == "service ident = 1000"
 
 
-def test_provider_decorator_no_args(di: PyxDI) -> None:
-    @di.provider
-    def ident() -> str:
-        return "1000"
-
-    assert di.get_provider(str) == Provider(obj=ident, scope=di.default_scope)
-
-
-def test_provider_decorator_no_args_provided(di: PyxDI) -> None:
-    @di.provider()
-    def ident() -> str:
-        return "1000"
-
-    assert di.get_provider(str) == Provider(obj=ident, scope=di.default_scope)
-
-
-def test_provider_decorator_with_provided_args(di: PyxDI) -> None:
+def test_provider_decorator(di: PyxDI) -> None:
     @di.provider(scope="singleton")
     def ident() -> str:
         return "1000"

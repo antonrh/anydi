@@ -20,7 +20,7 @@ def test_inject_param_missing_interface() -> None:
 def test_install_without_annotation() -> None:
     di = pyxdi.PyxDI()
 
-    @di.provider
+    @di.provider(scope="singleton")
     def message() -> str:
         return "Hello"
 
