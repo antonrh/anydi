@@ -14,6 +14,5 @@ class RequestScopedMiddleware(BaseHTTPMiddleware):
     async def dispatch(
         self, request: Request, call_next: RequestResponseEndpoint
     ) -> Response:
-        async with self._di.arequest_context() as ctx:
-            ctx.set(Request, instance=request)
+        async with self._di.arequest_context():
             return await call_next(request)

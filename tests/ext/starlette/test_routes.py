@@ -50,12 +50,3 @@ def test_send_mail_mock_user_service(client: TestClient, di: pyxdi.PyxDI) -> Non
         "email": user.email,
         "message": message,
     }
-
-
-def test_request_info(client: TestClient) -> None:
-    response = client.get("/request-info")
-
-    assert response.status_code == 200
-    assert response.json() == {
-        "request_info": "GET /request-info",
-    }

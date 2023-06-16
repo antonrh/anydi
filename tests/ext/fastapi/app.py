@@ -1,9 +1,11 @@
 import typing as t
 
 import fastapi
+from starlette.middleware import Middleware
 
 import pyxdi.ext.fastapi
 from pyxdi.ext.fastapi import Inject
+from pyxdi.ext.starlette.middleware import RequestScopedMiddleware
 
 from tests.ext.fixtures import Mail, MailService, User, UserService
 
@@ -15,7 +17,7 @@ def user_service() -> UserService:
     return UserService()
 
 
-@di.provider(scope="singleton")
+@di.provider(scope="request")
 def mail_service() -> MailService:
     return MailService()
 
@@ -24,7 +26,7 @@ async def get_user(user_service: UserService = Inject()) -> User:
     return await user_service.get_user()
 
 
-app = fastapi.FastAPI()
+app = fastapi.FastAPI(middleware=[Middleware(RequestScopedMiddleware, di=di)])
 
 
 @app.post("/send-mail", response_model=Mail)
