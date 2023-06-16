@@ -48,7 +48,7 @@ import pyxdi
 di = pyxdi.PyxDI()
 
 
-@di.provider
+@di.provider(scope="singleton")
 def message() -> str:
     return "Hello, world!"
 
