@@ -23,16 +23,17 @@ def install(app: fastapi.FastAPI, di: pyxdi.PyxDI) -> None:
         if not isinstance(route, APIRoute):
             continue
         for dependant in iter_dependencies(route.dependant):
-            if dependant.cache_key not in patched:
-                patched.append(dependant.cache_key)
-                call, *params = dependant.cache_key
-                if not call:
-                    continue  # pragma: no cover
-                for parameter in get_signature(call).parameters.values():
-                    if not isinstance(parameter.default, InjectParam):
-                        continue
-                    di._validate_injected_parameter(call, parameter)  # noqa
-                    parameter.default.interface = parameter.annotation
+            if dependant.cache_key in patched:
+                continue
+            patched.append(dependant.cache_key)
+            call, *params = dependant.cache_key
+            if not call:
+                continue  # pragma: no cover
+            for parameter in get_signature(call).parameters.values():
+                if not isinstance(parameter.default, InjectParam):
+                    continue
+                di._validate_injected_parameter(call, parameter)  # noqa
+                parameter.default.interface = parameter.annotation
 
 
 def get_di(request: Request) -> pyxdi.PyxDI:

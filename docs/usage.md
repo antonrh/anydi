@@ -8,7 +8,7 @@ Once a provider is registered with PyxDI, it can be used to resolve dependencies
 ### Registering Providers
 
 To register a provider, you can use the `register_provider` method of the `PyxDI` instance. The method takes
-three arguments: the type of the object to be provided, the provider function or class, and an optional scope.
+three arguments: the type of the object to be provided, the provider function or class, and an scope.
 
 ```python
 import pyxdi
@@ -33,7 +33,7 @@ import pyxdi
 di = pyxdi.PyxDI()
 
 
-@di.provider
+@di.provider(scope="singleton")
 def message() -> str:
     return "Hello, message!"
 
@@ -164,7 +164,7 @@ async def main() -> None:
 
 ## Resource Providers
 
-Resource providers are special types of providers that need to be started and stopped. PyxDI supports synchronous and asynchronous resource providers.
+Resource providers are special types of providers that need to be started and stopped. `PyxDI` supports synchronous and asynchronous resource providers.
 
 ### Synchronous Resources
 
@@ -278,7 +278,7 @@ class Client:
 di = pyxdi.PyxDI()
 
 
-@di.provider
+@di.provider(scope="singleton")
 def client_provider() -> Client:
     return Client()
 
@@ -312,42 +312,9 @@ assert client.closed
     This pattern can be used for both synchronous and asynchronous resources.
 
 
-## Default Scope
-
-By default, providers are registered with a `singleton` scope. You can change the default scope by passing the default_scope parameter to the `PyxDI` constructor. This way, you don't have to specify the scope for each provider.
-
-```python
-import pyxdi
-
-di = pyxdi.PyxDI(default_scope="transient")
-
-
-@di.provider    # will use `default_scope`
-def message_provider() -> str:
-    return "Hello, message!"
-
-
-assert di.get_instance(str) == "Hello, world!"
-```
-
-In this example, the message_provider function is registered as a singleton provider because default_scope is set to `singleton`.
-
-## Singleton Provider
-
-You can register a provider as a singleton by calling the singleton method on the `PyxDI` instance.
-
-```python
-import pyxdi
-
-di = pyxdi.PyxDI()
-di.singleton(str, "Hello, world!")
-
-assert di.get_instance(str) == "Hello, world!"
-```
-
 ## Overriding Providers
 
-Sometimes it's necessary to override a provider with a different implementation. To do this, you can call the singleton() or register_provider() method again with the same key.
+Sometimes it's necessary to override a provider with a different implementation. To do this, you can register the provider with the override=True property set.
 
 For example, suppose you have registered a singleton provider for a string:
 
@@ -355,19 +322,27 @@ For example, suppose you have registered a singleton provider for a string:
 import pyxdi
 
 di = pyxdi.PyxDI()
-di.singleton(str, "Hello, world!")
+
+
+@di.provider(scope="singleton")
+def hello_message() -> str:
+    return "Hello, world!"
+
+
+@di.provider(scope="singleton", override=True)
+def goodbye_message() -> str:
+    return "Goodbye!"
+
+
+assert di.get_instance(str) == "Goodbye!"
 ```
 
-If you later want to change the value of the string to "Good-bye", you can call the singleton() method again with the same key:
+Note that if you try to register the provider without passing the override parameter as True, it will raise an error:
 
 ```python
-di.singleton(str, "Good-bye", override=True)
-```
-
-Note that if you call singleton() without passing the override parameter as True, it will raise an error. Also, once you override a provider, any further requests for that key will return the new implementation.
-
-```python
-di.singleton(str, "Good-bye")  # will raise an error
+@di.provider(scope="singleton")  # will raise an error
+def goodbye_message() -> str:
+    return "Good-bye!"
 ```
 
 ## Injecting Dependencies
@@ -388,7 +363,7 @@ class Service:
 di = pyxdi.PyxDI()
 
 
-@di.provider
+@di.provider(scope="singleton")
 def service() -> Service:
     return Service(name="demo")
 
@@ -450,7 +425,7 @@ import pyxdi
 di = pyxdi.PyxDI()
 
 
-@di.provider
+@di.provider(scope="singleton")
 def service() -> str:
     return Service(name="demo")
 
@@ -548,7 +523,7 @@ class Service:
 di = pyxdi.PyxDI()
 
 
-@di.provider
+@di.provider(scope="singleton")
 def service() -> Service:
     return Service(name="demo")
 
