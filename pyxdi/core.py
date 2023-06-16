@@ -275,8 +275,7 @@ class PyxDI:
             module.configure(self)
             for provider_name, params in module.providers:
                 obj = getattr(module, provider_name)
-                scope = params["scope"]
-                override = params["override"]  # Override module providers by default
+                scope, override = params["scope"], params["override"]
                 self.provider(scope=scope, override=override)(obj)
 
     # Lifespan
