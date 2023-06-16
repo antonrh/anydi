@@ -104,12 +104,10 @@ class PyxDI:
     def __init__(
         self,
         *,
-        default_scope: Scope = "singleton",
         modules: t.Optional[
             t.Sequence[t.Union[Module, t.Type[Module], t.Callable[[PyxDI], None]]],
         ] = None,
     ) -> None:
-        self._default_scope = default_scope
         self._providers: t.Dict[t.Type[t.Any], Provider] = {}
         self._singleton_context = SingletonContext(self)
         self._request_context_var: ContextVar[t.Optional[RequestContext]] = ContextVar(
@@ -121,10 +119,6 @@ class PyxDI:
         modules = modules or []
         for module in modules:
             self.register_module(module)
-
-    @property
-    def default_scope(self) -> Scope:
-        return self._default_scope
 
     @property
     def providers(self) -> t.Dict[t.Type[t.Any], Provider]:
@@ -140,10 +134,10 @@ class PyxDI:
         interface: t.Type[t.Any],
         obj: t.Callable[..., t.Any],
         *,
-        scope: t.Optional[Scope] = None,
+        scope: Scope,
         override: bool = False,
     ) -> Provider:
-        provider = Provider(obj=obj, scope=scope or self.default_scope)
+        provider = Provider(obj=obj, scope=scope)
 
         # Create Event type
         if (provider.is_resource or provider.is_async_resource) and (
@@ -205,16 +199,6 @@ class PyxDI:
                 "not been registered. Please ensure that the provider interface is "
                 "properly registered before attempting to use it."
             ) from exc
-
-    def singleton(
-        self, interface: t.Type[t.Any], instance: t.Any, *, override: bool = False
-    ) -> Provider:
-        """
-        Register singleton instance provider.
-        """
-        return self.register_provider(
-            interface, lambda: instance, scope="singleton", override=override
-        )
 
     # Validators
 
@@ -291,9 +275,8 @@ class PyxDI:
             module.configure(self)
             for provider_name, params in module.providers:
                 obj = getattr(module, provider_name)
-                scope = params.get("scope")
-                # Override module providers by default
-                override = params.get("override", True)
+                scope = params["scope"]
+                override = params["override"]  # Override module providers by default
                 self.provider(scope=scope, override=override)(obj)
 
     # Lifespan
@@ -448,34 +431,15 @@ class PyxDI:
 
     # Decorators
 
-    @t.overload
-    def provider(self, func: t.Callable[P, T]) -> t.Callable[P, T]:
-        ...
-
-    @t.overload
     def provider(
-        self,
-        *,
-        scope: t.Optional[Scope] = None,
-        override: bool = False,
+        self, *, scope: Scope, override: bool = False
     ) -> t.Callable[[t.Callable[P, T]], t.Callable[P, T]]:
-        ...
-
-    def provider(
-        self,
-        func: t.Optional[t.Callable[P, T]] = None,
-        *,
-        scope: t.Optional[Scope] = None,
-        override: bool = False,
-    ) -> t.Union[t.Callable[P, T], t.Callable[[t.Callable[P, T]], t.Callable[P, T]]]:
         def decorator(func: t.Callable[P, T]) -> t.Callable[P, T]:
             interface = self._get_provider_annotation(func)
             self.register_provider(interface, func, scope=scope, override=override)
             return func
 
-        if func is None:
-            return decorator
-        return decorator(func)
+        return decorator
 
     @t.overload
     def inject(self, obj: t.Callable[P, T]) -> t.Callable[P, T]:

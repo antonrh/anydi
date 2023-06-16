@@ -476,7 +476,7 @@ class Service:
 
 class AppModule(pyxdi.Module):
     def configure(self, di: pyxdi.PyxDI) -> None:
-        di.singleton(Repository, Repository())
+        di.register_provider(Repository, lambda: Repository(), scope="singleton")
 
     @pyxdi.provider(scope="singleton")
     def configure_service(self, repo: Repository) -> Service:

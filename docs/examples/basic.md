@@ -9,7 +9,7 @@ app/
   handlers.py
   main.py
   models.py
-  providers.py
+  modules.py
   repositories.py
   services.py
 ```
@@ -102,7 +102,7 @@ class UserService:
         return self.user_repository.get_by_email(email)
 ```
 
-`providers.py`
+`modules.py`
 
 Defines two providers using PyxDI's @provider decorator. The first provider creates an instance of the InMemoryUserRepository class, which is then injected into the UserService provider when it is created.
 
@@ -113,14 +113,14 @@ from app.repositories import InMemoryUserRepository, UserRepository
 from app.services import UserService
 
 
-@pyxdi.provider
-def user_repository() -> UserRepository:
-    return InMemoryUserRepository()
+class AppModule(pyxdi.Module):
+    @pyxdi.provider(scope="singleton")
+    def user_repository(self) -> UserRepository:
+        return InMemoryUserRepository()
 
-
-@pyxdi.provider
-def user_service(user_repository: UserRepository) -> UserService:
-    return UserService(user_repository=user_repository)
+    @pyxdi.provider(scope="singleton")
+    def user_service(self, user_repository: UserRepository) -> UserService:
+        return UserService(user_repository=user_repository)
 ```
 
 `handlers.py`
@@ -161,8 +161,10 @@ Creates an instance of the PyxDI class, scans for providers and request handlers
 ```python
 import pyxdi
 
-di = pyxdi.PyxDI()
-di.scan(["app.providers", "app.handlers"])
+from app.modules import AppModule
+
+di = pyxdi.PyxDI(modules=[AppModule])
+di.scan("app.handlers")
 di.start()
 
 

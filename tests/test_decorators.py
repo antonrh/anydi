@@ -2,30 +2,6 @@ from pyxdi.core import Module
 from pyxdi.decorators import inject, provider
 
 
-def test_provider_no_args() -> None:
-    class TestModule(Module):
-        @provider
-        def provider(self) -> str:
-            return "test"
-
-    assert getattr(TestModule.provider, "__pyxdi_provider__") == {
-        "scope": None,
-        "override": None,
-    }
-
-
-def test_provider_no_args_provided() -> None:
-    class TestModule(Module):
-        @provider()
-        def provider(self) -> str:
-            return "test"
-
-    assert getattr(TestModule.provider, "__pyxdi_provider__") == {
-        "scope": None,
-        "override": None,
-    }
-
-
 def test_provider() -> None:
     class TestModule(Module):
         @provider(scope="singleton", override=True)

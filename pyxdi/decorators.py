@@ -9,31 +9,9 @@ M = t.TypeVar("M", bound=Module)
 P = ParamSpec("P")
 
 
-@t.overload
 def provider(
-    target: t.Callable[Concatenate[M, P], T]
-) -> t.Callable[Concatenate[M, P], T]:
-    ...
-
-
-@t.overload
-def provider(
-    *,
-    scope: t.Optional[Scope] = None,
-    override: t.Optional[bool] = None,
+    *, scope: Scope, override: bool = False
 ) -> t.Callable[[t.Callable[Concatenate[M, P], T]], t.Callable[Concatenate[M, P], T]]:
-    ...
-
-
-def provider(
-    target: t.Optional[t.Callable[Concatenate[M, P], T]] = None,
-    *,
-    scope: t.Optional[Scope] = None,
-    override: t.Optional[bool] = None,
-) -> t.Union[
-    t.Callable[Concatenate[M, P], T],
-    t.Callable[[t.Callable[Concatenate[M, P], T]], t.Callable[Concatenate[M, P], T]],
-]:
     def decorator(
         target: t.Callable[Concatenate[M, P], T]
     ) -> t.Callable[Concatenate[M, P], T]:
@@ -47,9 +25,7 @@ def provider(
         )
         return target
 
-    if target is None:
-        return decorator
-    return decorator(target)
+    return decorator
 
 
 @t.overload
