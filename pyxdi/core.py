@@ -89,7 +89,7 @@ class Provider:
             True if the provider object is a function, False otherwise.
         """
         return (inspect.isfunction(self.obj) or inspect.ismethod(self.obj)) and not (
-            self.is_resource or self.is_async_resource
+            self.is_resource
         )
 
     @cached_property
@@ -102,8 +102,8 @@ class Provider:
         return inspect.iscoroutinefunction(self.obj)
 
     @cached_property
-    def is_resource(self) -> bool:
-        """Checks if the provider object is a resource (generator function).
+    def is_generator(self) -> bool:
+        """Checks if the provider object is a generator function.
 
         Returns:
             True if the provider object is a resource, False otherwise.
@@ -111,13 +111,22 @@ class Provider:
         return inspect.isgeneratorfunction(self.obj)
 
     @cached_property
-    def is_async_resource(self) -> bool:
-        """Checks if the provider object is an async resource.
+    def is_async_generator(self) -> bool:
+        """Checks if the provider object is an async generator function.
 
         Returns:
             True if the provider object is an async resource, False otherwise.
         """
         return inspect.isasyncgenfunction(self.obj)
+
+    @property
+    def is_resource(self) -> bool:
+        """Checks if the provider object is a sync or async generator function.
+
+        Returns:
+            True if the provider object is a resource, False otherwise.
+        """
+        return self.is_generator or self.is_async_generator
 
 
 @dataclass(frozen=True)
@@ -242,9 +251,7 @@ class PyxDI:
         provider = Provider(obj=obj, scope=scope)
 
         # Create Event type
-        if (provider.is_resource or provider.is_async_resource) and (
-            interface is NoneType or interface is None
-        ):
+        if provider.is_resource and (interface is NoneType or interface is None):
             interface = type(f"Event{uuid.uuid4().hex}", (), {})
 
         if interface in self._providers:
@@ -349,7 +356,7 @@ class PyxDI:
         if provider.is_function or provider.is_class:
             return
 
-        if provider.is_resource or provider.is_async_resource:
+        if provider.is_resource:
             if provider.scope == "transient":
                 raise TypeError(
                     f"The resource provider `{provider}` is attempting to register "
@@ -986,7 +993,6 @@ class ScopedContext(abc.ABC):
             TypeError: If the provider's instance is a coroutine provider
                 and synchronous mode is used.
         """
-        self._validate_instance_is_not_resource(provider)
         if provider.is_coroutine:
             raise TypeError(
                 f"The instance for the coroutine provider `{provider}` cannot be "
@@ -1011,26 +1017,9 @@ class ScopedContext(abc.ABC):
             TypeError: If the provider's instance is a coroutine provider
                 and asynchronous mode is used.
         """
-        self._validate_instance_is_not_resource(provider)
         if provider.is_coroutine:
             return await provider.obj(*args, **kwargs)
         return await run_async(provider.obj, *args, **kwargs)
-
-    def _validate_instance_is_not_resource(self, provider: Provider) -> None:
-        """Validate that the provider's instance is not a resource.
-
-        Args:
-            provider: The provider to validate.
-
-        Raises:
-            TypeError: If the provider's instance is a resource provider.
-        """
-        if provider.is_resource or provider.is_async_resource:
-            raise TypeError(
-                f"The instance for the resource provider `{provider}` cannot be "
-                "created until the scope context has been started. Please ensure "
-                "that the scope context is started."
-            )
 
 
 class ResourceScopedContext(ScopedContext):
@@ -1059,9 +1048,9 @@ class ResourceScopedContext(ScopedContext):
         """
         instance = self._instances.get(interface)
         if instance is None:
-            if provider.is_resource:
+            if provider.is_generator:
                 instance = self._create_resource(provider, *args, **kwargs)
-            elif provider.is_async_resource:
+            elif provider.is_async_generator:
                 raise TypeError(
                     f"The provider `{provider}` cannot be started in synchronous mode "
                     "because it is an asynchronous provider. Please start the provider "
@@ -1088,11 +1077,11 @@ class ResourceScopedContext(ScopedContext):
         """
         instance = self._instances.get(interface)
         if instance is None:
-            if provider.is_resource:
+            if provider.is_generator:
                 instance = await run_async(
                     self._create_resource, provider, *args, **kwargs
                 )
-            elif provider.is_async_resource:
+            elif provider.is_async_generator:
                 instance = await self._acreate_resource(provider, *args, **kwargs)
             else:
                 instance = await self._acreate_instance(provider, *args, **kwargs)

@@ -25,8 +25,8 @@ def test_provider_function_type() -> None:
 
     assert provider.is_function
     assert not provider.is_class
-    assert not provider.is_resource
-    assert not provider.is_async_resource
+    assert not provider.is_generator
+    assert not provider.is_async_generator
 
 
 def test_provider_function_class() -> None:
@@ -34,8 +34,8 @@ def test_provider_function_class() -> None:
 
     assert not provider.is_function
     assert provider.is_class
-    assert not provider.is_resource
-    assert not provider.is_async_resource
+    assert not provider.is_generator
+    assert not provider.is_async_generator
 
 
 def test_provider_function_resource() -> None:
@@ -46,8 +46,8 @@ def test_provider_function_resource() -> None:
 
     assert not provider.is_function
     assert not provider.is_class
-    assert provider.is_resource
-    assert not provider.is_async_resource
+    assert provider.is_generator
+    assert not provider.is_async_generator
 
 
 def test_provider_function_async_resource() -> None:
@@ -58,8 +58,8 @@ def test_provider_function_async_resource() -> None:
 
     assert not provider.is_function
     assert not provider.is_class
-    assert not provider.is_resource
-    assert provider.is_async_resource
+    assert not provider.is_generator
+    assert provider.is_async_generator
 
 
 def test_provider_name() -> None:
@@ -618,6 +618,17 @@ def test_get_singleton_scoped_started_with_async_resource_provider(di: PyxDI) ->
         "mode because it is an asynchronous provider. Please start the provider "
         "in asynchronous mode before using it."
     )
+
+
+def test_get(di: PyxDI) -> None:
+    instance = "test"
+
+    def provide() -> t.Iterator[str]:
+        yield instance
+
+    di.register_provider(str, provide, scope="singleton")
+
+    di.get_instance(str)
 
 
 async def test_get_singleton_scoped_async_resource(di: PyxDI) -> None:
