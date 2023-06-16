@@ -1,6 +1,7 @@
 """PyxDI core implementation module."""
 from __future__ import annotations
 
+import abc
 import contextlib
 import importlib
 import inspect
@@ -176,7 +177,8 @@ class PyxDI:
             modules: Optional sequence of modules to register during initialization.
         """
         self._providers: t.Dict[t.Type[t.Any], Provider] = {}
-        self._singleton_context = SingletonContext(self)
+        self._singleton_context = SingletonContext()
+        self._transient_context = TransientContext()
         self._request_context_var: ContextVar[t.Optional[RequestContext]] = ContextVar(
             "request_context", default=None
         )
@@ -195,8 +197,6 @@ class PyxDI:
             A dictionary containing the registered providers.
         """
         return self._providers
-
-    # Provider
 
     def has_provider(self, interface: t.Type[t.Any]) -> bool:
         """Check if a provider is registered for the specified interface.
@@ -294,7 +294,7 @@ class PyxDI:
         except LookupError:
             pass
         else:
-            if scoped_context:
+            if isinstance(scoped_context, ResourceScopedContext):
                 scoped_context.delete(interface)
 
         # Cleanup provider references
@@ -320,8 +320,6 @@ class PyxDI:
                 "not been registered. Please ensure that the provider interface is "
                 "properly registered before attempting to use it."
             ) from exc
-
-    # Validators
 
     def _validate_provider_scope(self, provider: Provider) -> None:
         """Validate the scope of a provider.
@@ -402,8 +400,6 @@ class PyxDI:
                     "registered with matching scopes."
                 )
 
-    # Modules
-
     def register_module(
         self, module: t.Union[Module, t.Type[Module], t.Callable[[PyxDI], None]]
     ) -> None:
@@ -427,11 +423,11 @@ class PyxDI:
                 scope, override = params["scope"], params["override"]
                 self.provider(scope=scope, override=override)(obj)
 
-    # Lifespan
-
     def start(self) -> None:
         """Start the singleton context."""
-        self._singleton_context.start()
+        for interface, provider in self.providers.items():
+            if provider.scope == "singleton":
+                self.get_instance(interface)  # noqa
 
     def close(self) -> None:
         """Close the singleton context."""
@@ -451,17 +447,17 @@ class PyxDI:
         Yields:
             Yield control to the code block within the request context.
         """
-        context = RequestContext(self)
+        context = RequestContext()
         token = self._request_context_var.set(context)
         with context:
             yield
             self._request_context_var.reset(token)
 
-    # Asynchronous lifespan
-
     async def astart(self) -> None:
         """Start the singleton context asynchronously."""
-        await self._singleton_context.astart()
+        for interface, provider in self._providers.items():
+            if provider.scope == "singleton":
+                await self.aget_instance(interface)  # noqa
 
     async def aclose(self) -> None:
         """Close the singleton context asynchronously."""
@@ -481,7 +477,7 @@ class PyxDI:
         Yields:
             Yield control to the code block within the request context.
         """
-        context = RequestContext(self)
+        context = RequestContext()
         token = self._request_context_var.set(context)
         async with context:
             yield
@@ -505,8 +501,6 @@ class PyxDI:
             )
         return request_context
 
-    # Instance
-
     def get_instance(self, interface: t.Type[T]) -> T:
         """Get an instance by interface.
 
@@ -523,11 +517,9 @@ class PyxDI:
             return t.cast(T, self._override_instances[interface])
 
         provider = self.get_provider(interface)
-
         scoped_context = self._get_scoped_context(provider.scope)
-        if scoped_context:
-            return scoped_context.get(interface)
-        return t.cast(T, self.create_instance(provider))
+        args, kwargs = self._get_provider_arguments(provider)
+        return scoped_context.get(interface, provider, *args, **kwargs)
 
     async def aget_instance(self, interface: t.Type[T]) -> T:
         """Get an instance by interface asynchronously.
@@ -545,13 +537,11 @@ class PyxDI:
             return t.cast(T, self._override_instances[interface])
 
         provider = self.get_provider(interface)
-
         scoped_context = self._get_scoped_context(provider.scope)
-        if scoped_context:
-            return await scoped_context.aget(interface)
-        return t.cast(T, await self.acreate_instance(provider))
+        args, kwargs = await self._aget_provider_arguments(provider)
+        return await scoped_context.aget(interface, provider, *args, **kwargs)
 
-    def _get_scoped_context(self, scope: Scope) -> t.Optional[ScopedContext]:
+    def _get_scoped_context(self, scope: Scope) -> ScopedContext:
         """Get the scoped context based on the specified scope.
 
         Args:
@@ -565,99 +555,7 @@ class PyxDI:
         elif scope == "request":
             request_context = self._get_request_context()
             return request_context
-        return None
-
-    def create_resource(
-        self, provider: Provider, *, stack: contextlib.ExitStack
-    ) -> t.Any:
-        """Create a resource using the provider.
-
-        Args:
-            provider: The provider for the resource.
-            stack: The exit stack to manage the resource's lifetime.
-
-        Returns:
-            The created resource.
-        """
-        args, kwargs = self._get_provider_arguments(provider)
-        cm = contextlib.contextmanager(provider.obj)(*args, **kwargs)
-        return stack.enter_context(cm)
-
-    async def acreate_resource(
-        self,
-        provider: Provider,
-        *,
-        stack: contextlib.AsyncExitStack,
-    ) -> t.Any:
-        """Create a resource asynchronously using the provider.
-
-        Args:
-            provider: The provider for the resource.
-            stack: The async exit stack to manage the resource's lifetime.
-
-        Returns:
-            The created resource.
-        """
-        args, kwargs = await self._aget_provider_arguments(provider)
-        cm = contextlib.asynccontextmanager(provider.obj)(*args, **kwargs)
-        return await stack.enter_async_context(cm)
-
-    def create_instance(self, provider: Provider) -> t.Any:
-        """Create an instance using the provider.
-
-        Args:
-            provider: The provider for the instance.
-
-        Returns:
-            The created instance.
-
-        Raises:
-            TypeError: If the provider's instance is a coroutine provider
-                and synchronous mode is used.
-        """
-        self._validate_instance_is_not_resource(provider)
-        if provider.is_coroutine:
-            raise TypeError(
-                f"The instance for the coroutine provider `{provider}` cannot be "
-                "created in synchronous mode."
-            )
-        args, kwargs = self._get_provider_arguments(provider)
-        return provider.obj(*args, **kwargs)
-
-    async def acreate_instance(self, provider: Provider) -> t.Any:
-        """Create an instance asynchronously using the provider.
-
-        Args:
-            provider: The provider for the instance.
-
-        Returns:
-            The created instance.
-
-        Raises:
-            TypeError: If the provider's instance is a coroutine provider
-                and asynchronous mode is used.
-        """
-        self._validate_instance_is_not_resource(provider)
-        args, kwargs = await self._aget_provider_arguments(provider)
-        if provider.is_coroutine:
-            return await provider.obj(*args, **kwargs)
-        return await run_async(provider.obj, *args, **kwargs)
-
-    def _validate_instance_is_not_resource(self, provider: Provider) -> None:
-        """Validate that the provider's instance is not a resource.
-
-        Args:
-            provider: The provider to validate.
-
-        Raises:
-            TypeError: If the provider's instance is a resource provider.
-        """
-        if provider.is_resource or provider.is_async_resource:
-            raise TypeError(
-                f"The instance for the resource provider `{provider}` cannot be "
-                "created until the scope context has been started. Please ensure "
-                "that the scope context is started."
-            )
+        return self._transient_context
 
     @contextlib.contextmanager
     def override(self, interface: t.Type[T], instance: t.Any) -> t.Iterator[None]:
@@ -681,8 +579,6 @@ class PyxDI:
         self._override_instances[interface] = instance
         yield
         del self._override_instances[interface]
-
-    # Decorators
 
     def provider(
         self, *, scope: Scope, override: bool = False
@@ -752,7 +648,7 @@ class PyxDI:
             if inspect.iscoroutinefunction(obj):
 
                 @wraps(obj)
-                async def awrapped(*args: P.args, **kwargs: P.kwargs) -> T:
+                async def awrapped(*args: t.Any, **kwargs: t.Any) -> T:
                     for name, annotation in injected_params.items():
                         kwargs[name] = await self.aget_instance(annotation)
                     return t.cast(T, await obj(*args, **kwargs))
@@ -760,7 +656,7 @@ class PyxDI:
                 return awrapped
 
             @wraps(obj)
-            def wrapped(*args: P.args, **kwargs: P.kwargs) -> T:
+            def wrapped(*args: t.Any, **kwargs: t.Any) -> T:
                 for name, annotation in injected_params.items():
                     kwargs[name] = self.get_instance(annotation)
                 return t.cast(T, obj(*args, **kwargs))
@@ -770,8 +666,6 @@ class PyxDI:
         if obj is None:
             return decorator
         return decorator(obj)
-
-    # Scanner
 
     def scan(
         self,
@@ -911,8 +805,6 @@ class PyxDI:
             member = member.__wrapped__
         return ScannedDependency(member=member, module=module)
 
-    # Inspection
-
     def _get_provider_annotation(self, obj: t.Callable[..., t.Any]) -> t.Any:
         """Retrieve the provider return annotation from a callable object.
 
@@ -1034,65 +926,210 @@ class PyxDI:
             )
 
 
-class ScopedContext:
-    """ScopedContext manages the instances of dependencies within a specific scope."""
+class ScopedContext(abc.ABC):
+    """ScopedContext base class."""
 
-    def __init__(self, scope: Scope, root: PyxDI) -> None:
-        """Initialize the ScopedContext.
-
-        Args:
-            scope: The scope associated with the context.
-            root: The root PyxDI container.
-        """
-        self._scope = scope
-        self._root = root
-        self._instances: t.Dict[t.Type[t.Any], t.Any] = {}
-        self._stack = contextlib.ExitStack()
-        self._async_stack = contextlib.AsyncExitStack()
-
-    def get(self, interface: t.Type[T]) -> T:
+    @abc.abstractmethod
+    def get(
+        self,
+        interface: t.Type[T],
+        provider: Provider,
+        *args: P.args,
+        **kwargs: P.kwargs,
+    ) -> T:
         """Get an instance of a dependency from the scoped context.
 
         Args:
             interface: The interface of the dependency.
+            provider: The provider for the instance.
+            *args: Positional arguments to be passed to the provider.
+            **kwargs: Keyword arguments to be passed to the provider.
+
+        Returns:
+            An instance of the dependency.
+        """
+
+    @abc.abstractmethod
+    async def aget(
+        self,
+        interface: t.Type[T],
+        provider: Provider,
+        *args: P.args,
+        **kwargs: P.kwargs,
+    ) -> T:
+        """Get an async instance of a dependency from the scoped context.
+
+        Args:
+            interface: The interface of the dependency.
+            provider: The provider for the instance.
+            *args: Positional arguments to be passed to the provider.
+            **kwargs: Keyword arguments to be passed to the provider.
+
+        Returns:
+            An async instance of the dependency.
+        """
+
+    def _create_instance(
+        self, provider: Provider, *args: t.Any, **kwargs: t.Any
+    ) -> t.Any:
+        """Create an instance using the provider.
+
+        Args:
+            provider: The provider for the instance.
+            *args: Positional arguments to be passed to the provider.
+            **kwargs: Keyword arguments to be passed to the provider.
+
+        Returns:
+            The created instance.
+
+        Raises:
+            TypeError: If the provider's instance is a coroutine provider
+                and synchronous mode is used.
+        """
+        self._validate_instance_is_not_resource(provider)
+        if provider.is_coroutine:
+            raise TypeError(
+                f"The instance for the coroutine provider `{provider}` cannot be "
+                "created in synchronous mode."
+            )
+        return provider.obj(*args, **kwargs)
+
+    async def _acreate_instance(
+        self, provider: Provider, *args: t.Any, **kwargs: t.Any
+    ) -> t.Any:
+        """Create an instance asynchronously using the provider.
+
+        Args:
+            provider: The provider for the instance.
+            *args: Positional arguments to be passed to the provider.
+            **kwargs: Keyword arguments to be passed to the provider.
+
+        Returns:
+            The created instance.
+
+        Raises:
+            TypeError: If the provider's instance is a coroutine provider
+                and asynchronous mode is used.
+        """
+        self._validate_instance_is_not_resource(provider)
+        if provider.is_coroutine:
+            return await provider.obj(*args, **kwargs)
+        return await run_async(provider.obj, *args, **kwargs)
+
+    def _validate_instance_is_not_resource(self, provider: Provider) -> None:
+        """Validate that the provider's instance is not a resource.
+
+        Args:
+            provider: The provider to validate.
+
+        Raises:
+            TypeError: If the provider's instance is a resource provider.
+        """
+        if provider.is_resource or provider.is_async_resource:
+            raise TypeError(
+                f"The instance for the resource provider `{provider}` cannot be "
+                "created until the scope context has been started. Please ensure "
+                "that the scope context is started."
+            )
+
+
+class ResourceScopedContext(ScopedContext):
+    """ScopedContext with closable resources support."""
+
+    def __init__(self) -> None:
+        """Initialize the ScopedContext."""
+        super().__init__()
+        self._instances: t.Dict[t.Type[t.Any], t.Any] = {}
+        self._stack = contextlib.ExitStack()
+        self._async_stack = contextlib.AsyncExitStack()
+
+    def get(
+        self, interface: t.Type[T], provider: Provider, *args: t.Any, **kwargs: t.Any
+    ) -> T:
+        """Get an instance of a dependency from the scoped context.
+
+        Args:
+            interface: The interface of the dependency.
+            provider: The provider for the instance.
+            *args: Positional arguments to be passed to the provider.
+            **kwargs: Keyword arguments to be passed to the provider.
 
         Returns:
             An instance of the dependency.
         """
         instance = self._instances.get(interface)
         if instance is None:
-            provider = self._root.get_provider(interface)
             if provider.is_resource:
-                instance = self._root.create_resource(provider, stack=self._stack)
+                instance = self._create_resource(provider, *args, **kwargs)
+            elif provider.is_async_resource:
+                raise TypeError(
+                    f"The provider `{provider}` cannot be started in synchronous mode "
+                    "because it is an asynchronous provider. Please start the provider "
+                    "in asynchronous mode before using it."
+                )
             else:
-                instance = self._root.create_instance(provider)
+                instance = self._create_instance(provider, *args, **kwargs)
             self._instances[interface] = instance
         return t.cast(T, instance)
 
-    async def aget(self, interface: t.Type[T]) -> T:
+    async def aget(
+        self, interface: t.Type[T], provider: Provider, *args: t.Any, **kwargs: t.Any
+    ) -> T:
         """Get an async instance of a dependency from the scoped context.
 
         Args:
             interface: The interface of the dependency.
+            provider: The provider for the instance.
+            *args: Positional arguments to be passed to the provider.
+            **kwargs: Keyword arguments to be passed to the provider.
 
         Returns:
             An async instance of the dependency.
         """
         instance = self._instances.get(interface)
         if instance is None:
-            provider = self._root.get_provider(interface)
             if provider.is_resource:
                 instance = await run_async(
-                    self._root.create_resource, provider, stack=self._stack
+                    self._create_resource, provider, *args, **kwargs
                 )
             elif provider.is_async_resource:
-                instance = await self._root.acreate_resource(
-                    provider, stack=self._async_stack
-                )
+                instance = await self._acreate_resource(provider, *args, **kwargs)
             else:
-                instance = await self._root.acreate_instance(provider)
+                instance = await self._acreate_instance(provider, *args, **kwargs)
             self._instances[interface] = instance
         return t.cast(T, instance)
+
+    def _create_resource(
+        self, provider: Provider, *args: t.Any, **kwargs: t.Any
+    ) -> t.Any:
+        """Create a resource using the provider.
+
+        Args:
+            provider: The provider for the resource.
+            *args: Positional arguments to be passed to the provider.
+            **kwargs: Keyword arguments to be passed to the provider.
+
+        Returns:
+            The created resource.
+        """
+        cm = contextlib.contextmanager(provider.obj)(*args, **kwargs)
+        return self._stack.enter_context(cm)
+
+    async def _acreate_resource(
+        self, provider: Provider, *args: t.Any, **kwargs: t.Any
+    ) -> t.Any:
+        """Create a resource asynchronously using the provider.
+
+        Args:
+            provider: The provider for the resource.
+            *args: Positional arguments to be passed to the provider.
+            **kwargs: Keyword arguments to be passed to the provider.
+
+        Returns:
+            The created resource.
+        """
+        cm = contextlib.asynccontextmanager(provider.obj)(*args, **kwargs)
+        return await self._async_stack.enter_async_context(cm)
 
     def delete(self, interface: t.Type[t.Any]) -> None:
         """Delete a dependency instance from the scoped context.
@@ -1102,28 +1139,12 @@ class ScopedContext:
         """
         self._instances.pop(interface, None)
 
-    def start(self) -> None:
-        """Start the scoped context."""
-
-    def close(self) -> None:
-        """Close the scoped context."""
-        self._stack.close()
-
-    async def astart(self) -> None:
-        """Start the scoped context asynchronously."""
-
-    async def aclose(self) -> None:
-        """Close the scoped context asynchronously."""
-        await run_async(self._stack.close)
-        await self._async_stack.aclose()
-
     def __enter__(self) -> Self:
         """Enter the context.
 
         Returns:
             The scoped context.
         """
-        self.start()
         return self
 
     def __exit__(
@@ -1142,13 +1163,16 @@ class ScopedContext:
         self.close()
         return
 
+    def close(self) -> None:
+        """Close the scoped context."""
+        self._stack.close()
+
     async def __aenter__(self) -> Self:
         """Enter the context asynchronously.
 
         Returns:
             The scoped context.
         """
-        await self.astart()
         return self
 
     async def __aexit__(
@@ -1167,71 +1191,59 @@ class ScopedContext:
         await self.aclose()
         return
 
+    async def aclose(self) -> None:
+        """Close the scoped context asynchronously."""
+        await run_async(self._stack.close)
+        await self._async_stack.aclose()
+
 
 @t.final
-class SingletonContext(ScopedContext):
+class SingletonContext(ResourceScopedContext):
     """A scoped context representing the "singleton" scope."""
 
-    def __init__(self, root: PyxDI) -> None:
-        """Initialize the SingletonContext.
 
-        Args:
-            root: The root PyxDI container.
-        """
-        super().__init__("singleton", root)
-
-    def start(self) -> None:
-        """Start the singleton context.
-
-        Raises:
-            TypeError: if an asynchronous provider is encountered.
-        """
-        for interface, provider in self._iter_providers():
-            if provider.is_resource:
-                self._instances[interface] = self._root.create_resource(
-                    provider, stack=self._stack
-                )
-            elif provider.is_async_resource:
-                raise TypeError(
-                    f"The provider `{provider}` cannot be started in synchronous mode "
-                    "because it is an asynchronous provider. Please start the provider "
-                    "in asynchronous mode before using it."
-                )
-
-    async def astart(self) -> None:
-        """Start the singleton context asynchronously."""
-        for interface, provider in self._iter_providers():
-            if provider.is_resource:
-                self._instances[interface] = await run_async(
-                    self._root.create_resource, provider, stack=self._stack
-                )
-            elif provider.is_async_resource:
-                self._instances[interface] = await self._root.acreate_resource(
-                    provider, stack=self._async_stack
-                )
-
-    def _iter_providers(self) -> t.Iterator[t.Tuple[t.Type[t.Any], Provider]]:
-        """Iterate over the providers.
-
-        Yields:
-             A tuple containing the dependency interface and its corresponding provider.
-        """
-        for interface, provider in self._root.providers.items():
-            if provider.scope == self._scope:
-                yield interface, provider
+@t.final
+class RequestContext(ResourceScopedContext):
+    """A scoped context representing the "request" scope."""
 
 
 @t.final
-class RequestContext(ScopedContext):
-    """A scoped context representing the "request" scope."""
+class TransientContext(ScopedContext):
+    """A scoped context representing the "transient" scope."""
 
-    def __init__(self, root: PyxDI) -> None:
-        """Initialize the RequestContext.
+    def get(
+        self, interface: t.Type[T], provider: Provider, *args: t.Any, **kwargs: t.Any
+    ) -> T:
+        """Get an instance of a dependency from the transient context.
 
         Args:
-            root: The root PyxDI container.
+            interface: The interface of the dependency.
+            provider: The provider for the instance.
+            *args: Positional arguments to be passed to the provider.
+            **kwargs: Keyword arguments to be passed to the provider.
+
+        Returns:
+            An instance of the dependency.
         """
-        super().__init__("request", root)
+        instance = self._create_instance(provider)
+        return t.cast(T, instance)
+
+    async def aget(
+        self, interface: t.Type[T], provider: Provider, *args: t.Any, **kwargs: t.Any
+    ) -> T:
+        """Get an async instance of a dependency from the transient context.
+
+        Args:
+            interface: The interface of the dependency.
+            provider: The provider for the instance.
+            *args: Positional arguments to be passed to the provider.
+            **kwargs: Keyword arguments to be passed to the provider.
+
+        Returns:
+            An instance of the dependency.
+        """
+        instance = await self._acreate_instance(provider, *args, **kwargs)
+        return t.cast(T, instance)
 
 
 class ModuleMeta(type):

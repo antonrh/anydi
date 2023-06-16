@@ -664,10 +664,10 @@ async def test_get_singleton_scoped_async_resource_not_started(di: PyxDI) -> Non
         di.get_instance(str)
 
     assert str(exc_info.value) == (
-        "The instance for the resource provider "
-        "`tests.test_core.test_get_singleton_scoped_async_resource_not_started"
-        ".<locals>.provide` cannot be created until the scope context has been "
-        "started. Please ensure that the scope context is started."
+        "The provider `tests.test_core"
+        ".test_get_singleton_scoped_async_resource_not_started.<locals>.provide` "
+        "cannot be started in synchronous mode because it is an asynchronous provider. "
+        "Please start the provider in asynchronous mode before using it."
     )
 
 
