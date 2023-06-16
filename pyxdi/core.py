@@ -1,3 +1,4 @@
+"""PyxDI core implementation module."""
 from __future__ import annotations
 
 import contextlib
@@ -34,50 +35,106 @@ ALLOWED_SCOPES: t.Dict[Scope, t.List[Scope]] = {
 
 @dataclass(frozen=True)
 class Provider:
+    """Represents a provider object.
+
+    Attributes:
+        obj: The callable object that serves as the provider.
+        scope: The scope of the provider.
+    """
+
     obj: t.Callable[..., t.Any]
     scope: Scope
 
     def __str__(self) -> str:
+        """Returns a string representation of the provider.
+
+        Returns:
+            The string representation of the provider.
+        """
         return self.name
 
     @cached_property
     def name(self) -> str:
+        """Returns the full qualified name of the provider object.
+
+        Returns:
+            The full qualified name of the provider object.
+        """
         return get_full_qualname(self.obj)
 
     @cached_property
     def parameters(self) -> types.MappingProxyType[str, inspect.Parameter]:
+        """Returns the parameters of the provider as a mapping.
+
+        Returns:
+            The parameters of the provider.
+        """
         return get_signature(self.obj).parameters
 
     @cached_property
     def is_class(self) -> bool:
+        """Checks if the provider object is a class.
+
+        Returns:
+            True if the provider object is a class, False otherwise.
+        """
         return inspect.isclass(self.obj)
 
     @cached_property
     def is_function(self) -> bool:
+        """Checks if the provider object is a function.
+
+        Returns:
+            True if the provider object is a function, False otherwise.
+        """
         return (inspect.isfunction(self.obj) or inspect.ismethod(self.obj)) and not (
             self.is_resource or self.is_async_resource
         )
 
     @cached_property
     def is_coroutine(self) -> bool:
+        """Checks if the provider object is a coroutine function.
+
+        Returns:
+            True if the provider object is a coroutine function, False otherwise.
+        """
         return inspect.iscoroutinefunction(self.obj)
 
     @cached_property
     def is_resource(self) -> bool:
+        """Checks if the provider object is a resource (generator function).
+
+        Returns:
+            True if the provider object is a resource, False otherwise.
+        """
         return inspect.isgeneratorfunction(self.obj)
 
     @cached_property
     def is_async_resource(self) -> bool:
+        """Checks if the provider object is an async resource.
+
+        Returns:
+            True if the provider object is an async resource, False otherwise.
+        """
         return inspect.isasyncgenfunction(self.obj)
 
 
 @dataclass(frozen=True)
 class ScannedDependency:
+    """Represents a scanned dependency.
+
+    Attributes:
+        member: The member object that represents the dependency.
+        module: The module where the dependency is defined.
+    """
+
     member: t.Any
     module: types.ModuleType
 
 
 class DependencyMark:
+    """A marker class used to represent a dependency mark."""
+
     __slots__ = ()
 
 
@@ -86,14 +143,26 @@ dep = t.cast(t.Any, DependencyMark())
 
 
 def named(tp: t.Type[T], name: str) -> Annotated[t.Type[T], str]:
-    """
-    Cast annotated type helper.
+    """Cast annotated type helper.
+
+    Args:
+        tp: The original type to be annotated.
+        name: The annotation to be added to the type.
+
+    Returns:
+        The annotated type with the provided name.
     """
     return t.cast(Annotated[t.Type[T], str], Annotated[tp, name])
 
 
 @t.final
 class PyxDI:
+    """PyxDI is a dependency injection container.
+
+    Args:
+        modules: Optional sequence of modules to register during initialization.
+    """
+
     def __init__(
         self,
         *,
@@ -101,6 +170,11 @@ class PyxDI:
             t.Sequence[t.Union[Module, t.Type[Module], t.Callable[[PyxDI], None]]],
         ] = None,
     ) -> None:
+        """Initialize the PyxDI instance.
+
+        Args:
+            modules: Optional sequence of modules to register during initialization.
+        """
         self._providers: t.Dict[t.Type[t.Any], Provider] = {}
         self._singleton_context = SingletonContext(self)
         self._request_context_var: ContextVar[t.Optional[RequestContext]] = ContextVar(
@@ -115,11 +189,24 @@ class PyxDI:
 
     @property
     def providers(self) -> t.Dict[t.Type[t.Any], Provider]:
+        """Get the registered providers.
+
+        Returns:
+            A dictionary containing the registered providers.
+        """
         return self._providers
 
     # Provider
 
     def has_provider(self, interface: t.Type[t.Any]) -> bool:
+        """Check if a provider is registered for the specified interface.
+
+        Args:
+            interface: The interface to check for a registered provider.
+
+        Returns:
+            True if a provider is registered for the interface, False otherwise.
+        """
         return interface in self._providers
 
     def register_provider(
@@ -130,6 +217,28 @@ class PyxDI:
         scope: Scope,
         override: bool = False,
     ) -> Provider:
+        """Register a provider for the specified interface.
+
+        Args:
+            interface: The interface for which the provider is being registered.
+            obj: The provider function or callable object.
+            scope: The scope of the provider.
+            override: If True, override an existing provider for the interface
+                if one is already registered. Defaults to False.
+
+        Returns:
+            The registered provider.
+
+        Raises:
+            LookupError: If a provider for the interface is already registered
+              and override is False.
+
+        Notes:
+            - If the provider is a resource or an asynchronous resource, and the
+              interface is None, an Event type will be automatically created and used
+              as the interface.
+            - The provider will be validated for its scope, type, and matching scopes.
+        """
         provider = Provider(obj=obj, scope=scope)
 
         # Create Event type
@@ -157,8 +266,19 @@ class PyxDI:
         return provider
 
     def unregister_provider(self, interface: t.Type[t.Any]) -> None:
-        """
-        Unregister provider by interface.
+        """Unregister a provider by interface.
+
+        Args:
+            interface: The interface of the provider to unregister.
+
+        Raises:
+            LookupError: If the provider interface is not registered.
+
+        Notes:
+            - The method cleans up any scoped context instance associated with
+              the provider's scope.
+            - The method removes the provider reference from the internal dictionary
+              of registered providers.
         """
         if not self.has_provider(interface):
             raise LookupError(
@@ -181,8 +301,16 @@ class PyxDI:
         self._providers.pop(interface, None)
 
     def get_provider(self, interface: t.Type[t.Any]) -> Provider:
-        """
-        Get provider by interface.
+        """Get the provider for the specified interface.
+
+        Args:
+            interface: The interface for which to retrieve the provider.
+
+        Returns:
+            Provider: The provider object associated with the interface.
+
+        Raises:
+            LookupError: If the provider interface has not been registered.
         """
         try:
             return self._providers[interface]
@@ -196,6 +324,14 @@ class PyxDI:
     # Validators
 
     def _validate_provider_scope(self, provider: Provider) -> None:
+        """Validate the scope of a provider.
+
+        Args:
+            provider: The provider to validate.
+
+        Raises:
+            ValueError: If the scope provided is invalid.
+        """
         if provider.scope not in t.get_args(Scope):
             raise ValueError(
                 "The scope provided is invalid. Only the following scopes are "
@@ -204,6 +340,14 @@ class PyxDI:
             )
 
     def _validate_provider_type(self, provider: Provider) -> None:
+        """Validate the type of provider.
+
+        Args:
+            provider: The provider to validate.
+
+        Raises:
+            TypeError: If the provider has an invalid type.
+        """
         if provider.is_function or provider.is_class:
             return
 
@@ -225,6 +369,16 @@ class PyxDI:
     def _validate_provider_match_scopes(
         self, interface: t.Type[t.Any], provider: Provider
     ) -> None:
+        """Validate that the provider and its dependencies have matching scopes.
+
+        Args:
+            interface: The interface associated with the provider.
+            provider: The provider to validate.
+
+        Raises:
+            ValueError: If the provider and its dependencies have mismatched scopes.
+            TypeError: If a dependency is missing an annotation.
+        """
         related_providers = []
 
         for parameter in provider.parameters.values():
@@ -242,10 +396,10 @@ class PyxDI:
             if left_scope not in allowed_scopes:
                 raise ValueError(
                     f"The provider `{provider}` with a {provider.scope} scope was "
-                    f"attempted to be registered with the provider "
+                    "attempted to be registered with the provider "
                     f"`{related_provider}` with a `{related_provider.scope}` scope, "
-                    f"which is not allowed. Please ensure that all providers are "
-                    f"registered with matching scopes."
+                    "which is not allowed. Please ensure that all providers are "
+                    "registered with matching scopes."
                 )
 
     # Modules
@@ -253,8 +407,10 @@ class PyxDI:
     def register_module(
         self, module: t.Union[Module, t.Type[Module], t.Callable[[PyxDI], None]]
     ) -> None:
-        """
-        Register module as callable, module type or module instance.
+        """Register a module as a callable, module type, or module instance.
+
+        Args:
+            module: The module to register.
         """
         # Callable Module
         if inspect.isfunction(module):
@@ -274,15 +430,27 @@ class PyxDI:
     # Lifespan
 
     def start(self) -> None:
+        """Start the singleton context."""
         self._singleton_context.start()
 
     def close(self) -> None:
+        """Close the singleton context."""
         self._singleton_context.close()
 
     def request_context(self) -> t.ContextManager[None]:
+        """Obtain a context manager for the request-scoped context.
+
+        Returns:
+            A context manager for the request-scoped context.
+        """
         return contextlib.contextmanager(self._request_context)()
 
     def _request_context(self) -> t.Iterator[None]:
+        """Internal method that manages the request-scoped context.
+
+        Yields:
+            Yield control to the code block within the request context.
+        """
         context = RequestContext(self)
         token = self._request_context_var.set(context)
         with context:
@@ -292,15 +460,27 @@ class PyxDI:
     # Asynchronous lifespan
 
     async def astart(self) -> None:
+        """Start the singleton context asynchronously."""
         await self._singleton_context.astart()
 
     async def aclose(self) -> None:
+        """Close the singleton context asynchronously."""
         await self._singleton_context.aclose()
 
     def arequest_context(self) -> t.AsyncContextManager[None]:
+        """Obtain an async context manager for the request-scoped context.
+
+        Returns:
+            An async context manager for the request-scoped context.
+        """
         return contextlib.asynccontextmanager(self._arequest_context)()
 
     async def _arequest_context(self) -> t.AsyncIterator[None]:
+        """Internal method that manages the async request-scoped context.
+
+        Yields:
+            Yield control to the code block within the request context.
+        """
         context = RequestContext(self)
         token = self._request_context_var.set(context)
         async with context:
@@ -308,6 +488,14 @@ class PyxDI:
             self._request_context_var.reset(token)
 
     def _get_request_context(self) -> RequestContext:
+        """Get the current request context.
+
+        Returns:
+            RequestContext: The current request context.
+
+        Raises:
+            LookupError: If the request context has not been started.
+        """
         request_context = self._request_context_var.get()
         if request_context is None:
             raise LookupError(
@@ -320,8 +508,16 @@ class PyxDI:
     # Instance
 
     def get_instance(self, interface: t.Type[T]) -> T:
-        """
-        Get instance by interface.
+        """Get an instance by interface.
+
+        Args:
+            interface: The interface type.
+
+        Returns:
+            The instance of the interface.
+
+        Raises:
+            LookupError: If the provider for the interface is not registered.
         """
         if interface in self._override_instances:
             return t.cast(T, self._override_instances[interface])
@@ -334,8 +530,16 @@ class PyxDI:
         return t.cast(T, self.create_instance(provider))
 
     async def aget_instance(self, interface: t.Type[T]) -> T:
-        """
-        Get instance by interface asynchronously.
+        """Get an instance by interface asynchronously.
+
+        Args:
+            interface: The interface type.
+
+        Returns:
+            The instance of the interface.
+
+        Raises:
+            LookupError: If the provider for the interface is not registered.
         """
         if interface in self._override_instances:
             return t.cast(T, self._override_instances[interface])
@@ -348,6 +552,14 @@ class PyxDI:
         return t.cast(T, await self.acreate_instance(provider))
 
     def _get_scoped_context(self, scope: Scope) -> t.Optional[ScopedContext]:
+        """Get the scoped context based on the specified scope.
+
+        Args:
+            scope: The scope of the provider.
+
+        Returns:
+            The scoped context, or None if the scope is not applicable.
+        """
         if scope == "singleton":
             return self._singleton_context
         elif scope == "request":
@@ -358,6 +570,15 @@ class PyxDI:
     def create_resource(
         self, provider: Provider, *, stack: contextlib.ExitStack
     ) -> t.Any:
+        """Create a resource using the provider.
+
+        Args:
+            provider: The provider for the resource.
+            stack: The exit stack to manage the resource's lifetime.
+
+        Returns:
+            The created resource.
+        """
         args, kwargs = self._get_provider_arguments(provider)
         cm = contextlib.contextmanager(provider.obj)(*args, **kwargs)
         return stack.enter_context(cm)
@@ -368,11 +589,32 @@ class PyxDI:
         *,
         stack: contextlib.AsyncExitStack,
     ) -> t.Any:
+        """Create a resource asynchronously using the provider.
+
+        Args:
+            provider: The provider for the resource.
+            stack: The async exit stack to manage the resource's lifetime.
+
+        Returns:
+            The created resource.
+        """
         args, kwargs = await self._aget_provider_arguments(provider)
         cm = contextlib.asynccontextmanager(provider.obj)(*args, **kwargs)
         return await stack.enter_async_context(cm)
 
     def create_instance(self, provider: Provider) -> t.Any:
+        """Create an instance using the provider.
+
+        Args:
+            provider: The provider for the instance.
+
+        Returns:
+            The created instance.
+
+        Raises:
+            TypeError: If the provider's instance is a coroutine provider
+                and synchronous mode is used.
+        """
         self._validate_instance_is_not_resource(provider)
         if provider.is_coroutine:
             raise TypeError(
@@ -383,13 +625,33 @@ class PyxDI:
         return provider.obj(*args, **kwargs)
 
     async def acreate_instance(self, provider: Provider) -> t.Any:
+        """Create an instance asynchronously using the provider.
+
+        Args:
+            provider: The provider for the instance.
+
+        Returns:
+            The created instance.
+
+        Raises:
+            TypeError: If the provider's instance is a coroutine provider
+                and asynchronous mode is used.
+        """
         self._validate_instance_is_not_resource(provider)
         args, kwargs = await self._aget_provider_arguments(provider)
         if provider.is_coroutine:
             return await provider.obj(*args, **kwargs)
-        return provider.obj(*args, **kwargs)
+        return await run_async(provider.obj, *args, **kwargs)
 
     def _validate_instance_is_not_resource(self, provider: Provider) -> None:
+        """Validate that the provider's instance is not a resource.
+
+        Args:
+            provider: The provider to validate.
+
+        Raises:
+            TypeError: If the provider's instance is a resource provider.
+        """
         if provider.is_resource or provider.is_async_resource:
             raise TypeError(
                 f"The instance for the resource provider `{provider}` cannot be "
@@ -399,6 +661,18 @@ class PyxDI:
 
     @contextlib.contextmanager
     def override(self, interface: t.Type[T], instance: t.Any) -> t.Iterator[None]:
+        """Override the provider for the specified interface with a specific instance.
+
+        Args:
+            interface: The interface type to override.
+            instance: The instance to use as the override.
+
+        Yields:
+            None
+
+        Raises:
+            LookupError: If the provider for the interface is not registered.
+        """
         if not self.has_provider(interface):
             raise LookupError(
                 f"The provider interface `{get_full_qualname(interface)}` "
@@ -413,6 +687,17 @@ class PyxDI:
     def provider(
         self, *, scope: Scope, override: bool = False
     ) -> t.Callable[[t.Callable[P, T]], t.Callable[P, T]]:
+        """Decorator to register a provider function with the specified scope.
+
+        Args:
+            scope : The scope of the provider.
+            override: Whether the provider should override an existing provider
+                for the same interface. Defaults to False.
+
+        Returns:
+            The decorator function.
+        """
+
         def decorator(func: t.Callable[P, T]) -> t.Callable[P, T]:
             interface = self._get_provider_annotation(func)
             self.register_provider(interface, func, scope=scope, override=override)
@@ -449,6 +734,16 @@ class PyxDI:
         ],
         t.Callable[P, t.Union[T, t.Awaitable[T]]],
     ]:
+        """Decorator to inject dependencies into a callable.
+
+        Args:
+            obj: The callable object to be decorated. If None, returns
+                the decorator itself.
+
+        Returns:
+            The decorated callable object or decorator function.
+        """
+
         def decorator(
             obj: t.Callable[P, t.Union[T, t.Awaitable[T]]]
         ) -> t.Callable[P, t.Union[T, t.Awaitable[T]]]:
@@ -488,6 +783,14 @@ class PyxDI:
         *,
         tags: t.Optional[t.Iterable[str]] = None,
     ) -> None:
+        """Scan packages or modules for decorated members and inject dependencies.
+
+        Args:
+            packages: A single package or module to scan,
+                or an iterable of packages or modules to scan.
+            tags: Optional list of tags to filter the scanned members. Only members
+                with at least one matching tag will be scanned. Defaults to None.
+        """
         dependencies: t.List[ScannedDependency] = []
 
         if isinstance(packages, t.Iterable) and not isinstance(packages, str):
@@ -510,6 +813,16 @@ class PyxDI:
         *,
         tags: t.Optional[t.Iterable[str]] = None,
     ) -> t.List[ScannedDependency]:
+        """Scan a package or module for decorated members.
+
+        Args:
+            package: The package or module to scan.
+            tags: Optional list of tags to filter the scanned members. Only members
+                with at least one matching tag will be scanned. Defaults to None.
+
+        Returns:
+            A list of scanned dependencies.
+        """
         tags = tags or []
         if isinstance(package, str):
             package = importlib.import_module(package)
@@ -535,6 +848,16 @@ class PyxDI:
         *,
         tags: t.Iterable[str],
     ) -> t.List[ScannedDependency]:
+        """Scan a module for decorated members.
+
+        Args:
+            module: The module to scan.
+            tags: List of tags to filter the scanned members. Only members with at
+                least one matching tag will be scanned.
+
+        Returns:
+            A list of scanned dependencies.
+        """
         dependencies: t.List[ScannedDependency] = []
 
         for _, member in inspect.getmembers(module):
@@ -575,6 +898,15 @@ class PyxDI:
     def _create_scanned_dependency(
         self, member: t.Any, module: types.ModuleType
     ) -> ScannedDependency:
+        """Create a `ScannedDependency` object from the scanned member and module.
+
+        Args:
+            member: The scanned member.
+            module: The module containing the scanned member.
+
+        Returns:
+            A `ScannedDependency` object.
+        """
         if hasattr(member, "__wrapped__"):
             member = member.__wrapped__
         return ScannedDependency(member=member, module=module)
@@ -582,6 +914,17 @@ class PyxDI:
     # Inspection
 
     def _get_provider_annotation(self, obj: t.Callable[..., t.Any]) -> t.Any:
+        """Retrieve the provider return annotation from a callable object.
+
+        Args:
+            obj: The callable object (provider).
+
+        Returns:
+            The provider return annotation.
+
+        Raises:
+            TypeError: If the provider return annotation is missing or invalid.
+        """
         annotation = get_signature(obj).return_annotation
 
         if annotation is inspect._empty:  # noqa
@@ -610,6 +953,14 @@ class PyxDI:
     def _get_provider_arguments(
         self, provider: Provider
     ) -> t.Tuple[t.List[t.Any], t.Dict[str, t.Any]]:
+        """Retrieve the arguments for a provider.
+
+        Args:
+            provider: The provider object.
+
+        Returns:
+            The arguments for the provider.
+        """
         args, kwargs = [], {}
         for parameter in provider.parameters.values():
             instance = self.get_instance(parameter.annotation)
@@ -622,6 +973,14 @@ class PyxDI:
     async def _aget_provider_arguments(
         self, provider: Provider
     ) -> t.Tuple[t.List[t.Any], t.Dict[str, t.Any]]:
+        """Asynchronously retrieve the arguments for a provider.
+
+        Args:
+            provider: The provider object.
+
+        Returns:
+            The arguments for the provider.
+        """
         args, kwargs = [], {}
         for parameter in provider.parameters.values():
             instance = await self.aget_instance(parameter.annotation)
@@ -632,6 +991,15 @@ class PyxDI:
         return args, kwargs
 
     def _get_injected_params(self, obj: t.Callable[..., t.Any]) -> t.Dict[str, t.Any]:
+        """Get the injected parameters of a callable object.
+
+        Args:
+            obj: The callable object.
+
+        Returns:
+            A dictionary containing the names and annotations
+                of the injected parameters.
+        """
         injected_params = {}
         for parameter in get_signature(obj).parameters.values():
             if not isinstance(parameter.default, DependencyMark):
@@ -643,6 +1011,15 @@ class PyxDI:
     def _validate_injected_parameter(
         self, obj: t.Callable[..., t.Any], parameter: inspect.Parameter
     ) -> None:
+        """Validate an injected parameter.
+
+        Args:
+            obj: The callable object.
+            parameter: The parameter to validate.
+
+        Raises:
+            TypeError: If the parameter annotation is missing or an unknown dependency.
+        """
         if parameter.annotation is inspect._empty:  # noqa
             raise TypeError(
                 f"Missing `{get_full_qualname(obj)}` parameter "
@@ -658,7 +1035,15 @@ class PyxDI:
 
 
 class ScopedContext:
+    """ScopedContext manages the instances of dependencies within a specific scope."""
+
     def __init__(self, scope: Scope, root: PyxDI) -> None:
+        """Initialize the ScopedContext.
+
+        Args:
+            scope: The scope associated with the context.
+            root: The root PyxDI container.
+        """
         self._scope = scope
         self._root = root
         self._instances: t.Dict[t.Type[t.Any], t.Any] = {}
@@ -666,6 +1051,14 @@ class ScopedContext:
         self._async_stack = contextlib.AsyncExitStack()
 
     def get(self, interface: t.Type[T]) -> T:
+        """Get an instance of a dependency from the scoped context.
+
+        Args:
+            interface: The interface of the dependency.
+
+        Returns:
+            An instance of the dependency.
+        """
         instance = self._instances.get(interface)
         if instance is None:
             provider = self._root.get_provider(interface)
@@ -677,6 +1070,14 @@ class ScopedContext:
         return t.cast(T, instance)
 
     async def aget(self, interface: t.Type[T]) -> T:
+        """Get an async instance of a dependency from the scoped context.
+
+        Args:
+            interface: The interface of the dependency.
+
+        Returns:
+            An async instance of the dependency.
+        """
         instance = self._instances.get(interface)
         if instance is None:
             provider = self._root.get_provider(interface)
@@ -693,26 +1094,35 @@ class ScopedContext:
             self._instances[interface] = instance
         return t.cast(T, instance)
 
-    def has(self, interface: t.Type[t.Any]) -> bool:
-        return interface in self._instances
-
     def delete(self, interface: t.Type[t.Any]) -> None:
+        """Delete a dependency instance from the scoped context.
+
+        Args:
+             interface: The interface of the dependency.
+        """
         self._instances.pop(interface, None)
 
     def start(self) -> None:
-        """Scope Context start event."""
+        """Start the scoped context."""
 
     def close(self) -> None:
+        """Close the scoped context."""
         self._stack.close()
 
     async def astart(self) -> None:
-        """Scope Context start asynchronous event."""
+        """Start the scoped context asynchronously."""
 
     async def aclose(self) -> None:
+        """Close the scoped context asynchronously."""
         await run_async(self._stack.close)
         await self._async_stack.aclose()
 
     def __enter__(self) -> Self:
+        """Enter the context.
+
+        Returns:
+            The scoped context.
+        """
         self.start()
         return self
 
@@ -722,10 +1132,22 @@ class ScopedContext:
         exc_val: BaseException | None,
         exc_tb: types.TracebackType | None,
     ) -> None:
+        """Exit the context.
+
+        Args:
+            exc_type: The type of the exception, if any.
+            exc_val: The exception instance, if any.
+            exc_tb: The traceback, if any.
+        """
         self.close()
         return
 
     async def __aenter__(self) -> Self:
+        """Enter the context asynchronously.
+
+        Returns:
+            The scoped context.
+        """
         await self.astart()
         return self
 
@@ -735,16 +1157,35 @@ class ScopedContext:
         exc_val: BaseException | None,
         exc_tb: types.TracebackType | None,
     ) -> None:
+        """Exit the context asynchronously.
+
+        Args:
+            exc_type: The type of the exception, if any.
+            exc_val: The exception instance, if any.
+            exc_tb: The traceback, if any.
+        """
         await self.aclose()
         return
 
 
 @t.final
 class SingletonContext(ScopedContext):
-    def __init__(self, root: PyxDI):
+    """A scoped context representing the "singleton" scope."""
+
+    def __init__(self, root: PyxDI) -> None:
+        """Initialize the SingletonContext.
+
+        Args:
+            root: The root PyxDI container.
+        """
         super().__init__("singleton", root)
 
     def start(self) -> None:
+        """Start the singleton context.
+
+        Raises:
+            TypeError: if an asynchronous provider is encountered.
+        """
         for interface, provider in self._iter_providers():
             if provider.is_resource:
                 self._instances[interface] = self._root.create_resource(
@@ -758,6 +1199,7 @@ class SingletonContext(ScopedContext):
                 )
 
     async def astart(self) -> None:
+        """Start the singleton context asynchronously."""
         for interface, provider in self._iter_providers():
             if provider.is_resource:
                 self._instances[interface] = await run_async(
@@ -769,6 +1211,11 @@ class SingletonContext(ScopedContext):
                 )
 
     def _iter_providers(self) -> t.Iterator[t.Tuple[t.Type[t.Any], Provider]]:
+        """Iterate over the providers.
+
+        Yields:
+             A tuple containing the dependency interface and its corresponding provider.
+        """
         for interface, provider in self._root.providers.items():
             if provider.scope == self._scope:
                 yield interface, provider
@@ -776,17 +1223,43 @@ class SingletonContext(ScopedContext):
 
 @t.final
 class RequestContext(ScopedContext):
-    def __init__(self, root: PyxDI):
+    """A scoped context representing the "request" scope."""
+
+    def __init__(self, root: PyxDI) -> None:
+        """Initialize the RequestContext.
+
+        Args:
+            root: The root PyxDI container.
+        """
         super().__init__("request", root)
 
 
 class ModuleMeta(type):
+    """A metaclass used for the Module base class.
+
+    This metaclass extracts provider information from the class attributes
+    and stores it in the `providers` attribute.
+    """
+
     def __new__(
         cls,
         name: str,
         bases: t.Tuple[type, ...],
         attrs: t.Dict[str, t.Any],
     ) -> t.Any:
+        """Create a new instance of the ModuleMeta class.
+
+        This method extracts provider information from the class attributes and
+        stores it in the `providers` attribute.
+
+        Args:
+            name: The name of the class.
+            bases: The base classes of the class.
+            attrs: The attributes of the class.
+
+        Returns:
+            The new instance of the class.
+        """
         attrs["providers"] = [
             (name, getattr(value, "__pyxdi_provider__", {}))
             for name, value in attrs.items()
@@ -796,11 +1269,16 @@ class ModuleMeta(type):
 
 
 class Module(metaclass=ModuleMeta):
-    """
-    Module base class.
-    """
+    """A base class for defining PyxDI modules."""
 
     providers: t.List[t.Tuple[str, t.Dict[str, t.Any]]]
 
     def configure(self, di: PyxDI) -> None:
-        ...
+        """Configure the PyxDI container with providers and their dependencies.
+
+        This method can be overridden in derived classes to provide the
+        configuration logic.
+
+        Args:
+            di: The PyxDI container to be configured.
+        """

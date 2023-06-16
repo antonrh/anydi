@@ -1,3 +1,4 @@
+"""PyxDI decorators module."""
 import typing as t
 
 from typing_extensions import Concatenate, ParamSpec
@@ -12,6 +13,17 @@ P = ParamSpec("P")
 def provider(
     *, scope: Scope, override: bool = False
 ) -> t.Callable[[t.Callable[Concatenate[M, P], T]], t.Callable[Concatenate[M, P], T]]:
+    """Decorator for marking a function or method as a provider in a PyxDI module.
+
+    Args:
+        scope: The scope in which the provided instance should be managed.
+        override: Whether the provider should override existing providers
+            with the same interface.
+
+    Returns:
+        A decorator that marks the target function or method as a provider.
+    """
+
     def decorator(
         target: t.Callable[Concatenate[M, P], T]
     ) -> t.Callable[Concatenate[M, P], T]:
@@ -58,6 +70,18 @@ def inject(
     ],
     t.Callable[P, t.Union[T, t.Awaitable[T]]],
 ]:
+    """Decorator for marking a function or method as requiring dependency injection.
+
+    Args:
+        obj: The target function or method to be decorated.
+        tags: Optional tags to associate with the injection point.
+
+    Returns:
+        If `obj` is provided, returns the decorated target function or method.
+        If `obj` is not provided, returns a decorator that can be used to mark
+        a function or method as requiring dependency injection.
+    """
+
     def decorator(
         obj: t.Callable[P, t.Union[T, t.Awaitable[T]]]
     ) -> t.Callable[P, t.Union[T, t.Awaitable[T]]]:

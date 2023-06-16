@@ -1,3 +1,4 @@
+"""PyxDI FastAPI extension."""
 import typing as t
 
 import fastapi
@@ -14,6 +15,16 @@ __all__ = ["RequestScopedMiddleware", "install", "get_di", "Inject"]
 
 
 def install(app: fastapi.FastAPI, di: pyxdi.PyxDI) -> None:
+    """Install PyxDI into a FastAPI application.
+
+    Args:
+        app: The FastAPI application instance.
+        di: The PyxDI container.
+
+    This function installs the PyxDI container into a FastAPI application by attaching
+    it to the application state. It also patches the route dependencies to inject the
+    required dependencies using PyxDI.
+    """
     app.state.di = di  # noqa
 
     patched = []
@@ -36,10 +47,20 @@ def install(app: fastapi.FastAPI, di: pyxdi.PyxDI) -> None:
 
 
 def get_di(request: Request) -> pyxdi.PyxDI:
+    """Get the PyxDI container from a FastAPI request.
+
+    Args:
+        request: The FastAPI request.
+
+    Returns:
+        The PyxDI container associated with the request.
+    """
     return t.cast(pyxdi.PyxDI, request.app.state.di)
 
 
 class InjectParam(params.Depends):
+    """Parameter dependency class for injecting dependencies using PyxDI."""
+
     def __init__(self) -> None:
         super().__init__(dependency=self._dependency, use_cache=True)
         self._interface: t.Any = None
@@ -59,6 +80,14 @@ class InjectParam(params.Depends):
 
 
 def Inject() -> t.Any:  # noqa
+    """Decorator for marking a function parameter as requiring injection.
+
+    The `Inject` decorator is used to mark a function parameter as requiring injection
+    of a dependency resolved by PyxDI.
+
+    Returns:
+        The `InjectParam` instance representing the parameter dependency.
+    """
     return InjectParam()
 
 

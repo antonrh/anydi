@@ -1,3 +1,4 @@
+"""PyxDI public objects and functions."""
 from .core import Module, PyxDI, dep, named
 from .decorators import inject, provider
 
