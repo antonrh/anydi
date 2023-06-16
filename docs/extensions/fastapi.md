@@ -84,27 +84,31 @@ which are instantiated and provided to the relevant request handlers throughout 
 from dataclasses import dataclass
 
 import fastapi
+from fastapi import Path
 from starlette.middleware import Middleware
-from starlette.requests import Request
 
 import pyxdi.ext.fastapi
 from pyxdi.ext.fastapi import Inject, RequestScopedMiddleware
 
 
 @dataclass
-class RequestService:
-    request: Request
+class User:
+    id: str
+    email: str = "user@mail.com"
 
-    async def get_info(self) -> str:
-        return f"{self.request.method} {self.request.url.path}"
+
+@dataclass
+class UserService:
+    async def get_user(self, user_id: str) -> User:
+        return User(id=user_id)
 
 
 di = pyxdi.PyxDI()
 
 
 @di.provider(scope="request")
-def request_service(request: Request) -> RequestService:
-    return RequestService(request=request)
+def user_service() -> UserService:
+    return UserService()
 
 
 app = fastapi.FastAPI(
@@ -112,11 +116,13 @@ app = fastapi.FastAPI(
 )
 
 
-@app.get("/request-info")
-async def get_request_info(
-    request_service: RequestService = Inject(),
+@app.get("/user/{user_id}")
+async def get_user(
+    user_id: str = Path(),
+    user_service: UserService = Inject(),
 ) -> str:
-    return await request_service.get_info()
+    user = await user_service.get_user(user_id=user_id)
+    return user.email
 
 
 pyxdi.ext.fastapi.install(app, di)
