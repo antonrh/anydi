@@ -21,7 +21,7 @@ class HelloService:
 di = pyxdi.PyxDI()
 
 
-@di.provider
+@di.provider(scope="singleton")
 def hello_service() -> HelloService:
     return HelloService()
 
