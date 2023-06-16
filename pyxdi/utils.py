@@ -1,3 +1,4 @@
+"""Shared PyxDI utils module."""
 import builtins
 import functools
 import inspect
@@ -18,17 +19,16 @@ T = t.TypeVar("T")
 
 
 def get_full_qualname(obj: t.Any) -> str:
-    """
-    Get the fully qualified name of an object.
+    """Get the fully qualified name of an object.
 
     This function returns the fully qualified name of the given object,
     which includes both the module name and the object's qualname.
 
     Args:
-        obj (Any): The object for which to retrieve the fully qualified name.
+        obj: The object for which to retrieve the fully qualified name.
 
     Returns:
-        str: The fully qualified name of the object.
+        The fully qualified name of the object.
     """
     qualname = getattr(obj, "__qualname__", None)
     module_name = getattr(obj, "__module__", None)
@@ -46,18 +46,17 @@ def get_full_qualname(obj: t.Any) -> str:
 
 @functools.lru_cache(maxsize=None)
 def get_signature(obj: t.Callable[..., t.Any]) -> inspect.Signature:
-    """
-    Get the signature of a callable object.
+    """Get the signature of a callable object.
 
     This function uses the `inspect.signature` function to retrieve the signature
     of the given callable object. It applies an LRU cache decorator to improve
     performance by caching the signatures of previously inspected objects.
 
     Args:
-        obj (callable): The callable object to inspect.
+        obj: The callable object to inspect.
 
     Returns:
-        inspect.Signature: The signature of the callable object.
+        The signature of the callable object.
     """
     signature_kwargs: t.Dict[str, t.Any] = {}
     if has_signature_eval_str_arg:
@@ -66,11 +65,10 @@ def get_signature(obj: t.Callable[..., t.Any]) -> inspect.Signature:
 
 
 async def run_async(func: t.Callable[..., T], /, *args: t.Any, **kwargs: t.Any) -> T:
-    """
-    Runs the given function asynchronously using the `anyio` library.
+    """Runs the given function asynchronously using the `anyio` library.
 
     Args:
-        func (callable): The function to run asynchronously.
+        func: The function to run asynchronously.
         args: The positional arguments to pass to the function.
         kwargs: The keyword arguments to pass to the function.
 
