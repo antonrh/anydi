@@ -19,13 +19,6 @@ except ImportError:
     NoneType = type(None)  # type: ignore[assignment,misc]
 
 
-from .exceptions import (
-    AnnotationError,
-    InvalidScopeError,
-    ProviderError,
-    ScopeMismatchError,
-    UnknownDependencyError,
-)
 from .utils import get_full_qualname, get_signature, run_async
 
 Scope = t.Literal["transient", "singleton", "request"]
@@ -150,7 +143,7 @@ class PyxDI:
                 self._providers[interface] = provider
                 return provider
 
-            raise ProviderError(
+            raise LookupError(
                 f"The provider interface `{get_full_qualname(interface)}` "
                 "already registered."
             )
@@ -168,7 +161,7 @@ class PyxDI:
         Unregister provider by interface.
         """
         if not self.has_provider(interface):
-            raise ProviderError(
+            raise LookupError(
                 "The provider interface "
                 f"`{get_full_qualname(interface)}` not registered."
             )
@@ -194,7 +187,7 @@ class PyxDI:
         try:
             return self._providers[interface]
         except KeyError as exc:
-            raise ProviderError(
+            raise LookupError(
                 f"The provider interface for `{get_full_qualname(interface)}` has "
                 "not been registered. Please ensure that the provider interface is "
                 "properly registered before attempting to use it."
@@ -204,7 +197,7 @@ class PyxDI:
 
     def _validate_provider_scope(self, provider: Provider) -> None:
         if provider.scope not in t.get_args(Scope):
-            raise InvalidScopeError(
+            raise ValueError(
                 "The scope provided is invalid. Only the following scopes are "
                 f"supported: {', '.join(t.get_args(Scope))}. Please use one of the "
                 "supported scopes when registering a provider."
@@ -216,14 +209,14 @@ class PyxDI:
 
         if provider.is_resource or provider.is_async_resource:
             if provider.scope == "transient":
-                raise ProviderError(
+                raise TypeError(
                     f"The resource provider `{provider}` is attempting to register "
                     "with a transient scope, which is not allowed. Please update the "
                     "provider's scope to an appropriate value before registering it."
                 )
             return
 
-        raise ProviderError(
+        raise TypeError(
             f"The provider `{provider.obj}` is invalid because it is not a callable "
             "object. Only callable providers are allowed. Please update the provider "
             "to a callable object before attempting to register it."
@@ -236,7 +229,7 @@ class PyxDI:
 
         for parameter in provider.parameters.values():
             if parameter.annotation is inspect._empty:  # noqa
-                raise AnnotationError(
+                raise TypeError(
                     f"Missing provider `{provider}` "
                     f"dependency `{parameter.name}` annotation."
                 )
@@ -247,7 +240,7 @@ class PyxDI:
             left_scope, right_scope = related_provider.scope, provider.scope
             allowed_scopes = ALLOWED_SCOPES.get(right_scope) or []
             if left_scope not in allowed_scopes:
-                raise ScopeMismatchError(
+                raise ValueError(
                     f"The provider `{provider}` with a {provider.scope} scope was "
                     f"attempted to be registered with the provider "
                     f"`{related_provider}` with a `{related_provider.scope}` scope, "
@@ -354,19 +347,6 @@ class PyxDI:
             return await scoped_context.aget(interface)
         return t.cast(T, await self.acreate_instance(provider))
 
-    def has_instance(self, interface: t.Type[T]) -> bool:
-        """
-        Check that container contains instance by interface.
-        """
-        try:
-            provider = self.get_provider(interface)
-        except ProviderError:
-            return False
-        scoped_context = self._get_scoped_context(provider.scope)
-        if scoped_context:
-            return scoped_context.has(interface)
-        return True
-
     def _get_scoped_context(self, scope: Scope) -> t.Optional[ScopedContext]:
         if scope == "singleton":
             return self._singleton_context
@@ -395,7 +375,7 @@ class PyxDI:
     def create_instance(self, provider: Provider) -> t.Any:
         self._validate_instance_is_not_resource(provider)
         if provider.is_coroutine:
-            raise ProviderError(
+            raise TypeError(
                 f"The instance for the coroutine provider `{provider}` cannot be "
                 "created in synchronous mode."
             )
@@ -411,7 +391,7 @@ class PyxDI:
 
     def _validate_instance_is_not_resource(self, provider: Provider) -> None:
         if provider.is_resource or provider.is_async_resource:
-            raise ProviderError(
+            raise TypeError(
                 f"The instance for the resource provider `{provider}` cannot be "
                 "created until the scope context has been started. Please ensure "
                 "that the scope context is started."
@@ -420,7 +400,7 @@ class PyxDI:
     @contextlib.contextmanager
     def override(self, interface: t.Type[T], instance: t.Any) -> t.Iterator[None]:
         if not self.has_provider(interface):
-            raise ProviderError(
+            raise LookupError(
                 f"The provider interface `{get_full_qualname(interface)}` "
                 "not registered."
             )
@@ -605,7 +585,7 @@ class PyxDI:
         annotation = get_signature(obj).return_annotation
 
         if annotation is inspect._empty:  # noqa
-            raise AnnotationError(
+            raise TypeError(
                 f"Missing `{get_full_qualname(obj)}` provider return annotation."
             )
 
@@ -617,7 +597,7 @@ class PyxDI:
             if args:
                 return annotation
             else:
-                raise AnnotationError(
+                raise TypeError(
                     f"Cannot use `{get_full_qualname(obj)}` generic type annotation "
                     "without actual type."
                 )
@@ -664,16 +644,16 @@ class PyxDI:
         self, obj: t.Callable[..., t.Any], parameter: inspect.Parameter
     ) -> None:
         if parameter.annotation is inspect._empty:  # noqa
-            raise AnnotationError(
+            raise TypeError(
                 f"Missing `{get_full_qualname(obj)}` parameter "
                 f"`{parameter.name}` annotation."
             )
 
         if not self.has_provider(parameter.annotation):
-            raise UnknownDependencyError(
-                f"`{get_full_qualname(obj)}` includes an unrecognized parameter "
-                f"`{parameter.name}` with a dependency "
-                f"annotation of `{get_full_qualname(parameter.annotation)}`."
+            raise TypeError(
+                f"`{get_full_qualname(obj)}` has an unknown dependency parameter "
+                f"`{parameter.name}` with an annotation of "
+                f"`{get_full_qualname(parameter.annotation)}`."
             )
 
 
@@ -771,7 +751,7 @@ class SingletonContext(ScopedContext):
                     provider, stack=self._stack
                 )
             elif provider.is_async_resource:
-                raise ProviderError(
+                raise TypeError(
                     f"The provider `{provider}` cannot be started in synchronous mode "
                     "because it is an asynchronous provider. Please start the provider "
                     "in asynchronous mode before using it."

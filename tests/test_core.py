@@ -7,13 +7,6 @@ from typing_extensions import Annotated
 
 from pyxdi import provider
 from pyxdi.core import Module, Provider, PyxDI, Scope, dep, named
-from pyxdi.exceptions import (
-    AnnotationError,
-    InvalidScopeError,
-    ProviderError,
-    ScopeMismatchError,
-    UnknownDependencyError,
-)
 
 from tests.fixtures import Service
 from tests.scan import ScanModule
@@ -105,7 +98,7 @@ def test_register_provider(di: PyxDI) -> None:
 def test_register_provider_already_registered(di: PyxDI) -> None:
     di.register_provider(str, lambda: "test", scope="singleton")
 
-    with pytest.raises(ProviderError) as exc_info:
+    with pytest.raises(LookupError) as exc_info:
         di.register_provider(str, lambda: "other", scope="singleton")
 
     assert str(exc_info.value) == "The provider interface `str` already registered."
@@ -153,7 +146,7 @@ def test_unregister_request_scoped_provider(di: PyxDI) -> None:
 
 
 def test_unregister_not_registered_provider(di: PyxDI) -> None:
-    with pytest.raises(ProviderError) as exc_info:
+    with pytest.raises(LookupError) as exc_info:
         di.unregister_provider(str)
 
     assert str(exc_info.value) == "The provider interface `str` not registered."
@@ -166,7 +159,7 @@ def test_get_provider(di: PyxDI) -> None:
 
 
 def test_get_provider_not_registered(di: PyxDI) -> None:
-    with pytest.raises(ProviderError) as exc_info:
+    with pytest.raises(LookupError) as exc_info:
         assert di.get_provider(str)
 
     assert str(exc_info.value) == (
@@ -179,7 +172,7 @@ def test_get_provider_not_registered(di: PyxDI) -> None:
 
 
 def test_register_provider_invalid_scope(di: PyxDI) -> None:
-    with pytest.raises(InvalidScopeError) as exc_info:
+    with pytest.raises(ValueError) as exc_info:
         di.register_provider(
             str,
             lambda: "test",
@@ -197,7 +190,7 @@ def test_register_provider_invalid_transient_resource(di: PyxDI) -> None:
     def provider_obj() -> t.Iterator[str]:
         yield "test"
 
-    with pytest.raises(ProviderError) as exc_info:
+    with pytest.raises(TypeError) as exc_info:
         di.register_provider(str, provider_obj, scope="transient")
 
     assert str(exc_info.value) == (
@@ -212,7 +205,7 @@ def test_register_provider_invalid_transient_async_resource(di: PyxDI) -> None:
     async def provider_obj() -> t.AsyncIterator[str]:
         yield "test"
 
-    with pytest.raises(ProviderError) as exc_info:
+    with pytest.raises(TypeError) as exc_info:
         di.register_provider(str, provider_obj, scope="transient")
 
     assert str(exc_info.value) == (
@@ -247,7 +240,7 @@ def test_register_provider_valid_async_resource(di: PyxDI) -> None:
 
 
 def test_register_invalid_provider_type(di: PyxDI) -> None:
-    with pytest.raises(ProviderError) as exc_info:
+    with pytest.raises(TypeError) as exc_info:
         di.register_provider(str, "Test", scope="singleton")  # type: ignore[arg-type]
 
     assert str(exc_info.value) == (
@@ -314,7 +307,7 @@ def test_register_provider_match_scopes(
         di.register_provider(int, a, scope=scope3)
         di.register_provider(float, b, scope=scope2)
         di.register_provider(str, mixed, scope=scope1)
-    except ScopeMismatchError:
+    except ValueError:
         result = False
     else:
         result = True
@@ -331,7 +324,7 @@ def test_register_provider_match_scopes_error(di: PyxDI) -> None:
 
     di.register_provider(int, provider_int, scope="request")
 
-    with pytest.raises(ScopeMismatchError) as exc_info:
+    with pytest.raises(ValueError) as exc_info:
         di.register_provider(str, provider_str, scope="singleton")
 
     assert str(exc_info.value) == (
@@ -353,7 +346,7 @@ def test_register_provider_without_annotation(di: PyxDI) -> None:
 
     di.register_provider(str, service_ident, scope="singleton")
 
-    with pytest.raises(AnnotationError) as exc_info:
+    with pytest.raises(TypeError) as exc_info:
         di.register_provider(Service, service, scope="singleton")
 
     assert str(exc_info.value) == (
@@ -616,7 +609,7 @@ def test_get_singleton_scoped_started_with_async_resource_provider(di: PyxDI) ->
 
     di.register_provider(str, provide, scope="singleton")
 
-    with pytest.raises(ProviderError) as exc_info:
+    with pytest.raises(TypeError) as exc_info:
         di.start()
 
     assert str(exc_info.value) == (
@@ -667,7 +660,7 @@ async def test_get_singleton_scoped_async_resource_not_started(di: PyxDI) -> Non
 
     di.register_provider(str, provide, scope="singleton")
 
-    with pytest.raises(ProviderError) as exc_info:
+    with pytest.raises(TypeError) as exc_info:
         di.get_instance(str)
 
     assert str(exc_info.value) == (
@@ -712,7 +705,7 @@ def test_get_async_transient_scoped(di: PyxDI) -> None:
     async def get_uuid() -> uuid.UUID:
         return uuid.uuid4()
 
-    with pytest.raises(ProviderError) as exc_info:
+    with pytest.raises(TypeError) as exc_info:
         di.get_instance(uuid.UUID)
 
     assert str(exc_info.value) == (
@@ -748,29 +741,6 @@ def test_get_not_registered_instance(di: PyxDI) -> None:
     )
 
 
-def test_has_instance(di: PyxDI) -> None:
-    di.register_provider(str, lambda: "test", scope="singleton")
-    di.get_instance(str)
-
-    assert di.has_instance(str)
-
-
-def test_has_no_instance(di: PyxDI) -> None:
-    di.register_provider(str, lambda: "test", scope="singleton")
-
-    assert not di.has_instance(str)
-
-
-def test_has_no_instance_and_provider(di: PyxDI) -> None:
-    assert not di.has_instance(str)
-
-
-def test_has_instance_for_transient_provider(di: PyxDI) -> None:
-    di.register_provider(str, lambda: "test", scope="transient")
-
-    assert di.has_instance(str)
-
-
 def test_override(di: PyxDI) -> None:
     origin_name = "origin"
     overriden_name = "overriden"
@@ -786,7 +756,7 @@ def test_override(di: PyxDI) -> None:
 
 
 def test_override_provider_not_registered(di: PyxDI) -> None:
-    with pytest.raises(ProviderError) as exc_info:
+    with pytest.raises(LookupError) as exc_info:
         with di.override(str, "test"):
             pass
 
@@ -861,7 +831,7 @@ def test_get_provider_annotation_missing(di: PyxDI) -> None:
     def provider():  # type: ignore[no-untyped-def]
         return object()
 
-    with pytest.raises(AnnotationError) as exc_info:
+    with pytest.raises(TypeError) as exc_info:
         di._get_provider_annotation(provider)
 
     assert str(exc_info.value) == (
@@ -874,7 +844,7 @@ def test_get_provider_annotation_origin_without_args(di: PyxDI) -> None:
     def provider() -> list:  # type: ignore[type-arg]
         return []
 
-    with pytest.raises(AnnotationError) as exc_info:
+    with pytest.raises(TypeError) as exc_info:
         di._get_provider_annotation(provider)
 
     assert str(exc_info.value) == (
@@ -935,7 +905,7 @@ def test_inject_missing_annotation(di: PyxDI) -> None:
     def handler(name=dep) -> str:  # type: ignore[no-untyped-def]
         return name  # type: ignore[no-any-return]
 
-    with pytest.raises(AnnotationError) as exc_info:
+    with pytest.raises(TypeError) as exc_info:
         di.inject(handler)
 
     assert str(exc_info.value) == (
@@ -948,13 +918,12 @@ def test_inject_unknown_dependency(di: PyxDI) -> None:
     def handler(message: str = dep) -> None:
         pass
 
-    with pytest.raises(UnknownDependencyError) as exc_info:
+    with pytest.raises(TypeError) as exc_info:
         di.inject(handler)
 
     assert str(exc_info.value) == (
         "`tests.test_core.test_inject_unknown_dependency.<locals>.handler` "
-        "includes an unrecognized parameter `message` "
-        "with a dependency annotation of `str`."
+        "has an unknown dependency parameter `message` with an annotation of `str`."
     )
 
 

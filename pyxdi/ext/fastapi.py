@@ -7,7 +7,6 @@ from fastapi.routing import APIRoute
 from starlette.requests import Request
 
 import pyxdi
-from pyxdi.exceptions import AnnotationError
 from pyxdi.ext.starlette.middleware import RequestScopedMiddleware
 from pyxdi.utils import get_signature
 
@@ -48,7 +47,7 @@ class InjectParam(params.Depends):
     @property
     def interface(self) -> t.Any:
         if self._interface is None:
-            raise AnnotationError("Interface is not set.")
+            raise TypeError("Interface is not set.")
         return self._interface
 
     @interface.setter
