@@ -3,7 +3,7 @@
 ## Providers
 
 Providers are the backbone of `PyxDI`. A provider is a function or a class that returns an instance of a specific type.
-Once a provider is registered with PyxDI, it can be used to resolve dependencies throughout the application.
+Once a provider is registered with `PyxDI`, it can be used to resolve dependencies throughout the application.
 
 ### Registering Providers
 
@@ -67,7 +67,7 @@ assert not di.has_provider(str)
 
 ## Scopes
 
-PyxDI supports three different scopes for providers:
+`PyxDI` supports three different scopes for providers:
 
 * `transient`
 * `singleton`
@@ -491,11 +491,6 @@ di = pyxdi.PyxDI(modules=[AppModule()])
 assert di.has_provider(Service)
 assert di.has_provider(Repository)
 ```
-
-!!! note
-
-    If the provider has already been registered, it will be overridden.
-
 
 With `PyxDI`'s application Modules, you can keep your code organized and easily manage your dependencies.
 
