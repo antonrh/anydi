@@ -22,9 +22,9 @@ docs = ["mkdocs", "mkdocs-material"]
 
 [tool.poetry.group.dev.dependencies]
 black = "^23.1.0"
-mypy = "^1.3.0"
-ruff = "^0.0.272"
-pytest = "^7.3.2"
+mypy = "^1.4.1"
+ruff = "^0.0.277"
+pytest = "^7.4.0"
 pytest-cov = "^4.0.0"
 anyio = "^3.6.2"
 fastapi = "^0.95.1"
@@ -68,6 +68,20 @@ addopts = [
 ]
 xfail_strict = true
 junit_family = "xunit2"
+
+[tool.coverage.report]
+exclude_also = [
+    "pragma: no cover",
+    "@abstractmethod",
+    "@abc.abstractmethod",
+    "if TYPE_CHECKING",
+    "if t.TYPE_CHECKING",
+    "@t.overload",
+    "raise NotImplementedError",
+    "except ImportError:",
+    "if has_signature_eval_str_arg",
+    "if not anyio_installed:",
+]
 
 [build-system]
 requires = ["poetry-core>=1.0.0"]
