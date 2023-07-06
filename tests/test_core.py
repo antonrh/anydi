@@ -336,7 +336,6 @@ def test_register_provider_match_scopes_error(di: PyxDI) -> None:
     )
 
 
-#
 def test_register_provider_without_annotation(di: PyxDI) -> None:
     def service_ident() -> str:
         return "10000"
@@ -353,6 +352,21 @@ def test_register_provider_without_annotation(di: PyxDI) -> None:
         "Missing provider "
         "`tests.test_core.test_register_provider_without_annotation.<locals>.service` "
         "dependency `ident` annotation."
+    )
+
+
+def test_register_provider_with_not_registered_sub_provider(di: PyxDI) -> None:
+    def dep2(dep1: int) -> str:
+        return str(dep1)
+
+    with pytest.raises(LookupError) as exc_info:
+        di.register_provider(str, dep2, scope="singleton")
+
+    assert str(exc_info.value) == (
+        "The `tests.test_core.test_register_provider_with_not_registered_sub_provider"
+        ".<locals>.dep2` provider interface for `str` has not been registered. "
+        "Please ensure that the provider interface is properly registered before "
+        "attempting to use it."
     )
 
 

@@ -392,7 +392,15 @@ class PyxDI:
                     f"Missing provider `{provider}` "
                     f"dependency `{parameter.name}` annotation."
                 )
-            sub_provider = self.get_provider(parameter.annotation)
+            try:
+                sub_provider = self.get_provider(parameter.annotation)
+            except LookupError:
+                raise LookupError(
+                    f"The `{provider}` provider interface for "
+                    f"`{get_full_qualname(interface)}` has not been registered. "
+                    "Please ensure that the provider interface is properly registered "
+                    "before attempting to use it."
+                ) from None
             related_providers.append(sub_provider)
 
         for related_provider in related_providers:
