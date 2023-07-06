@@ -50,19 +50,7 @@ pyxdi.ext.fastapi.install(app, di)
 If you need to use `PyxDI` resources in your `FastAPI` application, you can easily integrate them by including `PyxDI`
 startup and shutdown events in the `FastAPI` application's lifecycle events.
 
-To do this synchronously, use the following code:
-
-```python
-import fastapi
-import pyxdi.ext.fastapi
-
-
-di = pyxdi.PyxDI()
-
-app = fastapi.FastAPI(on_startup=[di.start], on_shutdown=[di.close])
-```
-
-And if you need to use asynchronous resources, use the following code:
+To do this, use the following code:
 
 ```python
 import fastapi
@@ -73,6 +61,30 @@ di = pyxdi.PyxDI()
 
 app = fastapi.FastAPI(on_startup=[di.astart], on_shutdown=[di.aclose])
 ```
+
+or using lifespan handler:
+
+```python
+import contextlib
+from typing import AsyncIterator
+
+import fastapi
+
+import pyxdi.ext.fastapi
+
+di = pyxdi.PyxDI()
+
+
+@contextlib.asynccontextmanager
+async def lifespan(app: fastapi.FastAPI) -> AsyncIterator[None]:
+    await di.astart()
+    yield
+    await di.aclose()
+
+
+app = fastapi.FastAPI(lifespan=lifespan)
+```
+
 
 ## Request Scope
 
