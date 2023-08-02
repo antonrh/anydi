@@ -21,9 +21,9 @@ mkdocs-material = { version = "^9.1.13", optional = true }
 docs = ["mkdocs", "mkdocs-material"]
 
 [tool.poetry.group.dev.dependencies]
-black = "^23.1.0"
+black = "^23.7.0"
 mypy = "^1.4.1"
-ruff = "^0.0.277"
+ruff = "^0.0.282"
 pytest = "^7.4.0"
 pytest-cov = "^4.0.0"
 anyio = "^3.6.2"
