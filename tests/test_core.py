@@ -584,6 +584,22 @@ async def test_arequest_context(di: PyxDI) -> None:
     assert events == ["dep1:before", "dep1:after"]
 
 
+def test_reset_resolved_instances(di: PyxDI) -> None:
+    di.register_provider(str, lambda: "test", scope="singleton")
+    di.register_provider(int, lambda: 1, scope="singleton")
+
+    di.get_instance(str)
+    di.get_instance(int)
+
+    assert di.has_instance(str)
+    assert di.has_instance(int)
+
+    di.reset()
+
+    assert not di.has_instance(str)
+    assert not di.has_instance(int)
+
+
 # Instance
 
 
@@ -764,6 +780,21 @@ def test_get_not_registered_instance(di: PyxDI) -> None:
         "The provider interface for `str` has not been registered. Please ensure that "
         "the provider interface is properly registered before attempting to use it."
     )
+
+
+def test_has_instance(di: PyxDI) -> None:
+    assert not di.has_instance(str)
+
+
+def test_reset_instance(di: PyxDI) -> None:
+    di.register_provider(str, lambda: "test", scope="singleton")
+    di.get_instance(str)
+
+    assert di.has_instance(str)
+
+    di.reset_instance(str)
+
+    assert not di.has_instance(str)
 
 
 def test_override(di: PyxDI) -> None:

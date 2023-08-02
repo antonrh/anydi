@@ -516,6 +516,13 @@ class PyxDI:
             )
         return request_context
 
+    def reset(self) -> None:
+        """Reset resolved instances."""
+        for interface, provider in self._providers.items():
+            scoped_context = self._get_scoped_context(provider.scope)
+            if isinstance(scoped_context, ResourceScopedContext):
+                scoped_context.delete(interface)
+
     def get_instance(self, interface: t.Type[T]) -> T:
         """Get an instance by interface.
 
@@ -555,6 +562,39 @@ class PyxDI:
         scoped_context = self._get_scoped_context(provider.scope)
         args, kwargs = await self._aget_provider_arguments(provider)
         return await scoped_context.aget(interface, provider, *args, **kwargs)
+
+    def has_instance(self, interface: t.Type[T]) -> bool:
+        """Check if an instance by interface exists.
+
+        Args:
+            interface: The interface type.
+
+        Returns:
+            True if the instance exists, otherwise False.
+        """
+        try:
+            provider = self.get_provider(interface)
+        except LookupError:
+            pass
+        else:
+            scoped_context = self._get_scoped_context(provider.scope)
+            if isinstance(scoped_context, ResourceScopedContext):
+                return scoped_context.has(interface)
+        return False
+
+    def reset_instance(self, interface: t.Type[T]) -> None:
+        """Reset an instance by interface.
+
+        Args:
+            interface: The interface type.
+
+        Raises:
+            LookupError: If the provider for the interface is not registered.
+        """
+        provider = self.get_provider(interface)
+        scoped_context = self._get_scoped_context(provider.scope)
+        if isinstance(scoped_context, ResourceScopedContext):
+            scoped_context.delete(interface)
 
     def _get_scoped_context(self, scope: Scope) -> ScopedContext:
         """Get the scoped context based on the specified scope.
@@ -1095,6 +1135,17 @@ class ResourceScopedContext(ScopedContext):
                 instance = await self._acreate_instance(provider, *args, **kwargs)
             self._instances[interface] = instance
         return t.cast(T, instance)
+
+    def has(self, interface: t.Type[T]) -> bool:
+        """Check if the scoped context has an instance of the dependency.
+
+        Args:
+            interface: The interface of the dependency.
+
+        Returns:
+            Whether the scoped context has an instance of the dependency.
+        """
+        return interface in self._instances
 
     def _create_resource(
         self, provider: Provider, *args: t.Any, **kwargs: t.Any

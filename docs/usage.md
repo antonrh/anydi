@@ -64,6 +64,59 @@ di.unregister_provider(str)
 assert not di.has_provider(str)
 ```
 
+### Resolved Providers
+
+To check if a registered provider has a resolved instance, you can use the `has_instance` method of the `PyxDI` instance.
+This method takes the interface of the dependency to be checked.
+
+```python
+import pyxdi
+
+di = pyxdi.PyxDI()
+
+
+@di.provider(scope="singleton")
+def message() -> str:
+    return "Hello, message!"
+
+
+# Check if a provider is registered
+assert not di.has_instance(str)
+
+assert di.get_instance(str) == "Hello, world!"
+
+assert di.has_instance(str)
+
+di.reset_instance(str)
+
+assert not di.has_instance(str)
+```
+
+To reset a provider instance, you can use the `reset_instance` method of the PyxDI instance. This method takes the interface of the dependency to be reset. Alternatively, you can reset all instances with the `reset` method.
+
+```python
+import pyxdi
+
+di = pyxdi.PyxDI()
+di.register_provider(str, lambda: "Hello, world!", scope="singleton")
+di.register_provider(int, lambda: 100, scope="singleton")
+
+di.get_instance(str)
+di.get_instance(int)
+
+assert di.has_instance(str)
+assert di.has_instance(int)
+
+di.reset()
+
+assert not di.has_instance(str)
+assert not di.has_instance(int)
+```
+
+!!! note
+
+    This pattern can be used while writing unit tests to ensure that each test case has a clean dependency graph.
+
 
 ## Scopes
 
@@ -344,6 +397,7 @@ Note that if you try to register the provider without passing the override param
 def goodbye_message() -> str:
     return "Good-bye!"
 ```
+
 
 ## Injecting Dependencies
 
