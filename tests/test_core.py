@@ -117,12 +117,24 @@ def test_register_provider_override(di: PyxDI) -> None:
     assert provider.obj == overriden_provider_obj
 
 
-def test_register_annotated_type(di: PyxDI) -> None:
+def test_register_provider_named(di: PyxDI) -> None:
     di.register_provider(named(str, "msg1"), lambda: "test1", scope="singleton")
     di.register_provider(named(str, "msg2"), lambda: "test2", scope="singleton")
 
     assert Annotated[str, "msg1"] in di.providers
     assert Annotated[str, "msg2"] in di.providers
+
+
+def test_register_provider_via_constructor() -> None:
+    di = PyxDI(
+        providers={
+            str: Provider(obj=lambda: "test", scope="singleton"),
+            int: Provider(obj=lambda: 1, scope="singleton"),
+        }
+    )
+
+    assert di.get_instance(str) == "test"
+    assert di.get_instance(int) == 1
 
 
 def test_unregister_singleton_scoped_provider(di: PyxDI) -> None:

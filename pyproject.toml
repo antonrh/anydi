@@ -22,8 +22,8 @@ docs = ["mkdocs", "mkdocs-material"]
 
 [tool.poetry.group.dev.dependencies]
 black = "^23.7.0"
-mypy = "^1.4.1"
-ruff = "^0.0.282"
+mypy = "^1.5.1"
+ruff = "^0.0.286"
 pytest = "^7.4.0"
 pytest-cov = "^4.0.0"
 anyio = "^3.6.2"
