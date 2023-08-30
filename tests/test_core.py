@@ -125,7 +125,7 @@ def test_register_provider_named(di: PyxDI) -> None:
     assert Annotated[str, "msg2"] in di.providers
 
 
-def test_register_provider_by_constructor() -> None:
+def test_register_provider_via_constructor() -> None:
     di = PyxDI(
         providers={
             str: Provider(obj=lambda: "test", scope="singleton"),
