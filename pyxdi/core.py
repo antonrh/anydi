@@ -176,6 +176,7 @@ class PyxDI:
     def __init__(
         self,
         *,
+        providers: t.Optional[t.Mapping[t.Type[t.Any], Provider]] = None,
         modules: t.Optional[
             t.Sequence[t.Union[Module, t.Type[Module], t.Callable[[PyxDI], None]]],
         ] = None,
@@ -192,6 +193,11 @@ class PyxDI:
             "request_context", default=None
         )
         self._override_instances: t.Dict[t.Type[t.Any], t.Any] = {}
+
+        # Register providers
+        providers = providers or {}
+        for interface, provider in providers.items():
+            self.register_provider(interface, provider.obj, scope=provider.scope)
 
         # Register modules
         modules = modules or []
