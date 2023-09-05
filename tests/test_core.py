@@ -5,8 +5,7 @@ from dataclasses import dataclass
 import pytest
 from typing_extensions import Annotated
 
-from pyxdi import provider
-from pyxdi.core import Module, Named, Provider, PyxDI, Scope, dep
+from pyxdi import Module, Named, Provider, PyxDI, Scope, dep, provider
 
 from tests.fixtures import Service
 from tests.scan import ScanModule

@@ -29,7 +29,6 @@ P = ParamSpec("P")
 AnyInterface: t.TypeAlias = t.Union[t.Type[t.Any], Annotated[t.Any, ...]]
 Interface: t.TypeAlias = t.Union[t.Type[T], Annotated[T, ...]]
 
-
 ALLOWED_SCOPES: t.Dict[Scope, t.List[Scope]] = {
     "singleton": ["singleton"],
     "request": ["request", "singleton"],

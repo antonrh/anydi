@@ -9,7 +9,9 @@ Here's an example of how to make them work together:
 ```python
 import fastapi
 from fastapi import Path
+
 import pyxdi.ext.fastapi
+from pyxdi import PyxDI
 from pyxdi.ext.fastapi import Inject
 
 
@@ -18,7 +20,7 @@ class HelloService:
         return f"Hello, {name}"
 
 
-di = pyxdi.PyxDI()
+di = PyxDI()
 
 
 @di.provider(scope="singleton")
@@ -53,13 +55,13 @@ startup and shutdown events in the `FastAPI` application's lifecycle events.
 To do this, use the following code:
 
 ```python
-import fastapi
-import pyxdi.ext.fastapi
+from fastapi import FastAPI
 
+from pyxdi import PyxDI
 
-di = pyxdi.PyxDI()
+di = PyxDI()
 
-app = fastapi.FastAPI(on_startup=[di.astart], on_shutdown=[di.aclose])
+app = FastAPI(on_startup=[di.astart], on_shutdown=[di.aclose])
 ```
 
 or using lifespan handler:
@@ -68,21 +70,21 @@ or using lifespan handler:
 import contextlib
 from typing import AsyncIterator
 
-import fastapi
+from fastapi import FastAPI
 
-import pyxdi.ext.fastapi
+from pyxdi import PyxDI
 
-di = pyxdi.PyxDI()
+di = PyxDI()
 
 
 @contextlib.asynccontextmanager
-async def lifespan(app: fastapi.FastAPI) -> AsyncIterator[None]:
+async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     await di.astart()
     yield
     await di.aclose()
 
 
-app = fastapi.FastAPI(lifespan=lifespan)
+app = FastAPI(lifespan=lifespan)
 ```
 
 
@@ -95,11 +97,11 @@ which are instantiated and provided to the relevant request handlers throughout 
 ```python
 from dataclasses import dataclass
 
-import fastapi
-from fastapi import Path
+from fastapi import FastAPI, Path
 from starlette.middleware import Middleware
 
 import pyxdi.ext.fastapi
+from pyxdi import PyxDI
 from pyxdi.ext.fastapi import Inject, RequestScopedMiddleware
 
 
@@ -115,7 +117,7 @@ class UserService:
         return User(id=user_id)
 
 
-di = pyxdi.PyxDI()
+di = PyxDI()
 
 
 @di.provider(scope="request")
@@ -123,7 +125,7 @@ def user_service() -> UserService:
     return UserService()
 
 
-app = fastapi.FastAPI(
+app = FastAPI(
     middleware=[Middleware(RequestScopedMiddleware, di=di)],
 )
 

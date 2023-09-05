@@ -11,9 +11,9 @@ To register a provider, you can use the `register_provider` method of the `PyxDI
 three arguments: the type of the object to be provided, the provider function or class, and an scope.
 
 ```python
-import pyxdi
+from pyxdi import PyxDI
 
-di = pyxdi.PyxDI()
+di = PyxDI()
 
 
 def message() -> str:
@@ -28,9 +28,9 @@ assert di.get_instance(str) == "Hello, world!"
 Alternatively, you can use the provider decorator to register a provider function. The decorator takes care of registering the provider with `PyxDI`.
 
 ```python
-import pyxdi
+from pyxdi import PyxDI
 
-di = pyxdi.PyxDI()
+di = PyxDI()
 
 
 @di.provider(scope="singleton")
@@ -48,26 +48,26 @@ Sometimes, it's useful to register multiple providers for the same type. For exa
 ```python
 from typing import Annotated
 
-import pyxdi
+from pyxdi import Named, PyxDI
 
-di = pyxdi.PyxDI()
+di = PyxDI()
 
 
 @di.provider(scope="singleton")
-def message1() -> Annotated[str, pyxdi.Named("message1")]:
+def message1() -> Annotated[str, Named("message1")]:
     return "Message1"
 
 
 @di.provider(scope="singleton")
-def message2() -> Annotated[str, pyxdi.Named("message2")]:
+def message2() -> Annotated[str, Named("message2")]:
     return "Message2"
 
 
-assert di.get_instance(Annotated[str, pyxdi.Named("message1")]) == "Message1"
-assert di.get_instance(Annotated[str, pyxdi.Named("message2")]) == "Message2"
+assert di.get_instance(Annotated[str, Named("message1")]) == "Message1"
+assert di.get_instance(Annotated[str, Named("message2")]) == "Message2"
 ```
 
-In this code example, we define two providers, `message1` and `message2`, each returning a different message. The Annotated type hint with `pyxdi.Named` allows you to specify which provider to retrieve based on the name provided within the annotation.
+In this code example, we define two providers, `message1` and `message2`, each returning a different message. The Annotated type hint with `Named` allows you to specify which provider to retrieve based on the name provided within the annotation.
 
 
 ### Unregistering Providers
@@ -76,9 +76,9 @@ To unregister a provider, you can use the `unregister_provider` method of the `P
 interface of the dependency to be unregistered.
 
 ```python
-import pyxdi
+from pyxdi import PyxDI
 
-di = pyxdi.PyxDI()
+di = PyxDI()
 
 
 @di.provider(scope="singleton")
@@ -99,9 +99,9 @@ To check if a registered provider has a resolved instance, you can use the `has_
 This method takes the interface of the dependency to be checked.
 
 ```python
-import pyxdi
+from pyxdi import PyxDI
 
-di = pyxdi.PyxDI()
+di = PyxDI()
 
 
 @di.provider(scope="singleton")
@@ -124,9 +124,9 @@ assert not di.has_instance(str)
 To reset a provider instance, you can use the `reset_instance` method of the PyxDI instance. This method takes the interface of the dependency to be reset. Alternatively, you can reset all instances with the `reset` method.
 
 ```python
-import pyxdi
+from pyxdi import PyxDI
 
-di = pyxdi.PyxDI()
+di = PyxDI()
 di.register_provider(str, lambda: "Hello, world!", scope="singleton")
 di.register_provider(int, lambda: 100, scope="singleton")
 
@@ -162,9 +162,9 @@ Providers with transient scope create a new instance of the object each time it'
 ```python
 import random
 
-import pyxdi
+from pyxdi import PyxDI
 
-di = pyxdi.PyxDI()
+di = PyxDI()
 
 
 @di.provider(scope="transient")
@@ -180,15 +180,15 @@ print(di.get_instance(str))  # will print random message
 Providers with singleton scope create a single instance of the object and return it every time it's requested.
 
 ```python
-import pyxdi
+from pyxdi import PyxDI
+
 
 class Service:
     def __init__(self, name: str) -> None:
         self.name = name
 
 
-di = pyxdi.PyxDI()
-
+di = PyxDI()
 
 
 @di.provider(scope="singleton")
@@ -204,7 +204,7 @@ assert di.get_instance(Service) == di.get_instance(Service)
 Providers with request scope create an instance of the object for each request. The instance is only available within the context of the request.
 
 ```python
-import pyxdi
+from pyxdi import PyxDI
 
 
 class Request:
@@ -212,7 +212,7 @@ class Request:
         self.path = path
 
 
-di = pyxdi.PyxDI()
+di = PyxDI()
 
 
 @di.provider(scope="request")
@@ -229,9 +229,9 @@ di.get_instance(Request)  # this will raise LookupError
 or using asynchronous request context:
 
 ```python
-import pyxdi
+from pyxdi import PyxDI
 
-di = pyxdi.PyxDI()
+di = PyxDI()
 
 
 @di.provider(scope="request")
@@ -255,7 +255,7 @@ Here is an example of a synchronous resource provider that manages the lifecycle
 ```python
 import typing as t
 
-import pyxdi
+from pyxdi import PyxDI
 
 
 class Resource:
@@ -269,7 +269,7 @@ class Resource:
         print("close resource")
 
 
-di = pyxdi.PyxDI()
+di = PyxDI()
 
 
 @di.provider(scope="singleton")
@@ -297,7 +297,7 @@ Here is an example of an asynchronous resource provider that manages the lifecyc
 import asyncio
 import typing as t
 
-import pyxdi
+from pyxdi import PyxDI
 
 
 class Resource:
@@ -311,7 +311,7 @@ class Resource:
         print("close resource")
 
 
-di = pyxdi.PyxDI()
+di = PyxDI()
 
 
 @di.provider(scope="singleton")
@@ -342,7 +342,7 @@ Sometimes, it can be useful to split the process of initializing and managing th
 ```python
 import typing as t
 
-import pyxdi
+from pyxdi import PyxDI
 
 
 class Client:
@@ -357,7 +357,7 @@ class Client:
         self.closed = True
 
 
-di = pyxdi.PyxDI()
+di = PyxDI()
 
 
 @di.provider(scope="singleton")
@@ -401,9 +401,9 @@ Sometimes it's necessary to override a provider with a different implementation.
 For example, suppose you have registered a singleton provider for a string:
 
 ```python
-import pyxdi
+from pyxdi import PyxDI
 
-di = pyxdi.PyxDI()
+di = PyxDI()
 
 
 @di.provider(scope="singleton")
@@ -435,7 +435,7 @@ In order to use the dependencies that have been provided to the `PyxDI` containe
 Here's an example of how to use the `@di.inject` decorator:
 
 ```python
-import pyxdi
+from pyxdi import PyxDI, dep
 
 
 class Service:
@@ -443,7 +443,7 @@ class Service:
         self.name = name
 
 
-di = pyxdi.PyxDI()
+di = PyxDI()
 
 
 @di.provider(scope="singleton")
@@ -452,11 +452,11 @@ def service() -> Service:
 
 
 @di.inject
-def handler(service: Service = pyxdi.dep) -> None:
+def handler(service: Service = dep) -> None:
     print(f"Hello, from service `{service.name}`")
 ```
 
-Note that the service argument in the handler function has been given a default value of pyxdi.dep. This is done so that `PyxDI` knows which dependency to inject when the handler function is called.
+Note that the service argument in the handler function has been given a default value of `dep` mark. This is done so that `PyxDI` knows which dependency to inject when the handler function is called.
 
 Once the dependencies have been injected, the function can be called as usual, like so:
 
@@ -488,28 +488,28 @@ class Service:
 `handlers.py` uses the Service class:
 
 ```python
-import pyxdi
+from pyxdi import dep, inject
 
 from app.services import Service
 
 
-@pyxdi.inject
-def my_handler(service: Service = pyxdi.dep) -> None:
+@inject
+def my_handler(service: Service = dep) -> None:
     print(f"Hello, from service `{service.name}`")
 ```
 
 `main.py` starts the DI container and scans the app `handlers.py` module:
 
 ```python
+from pyxdi import PyxDI
+
 from app.services import Service
 
-import pyxdi
-
-di = pyxdi.PyxDI()
+di = PyxDI()
 
 
 @di.provider(scope="singleton")
-def service() -> str:
+def service() -> Service:
     return Service(name="demo")
 
 
@@ -521,16 +521,16 @@ di.start()
 di.close()
 ```
 
-The scan method takes a list of directory paths as an argument and recursively searches those directories for Python modules containing `@pyxdi.inject`-decorated functions or classes.
+The scan method takes a list of directory paths as an argument and recursively searches those directories for Python modules containing `@inject`-decorated functions or classes.
 
 ### Scanning Injections by tags
 
 You can also scan for providers or injectables in specific tags. To do so, you need to use the tags argument when registering providers or injectables. For example:
 
 ```python
-import pyxdi
+from pyxdi import PyxDI
 
-di = pyxdi.PyxDI()
+di = PyxDI()
 di.scan(["app.handlers"], tags=["tag1"])
 ```
 
@@ -545,7 +545,7 @@ A module is a class that extends the `pyxdi.Module` base class and contains the 
 Here's an example how to create and register simple module:
 
 ```python
-import pyxdi
+from pyxdi import Module, PyxDI, provider
 
 
 class Repository:
@@ -557,16 +557,16 @@ class Service:
         self.repo = repo
 
 
-class AppModule(pyxdi.Module):
-    def configure(self, di: pyxdi.PyxDI) -> None:
+class AppModule(Module):
+    def configure(self, di: PyxDI) -> None:
         di.register_provider(Repository, lambda: Repository(), scope="singleton")
 
-    @pyxdi.provider(scope="singleton")
+    @provider(scope="singleton")
     def configure_service(self, repo: Repository) -> Service:
         return Service(repo=repo)
 
 
-di = pyxdi.PyxDI(modules=[AppModule()])
+di = PyxDI(modules=[AppModule()])
 
 # or
 # di.register_module(AppModule())
@@ -587,7 +587,7 @@ the overridden instance is used only within the context of the with block. Once 
 ```python
 from unittest import mock
 
-import pyxdi
+from pyxdi import PyxDI, dep
 
 
 class Service:
@@ -598,7 +598,7 @@ class Service:
         return f"Hello, from `{self.name}` service!"
 
 
-di = pyxdi.PyxDI()
+di = PyxDI()
 
 
 @di.provider(scope="singleton")
@@ -607,7 +607,7 @@ def service() -> Service:
 
 
 @di.inject
-def hello_handler(service: Service = pyxdi.dep) -> str:
+def hello_handler(service: Service = dep) -> str:
     return service.say_hello()
 
 

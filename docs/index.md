@@ -38,9 +38,9 @@ poetry add pyxdi
 *app.py*
 
 ```python
-import pyxdi
+from pyxdi import PyxDI, dep
 
-di = pyxdi.PyxDI()
+di = PyxDI()
 
 
 @di.provider(scope="singleton")
@@ -49,7 +49,7 @@ def message() -> str:
 
 
 @di.inject
-def say_hello(message: str = pyxdi.dep) -> None:
+def say_hello(message: str = dep) -> None:
     print(message)
 
 
