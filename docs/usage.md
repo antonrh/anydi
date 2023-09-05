@@ -41,6 +41,35 @@ def message() -> str:
 assert di.get_instance(str) == "Hello, world!"
 ```
 
+### Named Providers
+
+Sometimes, it's useful to register multiple providers for the same type. For example, you might want to register a provider for a string that returns a different message depending on the name of the provider. This can be achieved by using the `Annotated`` type hint with the `Named`` argument:
+
+```python
+from typing import Annotated
+
+import pyxdi
+
+di = pyxdi.PyxDI()
+
+
+@di.provider(scope="singleton")
+def message1() -> Annotated[str, pyxdi.Named("message1")]:
+    return "Message1"
+
+
+@di.provider(scope="singleton")
+def message2() -> Annotated[str, pyxdi.Named("message2")]:
+    return "Message2"
+
+
+assert di.get_instance(Annotated[str, pyxdi.Named("message1")]) == "Message1"
+assert di.get_instance(Annotated[str, pyxdi.Named("message2")]) == "Message2"
+```
+
+In this code example, we define two providers, `message1` and `message2`, each returning a different message. The Annotated type hint with `pyxdi.Named` allows you to specify which provider to retrieve based on the name provided within the annotation.
+
+
 ### Unregistering Providers
 
 To unregister a provider, you can use the `unregister_provider` method of the `PyxDI` instance. The method takes

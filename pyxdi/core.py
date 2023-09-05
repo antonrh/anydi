@@ -26,8 +26,9 @@ from .utils import get_full_qualname, get_signature, run_async
 Scope = t.Literal["transient", "singleton", "request"]
 T = t.TypeVar("T", bound=t.Any)
 P = ParamSpec("P")
-AnyInterface: t.TypeAlias = t.Type[t.Any] | Annotated[t.Any, ...]
-Interface: t.TypeAlias = t.Type[T] | t.Type[Annotated[T, ...]]
+AnyInterface: t.TypeAlias = t.Union[t.Type[t.Any], Annotated[t.Any, ...]]
+Interface: t.TypeAlias = t.Union[t.Type[T], Annotated[T, ...]]
+
 
 ALLOWED_SCOPES: t.Dict[Scope, t.List[Scope]] = {
     "singleton": ["singleton"],
@@ -154,11 +155,11 @@ class DependencyMark:
 dep = t.cast(t.Any, DependencyMark())
 
 
-@dataclass
+@dataclass(slots=True)
 class Named:
-    name: str
+    """Represents a named dependency."""
 
-    __slots__ = ()
+    name: str
 
     def __hash__(self) -> int:
         return hash(self.name)
@@ -528,6 +529,14 @@ class PyxDI:
             if isinstance(scoped_context, ResourceScopedContext):
                 scoped_context.delete(interface)
 
+    @t.overload
+    def get_instance(self, interface: t.Type[T]) -> T:
+        ...
+
+    @t.overload
+    def get_instance(self, interface: T) -> T:
+        ...
+
     def get_instance(self, interface: Interface[T]) -> T:
         """Get an instance by interface.
 
@@ -547,6 +556,14 @@ class PyxDI:
         scoped_context = self._get_scoped_context(provider.scope)
         args, kwargs = self._get_provider_arguments(provider)
         return scoped_context.get(interface, provider, *args, **kwargs)
+
+    @t.overload
+    async def aget_instance(self, interface: t.Type[T]) -> T:
+        ...
+
+    @t.overload
+    async def aget_instance(self, interface: T) -> T:
+        ...
 
     async def aget_instance(self, interface: Interface[T]) -> T:
         """Get an instance by interface asynchronously.
