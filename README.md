@@ -43,9 +43,9 @@ poetry add pyxdi
 *app.py*
 
 ```python
-import pyxdi
+from pyxdi import dep, inject, PyxDI
 
-di = pyxdi.PyxDI()
+di = PyxDI()
 
 
 @di.provider(scope="singleton")
@@ -53,8 +53,8 @@ def message() -> str:
     return "Hello, world!"
 
 
-@di.inject
-def say_hello(message: str = pyxdi.dep) -> None:
+@inject
+def say_hello(message: str = dep) -> None:
     print(message)
 
 
