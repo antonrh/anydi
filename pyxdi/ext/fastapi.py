@@ -1,20 +1,19 @@
 """PyxDI FastAPI extension."""
 import typing as t
 
-import fastapi
-from fastapi import params
+from fastapi import Depends, FastAPI, params
 from fastapi.dependencies.models import Dependant
 from fastapi.routing import APIRoute
 from starlette.requests import Request
 
-import pyxdi
+from pyxdi import PyxDI
 from pyxdi.ext.starlette.middleware import RequestScopedMiddleware
 from pyxdi.utils import get_signature
 
 __all__ = ["RequestScopedMiddleware", "install", "get_di", "Inject"]
 
 
-def install(app: fastapi.FastAPI, di: pyxdi.PyxDI) -> None:
+def install(app: FastAPI, di: PyxDI) -> None:
     """Install PyxDI into a FastAPI application.
 
     Args:
@@ -46,7 +45,7 @@ def install(app: fastapi.FastAPI, di: pyxdi.PyxDI) -> None:
                 parameter.default.interface = parameter.annotation
 
 
-def get_di(request: Request) -> pyxdi.PyxDI:
+def get_di(request: Request) -> PyxDI:
     """Get the PyxDI container from a FastAPI request.
 
     Args:
@@ -55,7 +54,7 @@ def get_di(request: Request) -> pyxdi.PyxDI:
     Returns:
         The PyxDI container associated with the request.
     """
-    return t.cast(pyxdi.PyxDI, request.app.state.di)
+    return t.cast(PyxDI, request.app.state.di)
 
 
 class InjectParam(params.Depends):
@@ -75,7 +74,7 @@ class InjectParam(params.Depends):
     def interface(self, val: t.Any) -> None:
         self._interface = val
 
-    async def _dependency(self, di: pyxdi.PyxDI = fastapi.Depends(get_di)) -> t.Any:
+    async def _dependency(self, di: PyxDI = Depends(get_di)) -> t.Any:
         return await di.aget_instance(self.interface)
 
 

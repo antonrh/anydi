@@ -26,6 +26,8 @@ from .utils import get_full_qualname, get_signature, run_async
 Scope = t.Literal["transient", "singleton", "request"]
 T = t.TypeVar("T", bound=t.Any)
 P = ParamSpec("P")
+AnyInterface: t.TypeAlias = t.Union[t.Type[t.Any], Annotated[t.Any, ...]]
+Interface: t.TypeAlias = t.Union[t.Type[T], Annotated[T, ...]]
 
 ALLOWED_SCOPES: t.Dict[Scope, t.List[Scope]] = {
     "singleton": ["singleton"],
@@ -152,17 +154,16 @@ class DependencyMark:
 dep = t.cast(t.Any, DependencyMark())
 
 
-def named(tp: t.Type[T], name: str) -> Annotated[t.Type[T], str]:
-    """Cast annotated type helper.
+@dataclass
+class Named:
+    """Represents a named dependency."""
 
-    Args:
-        tp: The original type to be annotated.
-        name: The annotation to be added to the type.
+    name: str
 
-    Returns:
-        The annotated type with the provided name.
-    """
-    return t.cast(Annotated[t.Type[T], str], Annotated[tp, name])
+    __slots__ = ("name",)
+
+    def __hash__(self) -> int:
+        return hash(self.name)
 
 
 @t.final
@@ -213,7 +214,7 @@ class PyxDI:
         """
         return self._providers
 
-    def has_provider(self, interface: t.Type[t.Any]) -> bool:
+    def has_provider(self, interface: AnyInterface) -> bool:
         """Check if a provider is registered for the specified interface.
 
         Args:
@@ -226,7 +227,7 @@ class PyxDI:
 
     def register_provider(
         self,
-        interface: t.Type[t.Any],
+        interface: AnyInterface,
         obj: t.Callable[..., t.Any],
         *,
         scope: Scope,
@@ -278,7 +279,7 @@ class PyxDI:
         self._providers[interface] = provider
         return provider
 
-    def unregister_provider(self, interface: t.Type[t.Any]) -> None:
+    def unregister_provider(self, interface: AnyInterface) -> None:
         """Unregister a provider by interface.
 
         Args:
@@ -313,7 +314,7 @@ class PyxDI:
         # Cleanup provider references
         self._providers.pop(interface, None)
 
-    def get_provider(self, interface: t.Type[t.Any]) -> Provider:
+    def get_provider(self, interface: AnyInterface) -> Provider:
         """Get the provider for the specified interface.
 
         Args:
@@ -378,7 +379,7 @@ class PyxDI:
         )
 
     def _validate_provider_match_scopes(
-        self, interface: t.Type[t.Any], provider: Provider
+        self, interface: AnyInterface, provider: Provider
     ) -> None:
         """Validate that the provider and its dependencies have matching scopes.
 
@@ -529,7 +530,15 @@ class PyxDI:
             if isinstance(scoped_context, ResourceScopedContext):
                 scoped_context.delete(interface)
 
+    @t.overload
     def get_instance(self, interface: t.Type[T]) -> T:
+        ...
+
+    @t.overload
+    def get_instance(self, interface: T) -> T:
+        ...
+
+    def get_instance(self, interface: Interface[T]) -> T:
         """Get an instance by interface.
 
         Args:
@@ -549,7 +558,15 @@ class PyxDI:
         args, kwargs = self._get_provider_arguments(provider)
         return scoped_context.get(interface, provider, *args, **kwargs)
 
+    @t.overload
     async def aget_instance(self, interface: t.Type[T]) -> T:
+        ...
+
+    @t.overload
+    async def aget_instance(self, interface: T) -> T:
+        ...
+
+    async def aget_instance(self, interface: Interface[T]) -> T:
         """Get an instance by interface asynchronously.
 
         Args:
@@ -569,7 +586,7 @@ class PyxDI:
         args, kwargs = await self._aget_provider_arguments(provider)
         return await scoped_context.aget(interface, provider, *args, **kwargs)
 
-    def has_instance(self, interface: t.Type[T]) -> bool:
+    def has_instance(self, interface: AnyInterface) -> bool:
         """Check if an instance by interface exists.
 
         Args:
@@ -588,7 +605,7 @@ class PyxDI:
                 return scoped_context.has(interface)
         return False
 
-    def reset_instance(self, interface: t.Type[T]) -> None:
+    def reset_instance(self, interface: AnyInterface) -> None:
         """Reset an instance by interface.
 
         Args:
@@ -619,7 +636,7 @@ class PyxDI:
         return self._transient_context
 
     @contextlib.contextmanager
-    def override(self, interface: t.Type[T], instance: t.Any) -> t.Iterator[None]:
+    def override(self, interface: AnyInterface, instance: t.Any) -> t.Iterator[None]:
         """Override the provider for the specified interface with a specific instance.
 
         Args:
@@ -993,7 +1010,7 @@ class ScopedContext(abc.ABC):
     @abc.abstractmethod
     def get(
         self,
-        interface: t.Type[T],
+        interface: Interface[T],
         provider: Provider,
         *args: P.args,
         **kwargs: P.kwargs,
@@ -1013,7 +1030,7 @@ class ScopedContext(abc.ABC):
     @abc.abstractmethod
     async def aget(
         self,
-        interface: t.Type[T],
+        interface: Interface[T],
         provider: Provider,
         *args: P.args,
         **kwargs: P.kwargs,
@@ -1087,7 +1104,11 @@ class ResourceScopedContext(ScopedContext):
         self._async_stack = contextlib.AsyncExitStack()
 
     def get(
-        self, interface: t.Type[T], provider: Provider, *args: t.Any, **kwargs: t.Any
+        self,
+        interface: Interface[T],
+        provider: Provider,
+        *args: t.Any,
+        **kwargs: t.Any,
     ) -> T:
         """Get an instance of a dependency from the scoped context.
 
@@ -1116,7 +1137,11 @@ class ResourceScopedContext(ScopedContext):
         return t.cast(T, instance)
 
     async def aget(
-        self, interface: t.Type[T], provider: Provider, *args: t.Any, **kwargs: t.Any
+        self,
+        interface: Interface[T],
+        provider: Provider,
+        *args: t.Any,
+        **kwargs: t.Any,
     ) -> T:
         """Get an async instance of a dependency from the scoped context.
 
@@ -1142,7 +1167,7 @@ class ResourceScopedContext(ScopedContext):
             self._instances[interface] = instance
         return t.cast(T, instance)
 
-    def has(self, interface: t.Type[T]) -> bool:
+    def has(self, interface: AnyInterface) -> bool:
         """Check if the scoped context has an instance of the dependency.
 
         Args:
@@ -1185,7 +1210,7 @@ class ResourceScopedContext(ScopedContext):
         cm = contextlib.asynccontextmanager(provider.obj)(*args, **kwargs)
         return await self._async_stack.enter_async_context(cm)
 
-    def delete(self, interface: t.Type[t.Any]) -> None:
+    def delete(self, interface: AnyInterface) -> None:
         """Delete a dependency instance from the scoped context.
 
         Args:
@@ -1266,7 +1291,11 @@ class TransientContext(ScopedContext):
     """A scoped context representing the "transient" scope."""
 
     def get(
-        self, interface: t.Type[T], provider: Provider, *args: t.Any, **kwargs: t.Any
+        self,
+        interface: Interface[T],
+        provider: Provider,
+        *args: t.Any,
+        **kwargs: t.Any,
     ) -> T:
         """Get an instance of a dependency from the transient context.
 
@@ -1283,7 +1312,11 @@ class TransientContext(ScopedContext):
         return t.cast(T, instance)
 
     async def aget(
-        self, interface: t.Type[T], provider: Provider, *args: t.Any, **kwargs: t.Any
+        self,
+        interface: Interface[T],
+        provider: Provider,
+        *args: t.Any,
+        **kwargs: t.Any,
     ) -> T:
         """Get an async instance of a dependency from the transient context.
 

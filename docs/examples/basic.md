@@ -107,18 +107,18 @@ class UserService:
 Defines two providers using PyxDI's @provider decorator. The first provider creates an instance of the InMemoryUserRepository class, which is then injected into the UserService provider when it is created.
 
 ```python
-import pyxdi
+from pyxdi import Module, provider
 
 from app.repositories import InMemoryUserRepository, UserRepository
 from app.services import UserService
 
 
-class AppModule(pyxdi.Module):
-    @pyxdi.provider(scope="singleton")
+class AppModule(Module):
+    @provider(scope="singleton")
     def user_repository(self) -> UserRepository:
         return InMemoryUserRepository()
 
-    @pyxdi.provider(scope="singleton")
+    @provider(scope="singleton")
     def user_service(self, user_repository: UserRepository) -> UserService:
         return UserService(user_repository=user_repository)
 ```
@@ -130,27 +130,27 @@ Defines several handlers that use the UserService instance to perform operations
 ```python
 import typing as t
 
-import pyxdi
+from pyxdi import dep, inject
 
 from app.models import User
 from app.services import UserService
 
 
-@pyxdi.inject
-def get_users(user_service: UserService = pyxdi.dep) -> t.List[User]:
+@inject
+def get_users(user_service: UserService = dep) -> t.List[User]:
     return user_service.get_users()
 
 
-@pyxdi.inject
-def get_user(email: str, user_service: UserService = pyxdi.dep) -> User:
+@inject
+def get_user(email: str, user_service: UserService = dep) -> User:
     user = user_service.get_user(email)
     if not user:
         raise Exception("User not found.")
     return user
 
 
-@pyxdi.inject
-def create_user(email: str, user_service: UserService = pyxdi.dep) -> User:
+@inject
+def create_user(email: str, user_service: UserService = dep) -> User:
     return user_service.create_user(email=email)
 ```
 
@@ -159,11 +159,11 @@ def create_user(email: str, user_service: UserService = pyxdi.dep) -> User:
 Creates an instance of the PyxDI class, scans for providers and request handlers, starts the dependency injection container, and runs a small test suite to ensure that everything is working correctly.
 
 ```python
-import pyxdi
+from pyxdi import PyxDI
 
 from app.modules import AppModule
 
-di = pyxdi.PyxDI(modules=[AppModule])
+di = PyxDI(modules=[AppModule])
 di.scan("app.handlers")
 di.start()
 

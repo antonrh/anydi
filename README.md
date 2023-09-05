@@ -61,7 +61,3 @@ def say_hello(message: str = pyxdi.dep) -> None:
 if __name__ == "__main__":
     say_hello()
 ```
-
-## TODO
-* Documentation (in progress)
-* Examples (in progress)
