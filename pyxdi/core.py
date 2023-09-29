@@ -403,10 +403,11 @@ class PyxDI:
                 sub_provider = self.get_provider(parameter.annotation)
             except LookupError:
                 raise LookupError(
-                    f"The `{provider}` provider interface for "
-                    f"`{get_full_qualname(interface)}` has not been registered. "
-                    "Please ensure that the provider interface is properly registered "
-                    "before attempting to use it."
+                    f"The provider `{get_full_qualname(provider.obj)}` depends on "
+                    f"`{parameter.name}` of type "
+                    f"`{get_full_qualname(parameter.annotation)}`, which "
+                    f"has not been registered. To resolve this, ensure that "
+                    f"`{parameter.name}` is registered before attempting to use it."
                 ) from None
             related_providers.append(sub_provider)
 

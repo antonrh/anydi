@@ -378,10 +378,11 @@ def test_register_provider_with_not_registered_sub_provider(di: PyxDI) -> None:
         di.register_provider(str, dep2, scope="singleton")
 
     assert str(exc_info.value) == (
-        "The `tests.test_core.test_register_provider_with_not_registered_sub_provider"
-        ".<locals>.dep2` provider interface for `str` has not been registered. "
-        "Please ensure that the provider interface is properly registered before "
-        "attempting to use it."
+        "The provider "
+        "`tests.test_core.test_register_provider_with_not_registered_sub_provider"
+        ".<locals>.dep2` depends on `dep1` of type `int`, which has not been "
+        "registered. To resolve this, ensure that `dep1` is registered "
+        "before attempting to use it."
     )
 
 
