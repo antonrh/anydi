@@ -406,7 +406,7 @@ class PyxDI:
                     f"The provider `{get_full_qualname(provider.obj)}` depends on "
                     f"`{parameter.name}` of type "
                     f"`{get_full_qualname(parameter.annotation)}`, which "
-                    f"has not been registered. To resolve this, ensure that "
+                    "has not been registered. To resolve this, ensure that "
                     f"`{parameter.name}` is registered before attempting to use it."
                 ) from None
             related_providers.append(sub_provider)
