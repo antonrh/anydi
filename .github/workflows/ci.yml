@@ -15,8 +15,7 @@ jobs:
     steps:
       - name: Install poetry
         run: |
-          curl -O -sSL https://install.python-poetry.org/install-poetry.py
-          python install-poetry.py -y --version 1.6.1
+          curl -sSL https://install.python-poetry.org | python3 - --version 1.6.1
           echo "PATH=${HOME}/.poetry/bin:${PATH}" >> $GITHUB_ENV
           rm install-poetry.py
       - name: Checkout
