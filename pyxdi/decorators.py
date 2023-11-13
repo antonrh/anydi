@@ -93,3 +93,42 @@ def inject(
         return decorator
 
     return decorator(obj)
+
+
+def transient(target: T) -> T:
+    """Decorator for marking a class as transient.
+
+    Args:
+        target: The target class to be decorated.
+
+    Returns:
+        The decorated target class.
+    """
+    setattr(target, "__pyxdi_scope__", "transient")
+    return target
+
+
+def request(target: T) -> T:
+    """Decorator for marking a class as transient.
+
+    Args:
+        target: The target class to be decorated.
+
+    Returns:
+        The decorated target class.
+    """
+    setattr(target, "__pyxdi_scope__", "request")
+    return target
+
+
+def singleton(target: T) -> T:
+    """Decorator for marking a class as transient.
+
+    Args:
+        target: The target class to be decorated.
+
+    Returns:
+        The decorated target class.
+    """
+    setattr(target, "__pyxdi_scope__", "singleton")
+    return target
