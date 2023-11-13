@@ -27,8 +27,6 @@ jobs:
       - name: Install dependencies
         run: poetry install
       - name: Code formatting
-        run: poetry run black --check pyxdi/ tests/
-      - name: Code style
         run: poetry run ruff check pyxdi/ tests/
       - name: Static type checking
         run: poetry run mypy pyxdi/ tests/

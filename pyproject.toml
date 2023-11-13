@@ -44,19 +44,13 @@ mkdocs-material = { version = "^9.1.13", optional = true }
 docs = ["mkdocs", "mkdocs-material"]
 
 [tool.poetry.group.dev.dependencies]
-black = "^23.7.0"
-mypy = "^1.6.0"
-ruff = "^0.0.286"
-pytest = "^7.4.0"
+mypy = "~1.6.1"
+ruff = "^0.1.5"
+pytest = "^7.4.3"
 pytest-cov = "^4.0.0"
 anyio = "^3.6.2"
 fastapi = "^0.95.1"
 httpx = "^0.24.0"
-
-[tool.black]
-line-length = 88
-target-version = ['py310']
-include = '\.pyi?$'
 
 [tool.ruff]
 line-length = 88
