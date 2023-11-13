@@ -96,7 +96,7 @@ def inject(  # type: ignore[misc]
 
 
 def transient(target: T) -> T:
-    """Decorator for marking a class as transient.
+    """Decorator for marking a class as transient scope.
 
     Args:
         target: The target class to be decorated.
@@ -109,7 +109,7 @@ def transient(target: T) -> T:
 
 
 def request(target: T) -> T:
-    """Decorator for marking a class as transient.
+    """Decorator for marking a class as request scope.
 
     Args:
         target: The target class to be decorated.
@@ -122,7 +122,7 @@ def request(target: T) -> T:
 
 
 def singleton(target: T) -> T:
-    """Decorator for marking a class as transient.
+    """Decorator for marking a class as singleton scope.
 
     Args:
         target: The target class to be decorated.
