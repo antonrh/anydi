@@ -42,7 +42,7 @@ poetry add pyxdi
 *app.py*
 
 ```python
-from pyxdi import dep, inject, PyxDI
+from pyxdi import dep, PyxDI
 
 di = PyxDI()
 
@@ -52,7 +52,7 @@ def message() -> str:
     return "Hello, world!"
 
 
-@inject
+@di.inject
 def say_hello(message: str = dep) -> None:
     print(message)
 
