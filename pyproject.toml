@@ -42,6 +42,7 @@ mkdocs-material = { version = "^9.1.13", optional = true }
 
 [tool.poetry.extras]
 docs = ["mkdocs", "mkdocs-material"]
+async = ["anyio"]
 
 [tool.poetry.group.dev.dependencies]
 mypy = "^1.7.1"
@@ -95,7 +96,7 @@ exclude_also = [
     "raise NotImplementedError",
     "except ImportError:",
     "if has_signature_eval_str_arg",
-    "if not anyio_installed:",
+    "if not anyio:",
 ]
 
 [build-system]
