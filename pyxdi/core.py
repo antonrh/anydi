@@ -557,7 +557,7 @@ class PyxDI:
         provider = self.get_provider(interface)
         scoped_context = self._get_scoped_context(provider.scope)
         args, kwargs = self._get_provider_arguments(provider)
-        return scoped_context.get(interface, provider, *args, **kwargs)
+        return t.cast(T, scoped_context.get(interface, provider, *args, **kwargs))
 
     @t.overload
     async def aget_instance(self, interface: t.Type[T]) -> T:
@@ -699,7 +699,7 @@ class PyxDI:
     ]:
         ...
 
-    def inject(
+    def inject(  # type: ignore[misc]
         self,
         obj: t.Union[t.Callable[P, t.Union[T, t.Awaitable[T]]], None] = None,
     ) -> t.Union[
@@ -727,7 +727,7 @@ class PyxDI:
             if inspect.iscoroutinefunction(obj):
 
                 @wraps(obj)
-                async def awrapped(*args: t.Any, **kwargs: t.Any) -> T:
+                async def awrapped(*args: P.args, **kwargs: P.kwargs) -> T:
                     for name, annotation in injected_params.items():
                         kwargs[name] = await self.aget_instance(annotation)
                     return t.cast(T, await obj(*args, **kwargs))
@@ -735,7 +735,7 @@ class PyxDI:
                 return awrapped
 
             @wraps(obj)
-            def wrapped(*args: t.Any, **kwargs: t.Any) -> T:
+            def wrapped(*args: P.args, **kwargs: P.kwargs) -> T:
                 for name, annotation in injected_params.items():
                     kwargs[name] = self.get_instance(annotation)
                 return t.cast(T, obj(*args, **kwargs))
@@ -1013,8 +1013,8 @@ class ScopedContext(abc.ABC):
         self,
         interface: Interface[T],
         provider: Provider,
-        *args: P.args,
-        **kwargs: P.kwargs,
+        *args: t.Any,
+        **kwargs: t.Any,
     ) -> T:
         """Get an instance of a dependency from the scoped context.
 
@@ -1033,8 +1033,8 @@ class ScopedContext(abc.ABC):
         self,
         interface: Interface[T],
         provider: Provider,
-        *args: P.args,
-        **kwargs: P.kwargs,
+        *args: t.Any,
+        **kwargs: t.Any,
     ) -> T:
         """Get an async instance of a dependency from the scoped context.
 
@@ -1138,11 +1138,7 @@ class ResourceScopedContext(ScopedContext):
         return t.cast(T, instance)
 
     async def aget(
-        self,
-        interface: Interface[T],
-        provider: Provider,
-        *args: t.Any,
-        **kwargs: t.Any,
+        self, interface: Interface[T], provider: Provider, *args: t.Any, **kwargs: t.Any
     ) -> T:
         """Get an async instance of a dependency from the scoped context.
 

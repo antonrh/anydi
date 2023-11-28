@@ -44,8 +44,8 @@ mkdocs-material = { version = "^9.1.13", optional = true }
 docs = ["mkdocs", "mkdocs-material"]
 
 [tool.poetry.group.dev.dependencies]
-mypy = "~1.6.1"
-ruff = "^0.1.5"
+mypy = "^1.7.1"
+ruff = "^0.1.6"
 pytest = "^7.4.3"
 pytest-cov = "^4.0.0"
 anyio = "^3.6.2"
