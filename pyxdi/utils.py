@@ -7,10 +7,8 @@ import typing as t
 
 try:
     import anyio  # noqa
-
-    anyio_installed = True
 except ImportError:
-    anyio_installed = False
+    anyio = None  # type: ignore[assignment]
 
 
 has_signature_eval_str_arg = sys.version_info >= (3, 10)
@@ -78,7 +76,7 @@ async def run_async(func: t.Callable[..., T], /, *args: t.Any, **kwargs: t.Any) 
     Raises:
         ImportError: If the `anyio` library is not installed.
     """
-    if not anyio_installed:
+    if not anyio:
         raise ImportError(
             "`anyio` library is not currently installed. Please make sure to install "
             "it first, or consider using `pyxdi[full]` instead."

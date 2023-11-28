@@ -48,7 +48,6 @@ mypy = "^1.7.1"
 ruff = "^0.1.6"
 pytest = "^7.4.3"
 pytest-cov = "^4.0.0"
-anyio = "^3.6.2"
 fastapi = "^0.95.1"
 httpx = "^0.24.0"
 

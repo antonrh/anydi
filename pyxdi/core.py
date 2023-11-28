@@ -27,7 +27,7 @@ Scope = t.Literal["transient", "singleton", "request"]
 T = t.TypeVar("T", bound=t.Any)
 P = ParamSpec("P")
 AnyInterface: t.TypeAlias = t.Union[t.Type[t.Any], Annotated[t.Any, ...]]
-Interface: t.TypeAlias = t.Union[t.Type[T], Annotated[T, ...]]
+Interface: t.TypeAlias = t.Type[T]
 
 ALLOWED_SCOPES: t.Dict[Scope, t.List[Scope]] = {
     "singleton": ["singleton"],
@@ -532,7 +532,7 @@ class PyxDI:
                 scoped_context.delete(interface)
 
     @t.overload
-    def get_instance(self, interface: t.Type[T]) -> T:
+    def get_instance(self, interface: Interface[T]) -> T:
         ...
 
     @t.overload
@@ -557,10 +557,10 @@ class PyxDI:
         provider = self.get_provider(interface)
         scoped_context = self._get_scoped_context(provider.scope)
         args, kwargs = self._get_provider_arguments(provider)
-        return t.cast(T, scoped_context.get(interface, provider, *args, **kwargs))
+        return scoped_context.get(interface, provider, *args, **kwargs)
 
     @t.overload
-    async def aget_instance(self, interface: t.Type[T]) -> T:
+    async def aget_instance(self, interface: Interface[T]) -> T:
         ...
 
     @t.overload
