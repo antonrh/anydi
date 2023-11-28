@@ -25,7 +25,7 @@ jobs:
           python-version: "3.10"
           cache: "poetry"
       - name: Install dependencies
-        run: poetry install
+        run: poetry install -E async
       - name: Code formatting
         run: poetry run ruff check pyxdi/ tests/
       - name: Static type checking

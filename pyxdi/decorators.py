@@ -60,7 +60,7 @@ def inject(
     ...
 
 
-def inject(
+def inject(  # type: ignore[misc]
     obj: t.Union[t.Callable[P, t.Union[T, t.Awaitable[T]]], None] = None,
     tags: t.Optional[t.Iterable[str]] = None,
 ) -> t.Union[
