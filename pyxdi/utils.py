@@ -42,6 +42,17 @@ def get_full_qualname(obj: t.Any) -> str:
     return f"{module_name}.{qualname}"
 
 
+def is_builtin_type(tp: t.Type[t.Any]) -> bool:
+    """
+    Check if the given type is a built-in type.
+    Args:
+        tp (type): The type to check.
+    Returns:
+        bool: True if the type is a built-in type, False otherwise.
+    """
+    return tp.__module__ == builtins.__name__
+
+
 @functools.lru_cache(maxsize=None)
 def get_signature(obj: t.Callable[..., t.Any]) -> inspect.Signature:
     """Get the signature of a callable object.

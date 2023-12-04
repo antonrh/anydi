@@ -2,9 +2,23 @@ import typing as t
 
 import pytest
 
-from pyxdi.utils import get_full_qualname
+from pyxdi.utils import get_full_qualname, is_builtin_type
 
 from tests.fixtures import Service
+
+
+@pytest.mark.parametrize(
+    "tp, expected",
+    [
+        (bool, True),
+        (str, True),
+        (int, True),
+        (float, True),
+        (Service, False),
+    ],
+)
+def test_is_builtin_type(tp: t.Type[t.Any], expected: bool) -> None:
+    assert is_builtin_type(tp) == expected
 
 
 @pytest.mark.parametrize(
