@@ -347,8 +347,9 @@ class PyxDI:
             ):
                 # Try to get defined scope
                 scope = getattr(interface, "__pyxdi_scope__", None)
+                # Try to detect scope
                 if scope is None:
-                    scope = self._detect_auto_scope(interface)
+                    scope = self._detect_scope(interface)
                 if scope is None:
                     raise TypeError(
                         "Unable to automatically register the provider interface for "
@@ -451,8 +452,8 @@ class PyxDI:
                     "registered with matching scopes."
                 )
 
-    def _detect_auto_scope(self, obj: t.Callable[..., t.Any]) -> t.Optional[Scope]:
-        """Detect the auto scope for a provider.
+    def _detect_scope(self, obj: t.Callable[..., t.Any]) -> t.Optional[Scope]:
+        """Detect the scope for a provider.
 
         Args:
             obj: The provider to detect the auto scope for.
