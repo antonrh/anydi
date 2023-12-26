@@ -179,7 +179,7 @@ class PyxDI:
         *,
         providers: t.Optional[t.Mapping[t.Type[t.Any], Provider]] = None,
         modules: t.Optional[
-            t.Sequence[t.Union[Module, t.Type[Module], t.Callable[[PyxDI], None]]],
+            t.Sequence[t.Union[Module, t.Type[Module], t.Callable[[PyxDI], None]]]
         ] = None,
         auto_register: bool = False,
     ) -> None:
@@ -754,8 +754,7 @@ class PyxDI:
         ...
 
     def inject(  # type: ignore[misc]
-        self,
-        obj: t.Union[t.Callable[P, t.Union[T, t.Awaitable[T]]], None] = None,
+        self, obj: t.Union[t.Callable[P, t.Union[T, t.Awaitable[T]]], None] = None
     ) -> t.Union[
         t.Callable[
             [t.Callable[P, t.Union[T, t.Awaitable[T]]]],
@@ -804,8 +803,7 @@ class PyxDI:
         self,
         /,
         packages: t.Union[
-            t.Union[types.ModuleType, str],
-            t.Iterable[t.Union[types.ModuleType, str]],
+            t.Union[types.ModuleType, str], t.Iterable[t.Union[types.ModuleType, str]]
         ],
         *,
         tags: t.Optional[t.Iterable[str]] = None,
