@@ -179,7 +179,7 @@ class PyxDI:
         *,
         providers: t.Optional[t.Mapping[t.Type[t.Any], Provider]] = None,
         modules: t.Optional[
-            t.Sequence[t.Union[Module, t.Type[Module], t.Callable[[PyxDI], None]]],
+            t.Sequence[t.Union[Module, t.Type[Module], t.Callable[[PyxDI], None]]]
         ] = None,
     ) -> None:
         """Initialize the PyxDI instance.
@@ -700,8 +700,7 @@ class PyxDI:
         ...
 
     def inject(  # type: ignore[misc]
-        self,
-        obj: t.Union[t.Callable[P, t.Union[T, t.Awaitable[T]]], None] = None,
+        self, obj: t.Union[t.Callable[P, t.Union[T, t.Awaitable[T]]], None] = None
     ) -> t.Union[
         t.Callable[
             [t.Callable[P, t.Union[T, t.Awaitable[T]]]],
@@ -750,8 +749,7 @@ class PyxDI:
         self,
         /,
         packages: t.Union[
-            t.Union[types.ModuleType, str],
-            t.Iterable[t.Union[types.ModuleType, str]],
+            t.Union[types.ModuleType, str], t.Iterable[t.Union[types.ModuleType, str]]
         ],
         *,
         tags: t.Optional[t.Iterable[str]] = None,
@@ -816,10 +814,7 @@ class PyxDI:
         return dependencies
 
     def _scan_module(
-        self,
-        module: types.ModuleType,
-        *,
-        tags: t.Iterable[str],
+        self, module: types.ModuleType, *, tags: t.Iterable[str]
     ) -> t.List[ScannedDependency]:
         """Scan a module for decorated members.
 
@@ -1010,11 +1005,7 @@ class ScopedContext(abc.ABC):
 
     @abc.abstractmethod
     def get(
-        self,
-        interface: Interface[T],
-        provider: Provider,
-        *args: t.Any,
-        **kwargs: t.Any,
+        self, interface: Interface[T], provider: Provider, *args: t.Any, **kwargs: t.Any
     ) -> T:
         """Get an instance of a dependency from the scoped context.
 
@@ -1030,11 +1021,7 @@ class ScopedContext(abc.ABC):
 
     @abc.abstractmethod
     async def aget(
-        self,
-        interface: Interface[T],
-        provider: Provider,
-        *args: t.Any,
-        **kwargs: t.Any,
+        self, interface: Interface[T], provider: Provider, *args: t.Any, **kwargs: t.Any
     ) -> T:
         """Get an async instance of a dependency from the scoped context.
 
@@ -1105,11 +1092,7 @@ class ResourceScopedContext(ScopedContext):
         self._async_stack = contextlib.AsyncExitStack()
 
     def get(
-        self,
-        interface: Interface[T],
-        provider: Provider,
-        *args: t.Any,
-        **kwargs: t.Any,
+        self, interface: Interface[T], provider: Provider, *args: t.Any, **kwargs: t.Any
     ) -> T:
         """Get an instance of a dependency from the scoped context.
 
@@ -1288,11 +1271,7 @@ class TransientContext(ScopedContext):
     """A scoped context representing the "transient" scope."""
 
     def get(
-        self,
-        interface: Interface[T],
-        provider: Provider,
-        *args: t.Any,
-        **kwargs: t.Any,
+        self, interface: Interface[T], provider: Provider, *args: t.Any, **kwargs: t.Any
     ) -> T:
         """Get an instance of a dependency from the transient context.
 
@@ -1305,7 +1284,7 @@ class TransientContext(ScopedContext):
         Returns:
             An instance of the dependency.
         """
-        instance = self._create_instance(provider)
+        instance = self._create_instance(provider, *args, **kwargs)
         return t.cast(T, instance)
 
     async def aget(
@@ -1338,10 +1317,7 @@ class ModuleMeta(type):
     """
 
     def __new__(
-        cls,
-        name: str,
-        bases: t.Tuple[type, ...],
-        attrs: t.Dict[str, t.Any],
+        cls, name: str, bases: t.Tuple[type, ...], attrs: t.Dict[str, t.Any]
     ) -> t.Any:
         """Create a new instance of the ModuleMeta class.
 
