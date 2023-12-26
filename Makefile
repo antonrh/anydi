@@ -6,6 +6,7 @@ help:
 
 lint: ## Run code linters
 	poetry run ruff check pyxdi/ tests/
+	poetry run ruff format --check pyxdi/ tests/
 	poetry run mypy pyxdi/ tests/
 
 fmt: ## Run code formatters

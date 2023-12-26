@@ -25,7 +25,7 @@ def provider(
     """
 
     def decorator(
-        target: t.Callable[Concatenate[M, P], T]
+        target: t.Callable[Concatenate[M, P], T],
     ) -> t.Callable[Concatenate[M, P], T]:
         setattr(
             target,
@@ -83,7 +83,7 @@ def inject(  # type: ignore[misc]
     """
 
     def decorator(
-        obj: t.Callable[P, t.Union[T, t.Awaitable[T]]]
+        obj: t.Callable[P, t.Union[T, t.Awaitable[T]]],
     ) -> t.Callable[P, t.Union[T, t.Awaitable[T]]]:
         setattr(obj, "__pyxdi_inject__", True)
         setattr(obj, "__pyxdi_tags__", tags)

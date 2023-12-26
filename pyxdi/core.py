@@ -774,7 +774,7 @@ class PyxDI:
         """
 
         def decorator(
-            obj: t.Callable[P, t.Union[T, t.Awaitable[T]]]
+            obj: t.Callable[P, t.Union[T, t.Awaitable[T]]],
         ) -> t.Callable[P, t.Union[T, t.Awaitable[T]]]:
             injected_params = self._get_injected_params(obj)
 
