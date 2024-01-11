@@ -1100,7 +1100,7 @@ def test_inject_unknown_dependency(di: PyxDI) -> None:
     def handler(message: str = dep) -> None:
         pass
 
-    with pytest.raises(TypeError) as exc_info:
+    with pytest.raises(LookupError) as exc_info:
         di.inject(handler)
 
     assert str(exc_info.value) == (

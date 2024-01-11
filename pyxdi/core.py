@@ -1047,7 +1047,7 @@ class PyxDI:
             )
 
         if not self.has_provider(parameter.annotation):
-            raise TypeError(
+            raise LookupError(
                 f"`{get_full_qualname(obj)}` has an unknown dependency parameter "
                 f"`{parameter.name}` with an annotation of "
                 f"`{get_full_qualname(parameter.annotation)}`."
