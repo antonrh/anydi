@@ -1,3 +1,4 @@
+import logging
 import typing as t
 import uuid
 from dataclasses import dataclass
@@ -268,8 +269,8 @@ def test_get_auto_registered_missing_scope() -> None:
 
     assert str(exc_info.value) == (
         "Unable to automatically register the provider interface for "
-        "`tests.test_core.test_get_auto_registered_missing_scope.<locals>."
-        "Repository` because the scope detection failed. Please resolve "
+        "`tests.test_core.test_get_auto_registered_missing_scope.<locals>"
+        ".Repository` because the scope detection failed. Please resolve "
         "this issue by using the appropriate scope decorator."
     )
 
@@ -289,6 +290,27 @@ def test_get_auto_registered_with_primitive_class() -> None:
         "Please ensure that the provider interface is properly registered "
         "before attempting to use it."
     )
+
+
+def test_inject_auto_registered_log_message(caplog: pytest.LogCaptureFixture) -> None:
+    class Service:
+        pass
+
+    di = PyxDI(auto_register=True)
+
+    with caplog.at_level(logging.INFO, logger="pyxdi.core"):
+
+        @di.inject
+        def handler(service: Service = dep) -> None:
+            pass
+
+        assert caplog.messages == [
+            "Cannot validate the `tests.test_core"
+            ".test_inject_auto_registered_log_message.<locals>.handler` parameter "
+            "`service` with an annotation of `tests.test_core"
+            ".test_inject_auto_registered_log_message.<locals>.Service due to being "
+            "in auto_register mode. It will be validated at the first call."
+        ]
 
 
 # Validators

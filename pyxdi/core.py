@@ -5,6 +5,7 @@ import abc
 import contextlib
 import importlib
 import inspect
+import logging
 import pkgutil
 import types
 import typing as t
@@ -34,6 +35,8 @@ ALLOWED_SCOPES: t.Dict[Scope, t.List[Scope]] = {
     "request": ["request", "singleton"],
     "transient": ["transient", "singleton", "request"],
 }
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass(frozen=True)
@@ -1024,7 +1027,18 @@ class PyxDI:
         for parameter in get_signature(obj).parameters.values():
             if not isinstance(parameter.default, DependencyMark):
                 continue
-            self._validate_injected_parameter(obj, parameter)
+            try:
+                self._validate_injected_parameter(obj, parameter)
+            except LookupError as exc:
+                if self.auto_register:
+                    logger.info(
+                        f"Cannot validate the `{get_full_qualname(obj)}` parameter "
+                        f"`{parameter.name}` with an annotation of "
+                        f"`{get_full_qualname(parameter.annotation)} due to being "
+                        "in auto_register mode. It will be validated at the first call."
+                    )
+                else:
+                    raise exc
             injected_params[parameter.name] = parameter.annotation
         return injected_params
 
