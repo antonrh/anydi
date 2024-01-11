@@ -44,18 +44,17 @@ def install(app: FastAPI, di: PyxDI) -> None:
             for parameter in get_signature(call).parameters.values():
                 if not isinstance(parameter.default, InjectParam):
                     continue
-                try:
+                if di.auto_register and not di.has_provider(parameter.annotation):
+                    logger.warning(
+                        f"Route `{get_full_qualname(call)}` injected parameter "
+                        f"`{parameter.name}` with an annotation of "
+                        f"`{get_full_qualname(parameter.annotation)}` "
+                        "is not registered. It will be registered at runtime with "
+                        "the first call."
+                    )
+                else:
                     di._validate_injected_parameter(call, parameter)  # noqa
-                except TypeError as exc:
-                    if di.auto_register:
-                        logger.debug(
-                            f"Route `{get_full_qualname(call)}` injected parameter "
-                            f"`{parameter.name}` with an annotation of "
-                            f"`{get_full_qualname(parameter.annotation)}` "
-                            "cannot be validated due to `auto_register` mode."
-                        )
-                    else:
-                        raise exc
+
                 parameter.default.interface = parameter.annotation
 
 
