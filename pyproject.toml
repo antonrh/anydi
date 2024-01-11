@@ -54,13 +54,10 @@ httpx = "^0.26.0"
 
 [tool.ruff]
 line-length = 88
+
+[tool.ruff.lint]
 select = ["A", "B", "C", "E", "F", "I", "W", "TID252", "T20"]
 ignore = ["A003", "B008", "B009", "B010", "D104", "D107"]
-exclude = [
-    ".git",
-    "__pycache__",
-    ".history"
-]
 
 [tool.ruff.isort]
 combine-as-imports = true

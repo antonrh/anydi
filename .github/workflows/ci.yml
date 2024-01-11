@@ -26,10 +26,11 @@ jobs:
           cache: "poetry"
       - name: Install dependencies
         run: poetry install -E async
-      - name: Code formatting
-        run: poetry run ruff check pyxdi/ tests/
       - name: Static type checking
         run: poetry run mypy pyxdi/ tests/
+      - name: Code formatting
+        run: poetry run ruff pyxdi/ tests/ && poetry run ruff format pyxdi/ tests/ --check
+
 
   tests:
     name: Run unit tests ${{ matrix.name }}

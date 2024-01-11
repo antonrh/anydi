@@ -1,4 +1,5 @@
 """PyxDI FastAPI extension."""
+import logging
 import typing as t
 
 from fastapi import Depends, FastAPI, params
@@ -8,9 +9,11 @@ from starlette.requests import Request
 
 from pyxdi import PyxDI
 from pyxdi.ext.starlette.middleware import RequestScopedMiddleware
-from pyxdi.utils import get_signature
+from pyxdi.utils import get_full_qualname, get_signature
 
 __all__ = ["RequestScopedMiddleware", "install", "get_di", "Inject"]
+
+logger = logging.getLogger(__name__)
 
 
 def install(app: FastAPI, di: PyxDI) -> None:
@@ -41,7 +44,18 @@ def install(app: FastAPI, di: PyxDI) -> None:
             for parameter in get_signature(call).parameters.values():
                 if not isinstance(parameter.default, InjectParam):
                     continue
-                di._validate_injected_parameter(call, parameter)  # noqa
+                try:
+                    di._validate_injected_parameter(call, parameter)  # noqa
+                except TypeError as exc:
+                    if di.auto_register:
+                        logger.debug(
+                            f"Route `{get_full_qualname(call)}` injected parameter "
+                            f"`{parameter.name}` with an annotation of "
+                            f"`{get_full_qualname(parameter.annotation)}` "
+                            "cannot be validated due to `auto_register` mode."
+                        )
+                    else:
+                        raise exc
                 parameter.default.interface = parameter.annotation
 
 
