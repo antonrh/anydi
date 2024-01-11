@@ -16,6 +16,13 @@ def di() -> PyxDI:
     return PyxDI()
 
 
+# Root
+
+
+def test_default_auto_register(di: PyxDI) -> None:
+    assert not di.auto_register
+
+
 # Provider
 
 
@@ -180,6 +187,107 @@ def test_get_provider_not_registered(di: PyxDI) -> None:
     assert str(exc_info.value) == (
         "The provider interface for `str` has not been registered. Please ensure that "
         "the provider interface is properly registered before attempting to use it."
+    )
+
+
+# Auto register
+
+
+def test_get_auto_registered_provider_scope_defined() -> None:
+    di = PyxDI(auto_register=True)
+
+    class Service:
+        __pyxdi_scope__ = "singleton"
+
+    assert di.get_provider(Service).scope == "singleton"
+
+
+def test_get_auto_registered_provider_scope_from_sub_provider_request() -> None:
+    di = PyxDI(auto_register=True)
+
+    @di.provider(scope="request")
+    def message() -> str:
+        return "test"
+
+    @dataclass
+    class Service:
+        message: str
+
+    with di.request_context():
+        _ = di.get_instance(Service)
+
+    assert di.get_provider(Service).scope == "request"
+
+
+def test_get_auto_registered_provider_scope_from_sub_provider_transient() -> None:
+    di = PyxDI(auto_register=True)
+
+    @di.provider(scope="transient")
+    def uuid_generator() -> Annotated[str, "uuid_generator"]:
+        return str(uuid.uuid4())
+
+    @dataclass
+    class Entity:
+        id: Annotated[str, "uuid_generator"]
+
+    _ = di.get_instance(Entity)
+
+    assert di.get_provider(Entity).scope == "transient"
+
+
+def test_get_auto_registered_nested_singleton_provider() -> None:
+    di = PyxDI(auto_register=True)
+
+    @dataclass
+    class Repository:
+        __pyxdi_scope__ = "singleton"
+
+    @dataclass
+    class Service:
+        repository: Repository
+
+    with di.request_context():
+        _ = di.get_instance(Service)
+
+    assert di.get_provider(Service).scope == "singleton"
+
+
+def test_get_auto_registered_missing_scope() -> None:
+    di = PyxDI(auto_register=True)
+
+    @dataclass
+    class Repository:
+        pass
+
+    @dataclass
+    class Service:
+        repository: Repository
+
+    with pytest.raises(TypeError) as exc_info:
+        _ = di.get_instance(Service)
+
+    assert str(exc_info.value) == (
+        "Unable to automatically register the provider interface for "
+        "`tests.test_core.test_get_auto_registered_missing_scope.<locals>."
+        "Repository` because the scope detection failed. Please resolve "
+        "this issue by using the appropriate scope decorator."
+    )
+
+
+def test_get_auto_registered_with_primitive_class() -> None:
+    di = PyxDI(auto_register=True)
+
+    @dataclass
+    class Service:
+        name: str
+
+    with pytest.raises(LookupError) as exc_info:
+        _ = di.get_instance(Service).name
+
+    assert str(exc_info.value) == (
+        "The provider interface for `str` has not been registered. "
+        "Please ensure that the provider interface is properly registered "
+        "before attempting to use it."
     )
 
 

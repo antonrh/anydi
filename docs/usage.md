@@ -70,6 +70,59 @@ assert di.get_instance(Annotated[str, Named("message2")]) == "Message2"
 In this code example, we define two providers, `message1` and `message2`, each returning a different message. The Annotated type hint with `Named` allows you to specify which provider to retrieve based on the name provided within the annotation.
 
 
+### Auto-Register Providers
+
+In addition to registering providers manually, you can enable the auto_register feature of the DI container to automatically register providers for classes that have type hints in their constructor parameters.
+
+For example, suppose you have a class that depends on another class:
+
+```python
+import typing as t
+from dataclasses import dataclass
+
+
+class RootComponent:
+    def start(self) -> None:
+        print("start")
+
+    def close(self) -> None:
+        print("close")
+
+
+@dataclass
+class ChildComponent:
+    root: RootComponent
+
+
+@dataclass
+class Component:
+    child: ChildComponent
+```
+
+If you create a `PyxDI` instance with `auto_register=True`, it will automatically register a provider for `Component` and `ChildComponent` with provided `RootComponent`:
+
+```python
+import pyxdi
+
+di = pyxdi.PyxDI(auto_register=True)
+
+
+@di.provider(scope="singleton")
+def root() -> t.Iterator[RootComponent]:
+    root = RootComponent()
+    root.start()
+    yield root
+    root.close()
+
+
+# Attempt to retrieve an instance of Component
+_ = di.get_instance(Component)
+
+assert di.has_instance(Component)
+assert di.has_instance(ChildComponent)
+assert di.has_instance(RootComponent)
+```
+
 ### Unregistering Providers
 
 To unregister a provider, you can use the `unregister_provider` method of the `PyxDI` instance. The method takes

@@ -21,7 +21,7 @@ except ImportError:
     NoneType = type(None)  # type: ignore[assignment,misc]
 
 
-from .utils import get_full_qualname, get_signature, run_async
+from .utils import get_full_qualname, get_signature, is_builtin_type, run_async
 
 Scope = t.Literal["transient", "singleton", "request"]
 T = t.TypeVar("T", bound=t.Any)
@@ -181,6 +181,7 @@ class PyxDI:
         modules: t.Optional[
             t.Sequence[t.Union[Module, t.Type[Module], t.Callable[[PyxDI], None]]]
         ] = None,
+        auto_register: bool = False,
     ) -> None:
         """Initialize the PyxDI instance.
 
@@ -194,6 +195,7 @@ class PyxDI:
             "request_context", default=None
         )
         self._override_instances: t.Dict[t.Type[t.Any], t.Any] = {}
+        self._auto_register = auto_register
 
         # Register providers
         providers = providers or {}
@@ -204,6 +206,15 @@ class PyxDI:
         modules = modules or []
         for module in modules:
             self.register_module(module)
+
+    @property
+    def auto_register(self) -> bool:
+        """Check if auto registration is enabled.
+
+        Returns:
+            True if auto registration is enabled, False otherwise.
+        """
+        return self._auto_register
 
     @property
     def providers(self) -> t.Dict[t.Type[t.Any], Provider]:
@@ -329,6 +340,24 @@ class PyxDI:
         try:
             return self._providers[interface]
         except KeyError as exc:
+            if (
+                self.auto_register
+                and inspect.isclass(interface)
+                and not is_builtin_type(interface)
+            ):
+                # Try to get defined scope
+                scope = getattr(interface, "__pyxdi_scope__", None)
+                # Try to detect scope
+                if scope is None:
+                    scope = self._detect_scope(interface)
+                if scope is None:
+                    raise TypeError(
+                        "Unable to automatically register the provider interface for "
+                        f"`{get_full_qualname(interface)}` because the scope detection "
+                        "failed. Please resolve this issue by using "
+                        "the appropriate scope decorator."
+                    ) from exc
+                return self.register_provider(interface, interface, scope=scope)
             raise LookupError(
                 f"The provider interface for `{get_full_qualname(interface)}` has "
                 "not been registered. Please ensure that the provider interface is "
@@ -422,6 +451,31 @@ class PyxDI:
                     "which is not allowed. Please ensure that all providers are "
                     "registered with matching scopes."
                 )
+
+    def _detect_scope(self, obj: t.Callable[..., t.Any]) -> t.Optional[Scope]:
+        """Detect the scope for a provider.
+
+        Args:
+            obj: The provider to detect the auto scope for.
+        Returns:
+            The auto scope, or None if the auto scope cannot be detected.
+        """
+        has_transient, has_request, has_singleton = False, False, False
+        for parameter in get_signature(obj).parameters.values():
+            sub_provider = self.get_provider(parameter.annotation)
+            if not has_transient and sub_provider.scope == "transient":
+                has_transient = True
+            if not has_request and sub_provider.scope == "request":
+                has_request = True
+            if not has_singleton and sub_provider.scope == "singleton":
+                has_singleton = True
+        if has_transient:
+            return "transient"
+        if has_request:
+            return "request"
+        if has_singleton:
+            return "singleton"
+        return None
 
     def register_module(
         self, module: t.Union[Module, t.Type[Module], t.Callable[[PyxDI], None]]
@@ -1288,11 +1342,7 @@ class TransientContext(ScopedContext):
         return t.cast(T, instance)
 
     async def aget(
-        self,
-        interface: Interface[T],
-        provider: Provider,
-        *args: t.Any,
-        **kwargs: t.Any,
+        self, interface: Interface[T], provider: Provider, *args: t.Any, **kwargs: t.Any
     ) -> T:
         """Get an async instance of a dependency from the transient context.
 
