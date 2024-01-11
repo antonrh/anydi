@@ -47,7 +47,7 @@ def test_install_unknown_annotation() -> None:
     def say_hello(message: str = Inject()) -> t.Any:
         return message
 
-    with pytest.raises(TypeError) as exc_info:
+    with pytest.raises(LookupError) as exc_info:
         install(app, di)
 
     assert str(exc_info.value) == (
