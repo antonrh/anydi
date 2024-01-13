@@ -613,7 +613,6 @@ class PyxDI:
 
         provider = self.get_provider(interface)
         scoped_context = self._get_scoped_context(provider.scope)
-        # args, kwargs = self._get_provider_arguments(provider)
         return scoped_context.get(interface, provider)
 
     @t.overload
