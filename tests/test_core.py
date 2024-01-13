@@ -1075,7 +1075,9 @@ def test_get_provider_arguments(di: PyxDI) -> None:
 
     provider = di.register_provider(Service, service, scope="singleton")
 
-    args, kwargs = di._get_provider_arguments(provider)
+    scoped_context = di._get_scoped_context("singleton")
+
+    args, kwargs = scoped_context._get_provider_arguments(provider)
 
     assert args == [10]
     assert kwargs == {"b": 1.0, "c": "test"}
@@ -1099,7 +1101,9 @@ async def test_async_get_provider_arguments(di: PyxDI) -> None:
 
     provider = di.register_provider(Service, service, scope="singleton")
 
-    args, kwargs = await di._aget_provider_arguments(provider)
+    scoped_context = di._get_scoped_context("singleton")
+
+    args, kwargs = await scoped_context._aget_provider_arguments(provider)
 
     assert args == [10]
     assert kwargs == {"b": 1.0, "c": "test"}
