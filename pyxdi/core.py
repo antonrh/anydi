@@ -1090,7 +1090,7 @@ class ScopedContext(abc.ABC):
             TypeError: If the provider's instance is a coroutine provider
                 and asynchronous mode is used.
         """
-        args, kwargs = self._get_provider_arguments(provider)
+        args, kwargs = await self._aget_provider_arguments(provider)
         if provider.is_coroutine:
             return await provider.obj(*args, **kwargs)
         return await run_async(provider.obj, *args, **kwargs)
@@ -1225,7 +1225,7 @@ class ResourceScopedContext(ScopedContext):
         Returns:
             The created resource.
         """
-        args, kwargs = self._get_provider_arguments(provider)
+        args, kwargs = await self._aget_provider_arguments(provider)
         cm = contextlib.asynccontextmanager(provider.obj)(*args, **kwargs)
         return await self._async_stack.enter_async_context(cm)
 
