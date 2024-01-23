@@ -44,13 +44,13 @@ def install(app: FastAPI, di: PyxDI) -> None:
             for parameter in get_signature(call).parameters.values():
                 if not isinstance(parameter.default, InjectParam):
                     continue
-                if di.auto_register and not di.has_provider(parameter.annotation):
+                if not di.strict and not di.has_provider(parameter.annotation):
                     logger.info(
                         f"Route `{get_full_qualname(call)}` injected parameter "
                         f"`{parameter.name}` with an annotation of "
                         f"`{get_full_qualname(parameter.annotation)}` "
                         "is not registered. It will be registered at runtime with the "
-                        "first call because it is running with auto_register mode."
+                        "first call because it is running in non-strict mode."
                     )
                 else:
                     di._validate_injected_parameter(call, parameter)  # noqa

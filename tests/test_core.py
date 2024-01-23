@@ -20,8 +20,8 @@ def di() -> PyxDI:
 # Root
 
 
-def test_default_auto_register(di: PyxDI) -> None:
-    assert not di.auto_register
+def test_default_strict(di: PyxDI) -> None:
+    assert di.strict
 
 
 # Provider
@@ -195,7 +195,7 @@ def test_get_provider_not_registered(di: PyxDI) -> None:
 
 
 def test_get_auto_registered_provider_scope_defined() -> None:
-    di = PyxDI(auto_register=True)
+    di = PyxDI(strict=False)
 
     class Service:
         __pyxdi_scope__ = "singleton"
@@ -204,7 +204,7 @@ def test_get_auto_registered_provider_scope_defined() -> None:
 
 
 def test_get_auto_registered_provider_scope_from_sub_provider_request() -> None:
-    di = PyxDI(auto_register=True)
+    di = PyxDI(strict=False)
 
     @di.provider(scope="request")
     def message() -> str:
@@ -221,7 +221,7 @@ def test_get_auto_registered_provider_scope_from_sub_provider_request() -> None:
 
 
 def test_get_auto_registered_provider_scope_from_sub_provider_transient() -> None:
-    di = PyxDI(auto_register=True)
+    di = PyxDI(strict=False)
 
     @di.provider(scope="transient")
     def uuid_generator() -> Annotated[str, "uuid_generator"]:
@@ -237,7 +237,7 @@ def test_get_auto_registered_provider_scope_from_sub_provider_transient() -> Non
 
 
 def test_get_auto_registered_nested_singleton_provider() -> None:
-    di = PyxDI(auto_register=True)
+    di = PyxDI(strict=False)
 
     @dataclass
     class Repository:
@@ -254,7 +254,7 @@ def test_get_auto_registered_nested_singleton_provider() -> None:
 
 
 def test_get_auto_registered_missing_scope() -> None:
-    di = PyxDI(auto_register=True)
+    di = PyxDI(strict=False)
 
     @dataclass
     class Repository:
@@ -276,7 +276,7 @@ def test_get_auto_registered_missing_scope() -> None:
 
 
 def test_get_auto_registered_with_primitive_class() -> None:
-    di = PyxDI(auto_register=True)
+    di = PyxDI(strict=False)
 
     @dataclass
     class Service:
@@ -296,9 +296,9 @@ def test_inject_auto_registered_log_message(caplog: pytest.LogCaptureFixture) ->
     class Service:
         pass
 
-    di = PyxDI(auto_register=True)
+    di = PyxDI(strict=False)
 
-    with caplog.at_level(logging.INFO, logger="pyxdi.core"):
+    with caplog.at_level(logging.DEBUG, logger="pyxdi.core"):
 
         @di.inject
         def handler(service: Service = dep) -> None:
@@ -309,7 +309,7 @@ def test_inject_auto_registered_log_message(caplog: pytest.LogCaptureFixture) ->
             ".test_inject_auto_registered_log_message.<locals>.handler` parameter "
             "`service` with an annotation of `tests.test_core"
             ".test_inject_auto_registered_log_message.<locals>.Service due to being "
-            "in auto_register mode. It will be validated at the first call."
+            "in non-strict mode. It will be validated at the first call."
         ]
 
 

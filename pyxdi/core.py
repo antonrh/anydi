@@ -184,7 +184,7 @@ class PyxDI:
         modules: t.Optional[
             t.Sequence[t.Union[Module, t.Type[Module], t.Callable[[PyxDI], None]]]
         ] = None,
-        auto_register: bool = False,
+        strict: bool = True,
     ) -> None:
         """Initialize the PyxDI instance.
 
@@ -198,7 +198,7 @@ class PyxDI:
             "request_context", default=None
         )
         self._override_instances: t.Dict[t.Type[t.Any], t.Any] = {}
-        self._auto_register = auto_register
+        self._strict = strict
 
         # Register providers
         providers = providers or {}
@@ -211,13 +211,13 @@ class PyxDI:
             self.register_module(module)
 
     @property
-    def auto_register(self) -> bool:
-        """Check if auto registration is enabled.
+    def strict(self) -> bool:
+        """Check if strict mode is enabled.
 
         Returns:
-            True if auto registration is enabled, False otherwise.
+            True if strict mode is enabled, False otherwise.
         """
-        return self._auto_register
+        return self._strict
 
     @property
     def providers(self) -> t.Dict[t.Type[t.Any], Provider]:
@@ -344,7 +344,7 @@ class PyxDI:
             return self._providers[interface]
         except KeyError as exc:
             if (
-                self.auto_register
+                not self.strict
                 and inspect.isclass(interface)
                 and not is_builtin_type(interface)
             ):
@@ -705,7 +705,7 @@ class PyxDI:
         Raises:
             LookupError: If the provider for the interface is not registered.
         """
-        if not self.has_provider(interface):
+        if not self.has_provider(interface) and self.strict:
             raise LookupError(
                 f"The provider interface `{get_full_qualname(interface)}` "
                 "not registered."
@@ -988,12 +988,12 @@ class PyxDI:
             try:
                 self._validate_injected_parameter(obj, parameter)
             except LookupError as exc:
-                if self.auto_register:
-                    logger.info(
+                if not self.strict:
+                    logger.debug(
                         f"Cannot validate the `{get_full_qualname(obj)}` parameter "
                         f"`{parameter.name}` with an annotation of "
                         f"`{get_full_qualname(parameter.annotation)} due to being "
-                        "in auto_register mode. It will be validated at the first call."
+                        "in non-strict mode. It will be validated at the first call."
                     )
                 else:
                     raise exc

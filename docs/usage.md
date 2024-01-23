@@ -70,7 +70,7 @@ assert di.get_instance(Annotated[str, Named("message2")]) == "Message2"
 In this code example, we define two providers, `message1` and `message2`, each returning a different message. The Annotated type hint with `Named` allows you to specify which provider to retrieve based on the name provided within the annotation.
 
 
-### Auto-Register Providers
+### Strict Mode
 
 In addition to registering providers manually, you can enable the auto_register feature of the DI container to automatically register providers for classes that have type hints in their constructor parameters.
 
@@ -104,7 +104,7 @@ If you create a `PyxDI` instance with `auto_register=True`, it will automaticall
 ```python
 import pyxdi
 
-di = pyxdi.PyxDI(auto_register=True)
+di = pyxdi.PyxDI(strict=False)
 
 
 @di.provider(scope="singleton")

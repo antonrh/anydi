@@ -11,7 +11,7 @@ from tests.ext.fixtures import Mail, MailService
 
 
 def test_auto_register(caplog: pytest.LogCaptureFixture) -> None:
-    di = pyxdi.PyxDI(auto_register=True)
+    di = pyxdi.PyxDI(strict=False)
 
     app = fastapi.FastAPI()
 
@@ -28,6 +28,6 @@ def test_auto_register(caplog: pytest.LogCaptureFixture) -> None:
             "Route `tests.ext.fastapi.test_auto_register.test_auto_register.<locals>"
             ".send_email` injected parameter `mail_service` with an annotation of "
             "`tests.ext.fixtures.MailService` is not registered. It will be "
-            "registered at runtime with the first call because it is running with "
-            "auto_register mode."
+            "registered at runtime with the first call because it is running in "
+            "non-strict mode."
         ]
