@@ -72,12 +72,13 @@ In this code example, we define two providers, `message1` and `message2`, each r
 
 ### Strict Mode
 
-In addition to registering providers manually, you can enable the auto_register feature of the DI container to automatically register providers for classes that have type hints in their constructor parameters.
+By default, `PyxDI` is in strict mode. This means that it will raise an error if you try to get an instance of a type or
+to register a provider for a type that not exists in the container.
+
 
 For example, suppose you have a class that depends on another class:
 
 ```python
-import typing as t
 from dataclasses import dataclass
 
 
@@ -99,12 +100,14 @@ class Component:
     child: ChildComponent
 ```
 
-If you create a `PyxDI` instance with `auto_register=True`, it will automatically register a provider for `Component` and `ChildComponent` with provided `RootComponent`:
+If you create a `PyxDI` instance in non-strict mode `strict=False`, it will automatically register a provider for `Component` and `ChildComponent` with provided `RootComponent`:
 
 ```python
-import pyxdi
+import typing as t
 
-di = pyxdi.PyxDI(strict=False)
+from pyxdi import PyxDI
+
+di = PyxDI(strict=False)
 
 
 @di.provider(scope="singleton")
@@ -121,6 +124,14 @@ _ = di.get_instance(Component)
 assert di.has_instance(Component)
 assert di.has_instance(ChildComponent)
 assert di.has_instance(RootComponent)
+```
+
+If you create a `PyxDI` instance in strict mode `strict=True`, it will raise an error if you try to get an instance of a type that not exists in the container:
+
+```python
+di = pyxdi.PyxDI(strict=True)
+
+_ = di.get_instance(Component)  # raises LookupError
 ```
 
 ### Unregistering Providers
