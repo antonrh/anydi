@@ -21,7 +21,7 @@ def test_auto_register(caplog: pytest.LogCaptureFixture) -> None:
     ) -> t.Any:
         return await mail_service.send_mail(email="test@mail.com", message="test")
 
-    with caplog.at_level(logging.INFO, logger="pyxdi.ext.fastapi"):
+    with caplog.at_level(logging.DEBUG, logger="pyxdi.ext.fastapi"):
         pyxdi.ext.fastapi.install(app, di)
 
         assert caplog.messages == [
