@@ -75,7 +75,6 @@ In this code example, we define two providers, `message1` and `message2`, each r
 By default, `PyxDI` is in strict mode. This means that it will raise an error if you try to get an instance of a type or
 to register a provider for a type that not exists in the container.
 
-
 For example, suppose you have a class that depends on another class:
 
 ```python
