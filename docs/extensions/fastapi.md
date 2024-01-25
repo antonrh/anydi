@@ -46,6 +46,46 @@ pyxdi.ext.fastapi.install(app, di)
 
     To detect a dependency interface, provide a valid type annotation.
 
+`PyxDI` also supports `Annotated` type hints, so you can use `Annotated[...]` instead of `... = Inject()` using `FastAPI` version `0.95.0` or higher:
+
+```python
+from typing import Annotated
+
+import fastapi
+from fastapi import Path
+
+import pyxdi.ext.fastapi
+from pyxdi import PyxDI
+from pyxdi.ext.fastapi import Inject
+
+
+class HelloService:
+    async def say_hello(self, name: str) -> str:
+        return f"Hello, {name}"
+
+
+di = PyxDI()
+
+
+@di.provider(scope="singleton")
+def hello_service() -> HelloService:
+    return HelloService()
+
+
+app = fastapi.FastAPI()
+
+
+@app.get("/hello/{name}")
+async def say_hello(
+    name: Annotated[str, Path()],
+    hello_service: Annotated[HelloService, Inject()],
+) -> str:
+    return await hello_service.say_hello(name=name)
+
+
+pyxdi.ext.fastapi.install(app, di)
+```
+
 
 ## Lifespan support
 
