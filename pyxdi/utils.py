@@ -12,9 +12,6 @@ try:
 except ImportError:
     anyio = None  # type: ignore[assignment]
 
-
-has_signature_eval_str_arg = sys.version_info >= (3, 10)
-
 T = t.TypeVar("T")
 
 
@@ -79,7 +76,7 @@ def get_signature(obj: t.Callable[..., t.Any]) -> inspect.Signature:
         The signature of the callable object.
     """
     signature_kwargs: t.Dict[str, t.Any] = {}
-    if has_signature_eval_str_arg:
+    if sys.version_info >= (3, 10):
         signature_kwargs["eval_str"] = True
     return inspect.signature(obj, **signature_kwargs)
 
