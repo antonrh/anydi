@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "pyxdi"
-version = "0.16.3"
+version = "0.17.0a2"
 description = "Dependency Injection library"
 authors = ["Anton Ruhlov <antonruhlov@gmail.com>"]
 license = "MIT"
@@ -46,7 +46,7 @@ async = ["anyio"]
 
 [tool.poetry.group.dev.dependencies]
 mypy = "^1.8.0"
-ruff = "^0.1.9"
+ruff = "^0.1.13"
 pytest = "^7.4.3"
 pytest-cov = "^4.0.0"
 fastapi = "^0.95.1"

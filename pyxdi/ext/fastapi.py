@@ -1,4 +1,5 @@
 """PyxDI FastAPI extension."""
+import inspect
 import logging
 import typing as t
 
@@ -6,6 +7,7 @@ from fastapi import Depends, FastAPI, params
 from fastapi.dependencies.models import Dependant
 from fastapi.routing import APIRoute
 from starlette.requests import Request
+from typing_extensions import Annotated, get_args, get_origin
 
 from pyxdi import PyxDI
 from pyxdi.ext.starlette.middleware import RequestScopedMiddleware
@@ -42,20 +44,43 @@ def install(app: FastAPI, di: PyxDI) -> None:
             if not call:
                 continue  # pragma: no cover
             for parameter in get_signature(call).parameters.values():
-                if not isinstance(parameter.default, InjectParam):
-                    continue
-                if di.auto_register and not di.has_provider(parameter.annotation):
-                    logger.info(
-                        f"Route `{get_full_qualname(call)}` injected parameter "
-                        f"`{parameter.name}` with an annotation of "
-                        f"`{get_full_qualname(parameter.annotation)}` "
-                        "is not registered. It will be registered at runtime with the "
-                        "first call because it is running with auto_register mode."
-                    )
-                else:
-                    di._validate_injected_parameter(call, parameter)  # noqa
+                _patch_route_parameter(call, parameter, di)
 
-                parameter.default.interface = parameter.annotation
+
+def _patch_route_parameter(
+    call: t.Callable[..., t.Any], parameter: inspect.Parameter, di: PyxDI
+) -> None:
+    """Patch a route parameter to inject dependencies using PyxDI.
+
+    Args:
+        call:  The route call.
+        parameter: The parameter to patch.
+        di: The PyxDI container.
+    """
+    interface, default = parameter.annotation, parameter.default
+
+    if get_origin(interface) is Annotated:
+        args = get_args(interface)
+        if len(args) == 2:
+            interface, default = args
+
+    if not isinstance(default, InjectParam):
+        return None
+
+    parameter = parameter.replace(annotation=interface, default=default)
+
+    if not di.strict and not di.has_provider(interface):
+        logger.debug(
+            f"Route `{get_full_qualname(call)}` injected parameter "
+            f"`{parameter.name}` with an annotation of "
+            f"`{get_full_qualname(interface)}` "
+            "is not registered. It will be registered at runtime with the "
+            "first call because it is running in non-strict mode."
+        )
+    else:
+        di._validate_injected_parameter(call, parameter)  # noqa
+
+    parameter.default.interface = parameter.annotation
 
 
 def get_di(request: Request) -> PyxDI:

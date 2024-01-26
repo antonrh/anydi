@@ -50,3 +50,15 @@ def test_send_mail_mock_user_service(client: TestClient, di: pyxdi.PyxDI) -> Non
         "email": user.email,
         "message": message,
     }
+
+
+def test_send_mail_with_annotated_params(client: TestClient) -> None:
+    message = "test"
+
+    response = client.post("/send-mail-annotated", json={"message": message})
+
+    assert response.status_code == 200
+    assert response.json() == {
+        "email": TEST_EMAIL,
+        "message": message,
+    }
