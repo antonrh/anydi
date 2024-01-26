@@ -1,6 +1,7 @@
 import typing as t
 
 import pytest
+from typing_extensions import Annotated
 
 from pyxdi.utils import get_full_qualname, is_builtin_type
 
@@ -27,6 +28,10 @@ def test_is_builtin_type(tp: t.Type[t.Any], expected: bool) -> None:
         (int, "int"),
         (Service, "tests.fixtures.Service"),
         (Service(ident="test"), "tests.fixtures.Service"),
+        (
+            Annotated[Service, "service"],
+            'Annotated[tests.fixtures.Service, "service"]]',
+        ),
         (lambda x: x, "tests.test_utils.<lambda>"),
         (123, "int"),
         ("hello", "str"),
