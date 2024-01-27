@@ -60,5 +60,5 @@ def test_send_mail_with_annotated_params(client: TestClient) -> None:
     assert response.status_code == 200
     assert response.json() == {
         "email": TEST_EMAIL,
-        "message": message,
+        "message": "Hello, " + message,
     }

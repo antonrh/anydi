@@ -1,8 +1,8 @@
 import typing as t
 
-import typing_extensions as te
 from fastapi import Body, Depends, FastAPI
 from starlette.middleware import Middleware
+from typing_extensions import Annotated
 
 import pyxdi.ext.fastapi
 from pyxdi.ext.fastapi import Inject
@@ -11,6 +11,11 @@ from pyxdi.ext.starlette.middleware import RequestScopedMiddleware
 from tests.ext.fixtures import Mail, MailService, User, UserService
 
 di = pyxdi.PyxDI(strict=True)
+
+
+@di.provider(scope="singleton")
+def prefix() -> Annotated[str, "prefix"]:
+    return "Hello, "
 
 
 @di.provider(scope="singleton")
@@ -41,11 +46,12 @@ async def send_email(
 
 @app.post("/send-mail-annotated", response_model=Mail)
 async def send_email_annotated(
-    user: te.Annotated[User, Depends(get_user)],
-    mail_service: te.Annotated[MailService, Inject()],
-    message: te.Annotated[str, Body(embed=True)],
+    user: Annotated[User, Depends(get_user)],
+    mail_service: Annotated[MailService, Inject()],
+    prefix: Annotated[Annotated[str, "prefix"], Inject()],
+    message: Annotated[str, Body(embed=True)],
 ) -> t.Any:
-    return await mail_service.send_mail(email=user.email, message=message)
+    return await mail_service.send_mail(email=user.email, message=prefix + message)
 
 
 pyxdi.ext.fastapi.install(app, di)

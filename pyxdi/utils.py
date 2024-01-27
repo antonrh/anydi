@@ -5,13 +5,12 @@ import inspect
 import sys
 import typing as t
 
+from typing_extensions import Annotated, get_origin
+
 try:
     import anyio  # noqa
 except ImportError:
     anyio = None  # type: ignore[assignment]
-
-
-has_signature_eval_str_arg = sys.version_info >= (3, 10)
 
 T = t.TypeVar("T")
 
@@ -28,17 +27,26 @@ def get_full_qualname(obj: t.Any) -> str:
     Returns:
         The fully qualified name of the object.
     """
+    origin = get_origin(obj)
+    if origin is Annotated:
+        metadata = ", ".join(
+            [
+                f'"{arg}"' if isinstance(arg, str) else str(arg)
+                for arg in obj.__metadata__
+            ]
+        )
+        return f"Annotated[{get_full_qualname(obj.__args__[0])}, {metadata}]]"
+
     qualname = getattr(obj, "__qualname__", None)
     module_name = getattr(obj, "__module__", None)
-
     if qualname is None:
         qualname = type(obj).__qualname__
+
     if module_name is None:
         module_name = type(obj).__module__
 
     if module_name == builtins.__name__:
         return qualname
-
     return f"{module_name}.{qualname}"
 
 
@@ -68,7 +76,7 @@ def get_signature(obj: t.Callable[..., t.Any]) -> inspect.Signature:
         The signature of the callable object.
     """
     signature_kwargs: t.Dict[str, t.Any] = {}
-    if has_signature_eval_str_arg:
+    if sys.version_info >= (3, 10):
         signature_kwargs["eval_str"] = True
     return inspect.signature(obj, **signature_kwargs)
 

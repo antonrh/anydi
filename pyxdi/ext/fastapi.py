@@ -63,6 +63,9 @@ def _patch_route_parameter(
         args = get_args(interface)
         if len(args) == 2:
             interface, default = args
+        elif len(args) == 3:
+            interface, metadata, default = args
+            interface = Annotated[interface, metadata]
 
     if not isinstance(default, InjectParam):
         return None
