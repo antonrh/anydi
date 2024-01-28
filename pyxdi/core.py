@@ -741,12 +741,6 @@ class PyxDI:
 
     @t.overload
     def inject(
-        self, obj: t.Callable[P, t.Awaitable[T]]
-    ) -> t.Callable[P, t.Awaitable[T]]:
-        ...
-
-    @t.overload
-    def inject(
         self,
     ) -> t.Callable[
         [t.Callable[P, t.Union[T, t.Awaitable[T]]]],

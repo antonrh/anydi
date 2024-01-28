@@ -46,11 +46,6 @@ def inject(obj: t.Callable[P, T]) -> t.Callable[P, T]:
 
 
 @t.overload
-def inject(obj: t.Callable[P, t.Awaitable[T]]) -> t.Callable[P, t.Awaitable[T]]:
-    ...
-
-
-@t.overload
 def inject(
     *, tags: t.Optional[t.Iterable[str]] = None
 ) -> t.Callable[
