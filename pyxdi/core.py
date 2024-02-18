@@ -794,6 +794,19 @@ class PyxDI:
             return decorator
         return decorator(obj)
 
+    def run(self, obj: t.Callable[P, T], /, *args: P.args, **kwargs: P.kwargs) -> T:
+        """Run the given function with injected dependencies.
+
+        Args:
+            obj: The callable object.
+            args: The positional arguments to pass to the object.
+            kwargs: The keyword arguments to pass to the object.
+
+        Returns:
+            The result of the callable object.
+        """
+        return self.inject(obj)(*args, **kwargs)
+
     def scan(
         self,
         /,
