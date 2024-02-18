@@ -1224,6 +1224,27 @@ async def test_inject_with_sync_and_async_resources(di: PyxDI) -> None:
     assert result == "service ident = 1000"
 
 
+def test_run(di: PyxDI) -> None:
+    @di.provider(scope="singleton")
+    def value1() -> Annotated[int, "value1"]:
+        return 10
+
+    @di.provider(scope="singleton")
+    def value2() -> Annotated[int, "value2"]:
+        return 20
+
+    def sum_handler(
+        value1: int,
+        value2: Annotated[int, "value1"] = dep,
+        value3: Annotated[int, "value2"] = dep,
+    ) -> int:
+        return value1 + value2 + value3
+
+    result = di.run(sum_handler, value1=30)
+
+    assert result == 60
+
+
 def test_provider_decorator(di: PyxDI) -> None:
     @di.provider(scope="singleton")
     def ident() -> str:

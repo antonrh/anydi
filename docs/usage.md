@@ -493,7 +493,7 @@ def goodbye_message() -> str:
 
 ## Injecting Dependencies
 
-In order to use the dependencies that have been provided to the `PyxDI` container, they need to be injected into the functions or classes that require them. This can be done by using the @di.inject decorator.
+In order to use the dependencies that have been provided to the `PyxDI` container, they need to be injected into the functions or classes that require them. This can be done by using the `@di.inject` decorator.
 
 Here's an example of how to use the `@di.inject` decorator:
 
@@ -526,6 +526,35 @@ Once the dependencies have been injected, the function can be called as usual, l
 ```python
 handler()
 ```
+
+You can also call the callable object with injected dependencies using the `run` method of the `PyxDI` instance:
+
+```python
+from pyxdi import PyxDI, dep
+
+
+class Service:
+    def __init__(self, name: str) -> None:
+        self.name = name
+
+
+di = PyxDI()
+
+
+@di.provider(scope="singleton")
+def service() -> Service:
+    return Service(name="demo")
+
+
+def handler(service: Service = dep) -> None:
+    print(f"Hello, from service `{service.name}`")
+
+
+di.run(handler)
+```
+
+In this case, the `run` method will automatically inject the dependencies and call the handler function. Using `@di.inject` is not necessary in this case.
+
 
 ### Scanning Injections
 
