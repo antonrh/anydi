@@ -5,14 +5,16 @@ import inspect
 import sys
 import typing as t
 
-from typing_extensions import Annotated, get_origin
+from typing_extensions import Annotated, ParamSpec, get_origin
 
 try:
     import anyio  # noqa
 except ImportError:
     anyio = None  # type: ignore[assignment]
 
+
 T = t.TypeVar("T")
+P = ParamSpec("P")
 
 
 def get_full_qualname(obj: t.Any) -> str:
@@ -81,7 +83,12 @@ def get_signature(obj: t.Callable[..., t.Any]) -> inspect.Signature:
     return inspect.signature(obj, **signature_kwargs)
 
 
-async def run_async(func: t.Callable[..., T], /, *args: t.Any, **kwargs: t.Any) -> T:
+async def run_async(
+    func: t.Callable[P, T],
+    /,
+    *args: P.args,
+    **kwargs: P.kwargs,
+) -> T:
     """Runs the given function asynchronously using the `anyio` library.
 
     Args:
