@@ -2,7 +2,7 @@ from unittest import mock
 
 from starlette.testclient import TestClient
 
-import pyxdi
+import initdi
 
 from tests.ext.fixtures import TEST_EMAIL, Mail, MailService, User, UserService
 
@@ -19,7 +19,7 @@ def test_send_mail(client: TestClient) -> None:
     }
 
 
-def test_send_mail_mock_mail_service(client: TestClient, di: pyxdi.PyxDI) -> None:
+def test_send_mail_mock_mail_service(client: TestClient, di: initdi.InitDI) -> None:
     mail = Mail(email=TEST_EMAIL, message="mock")
 
     mail_service_mock = mock.MagicMock(spec=MailService)
@@ -35,7 +35,7 @@ def test_send_mail_mock_mail_service(client: TestClient, di: pyxdi.PyxDI) -> Non
     }
 
 
-def test_send_mail_mock_user_service(client: TestClient, di: pyxdi.PyxDI) -> None:
+def test_send_mail_mock_user_service(client: TestClient, di: initdi.InitDI) -> None:
     user = User(id=999, email="mock1@mail.com")
     message = "hello"
 

@@ -3,8 +3,8 @@ import typing as t
 import fastapi
 import pytest
 
-import pyxdi
-from pyxdi.ext.fastapi import Inject, InjectParam, install  # noqa
+import initdi
+from initdi.ext.fastapi import Inject, InjectParam, install  # noqa
 
 
 def test_inject_param_missing_interface() -> None:
@@ -17,7 +17,7 @@ def test_inject_param_missing_interface() -> None:
 
 
 def test_install_without_annotation() -> None:
-    di = pyxdi.PyxDI()
+    di = initdi.InitDI()
 
     @di.provider(scope="singleton")
     def message() -> str:
@@ -39,7 +39,7 @@ def test_install_without_annotation() -> None:
 
 
 def test_install_unknown_annotation() -> None:
-    di = pyxdi.PyxDI()
+    di = initdi.InitDI()
 
     app = fastapi.FastAPI()
 

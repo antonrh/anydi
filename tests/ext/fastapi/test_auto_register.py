@@ -4,14 +4,14 @@ import typing as t
 import fastapi
 import pytest
 
-import pyxdi.ext.fastapi
-from pyxdi.ext.fastapi import Inject
+import initdi.ext.fastapi
+from initdi.ext.fastapi import Inject
 
 from tests.ext.fixtures import Mail, MailService
 
 
 def test_auto_register(caplog: pytest.LogCaptureFixture) -> None:
-    di = pyxdi.PyxDI(strict=False)
+    di = initdi.InitDI(strict=False)
 
     app = fastapi.FastAPI()
 
@@ -21,8 +21,8 @@ def test_auto_register(caplog: pytest.LogCaptureFixture) -> None:
     ) -> t.Any:
         return await mail_service.send_mail(email="test@mail.com", message="test")
 
-    with caplog.at_level(logging.DEBUG, logger="pyxdi.ext.fastapi"):
-        pyxdi.ext.fastapi.install(app, di)
+    with caplog.at_level(logging.DEBUG, logger="initdi.ext.fastapi"):
+        initdi.ext.fastapi.install(app, di)
 
         assert caplog.messages == [
             "Route `tests.ext.fastapi.test_auto_register.test_auto_register.<locals>"

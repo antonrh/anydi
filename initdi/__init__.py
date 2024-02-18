@@ -1,5 +1,5 @@
-"""PyxDI public objects and functions."""
-from .core import Module, Named, Provider, PyxDI, Scope, dep
+"""InitDI public objects and functions."""
+from .core import InitDI, Module, Named, Provider, Scope, dep
 from .decorators import inject, provider, request, singleton, transient
 
 __all__ = [
@@ -9,7 +9,7 @@ __all__ = [
     "Named",
     "provider",
     "Provider",
-    "PyxDI",
+    "InitDI",
     "Scope",
     "singleton",
     "request",

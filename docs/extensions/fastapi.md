@@ -1,6 +1,6 @@
 # FastAPI Extension
 
-Integrating `PyxDI` with `FastAPI` is straightforward. Since `FastAPI` comes with its own internal dependency injection
+Integrating `InitDI` with `FastAPI` is straightforward. Since `FastAPI` comes with its own internal dependency injection
 mechanism, there is a simple workaround for using the two together using custom `Inject` parameter instead of standard `Depends`.
 
 Here's an example of how to make them work together:
@@ -10,9 +10,9 @@ Here's an example of how to make them work together:
 import fastapi
 from fastapi import Path
 
-import pyxdi.ext.fastapi
-from pyxdi import PyxDI
-from pyxdi.ext.fastapi import Inject
+import initdi.ext.fastapi
+from initdi import InitDI
+from initdi.ext.fastapi import Inject
 
 
 class HelloService:
@@ -20,7 +20,7 @@ class HelloService:
         return f"Hello, {name}"
 
 
-di = PyxDI()
+di = InitDI()
 
 
 @di.provider(scope="singleton")
@@ -39,14 +39,14 @@ async def say_hello(
     return await hello_service.say_hello(name=name)
 
 
-pyxdi.ext.fastapi.install(app, di)
+initdi.ext.fastapi.install(app, di)
 ```
 
 !!! note
 
     To detect a dependency interface, provide a valid type annotation.
 
-`PyxDI` also supports `Annotated` type hints, so you can use `Annotated[...]` instead of `... = Inject()` using `FastAPI` version `0.95.0` or higher:
+`InitDI` also supports `Annotated` type hints, so you can use `Annotated[...]` instead of `... = Inject()` using `FastAPI` version `0.95.0` or higher:
 
 ```python
 from typing import Annotated
@@ -54,9 +54,9 @@ from typing import Annotated
 import fastapi
 from fastapi import Path
 
-import pyxdi.ext.fastapi
-from pyxdi import PyxDI
-from pyxdi.ext.fastapi import Inject
+import initdi.ext.fastapi
+from initdi import InitDI
+from initdi.ext.fastapi import Inject
 
 
 class HelloService:
@@ -64,7 +64,7 @@ class HelloService:
         return f"Hello, {name}"
 
 
-di = PyxDI()
+di = InitDI()
 
 
 @di.provider(scope="singleton")
@@ -83,13 +83,13 @@ async def say_hello(
     return await hello_service.say_hello(name=name)
 
 
-pyxdi.ext.fastapi.install(app, di)
+initdi.ext.fastapi.install(app, di)
 ```
 
 
 ## Lifespan support
 
-If you need to use `PyxDI` resources in your `FastAPI` application, you can easily integrate them by including `PyxDI`
+If you need to use `InitDI` resources in your `FastAPI` application, you can easily integrate them by including `InitDI`
 startup and shutdown events in the `FastAPI` application's lifecycle events.
 
 To do this, use the following code:
@@ -97,9 +97,9 @@ To do this, use the following code:
 ```python
 from fastapi import FastAPI
 
-from pyxdi import PyxDI
+from initdi import InitDI
 
-di = PyxDI()
+di = InitDI()
 
 app = FastAPI(on_startup=[di.astart], on_shutdown=[di.aclose])
 ```
@@ -112,9 +112,9 @@ from typing import AsyncIterator
 
 from fastapi import FastAPI
 
-from pyxdi import PyxDI
+from initdi import InitDI
 
-di = PyxDI()
+di = InitDI()
 
 
 @contextlib.asynccontextmanager
@@ -130,7 +130,7 @@ app = FastAPI(lifespan=lifespan)
 
 ## Request Scope
 
-To utilize `request` scoped dependencies in your `FastAPI` application with `PyxDI`, you can make use of the
+To utilize `request` scoped dependencies in your `FastAPI` application with `InitDI`, you can make use of the
 `RequestScopedMiddleware`. This middleware enables the creation of request-specific dependency instances,
 which are instantiated and provided to the relevant request handlers throughout the lifetime of each request.
 
@@ -140,9 +140,9 @@ from dataclasses import dataclass
 from fastapi import FastAPI, Path
 from starlette.middleware import Middleware
 
-import pyxdi.ext.fastapi
-from pyxdi import PyxDI
-from pyxdi.ext.fastapi import Inject, RequestScopedMiddleware
+import initdi.ext.fastapi
+from initdi import InitDI
+from initdi.ext.fastapi import Inject, RequestScopedMiddleware
 
 
 @dataclass
@@ -157,7 +157,7 @@ class UserService:
         return User(id=user_id)
 
 
-di = PyxDI()
+di = InitDI()
 
 
 @di.provider(scope="request")
@@ -179,5 +179,5 @@ async def get_user(
     return user.email
 
 
-pyxdi.ext.fastapi.install(app, di)
+initdi.ext.fastapi.install(app, di)
 ```
