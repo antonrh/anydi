@@ -4,8 +4,8 @@ import typing as t
 
 from typing_extensions import Annotated, get_args, get_origin
 
-from pyxdi import PyxDI
-from pyxdi.utils import get_full_qualname
+from initdi import InitDI
+from initdi.utils import get_full_qualname
 
 logger = logging.getLogger(__name__)
 
@@ -26,14 +26,14 @@ class HasInterface:
 
 
 def patch_parameter_interface(
-    call: t.Callable[..., t.Any], parameter: inspect.Parameter, di: PyxDI
+    call: t.Callable[..., t.Any], parameter: inspect.Parameter, di: InitDI
 ) -> None:
-    """Patch a parameter to inject dependencies using PyxDI.
+    """Patch a parameter to inject dependencies using InitDI.
 
     Args:
         call:  The call function.
         parameter: The parameter to patch.
-        di: The PyxDI container.
+        di: The InitDI container.
     """
     interface, default = parameter.annotation, parameter.default
 

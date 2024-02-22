@@ -4,7 +4,7 @@ import fastapi
 import pytest
 from starlette.testclient import TestClient
 
-import pyxdi
+import initdi
 
 from .app import app as _app
 
@@ -15,8 +15,8 @@ def app() -> fastapi.FastAPI:
 
 
 @pytest.fixture(scope="session")
-def di(app: fastapi.FastAPI) -> pyxdi.PyxDI:
-    return t.cast(pyxdi.PyxDI, app.state.di)
+def di(app: fastapi.FastAPI) -> initdi.InitDI:
+    return t.cast(initdi.InitDI, app.state.di)
 
 
 @pytest.fixture

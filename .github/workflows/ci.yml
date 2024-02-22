@@ -27,9 +27,9 @@ jobs:
       - name: Install dependencies
         run: poetry install -E async
       - name: Static type checking
-        run: poetry run mypy pyxdi/ tests/
+        run: poetry run mypy initdi tests
       - name: Code formatting
-        run: poetry run ruff pyxdi/ tests/ && poetry run ruff format pyxdi/ tests/ --check
+        run: poetry run ruff initdi tests/ && poetry run ruff format initdi tests --check
 
 
   tests:
@@ -60,7 +60,7 @@ jobs:
       - name: Install dependencies
         run: poetry install
       - name: Run tests
-        run: poetry run pytest -vv --cov=pyxdi/ --cov-report=xml
+        run: poetry run pytest -vv --cov=initdi/ --cov-report=xml
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v3
         if: matrix.python == '3.10'

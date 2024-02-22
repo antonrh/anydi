@@ -1,16 +1,21 @@
-# PyxDI
+# InitDI
 
-`PyxDI` is a modern, lightweight and async-friendly Python Dependency Injection library that leverages type annotations ([PEP 484](https://peps.python.org/pep-0484/))
+> [!IMPORTANT]
+> `initdi` previously known as `pyxdi` has been renamed to `initdi` and is now available on PyPI.
+> Please `initdi` package instead of `pyxdi` for the latest version and updates.
+
+
+`InitDI` is a modern, lightweight and async-friendly Python Dependency Injection library that leverages type annotations ([PEP 484](https://peps.python.org/pep-0484/))
 to effortlessly manage dependencies in your applications.
 
-[![CI](https://github.com/antonrh/pyxdi/actions/workflows/ci.yml/badge.svg)](https://github.com/antonrh/pyxdi/actions/workflows/ci.yml)
-[![codecov](https://codecov.io/gh/antonrh/pyxdi/branch/main/graph/badge.svg?token=67CLD19I0C)](https://codecov.io/gh/antonrh/pyxdi)
-[![Documentation Status](https://readthedocs.org/projects/pyxdi/badge/?version=latest)](https://pyxdi.readthedocs.io/en/latest/?badge=latest)
+[![CI](https://github.com/antonrh/initdi/actions/workflows/ci.yml/badge.svg)](https://github.com/antonrh/initdi/actions/workflows/ci.yml)
+[![codecov](https://codecov.io/gh/antonrh/initdi/branch/main/graph/badge.svg?token=67CLD19I0C)](https://codecov.io/gh/antonrh/initdi)
+[![Documentation Status](https://readthedocs.org/projects/initdi/badge/?version=latest)](https://initdi.readthedocs.io/en/latest/?badge=latest)
 
 ---
 Documentation
 
-http://pyxdi.readthedocs.io/
+http://initdi.readthedocs.io/
 
 ---
 
@@ -28,13 +33,13 @@ and optional dependencies:
 Install using `pip`:
 
 ```shell
-pip install pyxdi
+pip install initdi
 ```
 
 or using `poetry`:
 
 ```shell
-poetry add pyxdi
+poetry add initdi
 ```
 
 ## Quick Example
@@ -42,9 +47,9 @@ poetry add pyxdi
 *app.py*
 
 ```python
-from pyxdi import dep, PyxDI
+from initdi import dep, InitDI
 
-di = PyxDI()
+di = InitDI()
 
 
 @di.provider(scope="singleton")

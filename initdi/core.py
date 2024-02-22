@@ -1,4 +1,4 @@
-"""PyxDI core implementation module."""
+"""InitDI core implementation module."""
 from __future__ import annotations
 
 import abc
@@ -170,8 +170,8 @@ class Named:
 
 
 @t.final
-class PyxDI:
-    """PyxDI is a dependency injection container.
+class InitDI:
+    """InitDI is a dependency injection container.
 
     Args:
         modules: Optional sequence of modules to register during initialization.
@@ -182,11 +182,11 @@ class PyxDI:
         *,
         providers: t.Optional[t.Mapping[t.Type[t.Any], Provider]] = None,
         modules: t.Optional[
-            t.Sequence[t.Union[Module, t.Type[Module], t.Callable[[PyxDI], None]]]
+            t.Sequence[t.Union[Module, t.Type[Module], t.Callable[[InitDI], None]]]
         ] = None,
         strict: bool = True,
     ) -> None:
-        """Initialize the PyxDI instance.
+        """Initialize the InitDI instance.
 
         Args:
             modules: Optional sequence of modules to register during initialization.
@@ -481,7 +481,7 @@ class PyxDI:
         return None
 
     def register_module(
-        self, module: t.Union[Module, t.Type[Module], t.Callable[[PyxDI], None]]
+        self, module: t.Union[Module, t.Type[Module], t.Callable[[InitDI], None]]
     ) -> None:
         """Register a module as a callable, module type, or module instance.
 
@@ -911,7 +911,7 @@ class PyxDI:
                 )
                 continue
 
-            # Get by pyxdi.dep mark
+            # Get by initdi.dep mark
             if inspect.isclass(member):
                 signature = get_signature(member.__init__)
             else:
@@ -1036,7 +1036,7 @@ class PyxDI:
 class ScopedContext(abc.ABC):
     """ScopedContext base class."""
 
-    def __init__(self, root: PyxDI) -> None:
+    def __init__(self, root: InitDI) -> None:
         self.root = root
 
     @abc.abstractmethod
@@ -1146,7 +1146,7 @@ class ScopedContext(abc.ABC):
 class ResourceScopedContext(ScopedContext):
     """ScopedContext with closable resources support."""
 
-    def __init__(self, root: PyxDI) -> None:
+    def __init__(self, root: InitDI) -> None:
         """Initialize the ScopedContext."""
         super().__init__(root)
         self._instances: t.Dict[t.Type[t.Any], t.Any] = {}
@@ -1375,16 +1375,16 @@ class ModuleMeta(type):
 
 
 class Module(metaclass=ModuleMeta):
-    """A base class for defining PyxDI modules."""
+    """A base class for defining InitDI modules."""
 
     providers: t.List[t.Tuple[str, t.Dict[str, t.Any]]]
 
-    def configure(self, di: PyxDI) -> None:
-        """Configure the PyxDI container with providers and their dependencies.
+    def configure(self, di: InitDI) -> None:
+        """Configure the InitDI container with providers and their dependencies.
 
         This method can be overridden in derived classes to provide the
         configuration logic.
 
         Args:
-            di: The PyxDI container to be configured.
+            di: The InitDI container to be configured.
         """
