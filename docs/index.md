@@ -23,13 +23,13 @@ and optional dependencies:
 Install using `pip`:
 
 ```shell
-pip install pyxdi
+pip install initdi
 ```
 
 or using `poetry`:
 
 ```shell
-poetry add pyxdi
+poetry add initdi
 ```
 
 ## Quick Example
