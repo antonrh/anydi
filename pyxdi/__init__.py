@@ -1,6 +1,18 @@
-"""PyxDI public objects and functions."""
-from .core import Module, Named, Provider, PyxDI, Scope, dep
-from .decorators import inject, provider, request, singleton, transient
+import warnings
+
+from initdi import (
+    InitDI as PyxDI,
+    Module,
+    Named,
+    Provider,
+    Scope,
+    dep,
+    inject,
+    provider,
+    request,
+    singleton,
+    transient,
+)
 
 __all__ = [
     "dep",
@@ -15,3 +27,13 @@ __all__ = [
     "request",
     "transient",
 ]
+
+
+warnings.warn(
+    (
+        "The `pyxdi` package is deprecated and will be removed in version 0.20.0. "
+        "Please use the `initdi` package instead."
+    ),
+    DeprecationWarning,
+    stacklevel=2,
+)

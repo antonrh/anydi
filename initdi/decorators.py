@@ -1,4 +1,4 @@
-"""PyxDI decorators module."""
+"""InitDI decorators module."""
 import typing as t
 
 from typing_extensions import Concatenate, ParamSpec
@@ -13,7 +13,7 @@ P = ParamSpec("P")
 def provider(
     *, scope: Scope, override: bool = False
 ) -> t.Callable[[t.Callable[Concatenate[M, P], T]], t.Callable[Concatenate[M, P], T]]:
-    """Decorator for marking a function or method as a provider in a PyxDI module.
+    """Decorator for marking a function or method as a provider in a InitDI module.
 
     Args:
         scope: The scope in which the provided instance should be managed.

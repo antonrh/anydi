@@ -1,20 +1,20 @@
 from dataclasses import dataclass
 
-import pyxdi
+import initdi
 
 from tests.fixtures import Service
 
 
-@pyxdi.inject
-def b_handler(service: Service = pyxdi.dep) -> None:
+@initdi.inject
+def b_handler(service: Service = initdi.dep) -> None:
     pass
 
 
 class BClassHandler:
-    def __init__(self, service: Service = pyxdi.dep) -> None:
+    def __init__(self, service: Service = initdi.dep) -> None:
         self.service = service
 
 
 @dataclass
 class BDataclassHandler:
-    service: Service = pyxdi.dep
+    service: Service = initdi.dep
