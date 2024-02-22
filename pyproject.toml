@@ -1,11 +1,11 @@
 [tool.poetry]
-name = "initidi"
-version = "0.19.0"
+name = "pyxdi"
+version = "0.18.1"
 description = "Dependency Injection library"
 authors = ["Anton Ruhlov <antonruhlov@gmail.com>"]
 license = "MIT"
 readme = "README.md"
-repository = "https://github.com/antonrh/initdi"
+repository = "https://github.com/antonrh/pyxdi"
 keywords = ["dependency injection", "dependencies", "di", "async", "asyncio", "application"]
 classifiers = [
     "Intended Audience :: Information Technology",
@@ -31,7 +31,6 @@ classifiers = [
     "Programming Language :: Python :: 3 :: Only",
 ]
 packages = [
-    { include = "initdi", from = "." },
     { include = "pyxdi", from = "." },
 ]
 

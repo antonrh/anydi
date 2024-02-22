@@ -1,22 +1,22 @@
-site_name: InitDI
+site_name: PyxDI
 site_description: Dependency Injection library
 site_author: Anton Ruhlov
-site_url: https://github.com/antonrh/initdi
+site_url: https://github.com/antonrh/pyxdi
 
 theme:
   name: material
   palette:
     - scheme: default
       toggle:
-        icon: material/brightness-7
+        icon: material/brightness-7 
         name: Switch to dark mode
     - scheme: slate
       toggle:
         icon: material/brightness-4
         name: Switch to light mode
 
-repo_name: antonrh/initdi
-repo_url: https://github.com/antonrh/initdi
+repo_name: antonrh/pyxdi
+repo_url: https://github.com/antonrh/pyxdi
 edit_uri: ""
 
 nav:
