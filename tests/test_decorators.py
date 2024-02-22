@@ -1,5 +1,5 @@
-from initdi.core import Module
-from initdi.decorators import inject, provider, request, singleton, transient
+from pyxdi.core import Module
+from pyxdi.decorators import inject, provider, request, singleton, transient
 
 from tests.fixtures import Service
 

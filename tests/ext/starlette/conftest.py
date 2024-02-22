@@ -4,7 +4,7 @@ import pytest
 from starlette.applications import Starlette
 from starlette.testclient import TestClient
 
-import initdi
+import pyxdi
 
 from .app import app as _app
 
@@ -15,8 +15,8 @@ def app() -> Starlette:
 
 
 @pytest.fixture(scope="session")
-def di(app: Starlette) -> initdi.InitDI:
-    return t.cast(initdi.InitDI, app.state.di)
+def di(app: Starlette) -> pyxdi.PyxDI:
+    return t.cast(pyxdi.PyxDI, app.state.di)
 
 
 @pytest.fixture

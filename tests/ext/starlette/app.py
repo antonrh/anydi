@@ -6,12 +6,12 @@ from starlette.requests import Request
 from starlette.responses import JSONResponse
 from starlette.routing import Route
 
-import initdi
-from initdi.ext.starlette.middleware import RequestScopedMiddleware
+import pyxdi
+from pyxdi.ext.starlette.middleware import RequestScopedMiddleware
 
 from tests.ext.fixtures import MailService, UserService
 
-di = initdi.InitDI()
+di = pyxdi.PyxDI()
 
 
 @di.provider(scope="singleton")
@@ -27,8 +27,8 @@ def mail_service() -> MailService:
 @di.inject
 async def send_email(
     request: Request,
-    user_service: UserService = initdi.dep,
-    mail_service: MailService = initdi.dep,
+    user_service: UserService = pyxdi.dep,
+    mail_service: MailService = pyxdi.dep,
 ) -> JSONResponse:
     data = await request.json()
     message = t.cast(str, data.get("message"))
