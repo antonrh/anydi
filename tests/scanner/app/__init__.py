@@ -3,7 +3,7 @@ import pyxdi
 from tests.fixtures import Service
 
 
-class ScanModule(pyxdi.Module):
+class AppModule(pyxdi.Module):
     @pyxdi.provider(scope="singleton")
     def a_a1_provider(self) -> str:
         return "a.a1.str_provider"
