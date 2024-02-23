@@ -41,33 +41,33 @@ def message() -> str:
 assert di.get_instance(str) == "Hello, world!"
 ```
 
-### Named Providers
+### Annotated Providers
 
-Sometimes, it's useful to register multiple providers for the same type. For example, you might want to register a provider for a string that returns a different message depending on the name of the provider. This can be achieved by using the `Annotated`` type hint with the `Named`` argument:
+Sometimes, it's useful to register multiple providers for the same type. For example, you might want to register a provider for a string that returns a different message depending on the name of the provider. This can be achieved by using the `Annotated` type hint with the string argument:
 
 ```python
 from typing import Annotated
 
-from pyxdi import Named, PyxDI
+from pyxdi import PyxDI
 
 di = PyxDI()
 
 
 @di.provider(scope="singleton")
-def message1() -> Annotated[str, Named("message1")]:
+def message1() -> Annotated[str, "message1"]:
     return "Message1"
 
 
 @di.provider(scope="singleton")
-def message2() -> Annotated[str, Named("message2")]:
+def message2() -> Annotated[str, "message2"]:
     return "Message2"
 
 
-assert di.get_instance(Annotated[str, Named("message1")]) == "Message1"
-assert di.get_instance(Annotated[str, Named("message2")]) == "Message2"
+assert di.get_instance(Annotated[str, "message1"]) == "Message1"
+assert di.get_instance(Annotated[str, "message2"]) == "Message2"
 ```
 
-In this code example, we define two providers, `message1` and `message2`, each returning a different message. The Annotated type hint with `Named` allows you to specify which provider to retrieve based on the name provided within the annotation.
+In this code example, we define two providers, `message1` and `message2`, each returning a different message. The Annotated type hint with string argument allows you to specify which provider to retrieve based on the name provided within the annotation.
 
 
 ### Strict Mode

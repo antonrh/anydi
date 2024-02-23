@@ -144,18 +144,6 @@ class DependencyMark:
 dep = t.cast(t.Any, DependencyMark())
 
 
-@dataclass
-class Named:
-    """Represents a named dependency."""
-
-    name: str
-
-    __slots__ = ("name",)
-
-    def __hash__(self) -> int:
-        return hash(self.name)
-
-
 @t.final
 class PyxDI:
     """PyxDI is a dependency injection container.

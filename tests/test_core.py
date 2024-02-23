@@ -6,7 +6,7 @@ from dataclasses import dataclass
 import pytest
 from typing_extensions import Annotated
 
-from pyxdi import Module, Named, Provider, PyxDI, Scope, dep, provider
+from pyxdi import Module, Provider, PyxDI, Scope, dep, provider
 
 from tests.fixtures import Service
 from tests.scan import ScanModule
@@ -125,15 +125,11 @@ def test_register_provider_override(di: PyxDI) -> None:
 
 
 def test_register_provider_named(di: PyxDI) -> None:
-    di.register_provider(
-        Annotated[str, Named("msg1")], lambda: "test1", scope="singleton"
-    )
-    di.register_provider(
-        Annotated[str, Named("msg2")], lambda: "test2", scope="singleton"
-    )
+    di.register_provider(Annotated[str, "msg1"], lambda: "test1", scope="singleton")
+    di.register_provider(Annotated[str, "msg2"], lambda: "test2", scope="singleton")
 
-    assert Annotated[str, Named("msg1")] in di.providers
-    assert Annotated[str, Named("msg2")] in di.providers
+    assert Annotated[str, "msg1"] in di.providers
+    assert Annotated[str, "msg2"] in di.providers
 
 
 def test_register_provider_via_constructor() -> None:
@@ -594,33 +590,33 @@ async def test_register_async_events(di: PyxDI) -> None:
 class TestModule(Module):
     def configure(self, di: PyxDI) -> None:
         di.register_provider(
-            Annotated[str, Named("msg1")], lambda: "Message 1", scope="singleton"
+            Annotated[str, "msg1"], lambda: "Message 1", scope="singleton"
         )
 
     @provider(scope="singleton")
-    def provide_msg2(self) -> Annotated[str, Named("msg2")]:
+    def provide_msg2(self) -> Annotated[str, "msg2"]:
         return "Message 2"
 
 
 def test_register_modules() -> None:
     di = PyxDI(modules=[TestModule])
 
-    assert di.has_provider(Annotated[str, Named("msg1")])
-    assert di.has_provider(Annotated[str, Named("msg2")])
+    assert di.has_provider(Annotated[str, "msg1"])
+    assert di.has_provider(Annotated[str, "msg2"])
 
 
 def test_register_module_class(di: PyxDI) -> None:
     di.register_module(TestModule)
 
-    assert di.has_provider(Annotated[str, Named("msg1")])
-    assert di.has_provider(Annotated[str, Named("msg2")])
+    assert di.has_provider(Annotated[str, "msg1"])
+    assert di.has_provider(Annotated[str, "msg2"])
 
 
 def test_register_module_instance(di: PyxDI) -> None:
     di.register_module(TestModule())
 
-    assert di.has_provider(Annotated[str, Named("msg1")])
-    assert di.has_provider(Annotated[str, Named("msg2")])
+    assert di.has_provider(Annotated[str, "msg1"])
+    assert di.has_provider(Annotated[str, "msg2"])
 
 
 def test_register_module_function(di: PyxDI) -> None:
@@ -634,15 +630,15 @@ def test_register_module_function(di: PyxDI) -> None:
 
 class OrderedModule(Module):
     @provider(scope="singleton")
-    def dep3(self) -> Annotated[str, Named("dep3")]:
+    def dep3(self) -> Annotated[str, "dep3"]:
         return "dep3"
 
     @provider(scope="singleton")
-    def dep1(self) -> Annotated[str, Named("dep1")]:
+    def dep1(self) -> Annotated[str, "dep1"]:
         return "dep1"
 
     @provider(scope="singleton")
-    def dep2(self) -> Annotated[str, Named("dep2")]:
+    def dep2(self) -> Annotated[str, "dep2"]:
         return "dep2"
 
 
@@ -650,9 +646,9 @@ def test_register_module_ordered_providers(di: PyxDI) -> None:
     di.register_module(OrderedModule)
 
     assert list(di.providers.keys()) == [
-        Annotated[str, Named("dep3")],
-        Annotated[str, Named("dep1")],
-        Annotated[str, Named("dep2")],
+        Annotated[str, "dep3"],
+        Annotated[str, "dep1"],
+        Annotated[str, "dep2"],
     ]
 
 
