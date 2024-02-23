@@ -7,7 +7,6 @@ from .types import Scope
 
 __all__ = [
     "dep",
-    "inject",
     "Module",
     "provider",
     "Provider",
