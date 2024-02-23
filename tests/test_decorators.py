@@ -1,5 +1,5 @@
 from pyxdi.core import Module
-from pyxdi.decorators import inject, provider, request, singleton, transient
+from pyxdi.decorators import provider, request, singleton, transient
 
 from tests.fixtures import Service
 
@@ -14,33 +14,6 @@ def test_provider() -> None:
         "scope": "singleton",
         "override": True,
     }
-
-
-def test_inject_no_args() -> None:
-    @inject
-    def my_func() -> None:
-        pass
-
-    assert getattr(my_func, "__pyxdi_inject__") is True
-    assert getattr(my_func, "__pyxdi_tags__") is None
-
-
-def test_inject_no_args_provided() -> None:
-    @inject()
-    def my_func() -> None:
-        pass
-
-    assert getattr(my_func, "__pyxdi_inject__") is True
-    assert getattr(my_func, "__pyxdi_tags__") is None
-
-
-def test_inject() -> None:
-    @inject(tags=["tag1", "tag2"])
-    def my_func() -> None:
-        pass
-
-    assert getattr(my_func, "__pyxdi_inject__") is True
-    assert getattr(my_func, "__pyxdi_tags__") == ["tag1", "tag2"]
 
 
 def test_request() -> None:

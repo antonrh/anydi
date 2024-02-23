@@ -85,6 +85,7 @@ exclude_also = [
     "@abc.abstractmethod",
     "if TYPE_CHECKING",
     "if t.TYPE_CHECKING",
+    "@overload",
     "@t.overload",
     "raise NotImplementedError",
     "except ImportError:",

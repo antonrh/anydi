@@ -580,12 +580,12 @@ class Service:
 `handlers.py` uses the Service class:
 
 ```python
-from pyxdi import dep, inject
+from pyxdi import dep, injectable
 
 from app.services import Service
 
 
-@inject
+@injectable
 def my_handler(service: Service = dep) -> None:
     print(f"Hello, from service `{service.name}`")
 ```

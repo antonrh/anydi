@@ -1,7 +1,8 @@
 """PyxDI public objects and functions."""
 from .api import dep
 from .core import Module, Provider, PyxDI
-from .decorators import inject, provider, request, singleton, transient
+from .decorators import provider, request, singleton, transient
+from .scanner import injectable
 from .types import Scope
 
 __all__ = [
@@ -15,4 +16,5 @@ __all__ = [
     "singleton",
     "request",
     "transient",
+    "injectable",
 ]

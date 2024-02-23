@@ -4,15 +4,31 @@ import importlib
 import inspect
 import pkgutil
 from types import ModuleType
-from typing import TYPE_CHECKING, Any, Iterable, List, Optional, Union, cast
+from typing import (
+    TYPE_CHECKING,
+    Any,
+    Awaitable,
+    Callable,
+    Iterable,
+    List,
+    Optional,
+    TypeVar,
+    Union,
+    cast,
+    overload,
+)
 
-from typing_extensions import final
+from typing_extensions import ParamSpec, final
 
 from .types import DependencyMark
 from .utils import get_signature
 
 if TYPE_CHECKING:
     from .core import PyxDI
+
+
+T_Retval = TypeVar("T_Retval")
+T_ParamSpec = ParamSpec("T_ParamSpec")
 
 
 class ScannedDependency:
@@ -123,16 +139,16 @@ class DependencyScanner:
             ):
                 continue
 
-            member_tags = getattr(member, "__pyxdi_tags__", [])
+            injectable_tags = getattr(member, "__injectable_tags__", [])
             if tags and (
-                member_tags
-                and not set(member_tags).intersection(tags)
-                or not member_tags
+                injectable_tags
+                and not set(injectable_tags).intersection(tags)
+                or not injectable_tags
             ):
                 continue
 
-            injected = getattr(member, "__pyxdi_inject__", None)
-            if injected:
+            injectable = getattr(member, "__injectable__", None)
+            if injectable:
                 dependencies.append(
                     self._create_scanned_dependency(member=member, module=module)
                 )
@@ -167,3 +183,53 @@ class DependencyScanner:
         if hasattr(member, "__wrapped__"):
             member = member.__wrapped__
         return ScannedDependency(member=member, module=module)
+
+
+@overload
+def injectable(obj: Callable[T_ParamSpec, T_Retval]) -> Callable[T_ParamSpec, T_Retval]:
+    ...
+
+
+@overload
+def injectable(
+    *, tags: Optional[Iterable[str]] = None
+) -> Callable[
+    [Callable[T_ParamSpec, Union[T_Retval, Awaitable[T_Retval]]]],
+    Callable[T_ParamSpec, Union[T_Retval, Awaitable[T_Retval]]],
+]:
+    ...
+
+
+def injectable(  # type: ignore[misc]
+    obj: Optional[Callable[T_ParamSpec, Union[T_Retval, Awaitable[T_Retval]]]] = None,
+    tags: Optional[Iterable[str]] = None,
+) -> Union[
+    Callable[
+        [Callable[T_ParamSpec, Union[T_Retval, Awaitable[T_Retval]]]],
+        Callable[T_ParamSpec, Union[T_Retval, Awaitable[T_Retval]]],
+    ],
+    Callable[T_ParamSpec, Union[T_Retval, Awaitable[T_Retval]]],
+]:
+    """Decorator for marking a function or method as requiring dependency injection.
+
+    Args:
+        obj: The target function or method to be decorated.
+        tags: Optional tags to associate with the injection point.
+
+    Returns:
+        If `obj` is provided, returns the decorated target function or method.
+        If `obj` is not provided, returns a decorator that can be used to mark
+        a function or method as requiring dependency injection.
+    """
+
+    def decorator(
+        obj: Callable[T_ParamSpec, Union[T_Retval, Awaitable[T_Retval]]],
+    ) -> Callable[T_ParamSpec, Union[T_Retval, Awaitable[T_Retval]]]:
+        setattr(obj, "__injectable__", True)
+        setattr(obj, "__injectable_tags__", tags)
+        return obj
+
+    if obj is None:
+        return decorator
+
+    return decorator(obj)

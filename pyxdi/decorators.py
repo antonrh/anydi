@@ -41,56 +41,6 @@ def provider(
     return decorator
 
 
-@t.overload
-def inject(obj: t.Callable[P, T]) -> t.Callable[P, T]:
-    ...
-
-
-@t.overload
-def inject(
-    *, tags: t.Optional[t.Iterable[str]] = None
-) -> t.Callable[
-    [t.Callable[P, t.Union[T, t.Awaitable[T]]]],
-    t.Callable[P, t.Union[T, t.Awaitable[T]]],
-]:
-    ...
-
-
-def inject(  # type: ignore[misc]
-    obj: t.Union[t.Callable[P, t.Union[T, t.Awaitable[T]]], None] = None,
-    tags: t.Optional[t.Iterable[str]] = None,
-) -> t.Union[
-    t.Callable[
-        [t.Callable[P, t.Union[T, t.Awaitable[T]]]],
-        t.Callable[P, t.Union[T, t.Awaitable[T]]],
-    ],
-    t.Callable[P, t.Union[T, t.Awaitable[T]]],
-]:
-    """Decorator for marking a function or method as requiring dependency injection.
-
-    Args:
-        obj: The target function or method to be decorated.
-        tags: Optional tags to associate with the injection point.
-
-    Returns:
-        If `obj` is provided, returns the decorated target function or method.
-        If `obj` is not provided, returns a decorator that can be used to mark
-        a function or method as requiring dependency injection.
-    """
-
-    def decorator(
-        obj: t.Callable[P, t.Union[T, t.Awaitable[T]]],
-    ) -> t.Callable[P, t.Union[T, t.Awaitable[T]]]:
-        setattr(obj, "__pyxdi_inject__", True)
-        setattr(obj, "__pyxdi_tags__", tags)
-        return obj
-
-    if obj is None:
-        return decorator
-
-    return decorator(obj)
-
-
 def transient(target: T) -> T:
     """Decorator for marking a class as transient scope.
 
