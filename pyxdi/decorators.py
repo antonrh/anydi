@@ -3,7 +3,8 @@ import typing as t
 
 from typing_extensions import Concatenate, ParamSpec
 
-from .core import Module, Scope
+from .core import Module
+from .types import Scope
 
 T = t.TypeVar("T", bound=t.Any)
 M = t.TypeVar("M", bound=Module)

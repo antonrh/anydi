@@ -22,9 +22,9 @@ except ImportError:
     NoneType = type(None)  # type: ignore[assignment,misc]
 
 
+from .types import Scope
 from .utils import get_full_qualname, get_signature, is_builtin_type, run_async
 
-Scope = t.Literal["transient", "singleton", "request"]
 T = t.TypeVar("T", bound=t.Any)
 P = ParamSpec("P")
 AnyInterface: t.TypeAlias = t.Union[t.Type[t.Any], Annotated[t.Any, ...]]
