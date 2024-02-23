@@ -22,7 +22,7 @@ except ImportError:
     NoneType = type(None)  # type: ignore[assignment,misc]
 
 
-from .types import Scope
+from .types import DependencyMark, Scope
 from .utils import get_full_qualname, get_signature, is_builtin_type, run_async
 
 T = t.TypeVar("T", bound=t.Any)
@@ -132,16 +132,6 @@ class Provider:
             True if the provider object is a resource, False otherwise.
         """
         return self.is_generator or self.is_async_generator
-
-
-class DependencyMark:
-    """A marker class used to represent a dependency mark."""
-
-    __slots__ = ()
-
-
-# Dependency mark with Any type
-dep = t.cast(t.Any, DependencyMark())
 
 
 @t.final

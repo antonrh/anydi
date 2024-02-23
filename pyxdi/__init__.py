@@ -1,5 +1,6 @@
 """PyxDI public objects and functions."""
-from .core import Module, Provider, PyxDI, dep
+from .api import dep
+from .core import Module, Provider, PyxDI
 from .decorators import inject, provider, request, singleton, transient
 from .types import Scope
 
