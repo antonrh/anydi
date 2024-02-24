@@ -5,7 +5,7 @@ from typing_extensions import Concatenate, ParamSpec
 
 from .core import Module, Scope
 
-T = t.TypeVar("T", bound=t.Any)
+T = t.TypeVar("T")
 M = t.TypeVar("M", bound=Module)
 P = ParamSpec("P")
 
@@ -48,22 +48,19 @@ def inject(obj: t.Callable[P, T]) -> t.Callable[P, T]:
 @t.overload
 def inject(
     *, tags: t.Optional[t.Iterable[str]] = None
-) -> t.Callable[
-    [t.Callable[P, t.Union[T, t.Awaitable[T]]]],
-    t.Callable[P, t.Union[T, t.Awaitable[T]]],
-]:
+) -> t.Callable[[t.Callable[P, T]], t.Callable[P, T]]:
     ...
 
 
-def inject(  # type: ignore[misc]
-    obj: t.Union[t.Callable[P, t.Union[T, t.Awaitable[T]]], None] = None,
+def inject(
+    obj: t.Optional[t.Callable[P, T]] = None,
     tags: t.Optional[t.Iterable[str]] = None,
 ) -> t.Union[
     t.Callable[
-        [t.Callable[P, t.Union[T, t.Awaitable[T]]]],
-        t.Callable[P, t.Union[T, t.Awaitable[T]]],
+        [t.Callable[P, T]],
+        t.Callable[P, T],
     ],
-    t.Callable[P, t.Union[T, t.Awaitable[T]]],
+    t.Callable[P, T],
 ]:
     """Decorator for marking a function or method as requiring dependency injection.
 
@@ -77,9 +74,7 @@ def inject(  # type: ignore[misc]
         a function or method as requiring dependency injection.
     """
 
-    def decorator(
-        obj: t.Callable[P, t.Union[T, t.Awaitable[T]]],
-    ) -> t.Callable[P, t.Union[T, t.Awaitable[T]]]:
+    def decorator(obj: t.Callable[P, T]) -> t.Callable[P, T]:
         setattr(obj, "__pyxdi_inject__", True)
         setattr(obj, "__pyxdi_tags__", tags)
         return obj
