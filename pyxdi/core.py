@@ -1200,37 +1200,6 @@ class TransientContext(ScopedContext):
         return t.cast(T, instance)
 
 
-class ModuleMeta(type):
-    """A metaclass used for the Module base class.
-
-    This metaclass extracts provider information from the class attributes
-    and stores it in the `providers` attribute.
-    """
-
-    def __new__(
-        cls, name: str, bases: t.Tuple[type, ...], attrs: t.Dict[str, t.Any]
-    ) -> t.Any:
-        """Create a new instance of the ModuleMeta class.
-
-        This method extracts provider information from the class attributes and
-        stores it in the `providers` attribute.
-
-        Args:
-            name: The name of the class.
-            bases: The base classes of the class.
-            attrs: The attributes of the class.
-
-        Returns:
-            The new instance of the class.
-        """
-        attrs["providers"] = [
-            (name, getattr(value, "__pyxdi_provider__", {}))
-            for name, value in attrs.items()
-            if hasattr(value, "__pyxdi_provider__")
-        ]
-        return super().__new__(cls, name, bases, attrs)
-
-
 @dataclass(frozen=True)
 class ScannedDependency:
     """Represents a scanned dependency.
@@ -1386,6 +1355,37 @@ class DependencyScanner:
         if hasattr(member, "__wrapped__"):
             member = member.__wrapped__
         return ScannedDependency(member=member, module=module)
+
+
+class ModuleMeta(type):
+    """A metaclass used for the Module base class.
+
+    This metaclass extracts provider information from the class attributes
+    and stores it in the `providers` attribute.
+    """
+
+    def __new__(
+        cls, name: str, bases: t.Tuple[type, ...], attrs: t.Dict[str, t.Any]
+    ) -> t.Any:
+        """Create a new instance of the ModuleMeta class.
+
+        This method extracts provider information from the class attributes and
+        stores it in the `providers` attribute.
+
+        Args:
+            name: The name of the class.
+            bases: The base classes of the class.
+            attrs: The attributes of the class.
+
+        Returns:
+            The new instance of the class.
+        """
+        attrs["providers"] = [
+            (name, getattr(value, "__pyxdi_provider__", {}))
+            for name, value in attrs.items()
+            if hasattr(value, "__pyxdi_provider__")
+        ]
+        return super().__new__(cls, name, bases, attrs)
 
 
 class Module(metaclass=ModuleMeta):
