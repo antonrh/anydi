@@ -893,8 +893,8 @@ class PyxDI:
 class ScopedContext(abc.ABC):
     """ScopedContext base class."""
 
-    def __init__(self, root: PyxDI) -> None:
-        self.root = root
+    def __init__(self, container: PyxDI) -> None:
+        self.container = container
 
     @abc.abstractmethod
     def get(self, interface: Interface[T], provider: Provider) -> T:
@@ -972,7 +972,7 @@ class ScopedContext(abc.ABC):
         """
         args, kwargs = [], {}
         for parameter in provider.parameters.values():
-            instance = self.root.get_instance(parameter.annotation)
+            instance = self.container.get_instance(parameter.annotation)
             if parameter.kind == parameter.POSITIONAL_ONLY:
                 args.append(instance)
             else:
@@ -992,7 +992,7 @@ class ScopedContext(abc.ABC):
         """
         args, kwargs = [], {}
         for parameter in provider.parameters.values():
-            instance = await self.root.aget_instance(parameter.annotation)
+            instance = await self.container.aget_instance(parameter.annotation)
             if parameter.kind == parameter.POSITIONAL_ONLY:
                 args.append(instance)
             else:
@@ -1003,9 +1003,9 @@ class ScopedContext(abc.ABC):
 class ResourceScopedContext(ScopedContext):
     """ScopedContext with closable resources support."""
 
-    def __init__(self, root: PyxDI) -> None:
+    def __init__(self, container: PyxDI) -> None:
         """Initialize the ScopedContext."""
-        super().__init__(root)
+        super().__init__(container)
         self._instances: t.Dict[t.Type[t.Any], t.Any] = {}
         self._stack = contextlib.ExitStack()
         self._async_stack = contextlib.AsyncExitStack()
@@ -1249,8 +1249,8 @@ class DependencyScanner:
     """A class for scanning packages or modules for decorated objects
     and injecting dependencies."""
 
-    def __init__(self, root: PyxDI) -> None:
-        self.root = root
+    def __init__(self, container: PyxDI) -> None:
+        self.container = container
 
     def scan(
         self,
@@ -1283,7 +1283,7 @@ class DependencyScanner:
             dependencies.extend(self._scan_package(package, tags=tags))
 
         for dependency in dependencies:
-            decorator = self.root.inject()(dependency.member)
+            decorator = self.container.inject()(dependency.member)
             setattr(dependency.module, dependency.member.__name__, decorator)
 
     def _scan_package(
