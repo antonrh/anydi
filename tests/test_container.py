@@ -7,8 +7,8 @@ import pytest
 from typing_extensions import Annotated
 
 from pyxdi import (
+    Container,
     Provider,
-    PyxDI,
     Scope,
     dep,
     request,
@@ -20,15 +20,15 @@ from tests.fixtures import Service
 
 
 @pytest.fixture
-def di() -> PyxDI:
-    return PyxDI()
+def container() -> Container:
+    return Container()
 
 
 # Root
 
 
-def test_default_strict(di: PyxDI) -> None:
-    assert di.strict
+def test_default_strict(container: Container) -> None:
+    assert container.strict
 
 
 # Provider
@@ -89,104 +89,112 @@ def test_provider_name() -> None:
     )
 
 
-def test_has_provider(di: PyxDI) -> None:
-    di.register_provider(str, lambda: "test", scope="singleton")
+def test_has_provider(container: Container) -> None:
+    container.register_provider(str, lambda: "test", scope="singleton")
 
-    assert di.has_provider(str)
-
-
-def test_has_no_provider(di: PyxDI) -> None:
-    assert not di.has_provider(str)
+    assert container.has_provider(str)
 
 
-def test_register_provider(di: PyxDI) -> None:
+def test_has_no_provider(container: Container) -> None:
+    assert not container.has_provider(str)
+
+
+def test_register_provider(container: Container) -> None:
     def provider_obj() -> str:
         return "test"
 
-    provider = di.register_provider(str, provider_obj, scope="transient")
+    provider = container.register_provider(str, provider_obj, scope="transient")
 
     assert provider.obj == provider_obj
     assert provider.scope == "transient"
 
 
-def test_register_provider_already_registered(di: PyxDI) -> None:
-    di.register_provider(str, lambda: "test", scope="singleton")
+def test_register_provider_already_registered(container: Container) -> None:
+    container.register_provider(str, lambda: "test", scope="singleton")
 
     with pytest.raises(LookupError) as exc_info:
-        di.register_provider(str, lambda: "other", scope="singleton")
+        container.register_provider(str, lambda: "other", scope="singleton")
 
     assert str(exc_info.value) == "The provider interface `str` already registered."
 
 
-def test_register_provider_override(di: PyxDI) -> None:
-    di.register_provider(str, lambda: "test", scope="singleton")
+def test_register_provider_override(container: Container) -> None:
+    container.register_provider(str, lambda: "test", scope="singleton")
 
     def overriden_provider_obj() -> str:
         return "test"
 
-    provider = di.register_provider(
+    provider = container.register_provider(
         str, overriden_provider_obj, scope="singleton", override=True
     )
 
     assert provider.obj == overriden_provider_obj
 
 
-def test_register_provider_named(di: PyxDI) -> None:
-    di.register_provider(Annotated[str, "msg1"], lambda: "test1", scope="singleton")
-    di.register_provider(Annotated[str, "msg2"], lambda: "test2", scope="singleton")
+def test_register_provider_named(container: Container) -> None:
+    container.register_provider(
+        Annotated[str, "msg1"],
+        lambda: "test1",
+        scope="singleton",
+    )
+    container.register_provider(
+        Annotated[str, "msg2"],
+        lambda: "test2",
+        scope="singleton",
+    )
 
-    assert Annotated[str, "msg1"] in di.providers
-    assert Annotated[str, "msg2"] in di.providers
+    assert Annotated[str, "msg1"] in container.providers
+    assert Annotated[str, "msg2"] in container.providers
 
 
 def test_register_provider_via_constructor() -> None:
-    di = PyxDI(
+    container = Container(
         providers={
             str: Provider(obj=lambda: "test", scope="singleton"),
             int: Provider(obj=lambda: 1, scope="singleton"),
         }
     )
 
-    assert di.get_instance(str) == "test"
-    assert di.get_instance(int) == 1
+    assert container.get_instance(str) == "test"
+    assert container.get_instance(int) == 1
 
 
-def test_unregister_singleton_scoped_provider(di: PyxDI) -> None:
-    di.register_provider(str, lambda: "test", scope="singleton")
+def test_unregister_singleton_scoped_provider(container: Container) -> None:
+    container.register_provider(str, lambda: "test", scope="singleton")
 
-    assert str in di.providers
+    assert str in container.providers
 
-    di.unregister_provider(str)
+    container.unregister_provider(str)
 
-    assert str not in di.providers
-
-
-def test_unregister_request_scoped_provider(di: PyxDI) -> None:
-    di.register_provider(str, lambda: "test", scope="request")
-
-    assert str in di.providers
-
-    di.unregister_provider(str)
-
-    assert str not in di.providers
+    assert str not in container.providers
 
 
-def test_unregister_not_registered_provider(di: PyxDI) -> None:
+def test_unregister_request_scoped_provider(container: Container) -> None:
+    container.register_provider(str, lambda: "test", scope="request")
+
+    assert str in container.providers
+
+    container.unregister_provider(str)
+
+    assert str not in container.providers
+
+
+def test_unregister_not_registered_provider(container: Container) -> None:
     with pytest.raises(LookupError) as exc_info:
-        di.unregister_provider(str)
+        container.unregister_provider(str)
 
     assert str(exc_info.value) == "The provider interface `str` not registered."
 
 
-def test_get_provider(di: PyxDI) -> None:
-    provider = di.register_provider(str, lambda: "str", scope="singleton")
+def test_get_provider(container: Container) -> None:
+    provider = container.register_provider(str, lambda: "str", scope="singleton")
 
-    assert di.get_provider(str) == provider
+    assert container.get_provider(str) == provider
 
 
-def test_get_provider_not_registered(di: PyxDI) -> None:
+def test_get_provider_not_registered(container: Container) -> None:
     with pytest.raises(LookupError) as exc_info:
-        assert di.get_provider(str)
+        assert container.get_provider(str)
 
     assert str(exc_info.value) == (
         "The provider interface for `str` has not been registered. Please ensure that "
@@ -198,18 +206,18 @@ def test_get_provider_not_registered(di: PyxDI) -> None:
 
 
 def test_get_auto_registered_provider_scope_defined() -> None:
-    di = PyxDI(strict=False)
+    container = Container(strict=False)
 
     class Service:
         __scope__ = "singleton"
 
-    assert di.get_provider(Service).scope == "singleton"
+    assert container.get_provider(Service).scope == "singleton"
 
 
 def test_get_auto_registered_provider_scope_from_sub_provider_request() -> None:
-    di = PyxDI(strict=False)
+    container = Container(strict=False)
 
-    @di.provider(scope="request")
+    @container.provider(scope="request")
     def message() -> str:
         return "test"
 
@@ -217,16 +225,16 @@ def test_get_auto_registered_provider_scope_from_sub_provider_request() -> None:
     class Service:
         message: str
 
-    with di.request_context():
-        _ = di.get_instance(Service)
+    with container.request_context():
+        _ = container.get_instance(Service)
 
-    assert di.get_provider(Service).scope == "request"
+    assert container.get_provider(Service).scope == "request"
 
 
 def test_get_auto_registered_provider_scope_from_sub_provider_transient() -> None:
-    di = PyxDI(strict=False)
+    container = Container(strict=False)
 
-    @di.provider(scope="transient")
+    @container.provider(scope="transient")
     def uuid_generator() -> Annotated[str, "uuid_generator"]:
         return str(uuid.uuid4())
 
@@ -234,13 +242,13 @@ def test_get_auto_registered_provider_scope_from_sub_provider_transient() -> Non
     class Entity:
         id: Annotated[str, "uuid_generator"]
 
-    _ = di.get_instance(Entity)
+    _ = container.get_instance(Entity)
 
-    assert di.get_provider(Entity).scope == "transient"
+    assert container.get_provider(Entity).scope == "transient"
 
 
 def test_get_auto_registered_nested_singleton_provider() -> None:
-    di = PyxDI(strict=False)
+    container = Container(strict=False)
 
     @dataclass
     class Repository:
@@ -250,14 +258,14 @@ def test_get_auto_registered_nested_singleton_provider() -> None:
     class Service:
         repository: Repository
 
-    with di.request_context():
-        _ = di.get_instance(Service)
+    with container.request_context():
+        _ = container.get_instance(Service)
 
-    assert di.get_provider(Service).scope == "singleton"
+    assert container.get_provider(Service).scope == "singleton"
 
 
 def test_get_auto_registered_missing_scope() -> None:
-    di = PyxDI(strict=False)
+    container = Container(strict=False)
 
     @dataclass
     class Repository:
@@ -268,7 +276,7 @@ def test_get_auto_registered_missing_scope() -> None:
         repository: Repository
 
     with pytest.raises(TypeError) as exc_info:
-        _ = di.get_instance(Service)
+        _ = container.get_instance(Service)
 
     assert str(exc_info.value) == (
         "Unable to automatically register the provider interface for "
@@ -279,14 +287,14 @@ def test_get_auto_registered_missing_scope() -> None:
 
 
 def test_get_auto_registered_with_primitive_class() -> None:
-    di = PyxDI(strict=False)
+    container = Container(strict=False)
 
     @dataclass
     class Service:
         name: str
 
     with pytest.raises(LookupError) as exc_info:
-        _ = di.get_instance(Service).name
+        _ = container.get_instance(Service).name
 
     assert str(exc_info.value) == (
         "The provider interface for `str` has not been registered. "
@@ -299,11 +307,11 @@ def test_inject_auto_registered_log_message(caplog: pytest.LogCaptureFixture) ->
     class Service:
         pass
 
-    di = PyxDI(strict=False)
+    container = Container(strict=False)
 
     with caplog.at_level(logging.DEBUG, logger="pyxdi"):
 
-        @di.inject
+        @container.inject
         def handler(service: Service = dep) -> None:
             pass
 
@@ -319,9 +327,9 @@ def test_inject_auto_registered_log_message(caplog: pytest.LogCaptureFixture) ->
 # Validators
 
 
-def test_register_provider_invalid_scope(di: PyxDI) -> None:
+def test_register_provider_invalid_scope(container: Container) -> None:
     with pytest.raises(ValueError) as exc_info:
-        di.register_provider(
+        container.register_provider(
             str,
             lambda: "test",
             scope="invalid",  # type: ignore[arg-type]
@@ -334,12 +342,12 @@ def test_register_provider_invalid_scope(di: PyxDI) -> None:
     )
 
 
-def test_register_provider_invalid_transient_resource(di: PyxDI) -> None:
+def test_register_provider_invalid_transient_resource(container: Container) -> None:
     def provider_obj() -> t.Iterator[str]:
         yield "test"
 
     with pytest.raises(TypeError) as exc_info:
-        di.register_provider(str, provider_obj, scope="transient")
+        container.register_provider(str, provider_obj, scope="transient")
 
     assert str(exc_info.value) == (
         "The resource provider `tests.test_container"
@@ -349,12 +357,14 @@ def test_register_provider_invalid_transient_resource(di: PyxDI) -> None:
     )
 
 
-def test_register_provider_invalid_transient_async_resource(di: PyxDI) -> None:
+def test_register_provider_invalid_transient_async_resource(
+    container: Container,
+) -> None:
     async def provider_obj() -> t.AsyncIterator[str]:
         yield "test"
 
     with pytest.raises(TypeError) as exc_info:
-        di.register_provider(str, provider_obj, scope="transient")
+        container.register_provider(str, provider_obj, scope="transient")
 
     assert str(exc_info.value) == (
         "The resource provider `tests.test_container"
@@ -365,31 +375,31 @@ def test_register_provider_invalid_transient_async_resource(di: PyxDI) -> None:
     )
 
 
-def test_register_provider_valid_resource(di: PyxDI) -> None:
+def test_register_provider_valid_resource(container: Container) -> None:
     def provider_obj1() -> t.Iterator[str]:
         yield "test"
 
     def provider_obj2() -> t.Iterator[int]:
         yield 100
 
-    di.register_provider(str, provider_obj1, scope="singleton")
-    di.register_provider(int, provider_obj2, scope="request")
+    container.register_provider(str, provider_obj1, scope="singleton")
+    container.register_provider(int, provider_obj2, scope="request")
 
 
-def test_register_provider_valid_async_resource(di: PyxDI) -> None:
+def test_register_provider_valid_async_resource(container: Container) -> None:
     async def provider_obj1() -> t.AsyncIterator[str]:
         yield "test"
 
     async def provider_obj2() -> t.AsyncIterator[int]:
         yield 100
 
-    di.register_provider(str, provider_obj1, scope="singleton")
-    di.register_provider(int, provider_obj2, scope="request")
+    container.register_provider(str, provider_obj1, scope="singleton")
+    container.register_provider(int, provider_obj2, scope="request")
 
 
-def test_register_invalid_provider_type(di: PyxDI) -> None:
+def test_register_invalid_provider_type(container: Container) -> None:
     with pytest.raises(TypeError) as exc_info:
-        di.register_provider(str, "Test", scope="singleton")  # type: ignore[arg-type]
+        container.register_provider(str, "Test", scope="singleton")  # type: ignore[arg-type]
 
     assert str(exc_info.value) == (
         "The provider `Test` is invalid because it is not a callable object. Only "
@@ -398,11 +408,11 @@ def test_register_invalid_provider_type(di: PyxDI) -> None:
     )
 
 
-def test_register_valid_class_provider(di: PyxDI) -> None:
+def test_register_valid_class_provider(container: Container) -> None:
     class Klass:
         pass
 
-    provider = di.register_provider(str, Klass, scope="singleton")
+    provider = container.register_provider(str, Klass, scope="singleton")
 
     assert provider.is_class
 
@@ -440,7 +450,7 @@ def test_register_valid_class_provider(di: PyxDI) -> None:
     ],
 )
 def test_register_provider_match_scopes(
-    di: PyxDI, scope1: Scope, scope2: Scope, scope3: Scope, valid: bool
+    container: Container, scope1: Scope, scope2: Scope, scope3: Scope, valid: bool
 ) -> None:
     def a() -> int:
         return 2
@@ -452,9 +462,9 @@ def test_register_provider_match_scopes(
         return f"{a} * {b} = {a * b}"
 
     try:
-        di.register_provider(int, a, scope=scope3)
-        di.register_provider(float, b, scope=scope2)
-        di.register_provider(str, mixed, scope=scope1)
+        container.register_provider(int, a, scope=scope3)
+        container.register_provider(float, b, scope=scope2)
+        container.register_provider(str, mixed, scope=scope1)
     except ValueError:
         result = False
     else:
@@ -463,17 +473,17 @@ def test_register_provider_match_scopes(
     assert result == valid
 
 
-def test_register_provider_match_scopes_error(di: PyxDI) -> None:
+def test_register_provider_match_scopes_error(container: Container) -> None:
     def provider_int() -> int:
         return 1000
 
     def provider_str(n: int) -> str:
         return f"{n}"
 
-    di.register_provider(int, provider_int, scope="request")
+    container.register_provider(int, provider_int, scope="request")
 
     with pytest.raises(ValueError) as exc_info:
-        di.register_provider(str, provider_str, scope="singleton")
+        container.register_provider(str, provider_str, scope="singleton")
 
     assert str(exc_info.value) == (
         "The provider `tests.test_container.test_register_provider_match_scopes_error"
@@ -485,17 +495,17 @@ def test_register_provider_match_scopes_error(di: PyxDI) -> None:
     )
 
 
-def test_register_provider_without_annotation(di: PyxDI) -> None:
+def test_register_provider_without_annotation(container: Container) -> None:
     def service_ident() -> str:
         return "10000"
 
     def service(ident) -> Service:  # type: ignore[no-untyped-def]
         return Service(ident=ident)
 
-    di.register_provider(str, service_ident, scope="singleton")
+    container.register_provider(str, service_ident, scope="singleton")
 
     with pytest.raises(TypeError) as exc_info:
-        di.register_provider(Service, service, scope="singleton")
+        container.register_provider(Service, service, scope="singleton")
 
     assert str(exc_info.value) == (
         "Missing provider "
@@ -504,12 +514,14 @@ def test_register_provider_without_annotation(di: PyxDI) -> None:
     )
 
 
-def test_register_provider_with_not_registered_sub_provider(di: PyxDI) -> None:
+def test_register_provider_with_not_registered_sub_provider(
+    container: Container,
+) -> None:
     def dep2(dep1: int) -> str:
         return str(dep1)
 
     with pytest.raises(LookupError) as exc_info:
-        di.register_provider(str, dep2, scope="singleton")
+        container.register_provider(str, dep2, scope="singleton")
 
     assert str(exc_info.value) == (
         "The provider "
@@ -520,33 +532,33 @@ def test_register_provider_with_not_registered_sub_provider(di: PyxDI) -> None:
     )
 
 
-def test_register_events(di: PyxDI) -> None:
+def test_register_events(container: Container) -> None:
     events = []
 
-    @di.provider(scope="singleton")
+    @container.provider(scope="singleton")
     def message() -> str:
         return "test"
 
-    @di.provider(scope="singleton")
+    @container.provider(scope="singleton")
     def event_1(message: str) -> t.Iterator[None]:
         events.append(f"event_1: before {message}")
         yield
         events.append(f"event_1: after {message}")
 
-    @di.provider(scope="singleton")
+    @container.provider(scope="singleton")
     def event_2(message: str) -> t.Iterator[None]:
         events.append(f"event_2: before {message}")
         yield
         events.append(f"event_2: after {message}")
 
-    di.start()
+    container.start()
 
     assert events == [
         "event_1: before test",
         "event_2: before test",
     ]
 
-    di.close()
+    container.close()
 
     assert events == [
         "event_1: before test",
@@ -556,33 +568,33 @@ def test_register_events(di: PyxDI) -> None:
     ]
 
 
-async def test_register_async_events(di: PyxDI) -> None:
+async def test_register_async_events(container: Container) -> None:
     events = []
 
-    @di.provider(scope="singleton")
+    @container.provider(scope="singleton")
     def message() -> str:
         return "test"
 
-    @di.provider(scope="singleton")
+    @container.provider(scope="singleton")
     async def event_1(message: str) -> t.AsyncIterator[None]:
         events.append(f"event_1: before {message}")
         yield
         events.append(f"event_1: after {message}")
 
-    @di.provider(scope="singleton")
+    @container.provider(scope="singleton")
     def event_2(message: str) -> t.Iterator[None]:
         events.append(f"event_2: before {message}")
         yield
         events.append(f"event_2: after {message}")
 
-    await di.astart()
+    await container.astart()
 
     assert events == [
         "event_1: before test",
         "event_2: before test",
     ]
 
-    await di.aclose()
+    await container.aclose()
 
     assert events == [
         "event_1: before test",
@@ -595,7 +607,7 @@ async def test_register_async_events(di: PyxDI) -> None:
 # Lifespan
 
 
-def test_start_and_close_singleton_context(di: PyxDI) -> None:
+def test_start_and_close_singleton_context(container: Container) -> None:
     events = []
 
     def dep1() -> t.Iterator[str]:
@@ -603,18 +615,18 @@ def test_start_and_close_singleton_context(di: PyxDI) -> None:
         yield "test"
         events.append("dep1:after")
 
-    di.register_provider(str, dep1, scope="singleton")
+    container.register_provider(str, dep1, scope="singleton")
 
-    di.start()
+    container.start()
 
-    assert di.get_instance(str) == "test"
+    assert container.get_instance(str) == "test"
 
-    di.close()
+    container.close()
 
     assert events == ["dep1:before", "dep1:after"]
 
 
-def test_request_context(di: PyxDI) -> None:
+def test_request_context(container: Container) -> None:
     events = []
 
     def dep1() -> t.Iterator[str]:
@@ -622,10 +634,10 @@ def test_request_context(di: PyxDI) -> None:
         yield "test"
         events.append("dep1:after")
 
-    di.register_provider(str, dep1, scope="request")
+    container.register_provider(str, dep1, scope="request")
 
-    with di.request_context():
-        assert di.get_instance(str) == "test"
+    with container.request_context():
+        assert container.get_instance(str) == "test"
 
     assert events == ["dep1:before", "dep1:after"]
 
@@ -633,7 +645,7 @@ def test_request_context(di: PyxDI) -> None:
 # Asynchronous lifespan
 
 
-async def test_astart_and_aclose_singleton_context(di: PyxDI) -> None:
+async def test_astart_and_aclose_singleton_context(container: Container) -> None:
     events = []
 
     async def dep1() -> t.AsyncIterator[str]:
@@ -641,18 +653,18 @@ async def test_astart_and_aclose_singleton_context(di: PyxDI) -> None:
         yield "test"
         events.append("dep1:after")
 
-    di.register_provider(str, dep1, scope="singleton")
+    container.register_provider(str, dep1, scope="singleton")
 
-    await di.astart()
+    await container.astart()
 
-    assert di.get_instance(str) == "test"
+    assert container.get_instance(str) == "test"
 
-    await di.aclose()
+    await container.aclose()
 
     assert events == ["dep1:before", "dep1:after"]
 
 
-async def test_arequest_context(di: PyxDI) -> None:
+async def test_arequest_context(container: Container) -> None:
     events = []
 
     async def dep1() -> t.AsyncIterator[str]:
@@ -660,71 +672,73 @@ async def test_arequest_context(di: PyxDI) -> None:
         yield "test"
         events.append("dep1:after")
 
-    di.register_provider(str, dep1, scope="request")
+    container.register_provider(str, dep1, scope="request")
 
-    async with di.arequest_context():
-        assert await di.aget_instance(str) == "test"
+    async with container.arequest_context():
+        assert await container.aget_instance(str) == "test"
 
     assert events == ["dep1:before", "dep1:after"]
 
 
-def test_reset_resolved_instances(di: PyxDI) -> None:
-    di.register_provider(str, lambda: "test", scope="singleton")
-    di.register_provider(int, lambda: 1, scope="singleton")
+def test_reset_resolved_instances(container: Container) -> None:
+    container.register_provider(str, lambda: "test", scope="singleton")
+    container.register_provider(int, lambda: 1, scope="singleton")
 
-    di.get_instance(str)
-    di.get_instance(int)
+    container.get_instance(str)
+    container.get_instance(int)
 
-    assert di.has_instance(str)
-    assert di.has_instance(int)
+    assert container.has_instance(str)
+    assert container.has_instance(int)
 
-    di.reset()
+    container.reset()
 
-    assert not di.has_instance(str)
-    assert not di.has_instance(int)
+    assert not container.has_instance(str)
+    assert not container.has_instance(int)
 
 
 # Instance
 
 
-def test_get_singleton_scoped(di: PyxDI) -> None:
+def test_get_singleton_scoped(container: Container) -> None:
     instance = "test"
 
-    di.register_provider(str, lambda: instance, scope="singleton")
+    container.register_provider(str, lambda: instance, scope="singleton")
 
-    assert di.get_instance(str) == instance
+    assert container.get_instance(str) == instance
 
 
-def test_get_singleton_scoped_not_started(di: PyxDI) -> None:
-    @di.provider(scope="singleton")
+def test_get_singleton_scoped_not_started(container: Container) -> None:
+    @container.provider(scope="singleton")
     def message() -> t.Iterator[str]:
         yield "test"
 
-    assert di.get_instance(str) == "test"
+    assert container.get_instance(str) == "test"
 
 
-def test_get_singleton_scoped_resource(di: PyxDI) -> None:
+def test_get_singleton_scoped_resource(container: Container) -> None:
     instance = "test"
 
     def provide() -> t.Iterator[str]:
         yield instance
 
-    di.register_provider(str, provide, scope="singleton")
-    di.start()
+    container.register_provider(str, provide, scope="singleton")
+    container.start()
 
-    assert di.get_instance(str) == instance
+    assert container.get_instance(str) == instance
 
 
-def test_get_singleton_scoped_started_with_async_resource_provider(di: PyxDI) -> None:
+def test_get_singleton_scoped_started_with_async_resource_provider(
+    container: Container,
+) -> None:
     instance = "test"
 
     async def provide() -> t.AsyncIterator[str]:
         yield instance
 
-    di.register_provider(str, provide, scope="singleton")
+    container.register_provider(str, provide, scope="singleton")
 
     with pytest.raises(TypeError) as exc_info:
-        di.start()
+        container.start()
 
     assert str(exc_info.value) == (
         "The provider `tests.test_container.test_get_singleton_scoped_started_with_"
@@ -734,31 +748,33 @@ def test_get_singleton_scoped_started_with_async_resource_provider(di: PyxDI) ->
     )
 
 
-def test_get(di: PyxDI) -> None:
+def test_get(container: Container) -> None:
     instance = "test"
 
     def provide() -> t.Iterator[str]:
         yield instance
 
-    di.register_provider(str, provide, scope="singleton")
+    container.register_provider(str, provide, scope="singleton")
 
-    di.get_instance(str)
+    container.get_instance(str)
 
 
-async def test_get_singleton_scoped_async_resource(di: PyxDI) -> None:
+async def test_get_singleton_scoped_async_resource(container: Container) -> None:
     instance = "test"
 
     def provide() -> t.Iterator[str]:
         yield instance
 
-    di.register_provider(str, provide, scope="singleton")
+    container.register_provider(str, provide, scope="singleton")
 
-    await di.astart()
+    await container.astart()
 
-    assert di.get_instance(str) == instance
+    assert container.get_instance(str) == instance
 
 
-async def test_get_singleton_scoped_async_and_sync_resources(di: PyxDI) -> None:
+async def test_get_singleton_scoped_async_and_sync_resources(
+    container: Container,
+) -> None:
     instance_str = "test"
     instance_int = 100
 
@@ -768,25 +784,27 @@ async def test_get_singleton_scoped_async_and_sync_resources(di: PyxDI) -> None:
     async def provider_2() -> t.AsyncIterator[int]:
         yield instance_int
 
-    di.register_provider(str, provider_1, scope="singleton")
-    di.register_provider(int, provider_2, scope="singleton")
+    container.register_provider(str, provider_1, scope="singleton")
+    container.register_provider(int, provider_2, scope="singleton")
 
-    await di.astart()
+    await container.astart()
 
-    assert di.get_instance(str) == instance_str
-    assert di.get_instance(int) == instance_int
+    assert container.get_instance(str) == instance_str
+    assert container.get_instance(int) == instance_int
 
 
-async def test_get_singleton_scoped_async_resource_not_started(di: PyxDI) -> None:
+async def test_get_singleton_scoped_async_resource_not_started(
+    container: Container,
+) -> None:
     instance = "test"
 
     async def provide() -> t.AsyncIterator[str]:
         yield instance
 
-    di.register_provider(str, provide, scope="singleton")
+    container.register_provider(str, provide, scope="singleton")
 
     with pytest.raises(TypeError) as exc_info:
-        di.get_instance(str)
+        container.get_instance(str)
 
     assert str(exc_info.value) == (
         "The provider `tests.test_container"
@@ -796,22 +814,22 @@ async def test_get_singleton_scoped_async_resource_not_started(di: PyxDI) -> Non
     )
 
 
-def test_get_request_scoped(di: PyxDI) -> None:
+def test_get_request_scoped(container: Container) -> None:
     instance = "test"
 
-    di.register_provider(str, lambda: instance, scope="request")
+    container.register_provider(str, lambda: instance, scope="request")
 
-    with di.request_context():
-        assert di.get_instance(str) == instance
+    with container.request_context():
+        assert container.get_instance(str) == instance
 
 
-def test_get_request_scoped_not_started(di: PyxDI) -> None:
+def test_get_request_scoped_not_started(container: Container) -> None:
     instance = "test"
 
-    di.register_provider(str, lambda: instance, scope="request")
+    container.register_provider(str, lambda: instance, scope="request")
 
     with pytest.raises(LookupError) as exc_info:
-        assert di.get_instance(str)
+        assert container.get_instance(str)
 
     assert str(exc_info.value) == (
         "The request context has not been started. Please ensure that the request "
@@ -819,19 +837,19 @@ def test_get_request_scoped_not_started(di: PyxDI) -> None:
     )
 
 
-def test_get_transient_scoped(di: PyxDI) -> None:
-    di.register_provider(uuid.UUID, uuid.uuid4, scope="transient")
+def test_get_transient_scoped(container: Container) -> None:
+    container.register_provider(uuid.UUID, uuid.uuid4, scope="transient")
 
-    assert di.get_instance(uuid.UUID) != di.get_instance(uuid.UUID)
+    assert container.get_instance(uuid.UUID) != container.get_instance(uuid.UUID)
 
 
-def test_get_async_transient_scoped(di: PyxDI) -> None:
-    @di.provider(scope="transient")
+def test_get_async_transient_scoped(container: Container) -> None:
+    @container.provider(scope="transient")
     async def get_uuid() -> uuid.UUID:
         return uuid.uuid4()
 
     with pytest.raises(TypeError) as exc_info:
-        di.get_instance(uuid.UUID)
+        container.get_instance(uuid.UUID)
 
     assert str(exc_info.value) == (
         "The instance for the coroutine provider "
@@ -840,25 +858,27 @@ def test_get_async_transient_scoped(di: PyxDI) -> None:
     )
 
 
-async def test_async_get_transient_scoped(di: PyxDI) -> None:
-    @di.provider(scope="transient")
+async def test_async_get_transient_scoped(container: Container) -> None:
+    @container.provider(scope="transient")
     async def get_uuid() -> uuid.UUID:
         return uuid.uuid4()
 
-    assert await di.aget_instance(uuid.UUID) != await di.aget_instance(uuid.UUID)
+    assert await container.aget_instance(uuid.UUID) != await container.aget_instance(
+        uuid.UUID
+    )
 
 
-async def test_async_get_synchronous_resource(di: PyxDI) -> None:
-    @di.provider(scope="singleton")
+async def test_async_get_synchronous_resource(container: Container) -> None:
+    @container.provider(scope="singleton")
     def msg() -> t.Iterator[str]:
         yield "test"
 
-    assert await di.aget_instance(str) == "test"
+    assert await container.aget_instance(str) == "test"
 
 
-def test_get_not_registered_instance(di: PyxDI) -> None:
+def test_get_not_registered_instance(container: Container) -> None:
     with pytest.raises(Exception) as exc_info:
-        di.get_instance(str)
+        container.get_instance(str)
 
     assert str(exc_info.value) == (
         "The provider interface for `str` has not been registered. Please ensure that "
@@ -866,80 +886,80 @@ def test_get_not_registered_instance(di: PyxDI) -> None:
     )
 
 
-def test_has_instance(di: PyxDI) -> None:
-    assert not di.has_instance(str)
+def test_has_instance(container: Container) -> None:
+    assert not container.has_instance(str)
 
 
-def test_reset_instance(di: PyxDI) -> None:
-    di.register_provider(str, lambda: "test", scope="singleton")
-    di.get_instance(str)
+def test_reset_instance(container: Container) -> None:
+    container.register_provider(str, lambda: "test", scope="singleton")
+    container.get_instance(str)
 
-    assert di.has_instance(str)
+    assert container.has_instance(str)
 
-    di.reset_instance(str)
+    container.reset_instance(str)
 
-    assert not di.has_instance(str)
+    assert not container.has_instance(str)
 
 
-def test_override(di: PyxDI) -> None:
+def test_override(container: Container) -> None:
     origin_name = "origin"
     overriden_name = "overriden"
 
-    @di.provider(scope="singleton")
+    @container.provider(scope="singleton")
     def name() -> str:
         return origin_name
 
-    with di.override(str, overriden_name):
-        assert di.get_instance(str) == overriden_name
+    with container.override(str, overriden_name):
+        assert container.get_instance(str) == overriden_name
 
-    assert di.get_instance(str) == origin_name
+    assert container.get_instance(str) == origin_name
 
 
-def test_override_provider_not_registered(di: PyxDI) -> None:
+def test_override_provider_not_registered(container: Container) -> None:
     with pytest.raises(LookupError) as exc_info:
-        with di.override(str, "test"):
+        with container.override(str, "test"):
             pass
 
     assert str(exc_info.value) == "The provider interface `str` not registered."
 
 
-def test_override_transient_provider(di: PyxDI) -> None:
+def test_override_transient_provider(container: Container) -> None:
     overriden_uuid = uuid.uuid4()
 
-    @di.provider(scope="transient")
+    @container.provider(scope="transient")
     def uuid_provider() -> uuid.UUID:
         return uuid.uuid4()
 
-    with di.override(uuid.UUID, overriden_uuid):
-        assert di.get_instance(uuid.UUID) == overriden_uuid
+    with container.override(uuid.UUID, overriden_uuid):
+        assert container.get_instance(uuid.UUID) == overriden_uuid
 
-    assert di.get_instance(uuid.UUID) != overriden_uuid
+    assert container.get_instance(uuid.UUID) != overriden_uuid
 
 
-def test_override_resource_provider(di: PyxDI) -> None:
+def test_override_resource_provider(container: Container) -> None:
     origin = "origin"
     overriden = "overriden"
 
-    @di.provider(scope="singleton")
+    @container.provider(scope="singleton")
     def message() -> t.Iterator[str]:
         yield origin
 
-    with di.override(str, overriden):
-        assert di.get_instance(str) == overriden
+    with container.override(str, overriden):
+        assert container.get_instance(str) == overriden
 
-    assert di.get_instance(str) == origin
+    assert container.get_instance(str) == origin
 
 
-async def test_override_async_resource_provider(di: PyxDI) -> None:
+async def test_override_async_resource_provider(container: Container) -> None:
     origin = "origin"
     overriden = "overriden"
 
-    @di.provider(scope="singleton")
+    @container.provider(scope="singleton")
     async def message() -> t.AsyncIterator[str]:
         yield origin
 
-    with di.override(str, overriden):
-        assert di.get_instance(str) == overriden
+    with container.override(str, overriden):
+        assert container.get_instance(str) == overriden
 
 
 # Inspections
@@ -959,20 +979,20 @@ async def test_override_async_resource_provider(di: PyxDI) -> None:
     ],
 )
 def test_get_supported_provider_annotation(
-    di: PyxDI, annotation: t.Type[t.Any], expected: t.Type[t.Any]
+    container: Container, annotation: t.Type[t.Any], expected: t.Type[t.Any]
 ) -> None:
     def provider() -> annotation:  # type: ignore[valid-type]
         return object()
 
-    assert di._get_provider_annotation(provider) == expected
+    assert container._get_provider_annotation(provider) == expected
 
 
-def test_get_provider_annotation_missing(di: PyxDI) -> None:
+def test_get_provider_annotation_missing(container: Container) -> None:
     def provider():  # type: ignore[no-untyped-def]
         return object()
 
     with pytest.raises(TypeError) as exc_info:
-        di._get_provider_annotation(provider)
+        container._get_provider_annotation(provider)
 
     assert str(exc_info.value) == (
         "Missing `tests.test_container.test_get_provider_annotation_missing.<locals>"
@@ -980,12 +1000,12 @@ def test_get_provider_annotation_missing(di: PyxDI) -> None:
     )
 
 
-def test_get_provider_annotation_origin_without_args(di: PyxDI) -> None:
+def test_get_provider_annotation_origin_without_args(container: Container) -> None:
     def provider() -> list:  # type: ignore[type-arg]
         return []
 
     with pytest.raises(TypeError) as exc_info:
-        di._get_provider_annotation(provider)
+        container._get_provider_annotation(provider)
 
     assert str(exc_info.value) == (
         "Cannot use `tests.test_container"
@@ -994,25 +1014,25 @@ def test_get_provider_annotation_origin_without_args(di: PyxDI) -> None:
     )
 
 
-def test_get_provider_arguments(di: PyxDI) -> None:
-    @di.provider(scope="singleton")
+def test_get_provider_arguments(container: Container) -> None:
+    @container.provider(scope="singleton")
     def a() -> int:
         return 10
 
-    @di.provider(scope="singleton")
+    @container.provider(scope="singleton")
     def b() -> float:
         return 1.0
 
-    @di.provider(scope="singleton")
+    @container.provider(scope="singleton")
     def c() -> str:
         return "test"
 
     def service(a: int, /, b: float, *, c: str) -> Service:
         return Service(ident=f"{a}/{b}/{c}")
 
-    provider = di.register_provider(Service, service, scope="singleton")
+    provider = container.register_provider(Service, service, scope="singleton")
 
-    scoped_context = di._get_scoped_context("singleton")
+    scoped_context = container._get_scoped_context("singleton")
 
     args, kwargs = scoped_context._get_provider_arguments(provider)
 
@@ -1020,25 +1040,25 @@ def test_get_provider_arguments(di: PyxDI) -> None:
     assert kwargs == {"b": 1.0, "c": "test"}
 
 
-async def test_async_get_provider_arguments(di: PyxDI) -> None:
-    @di.provider(scope="singleton")
+async def test_async_get_provider_arguments(container: Container) -> None:
+    @container.provider(scope="singleton")
     async def a() -> int:
         return 10
 
-    @di.provider(scope="singleton")
+    @container.provider(scope="singleton")
     async def b() -> float:
         return 1.0
 
-    @di.provider(scope="singleton")
+    @container.provider(scope="singleton")
     async def c() -> str:
         return "test"
 
     async def service(a: int, /, b: float, *, c: str) -> Service:
         return Service(ident=f"{a}/{b}/{c}")
 
-    provider = di.register_provider(Service, service, scope="singleton")
+    provider = container.register_provider(Service, service, scope="singleton")
 
-    scoped_context = di._get_scoped_context("singleton")
+    scoped_context = container._get_scoped_context("singleton")
 
     args, kwargs = await scoped_context._aget_provider_arguments(provider)
 
@@ -1046,12 +1066,12 @@ async def test_async_get_provider_arguments(di: PyxDI) -> None:
     assert kwargs == {"b": 1.0, "c": "test"}
 
 
-def test_inject_missing_annotation(di: PyxDI) -> None:
+def test_inject_missing_annotation(container: Container) -> None:
     def handler(name=dep) -> str:  # type: ignore[no-untyped-def]
         return name  # type: ignore[no-any-return]
 
     with pytest.raises(TypeError) as exc_info:
-        di.inject(handler)
+        container.inject(handler)
 
     assert str(exc_info.value) == (
         "Missing `tests.test_container.test_inject_missing_annotation"
@@ -1059,12 +1079,12 @@ def test_inject_missing_annotation(di: PyxDI) -> None:
     )
 
 
-def test_inject_unknown_dependency(di: PyxDI) -> None:
+def test_inject_unknown_dependency(container: Container) -> None:
     def handler(message: str = dep) -> None:
         pass
 
     with pytest.raises(LookupError) as exc_info:
-        di.inject(handler)
+        container.inject(handler)
 
     assert str(exc_info.value) == (
         "`tests.test_container.test_inject_unknown_dependency.<locals>.handler` "
@@ -1072,16 +1092,16 @@ def test_inject_unknown_dependency(di: PyxDI) -> None:
     )
 
 
-def test_inject(di: PyxDI) -> None:
-    @di.provider(scope="singleton")
+def test_inject(container: Container) -> None:
+    @container.provider(scope="singleton")
     def ident_provider() -> str:
         return "1000"
 
-    @di.provider(scope="singleton")
+    @container.provider(scope="singleton")
     def service_provider(ident: str) -> Service:
         return Service(ident=ident)
 
-    @di.inject
+    @container.inject
     def func(name: str, service: Service = dep) -> str:
         return f"{name} = {service.ident}"
 
@@ -1090,16 +1110,16 @@ def test_inject(di: PyxDI) -> None:
     assert result == "service ident = 1000"
 
 
-def test_inject_class(di: PyxDI) -> None:
-    @di.provider(scope="singleton")
+def test_inject_class(container: Container) -> None:
+    @container.provider(scope="singleton")
     def ident_provider() -> str:
         return "1000"
 
-    @di.provider(scope="singleton")
+    @container.provider(scope="singleton")
     def service_provider(ident: str) -> Service:
         return Service(ident=ident)
 
-    @di.inject
+    @container.inject
     class Handler:
         def __init__(self, name: str, service: Service = dep) -> None:
             self.name = name
@@ -1115,16 +1135,16 @@ def test_inject_class(di: PyxDI) -> None:
     assert result == "service ident = 1000"
 
 
-def test_inject_dataclass(di: PyxDI) -> None:
-    @di.provider(scope="singleton")
+def test_inject_dataclass(container: Container) -> None:
+    @container.provider(scope="singleton")
     def ident_provider() -> str:
         return "1000"
 
-    @di.provider(scope="singleton")
+    @container.provider(scope="singleton")
     def service_provider(ident: str) -> Service:
         return Service(ident=ident)
 
-    @di.inject
+    @container.inject
     @dataclass
     class Handler:
         name: str
@@ -1140,19 +1160,19 @@ def test_inject_dataclass(di: PyxDI) -> None:
     assert result == "service ident = 1000"
 
 
-async def test_inject_with_sync_and_async_resources(di: PyxDI) -> None:
+async def test_inject_with_sync_and_async_resources(container: Container) -> None:
     def ident_provider() -> t.Iterator[str]:
         yield "1000"
 
     async def service_provider(ident: str) -> t.AsyncIterator[Service]:
         yield Service(ident=ident)
 
-    di.register_provider(str, ident_provider, scope="singleton")
-    di.register_provider(Service, service_provider, scope="singleton")
+    container.register_provider(str, ident_provider, scope="singleton")
+    container.register_provider(Service, service_provider, scope="singleton")
 
-    await di.astart()
+    await container.astart()
 
-    @di.inject
+    @container.inject
     async def func(name: str, service: Service = dep) -> str:
         return f"{name} = {service.ident}"
 
@@ -1161,12 +1181,12 @@ async def test_inject_with_sync_and_async_resources(di: PyxDI) -> None:
     assert result == "service ident = 1000"
 
 
-def test_run(di: PyxDI) -> None:
-    @di.provider(scope="singleton")
+def test_run(container: Container) -> None:
+    @container.provider(scope="singleton")
     def value1() -> Annotated[int, "value1"]:
         return 10
 
-    @di.provider(scope="singleton")
+    @container.provider(scope="singleton")
     def value2() -> Annotated[int, "value2"]:
         return 20
 
@@ -1177,17 +1197,17 @@ def test_run(di: PyxDI) -> None:
     ) -> int:
         return value1 + value2 + value3
 
-    result = di.run(sum_handler, value1=30)
+    result = container.run(sum_handler, value1=30)
 
     assert result == 60
 
 
-def test_provider_decorator(di: PyxDI) -> None:
-    @di.provider(scope="singleton")
+def test_provider_decorator(container: Container) -> None:
+    @container.provider(scope="singleton")
     def ident() -> str:
         return "1000"
 
-    assert di.get_provider(str) == Provider(obj=ident, scope="singleton")
+    assert container.get_provider(str) == Provider(obj=ident, scope="singleton")
 
 
 def test_request_decorator() -> None:

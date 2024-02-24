@@ -6,9 +6,6 @@ from ._module import Module, provider
 from ._scanner import injectable
 from ._types import Marker, Provider, Scope
 
-# Container type alias for backward compatibility
-PyxDI = Container
-
 # Dependency marker with Any type
 dep = cast(Any, Marker())
 
@@ -20,7 +17,6 @@ __all__ = [
     "provider",
     "Provider",
     "Container",
-    "PyxDI",
     "Scope",
     "singleton",
     "request",
