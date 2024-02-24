@@ -5,25 +5,26 @@ from starlette.middleware import Middleware
 from typing_extensions import Annotated
 
 import pyxdi.ext.fastapi
+from pyxdi import Container
 from pyxdi.ext.fastapi import Inject
 from pyxdi.ext.starlette.middleware import RequestScopedMiddleware
 
 from tests.ext.fixtures import Mail, MailService, User, UserService
 
-di = pyxdi.PyxDI(strict=True)
+container = Container(strict=True)
 
 
-@di.provider(scope="singleton")
+@container.provider(scope="singleton")
 def prefix() -> Annotated[str, "prefix"]:
     return "Hello, "
 
 
-@di.provider(scope="singleton")
+@container.provider(scope="singleton")
 def user_service() -> UserService:
     return UserService()
 
 
-@di.provider(scope="request")
+@container.provider(scope="request")
 def mail_service() -> MailService:
     return MailService()
 
@@ -32,7 +33,7 @@ async def get_user(user_service: UserService = Inject()) -> User:
     return await user_service.get_user()
 
 
-app = FastAPI(middleware=[Middleware(RequestScopedMiddleware, di=di)])
+app = FastAPI(middleware=[Middleware(RequestScopedMiddleware, container=container)])
 
 
 @app.post("/send-mail", response_model=Mail)
@@ -54,4 +55,4 @@ async def send_email_annotated(
     return await mail_service.send_mail(email=user.email, message=prefix + message)
 
 
-pyxdi.ext.fastapi.install(app, di)
+pyxdi.ext.fastapi.install(app, container)

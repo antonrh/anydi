@@ -3,7 +3,7 @@ import builtins
 import functools
 import inspect
 import sys
-import typing as t
+from typing import Any, Callable, Dict, Type, TypeVar
 
 from typing_extensions import Annotated, ParamSpec, get_origin
 
@@ -13,11 +13,11 @@ except ImportError:
     anyio = None  # type: ignore[assignment]
 
 
-T = t.TypeVar("T")
+T = TypeVar("T")
 P = ParamSpec("P")
 
 
-def get_full_qualname(obj: t.Any) -> str:
+def get_full_qualname(obj: Any) -> str:
     """Get the fully qualified name of an object.
 
     This function returns the fully qualified name of the given object,
@@ -52,7 +52,7 @@ def get_full_qualname(obj: t.Any) -> str:
     return f"{module_name}.{qualname}"
 
 
-def is_builtin_type(tp: t.Type[t.Any]) -> bool:
+def is_builtin_type(tp: Type[Any]) -> bool:
     """
     Check if the given type is a built-in type.
     Args:
@@ -64,7 +64,7 @@ def is_builtin_type(tp: t.Type[t.Any]) -> bool:
 
 
 @functools.lru_cache(maxsize=None)
-def get_signature(obj: t.Callable[..., t.Any]) -> inspect.Signature:
+def get_signature(obj: Callable[..., Any]) -> inspect.Signature:
     """Get the signature of a callable object.
 
     This function uses the `inspect.signature` function to retrieve the signature
@@ -77,14 +77,14 @@ def get_signature(obj: t.Callable[..., t.Any]) -> inspect.Signature:
     Returns:
         The signature of the callable object.
     """
-    signature_kwargs: t.Dict[str, t.Any] = {}
+    signature_kwargs: Dict[str, Any] = {}
     if sys.version_info >= (3, 10):
         signature_kwargs["eval_str"] = True
     return inspect.signature(obj, **signature_kwargs)
 
 
 async def run_async(
-    func: t.Callable[P, T],
+    func: Callable[P, T],
     /,
     *args: P.args,
     **kwargs: P.kwargs,

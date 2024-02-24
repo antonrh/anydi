@@ -3,7 +3,7 @@ import typing as t
 import pytest
 from typing_extensions import Annotated
 
-from pyxdi.utils import get_full_qualname, is_builtin_type
+from pyxdi._utils import get_full_qualname, is_builtin_type
 
 from tests.fixtures import Service
 

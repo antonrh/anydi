@@ -1,20 +1,35 @@
 """PyxDI core implementation module."""
 from __future__ import annotations
 
-import abc
 import contextlib
-import importlib
 import inspect
 import logging
-import pkgutil
 import types
-import typing as t
 import uuid
 from contextvars import ContextVar
-from dataclasses import dataclass
-from functools import cached_property, wraps
+from functools import wraps
+from typing import (
+    Any,
+    AsyncContextManager,
+    AsyncIterator,
+    Awaitable,
+    Callable,
+    ContextManager,
+    Dict,
+    Iterable,
+    Iterator,
+    List,
+    Mapping,
+    Optional,
+    Sequence,
+    Type,
+    TypeVar,
+    Union,
+    cast,
+    overload,
+)
 
-from typing_extensions import Annotated, ParamSpec, Self, get_args, get_origin
+from typing_extensions import Annotated, ParamSpec, final, get_args, get_origin
 
 try:
     from types import NoneType
@@ -22,15 +37,22 @@ except ImportError:
     NoneType = type(None)  # type: ignore[assignment,misc]
 
 
-from .utils import get_full_qualname, get_signature, is_builtin_type, run_async
+from ._context import (
+    RequestContext,
+    ResourceScopedContext,
+    ScopedContext,
+    SingletonContext,
+    TransientContext,
+)
+from ._module import Module, ModuleRegistry
+from ._scanner import Scanner
+from ._types import AnyInterface, Interface, Marker, Provider, Scope
+from ._utils import get_full_qualname, get_signature, is_builtin_type
 
-Scope = t.Literal["transient", "singleton", "request"]
-T = t.TypeVar("T", bound=t.Any)
+T = TypeVar("T", bound=Any)
 P = ParamSpec("P")
-AnyInterface: t.TypeAlias = t.Union[t.Type[t.Any], Annotated[t.Any, ...]]
-Interface: t.TypeAlias = t.Type[T]
 
-ALLOWED_SCOPES: t.Dict[Scope, t.List[Scope]] = {
+ALLOWED_SCOPES: Dict[Scope, List[Scope]] = {
     "singleton": ["singleton"],
     "request": ["request", "singleton"],
     "transient": ["transient", "singleton", "request"],
@@ -39,113 +61,8 @@ ALLOWED_SCOPES: t.Dict[Scope, t.List[Scope]] = {
 logger = logging.getLogger(__name__)
 
 
-@dataclass(frozen=True)
-class Provider:
-    """Represents a provider object.
-
-    Attributes:
-        obj: The callable object that serves as the provider.
-        scope: The scope of the provider.
-    """
-
-    obj: t.Callable[..., t.Any]
-    scope: Scope
-
-    def __str__(self) -> str:
-        """Returns a string representation of the provider.
-
-        Returns:
-            The string representation of the provider.
-        """
-        return self.name
-
-    @cached_property
-    def name(self) -> str:
-        """Returns the full qualified name of the provider object.
-
-        Returns:
-            The full qualified name of the provider object.
-        """
-        return get_full_qualname(self.obj)
-
-    @cached_property
-    def parameters(self) -> types.MappingProxyType[str, inspect.Parameter]:
-        """Returns the parameters of the provider as a mapping.
-
-        Returns:
-            The parameters of the provider.
-        """
-        return get_signature(self.obj).parameters
-
-    @cached_property
-    def is_class(self) -> bool:
-        """Checks if the provider object is a class.
-
-        Returns:
-            True if the provider object is a class, False otherwise.
-        """
-        return inspect.isclass(self.obj)
-
-    @cached_property
-    def is_function(self) -> bool:
-        """Checks if the provider object is a function.
-
-        Returns:
-            True if the provider object is a function, False otherwise.
-        """
-        return (inspect.isfunction(self.obj) or inspect.ismethod(self.obj)) and not (
-            self.is_resource
-        )
-
-    @cached_property
-    def is_coroutine(self) -> bool:
-        """Checks if the provider object is a coroutine function.
-
-        Returns:
-            True if the provider object is a coroutine function, False otherwise.
-        """
-        return inspect.iscoroutinefunction(self.obj)
-
-    @cached_property
-    def is_generator(self) -> bool:
-        """Checks if the provider object is a generator function.
-
-        Returns:
-            True if the provider object is a resource, False otherwise.
-        """
-        return inspect.isgeneratorfunction(self.obj)
-
-    @cached_property
-    def is_async_generator(self) -> bool:
-        """Checks if the provider object is an async generator function.
-
-        Returns:
-            True if the provider object is an async resource, False otherwise.
-        """
-        return inspect.isasyncgenfunction(self.obj)
-
-    @property
-    def is_resource(self) -> bool:
-        """Checks if the provider object is a sync or async generator function.
-
-        Returns:
-            True if the provider object is a resource, False otherwise.
-        """
-        return self.is_generator or self.is_async_generator
-
-
-class DependencyMark:
-    """A marker class used to represent a dependency mark."""
-
-    __slots__ = ()
-
-
-# Dependency mark with Any type
-dep = t.cast(t.Any, DependencyMark())
-
-
-@t.final
-class PyxDI:
+@final
+class Container:
     """PyxDI is a dependency injection container.
 
     Args:
@@ -155,9 +72,9 @@ class PyxDI:
     def __init__(
         self,
         *,
-        providers: t.Optional[t.Mapping[t.Type[t.Any], Provider]] = None,
-        modules: t.Optional[
-            t.Sequence[t.Union[Module, t.Type[Module], t.Callable[[PyxDI], None]]]
+        providers: Optional[Mapping[Type[Any], Provider]] = None,
+        modules: Optional[
+            Sequence[Union[Module, Type[Module], Callable[[Container], None]]]
         ] = None,
         strict: bool = True,
     ) -> None:
@@ -166,15 +83,18 @@ class PyxDI:
         Args:
             modules: Optional sequence of modules to register during initialization.
         """
-        self._providers: t.Dict[t.Type[t.Any], Provider] = {}
+        self._providers: Dict[Type[Any], Provider] = {}
         self._singleton_context = SingletonContext(self)
         self._transient_context = TransientContext(self)
-        self._request_context_var: ContextVar[t.Optional[RequestContext]] = ContextVar(
+        self._request_context_var: ContextVar[Optional[RequestContext]] = ContextVar(
             "request_context", default=None
         )
-        self._override_instances: t.Dict[t.Type[t.Any], t.Any] = {}
+        self._override_instances: Dict[Type[Any], Any] = {}
         self._strict = strict
-        self._scanner = DependencyScanner(self)
+
+        # Components
+        self._modules = ModuleRegistry(self)
+        self._scanner = Scanner(self)
 
         # Register providers
         providers = providers or {}
@@ -196,7 +116,7 @@ class PyxDI:
         return self._strict
 
     @property
-    def providers(self) -> t.Dict[t.Type[t.Any], Provider]:
+    def providers(self) -> Dict[Type[Any], Provider]:
         """Get the registered providers.
 
         Returns:
@@ -218,7 +138,7 @@ class PyxDI:
     def register_provider(
         self,
         interface: AnyInterface,
-        obj: t.Callable[..., t.Any],
+        obj: Callable[..., Any],
         *,
         scope: Scope,
         override: bool = False,
@@ -325,7 +245,7 @@ class PyxDI:
                 and not is_builtin_type(interface)
             ):
                 # Try to get defined scope
-                scope = getattr(interface, "__pyxdi_scope__", None)
+                scope = getattr(interface, "__scope__", None)
                 # Try to detect scope
                 if scope is None:
                     scope = self._detect_scope(interface)
@@ -352,10 +272,10 @@ class PyxDI:
         Raises:
             ValueError: If the scope provided is invalid.
         """
-        if provider.scope not in t.get_args(Scope):
+        if provider.scope not in get_args(Scope):
             raise ValueError(
                 "The scope provided is invalid. Only the following scopes are "
-                f"supported: {', '.join(t.get_args(Scope))}. Please use one of the "
+                f"supported: {', '.join(get_args(Scope))}. Please use one of the "
                 "supported scopes when registering a provider."
             )
 
@@ -431,7 +351,7 @@ class PyxDI:
                     "registered with matching scopes."
                 )
 
-    def _detect_scope(self, obj: t.Callable[..., t.Any]) -> t.Optional[Scope]:
+    def _detect_scope(self, obj: Callable[..., Any]) -> Optional[Scope]:
         """Detect the scope for a provider.
 
         Args:
@@ -457,27 +377,14 @@ class PyxDI:
         return None
 
     def register_module(
-        self, module: t.Union[Module, t.Type[Module], t.Callable[[PyxDI], None]]
+        self, module: Union[Module, Type[Module], Callable[[Container], None]]
     ) -> None:
         """Register a module as a callable, module type, or module instance.
 
         Args:
             module: The module to register.
         """
-        # Callable Module
-        if inspect.isfunction(module):
-            module(self)
-            return
-
-        # Class based Module or Module type
-        if inspect.isclass(module) and issubclass(module, Module):
-            module = module()
-        if isinstance(module, Module):
-            module.configure(self)
-            for provider_name, params in module.providers:
-                obj = getattr(module, provider_name)
-                scope, override = params["scope"], params["override"]
-                self.provider(scope=scope, override=override)(obj)
+        self._modules.register(module)
 
     def start(self) -> None:
         """Start the singleton context."""
@@ -489,7 +396,7 @@ class PyxDI:
         """Close the singleton context."""
         self._singleton_context.close()
 
-    def request_context(self) -> t.ContextManager[None]:
+    def request_context(self) -> ContextManager[None]:
         """Obtain a context manager for the request-scoped context.
 
         Returns:
@@ -497,7 +404,7 @@ class PyxDI:
         """
         return contextlib.contextmanager(self._request_context)()
 
-    def _request_context(self) -> t.Iterator[None]:
+    def _request_context(self) -> Iterator[None]:
         """Internal method that manages the request-scoped context.
 
         Yields:
@@ -519,7 +426,7 @@ class PyxDI:
         """Close the singleton context asynchronously."""
         await self._singleton_context.aclose()
 
-    def arequest_context(self) -> t.AsyncContextManager[None]:
+    def arequest_context(self) -> AsyncContextManager[None]:
         """Obtain an async context manager for the request-scoped context.
 
         Returns:
@@ -527,7 +434,7 @@ class PyxDI:
         """
         return contextlib.asynccontextmanager(self._arequest_context)()
 
-    async def _arequest_context(self) -> t.AsyncIterator[None]:
+    async def _arequest_context(self) -> AsyncIterator[None]:
         """Internal method that manages the async request-scoped context.
 
         Yields:
@@ -564,11 +471,11 @@ class PyxDI:
             if isinstance(scoped_context, ResourceScopedContext):
                 scoped_context.delete(interface)
 
-    @t.overload
+    @overload
     def get_instance(self, interface: Interface[T]) -> T:
         ...
 
-    @t.overload
+    @overload
     def get_instance(self, interface: T) -> T:
         ...
 
@@ -585,17 +492,17 @@ class PyxDI:
             LookupError: If the provider for the interface is not registered.
         """
         if interface in self._override_instances:
-            return t.cast(T, self._override_instances[interface])
+            return cast(T, self._override_instances[interface])
 
         provider = self.get_provider(interface)
         scoped_context = self._get_scoped_context(provider.scope)
         return scoped_context.get(interface, provider)
 
-    @t.overload
+    @overload
     async def aget_instance(self, interface: Interface[T]) -> T:
         ...
 
-    @t.overload
+    @overload
     async def aget_instance(self, interface: T) -> T:
         ...
 
@@ -612,7 +519,7 @@ class PyxDI:
             LookupError: If the provider for the interface is not registered.
         """
         if interface in self._override_instances:
-            return t.cast(T, self._override_instances[interface])
+            return cast(T, self._override_instances[interface])
 
         provider = self.get_provider(interface)
         scoped_context = self._get_scoped_context(provider.scope)
@@ -668,7 +575,7 @@ class PyxDI:
         return self._transient_context
 
     @contextlib.contextmanager
-    def override(self, interface: AnyInterface, instance: t.Any) -> t.Iterator[None]:
+    def override(self, interface: AnyInterface, instance: Any) -> Iterator[None]:
         """Override the provider for the specified interface with a specific instance.
 
         Args:
@@ -692,7 +599,7 @@ class PyxDI:
 
     def provider(
         self, *, scope: Scope, override: bool = False
-    ) -> t.Callable[[t.Callable[P, T]], t.Callable[P, T]]:
+    ) -> Callable[[Callable[P, T]], Callable[P, T]]:
         """Decorator to register a provider function with the specified scope.
 
         Args:
@@ -704,29 +611,29 @@ class PyxDI:
             The decorator function.
         """
 
-        def decorator(func: t.Callable[P, T]) -> t.Callable[P, T]:
+        def decorator(func: Callable[P, T]) -> Callable[P, T]:
             interface = self._get_provider_annotation(func)
             self.register_provider(interface, func, scope=scope, override=override)
             return func
 
         return decorator
 
-    @t.overload
-    def inject(self, obj: t.Callable[P, T]) -> t.Callable[P, T]:
+    @overload
+    def inject(self, obj: Callable[P, T]) -> Callable[P, T]:
         ...
 
-    @t.overload
-    def inject(self) -> t.Callable[[t.Callable[P, T]], t.Callable[P, T]]:
+    @overload
+    def inject(self) -> Callable[[Callable[P, T]], Callable[P, T]]:
         ...
 
     def inject(
-        self, obj: t.Union[t.Callable[P, t.Union[T, t.Awaitable[T]]], None] = None
-    ) -> t.Union[
-        t.Callable[
-            [t.Callable[P, t.Union[T, t.Awaitable[T]]]],
-            t.Callable[P, t.Union[T, t.Awaitable[T]]],
+        self, obj: Union[Callable[P, Union[T, Awaitable[T]]], None] = None
+    ) -> Union[
+        Callable[
+            [Callable[P, Union[T, Awaitable[T]]]],
+            Callable[P, Union[T, Awaitable[T]]],
         ],
-        t.Callable[P, t.Union[T, t.Awaitable[T]]],
+        Callable[P, Union[T, Awaitable[T]]],
     ]:
         """Decorator to inject dependencies into a callable.
 
@@ -739,8 +646,8 @@ class PyxDI:
         """
 
         def decorator(
-            obj: t.Callable[P, t.Union[T, t.Awaitable[T]]],
-        ) -> t.Callable[P, t.Union[T, t.Awaitable[T]]]:
+            obj: Callable[P, Union[T, Awaitable[T]]],
+        ) -> Callable[P, Union[T, Awaitable[T]]]:
             injected_params = self._get_injected_params(obj)
 
             if inspect.iscoroutinefunction(obj):
@@ -749,7 +656,7 @@ class PyxDI:
                 async def awrapped(*args: P.args, **kwargs: P.kwargs) -> T:
                     for name, annotation in injected_params.items():
                         kwargs[name] = await self.aget_instance(annotation)
-                    return t.cast(T, await obj(*args, **kwargs))
+                    return cast(T, await obj(*args, **kwargs))
 
                 return awrapped
 
@@ -757,7 +664,7 @@ class PyxDI:
             def wrapped(*args: P.args, **kwargs: P.kwargs) -> T:
                 for name, annotation in injected_params.items():
                     kwargs[name] = self.get_instance(annotation)
-                return t.cast(T, obj(*args, **kwargs))
+                return cast(T, obj(*args, **kwargs))
 
             return wrapped
 
@@ -765,7 +672,7 @@ class PyxDI:
             return decorator
         return decorator(obj)
 
-    def run(self, obj: t.Callable[P, T], /, *args: P.args, **kwargs: P.kwargs) -> T:
+    def run(self, obj: Callable[P, T], /, *args: P.args, **kwargs: P.kwargs) -> T:
         """Run the given function with injected dependencies.
 
         Args:
@@ -781,12 +688,12 @@ class PyxDI:
     def scan(
         self,
         /,
-        packages: t.Union[
-            t.Union[types.ModuleType, str],
-            t.Iterable[t.Union[types.ModuleType, str]],
+        packages: Union[
+            Union[types.ModuleType, str],
+            Iterable[Union[types.ModuleType, str]],
         ],
         *,
-        tags: t.Optional[t.Iterable[str]] = None,
+        tags: Optional[Iterable[str]] = None,
     ) -> None:
         """Scan packages or modules for decorated members and inject dependencies.
 
@@ -798,7 +705,7 @@ class PyxDI:
         """
         self._scanner.scan(packages, tags=tags)
 
-    def _get_provider_annotation(self, obj: t.Callable[..., t.Any]) -> t.Any:
+    def _get_provider_annotation(self, obj: Callable[..., Any]) -> Any:
         """Retrieve the provider return annotation from a callable object.
 
         Args:
@@ -835,7 +742,7 @@ class PyxDI:
         except IndexError:
             return annotation
 
-    def _get_injected_params(self, obj: t.Callable[..., t.Any]) -> t.Dict[str, t.Any]:
+    def _get_injected_params(self, obj: Callable[..., Any]) -> Dict[str, Any]:
         """Get the injected parameters of a callable object.
 
         Args:
@@ -847,7 +754,7 @@ class PyxDI:
         """
         injected_params = {}
         for parameter in get_signature(obj).parameters.values():
-            if not isinstance(parameter.default, DependencyMark):
+            if not isinstance(parameter.default, Marker):
                 continue
             try:
                 self._validate_injected_parameter(obj, parameter)
@@ -865,7 +772,7 @@ class PyxDI:
         return injected_params
 
     def _validate_injected_parameter(
-        self, obj: t.Callable[..., t.Any], parameter: inspect.Parameter
+        self, obj: Callable[..., Any], parameter: inspect.Parameter
     ) -> None:
         """Validate an injected parameter.
 
@@ -890,515 +797,40 @@ class PyxDI:
             )
 
 
-class ScopedContext(abc.ABC):
-    """ScopedContext base class."""
+def transient(target: T) -> T:
+    """Decorator for marking a class as transient scope.
 
-    def __init__(self, container: PyxDI) -> None:
-        self.container = container
+    Args:
+        target: The target class to be decorated.
 
-    @abc.abstractmethod
-    def get(self, interface: Interface[T], provider: Provider) -> T:
-        """Get an instance of a dependency from the scoped context.
-
-        Args:
-            interface: The interface of the dependency.
-            provider: The provider for the instance.
-
-        Returns:
-            An instance of the dependency.
-        """
-
-    @abc.abstractmethod
-    async def aget(self, interface: Interface[T], provider: Provider) -> T:
-        """Get an async instance of a dependency from the scoped context.
-
-        Args:
-            interface: The interface of the dependency.
-            provider: The provider for the instance.
-
-        Returns:
-            An async instance of the dependency.
-        """
-
-    def _create_instance(self, provider: Provider) -> t.Any:
-        """Create an instance using the provider.
-
-        Args:
-            provider: The provider for the instance.
-
-        Returns:
-            The created instance.
-
-        Raises:
-            TypeError: If the provider's instance is a coroutine provider
-                and synchronous mode is used.
-        """
-        if provider.is_coroutine:
-            raise TypeError(
-                f"The instance for the coroutine provider `{provider}` cannot be "
-                "created in synchronous mode."
-            )
-        args, kwargs = self._get_provider_arguments(provider)
-        return provider.obj(*args, **kwargs)
-
-    async def _acreate_instance(self, provider: Provider) -> t.Any:
-        """Create an instance asynchronously using the provider.
-
-        Args:
-            provider: The provider for the instance.
-
-        Returns:
-            The created instance.
-
-        Raises:
-            TypeError: If the provider's instance is a coroutine provider
-                and asynchronous mode is used.
-        """
-        args, kwargs = await self._aget_provider_arguments(provider)
-        if provider.is_coroutine:
-            return await provider.obj(*args, **kwargs)
-        return await run_async(provider.obj, *args, **kwargs)
-
-    def _get_provider_arguments(
-        self, provider: Provider
-    ) -> t.Tuple[t.List[t.Any], t.Dict[str, t.Any]]:
-        """Retrieve the arguments for a provider.
-
-        Args:
-            provider: The provider object.
-
-        Returns:
-            The arguments for the provider.
-        """
-        args, kwargs = [], {}
-        for parameter in provider.parameters.values():
-            instance = self.container.get_instance(parameter.annotation)
-            if parameter.kind == parameter.POSITIONAL_ONLY:
-                args.append(instance)
-            else:
-                kwargs[parameter.name] = instance
-        return args, kwargs
-
-    async def _aget_provider_arguments(
-        self, provider: Provider
-    ) -> t.Tuple[t.List[t.Any], t.Dict[str, t.Any]]:
-        """Asynchronously retrieve the arguments for a provider.
-
-        Args:
-            provider: The provider object.
-
-        Returns:
-            The arguments for the provider.
-        """
-        args, kwargs = [], {}
-        for parameter in provider.parameters.values():
-            instance = await self.container.aget_instance(parameter.annotation)
-            if parameter.kind == parameter.POSITIONAL_ONLY:
-                args.append(instance)
-            else:
-                kwargs[parameter.name] = instance
-        return args, kwargs
-
-
-class ResourceScopedContext(ScopedContext):
-    """ScopedContext with closable resources support."""
-
-    def __init__(self, container: PyxDI) -> None:
-        """Initialize the ScopedContext."""
-        super().__init__(container)
-        self._instances: t.Dict[t.Type[t.Any], t.Any] = {}
-        self._stack = contextlib.ExitStack()
-        self._async_stack = contextlib.AsyncExitStack()
-
-    def get(self, interface: Interface[T], provider: Provider) -> T:
-        """Get an instance of a dependency from the scoped context.
-
-        Args:
-            interface: The interface of the dependency.
-            provider: The provider for the instance.
-
-        Returns:
-            An instance of the dependency.
-        """
-        instance = self._instances.get(interface)
-        if instance is None:
-            if provider.is_generator:
-                instance = self._create_resource(provider)
-            elif provider.is_async_generator:
-                raise TypeError(
-                    f"The provider `{provider}` cannot be started in synchronous mode "
-                    "because it is an asynchronous provider. Please start the provider "
-                    "in asynchronous mode before using it."
-                )
-            else:
-                instance = self._create_instance(provider)
-            self._instances[interface] = instance
-        return t.cast(T, instance)
-
-    async def aget(self, interface: Interface[T], provider: Provider) -> T:
-        """Get an async instance of a dependency from the scoped context.
-
-        Args:
-            interface: The interface of the dependency.
-            provider: The provider for the instance.
-
-        Returns:
-            An async instance of the dependency.
-        """
-        instance = self._instances.get(interface)
-        if instance is None:
-            if provider.is_generator:
-                instance = await run_async(self._create_resource, provider)
-            elif provider.is_async_generator:
-                instance = await self._acreate_resource(provider)
-            else:
-                instance = await self._acreate_instance(provider)
-            self._instances[interface] = instance
-        return t.cast(T, instance)
-
-    def has(self, interface: AnyInterface) -> bool:
-        """Check if the scoped context has an instance of the dependency.
-
-        Args:
-            interface: The interface of the dependency.
-
-        Returns:
-            Whether the scoped context has an instance of the dependency.
-        """
-        return interface in self._instances
-
-    def _create_resource(self, provider: Provider) -> t.Any:
-        """Create a resource using the provider.
-
-        Args:
-            provider: The provider for the resource.
-
-        Returns:
-            The created resource.
-        """
-        args, kwargs = self._get_provider_arguments(provider)
-        cm = contextlib.contextmanager(provider.obj)(*args, **kwargs)
-        return self._stack.enter_context(cm)
-
-    async def _acreate_resource(self, provider: Provider) -> t.Any:
-        """Create a resource asynchronously using the provider.
-
-        Args:
-            provider: The provider for the resource.
-
-        Returns:
-            The created resource.
-        """
-        args, kwargs = await self._aget_provider_arguments(provider)
-        cm = contextlib.asynccontextmanager(provider.obj)(*args, **kwargs)
-        return await self._async_stack.enter_async_context(cm)
-
-    def delete(self, interface: AnyInterface) -> None:
-        """Delete a dependency instance from the scoped context.
-
-        Args:
-             interface: The interface of the dependency.
-        """
-        self._instances.pop(interface, None)
-
-    def __enter__(self) -> Self:
-        """Enter the context.
-
-        Returns:
-            The scoped context.
-        """
-        return self
-
-    def __exit__(
-        self,
-        exc_type: t.Type[BaseException] | None,
-        exc_val: BaseException | None,
-        exc_tb: types.TracebackType | None,
-    ) -> None:
-        """Exit the context.
-
-        Args:
-            exc_type: The type of the exception, if any.
-            exc_val: The exception instance, if any.
-            exc_tb: The traceback, if any.
-        """
-        self.close()
-        return
-
-    def close(self) -> None:
-        """Close the scoped context."""
-        self._stack.close()
-
-    async def __aenter__(self) -> Self:
-        """Enter the context asynchronously.
-
-        Returns:
-            The scoped context.
-        """
-        return self
-
-    async def __aexit__(
-        self,
-        exc_type: t.Type[BaseException] | None,
-        exc_val: BaseException | None,
-        exc_tb: types.TracebackType | None,
-    ) -> None:
-        """Exit the context asynchronously.
-
-        Args:
-            exc_type: The type of the exception, if any.
-            exc_val: The exception instance, if any.
-            exc_tb: The traceback, if any.
-        """
-        await self.aclose()
-        return
-
-    async def aclose(self) -> None:
-        """Close the scoped context asynchronously."""
-        await run_async(self._stack.close)
-        await self._async_stack.aclose()
-
-
-@t.final
-class SingletonContext(ResourceScopedContext):
-    """A scoped context representing the "singleton" scope."""
-
-
-@t.final
-class RequestContext(ResourceScopedContext):
-    """A scoped context representing the "request" scope."""
-
-
-@t.final
-class TransientContext(ScopedContext):
-    """A scoped context representing the "transient" scope."""
-
-    def get(self, interface: Interface[T], provider: Provider) -> T:
-        """Get an instance of a dependency from the transient context.
-
-        Args:
-            interface: The interface of the dependency.
-            provider: The provider for the instance.
-
-        Returns:
-            An instance of the dependency.
-        """
-        instance = self._create_instance(provider)
-        return t.cast(T, instance)
-
-    async def aget(self, interface: Interface[T], provider: Provider) -> T:
-        """Get an async instance of a dependency from the transient context.
-
-        Args:
-            interface: The interface of the dependency.
-            provider: The provider for the instance.
-
-        Returns:
-            An instance of the dependency.
-        """
-        instance = await self._acreate_instance(provider)
-        return t.cast(T, instance)
-
-
-@dataclass(frozen=True)
-class ScannedDependency:
-    """Represents a scanned dependency.
-
-    Attributes:
-        member: The member object that represents the dependency.
-        module: The module where the dependency is defined.
+    Returns:
+        The decorated target class.
     """
-
-    member: t.Any
-    module: types.ModuleType
-
-
-@t.final
-class DependencyScanner:
-    """A class for scanning packages or modules for decorated objects
-    and injecting dependencies."""
-
-    def __init__(self, container: PyxDI) -> None:
-        self.container = container
-
-    def scan(
-        self,
-        /,
-        packages: t.Union[
-            t.Union[types.ModuleType, str],
-            t.Iterable[t.Union[types.ModuleType, str]],
-        ],
-        *,
-        tags: t.Optional[t.Iterable[str]] = None,
-    ) -> None:
-        """Scan packages or modules for decorated members and inject dependencies.
-
-        Args:
-            packages: A single package or module to scan,
-                or an iterable of packages or modules to scan.
-            tags: Optional list of tags to filter the scanned members. Only members
-                with at least one matching tag will be scanned. Defaults to None.
-        """
-        dependencies: t.List[ScannedDependency] = []
-
-        if isinstance(packages, t.Iterable) and not isinstance(packages, str):
-            scan_packages: t.Iterable[t.Union[types.ModuleType, str]] = packages
-        else:
-            scan_packages = t.cast(
-                t.Iterable[t.Union[types.ModuleType, str]], [packages]
-            )
-
-        for package in scan_packages:
-            dependencies.extend(self._scan_package(package, tags=tags))
-
-        for dependency in dependencies:
-            decorator = self.container.inject()(dependency.member)
-            setattr(dependency.module, dependency.member.__name__, decorator)
-
-    def _scan_package(
-        self,
-        package: t.Union[types.ModuleType, str],
-        *,
-        tags: t.Optional[t.Iterable[str]] = None,
-    ) -> t.List[ScannedDependency]:
-        """Scan a package or module for decorated members.
-
-        Args:
-            package: The package or module to scan.
-            tags: Optional list of tags to filter the scanned members. Only members
-                with at least one matching tag will be scanned. Defaults to None.
-
-        Returns:
-            A list of scanned dependencies.
-        """
-        tags = tags or []
-        if isinstance(package, str):
-            package = importlib.import_module(package)
-
-        package_path = getattr(package, "__path__", None)
-
-        if not package_path:
-            return self._scan_module(package, tags=tags)
-
-        dependencies: t.List[ScannedDependency] = []
-
-        for module_info in pkgutil.walk_packages(
-            path=package_path, prefix=package.__name__ + "."
-        ):
-            module = importlib.import_module(module_info.name)
-            dependencies.extend(self._scan_module(module, tags=tags))
-
-        return dependencies
-
-    def _scan_module(
-        self, module: types.ModuleType, *, tags: t.Iterable[str]
-    ) -> t.List[ScannedDependency]:
-        """Scan a module for decorated members.
-
-        Args:
-            module: The module to scan.
-            tags: List of tags to filter the scanned members. Only members with at
-                least one matching tag will be scanned.
-
-        Returns:
-            A list of scanned dependencies.
-        """
-        dependencies: t.List[ScannedDependency] = []
-
-        for _, member in inspect.getmembers(module):
-            if getattr(member, "__module__", None) != module.__name__ or not callable(
-                member
-            ):
-                continue
-
-            member_tags = getattr(member, "__pyxdi_tags__", [])
-            if tags and (
-                member_tags
-                and not set(member_tags).intersection(tags)
-                or not member_tags
-            ):
-                continue
-
-            injected = getattr(member, "__pyxdi_inject__", None)
-            if injected:
-                dependencies.append(
-                    self._create_scanned_dependency(member=member, module=module)
-                )
-                continue
-
-            # Get by pyxdi.dep mark
-            if inspect.isclass(member):
-                signature = get_signature(member.__init__)
-            else:
-                signature = get_signature(member)
-            for parameter in signature.parameters.values():
-                if isinstance(parameter.default, DependencyMark):
-                    dependencies.append(
-                        self._create_scanned_dependency(member=member, module=module)
-                    )
-                    continue
-
-        return dependencies
-
-    def _create_scanned_dependency(
-        self, member: t.Any, module: types.ModuleType
-    ) -> ScannedDependency:
-        """Create a `ScannedDependency` object from the scanned member and module.
-
-        Args:
-            member: The scanned member.
-            module: The module containing the scanned member.
-
-        Returns:
-            A `ScannedDependency` object.
-        """
-        if hasattr(member, "__wrapped__"):
-            member = member.__wrapped__
-        return ScannedDependency(member=member, module=module)
+    setattr(target, "__scope__", "transient")
+    return target
 
 
-class ModuleMeta(type):
-    """A metaclass used for the Module base class.
+def request(target: T) -> T:
+    """Decorator for marking a class as request scope.
 
-    This metaclass extracts provider information from the class attributes
-    and stores it in the `providers` attribute.
+    Args:
+        target: The target class to be decorated.
+
+    Returns:
+        The decorated target class.
     """
-
-    def __new__(
-        cls, name: str, bases: t.Tuple[type, ...], attrs: t.Dict[str, t.Any]
-    ) -> t.Any:
-        """Create a new instance of the ModuleMeta class.
-
-        This method extracts provider information from the class attributes and
-        stores it in the `providers` attribute.
-
-        Args:
-            name: The name of the class.
-            bases: The base classes of the class.
-            attrs: The attributes of the class.
-
-        Returns:
-            The new instance of the class.
-        """
-        attrs["providers"] = [
-            (name, getattr(value, "__pyxdi_provider__", {}))
-            for name, value in attrs.items()
-            if hasattr(value, "__pyxdi_provider__")
-        ]
-        return super().__new__(cls, name, bases, attrs)
+    setattr(target, "__scope__", "request")
+    return target
 
 
-class Module(metaclass=ModuleMeta):
-    """A base class for defining PyxDI modules."""
+def singleton(target: T) -> T:
+    """Decorator for marking a class as singleton scope.
 
-    providers: t.List[t.Tuple[str, t.Dict[str, t.Any]]]
+    Args:
+        target: The target class to be decorated.
 
-    def configure(self, di: PyxDI) -> None:
-        """Configure the PyxDI container with providers and their dependencies.
-
-        This method can be overridden in derived classes to provide the
-        configuration logic.
-
-        Args:
-            di: The PyxDI container to be configured.
-        """
+    Returns:
+        The decorated target class.
+    """
+    setattr(target, "__scope__", "singleton")
+    return target

@@ -1,39 +1,37 @@
 import inspect
-import logging
-import typing as t
+from typing import Any, Callable
 
 from typing_extensions import Annotated, get_args, get_origin
 
-from pyxdi import PyxDI
-from pyxdi.utils import get_full_qualname
-
-logger = logging.getLogger(__name__)
+from pyxdi import Container
+from pyxdi._logger import logger
+from pyxdi._utils import get_full_qualname
 
 
 class HasInterface:
     def __init__(self) -> None:
-        self._interface: t.Any = None
+        self._interface: Any = None
 
     @property
-    def interface(self) -> t.Any:
+    def interface(self) -> Any:
         if self._interface is None:
             raise TypeError("Interface is not set.")
         return self._interface
 
     @interface.setter
-    def interface(self, interface: t.Any) -> None:
+    def interface(self, interface: Any) -> None:
         self._interface = interface
 
 
 def patch_parameter_interface(
-    call: t.Callable[..., t.Any], parameter: inspect.Parameter, di: PyxDI
+    call: Callable[..., Any], parameter: inspect.Parameter, container: Container
 ) -> None:
     """Patch a parameter to inject dependencies using PyxDI.
 
     Args:
         call:  The call function.
         parameter: The parameter to patch.
-        di: The PyxDI container.
+        container: The PyxDI container.
     """
     interface, default = parameter.annotation, parameter.default
 
@@ -50,15 +48,15 @@ def patch_parameter_interface(
 
     parameter = parameter.replace(annotation=interface, default=default)
 
-    if not di.strict and not di.has_provider(interface):
+    if not container.strict and not container.has_provider(interface):
         logger.debug(
-            f"Route `{get_full_qualname(call)}` injected parameter "
+            f"Callable `{get_full_qualname(call)}` injected parameter "
             f"`{parameter.name}` with an annotation of "
             f"`{get_full_qualname(interface)}` "
             "is not registered. It will be registered at runtime with the "
             "first call because it is running in non-strict mode."
         )
     else:
-        di._validate_injected_parameter(call, parameter)  # noqa
+        container._validate_injected_parameter(call, parameter)  # noqa
 
     parameter.default.interface = parameter.annotation

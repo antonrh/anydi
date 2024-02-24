@@ -1,32 +1,33 @@
 """PyxDI FastAPI extension."""
-import typing as t
+
+from typing import Any, Iterator, cast
 
 from fastapi import Depends, FastAPI, params
 from fastapi.dependencies.models import Dependant
 from fastapi.routing import APIRoute
 from starlette.requests import Request
 
-from pyxdi import PyxDI
-from pyxdi.utils import get_signature
+from pyxdi import Container
+from pyxdi._utils import get_signature
 
+from ._utils import HasInterface, patch_parameter_interface
 from .starlette.middleware import RequestScopedMiddleware
-from .utils import HasInterface, patch_parameter_interface
 
-__all__ = ["RequestScopedMiddleware", "install", "get_di", "Inject"]
+__all__ = ["RequestScopedMiddleware", "install", "get_container", "Inject"]
 
 
-def install(app: FastAPI, di: PyxDI) -> None:
+def install(app: FastAPI, container: Container) -> None:
     """Install PyxDI into a FastAPI application.
 
     Args:
         app: The FastAPI application instance.
-        di: The PyxDI container.
+        container: The container.
 
     This function installs the PyxDI container into a FastAPI application by attaching
     it to the application state. It also patches the route dependencies to inject the
     required dependencies using PyxDI.
     """
-    app.state.di = di  # noqa
+    app.state.container = container  # noqa
 
     patched = []
 
@@ -41,10 +42,10 @@ def install(app: FastAPI, di: PyxDI) -> None:
             if not call:
                 continue  # pragma: no cover
             for parameter in get_signature(call).parameters.values():
-                patch_parameter_interface(call, parameter, di)
+                patch_parameter_interface(call, parameter, container)
 
 
-def get_di(request: Request) -> PyxDI:
+def get_container(request: Request) -> Container:
     """Get the PyxDI container from a FastAPI request.
 
     Args:
@@ -53,7 +54,7 @@ def get_di(request: Request) -> PyxDI:
     Returns:
         The PyxDI container associated with the request.
     """
-    return t.cast(PyxDI, request.app.state.di)
+    return cast(Container, request.app.state.container)
 
 
 class GetInstance(params.Depends, HasInterface):
@@ -63,11 +64,11 @@ class GetInstance(params.Depends, HasInterface):
         super().__init__(dependency=self._dependency, use_cache=True)
         HasInterface.__init__(self)
 
-    async def _dependency(self, di: PyxDI = Depends(get_di)) -> t.Any:
-        return await di.aget_instance(self.interface)
+    async def _dependency(self, container: Container = Depends(get_container)) -> Any:
+        return await container.aget_instance(self.interface)
 
 
-def Inject() -> t.Any:  # noqa
+def Inject() -> Any:  # noqa
     """Decorator for marking a function parameter as requiring injection.
 
     The `Inject` decorator is used to mark a function parameter as requiring injection
@@ -79,7 +80,7 @@ def Inject() -> t.Any:  # noqa
     return GetInstance()
 
 
-def _iter_dependencies(dependant: Dependant) -> t.Iterator[Dependant]:
+def _iter_dependencies(dependant: Dependant) -> Iterator[Dependant]:
     """Iterate over the dependencies of a dependant."""
     yield dependant
     if dependant.dependencies:

@@ -6,10 +6,17 @@ from dataclasses import dataclass
 import pytest
 from typing_extensions import Annotated
 
-from pyxdi import Module, Provider, PyxDI, Scope, dep, provider
+from pyxdi import (
+    Provider,
+    PyxDI,
+    Scope,
+    dep,
+    request,
+    singleton,
+    transient,
+)
 
 from tests.fixtures import Service
-from tests.scan import ScanModule
 
 
 @pytest.fixture
@@ -78,7 +85,7 @@ def test_provider_name() -> None:
     assert (
         provider.name
         == str(provider)
-        == "tests.test_core.test_provider_name.<locals>.obj"
+        == "tests.test_container.test_provider_name.<locals>.obj"
     )
 
 
@@ -194,7 +201,7 @@ def test_get_auto_registered_provider_scope_defined() -> None:
     di = PyxDI(strict=False)
 
     class Service:
-        __pyxdi_scope__ = "singleton"
+        __scope__ = "singleton"
 
     assert di.get_provider(Service).scope == "singleton"
 
@@ -237,7 +244,7 @@ def test_get_auto_registered_nested_singleton_provider() -> None:
 
     @dataclass
     class Repository:
-        __pyxdi_scope__ = "singleton"
+        __scope__ = "singleton"
 
     @dataclass
     class Service:
@@ -265,7 +272,7 @@ def test_get_auto_registered_missing_scope() -> None:
 
     assert str(exc_info.value) == (
         "Unable to automatically register the provider interface for "
-        "`tests.test_core.test_get_auto_registered_missing_scope.<locals>"
+        "`tests.test_container.test_get_auto_registered_missing_scope.<locals>"
         ".Repository` because the scope detection failed. Please resolve "
         "this issue by using the appropriate scope decorator."
     )
@@ -294,16 +301,16 @@ def test_inject_auto_registered_log_message(caplog: pytest.LogCaptureFixture) ->
 
     di = PyxDI(strict=False)
 
-    with caplog.at_level(logging.DEBUG, logger="pyxdi.core"):
+    with caplog.at_level(logging.DEBUG, logger="pyxdi"):
 
         @di.inject
         def handler(service: Service = dep) -> None:
             pass
 
         assert caplog.messages == [
-            "Cannot validate the `tests.test_core"
+            "Cannot validate the `tests.test_container"
             ".test_inject_auto_registered_log_message.<locals>.handler` parameter "
-            "`service` with an annotation of `tests.test_core"
+            "`service` with an annotation of `tests.test_container"
             ".test_inject_auto_registered_log_message.<locals>.Service due to being "
             "in non-strict mode. It will be validated at the first call."
         ]
@@ -335,7 +342,7 @@ def test_register_provider_invalid_transient_resource(di: PyxDI) -> None:
         di.register_provider(str, provider_obj, scope="transient")
 
     assert str(exc_info.value) == (
-        "The resource provider `tests.test_core"
+        "The resource provider `tests.test_container"
         ".test_register_provider_invalid_transient_resource.<locals>.provider_obj` is "
         "attempting to register with a transient scope, which is not allowed. Please "
         "update the provider's scope to an appropriate value before registering it."
@@ -350,7 +357,7 @@ def test_register_provider_invalid_transient_async_resource(di: PyxDI) -> None:
         di.register_provider(str, provider_obj, scope="transient")
 
     assert str(exc_info.value) == (
-        "The resource provider `tests.test_core"
+        "The resource provider `tests.test_container"
         ".test_register_provider_invalid_transient_async_resource"
         ".<locals>.provider_obj` is attempting to register with a transient scope, "
         "which is not allowed. Please update the provider's scope to an "
@@ -469,11 +476,12 @@ def test_register_provider_match_scopes_error(di: PyxDI) -> None:
         di.register_provider(str, provider_str, scope="singleton")
 
     assert str(exc_info.value) == (
-        "The provider `tests.test_core.test_register_provider_match_scopes_error"
+        "The provider `tests.test_container.test_register_provider_match_scopes_error"
         ".<locals>.provider_str` with a singleton scope was attempted to be registered "
-        "with the provider `tests.test_core.test_register_provider_match_scopes_error"
-        ".<locals>.provider_int` with a `request` scope, which is not allowed. "
-        "Please ensure that all providers are registered with matching scopes."
+        "with the provider `tests.test_container"
+        ".test_register_provider_match_scopes_error.<locals>.provider_int` with a "
+        "`request` scope, which is not allowed. Please ensure that all providers are "
+        "registered with matching scopes."
     )
 
 
@@ -491,8 +499,8 @@ def test_register_provider_without_annotation(di: PyxDI) -> None:
 
     assert str(exc_info.value) == (
         "Missing provider "
-        "`tests.test_core.test_register_provider_without_annotation.<locals>.service` "
-        "dependency `ident` annotation."
+        "`tests.test_container.test_register_provider_without_annotation"
+        ".<locals>.service` dependency `ident` annotation."
     )
 
 
@@ -505,7 +513,7 @@ def test_register_provider_with_not_registered_sub_provider(di: PyxDI) -> None:
 
     assert str(exc_info.value) == (
         "The provider "
-        "`tests.test_core.test_register_provider_with_not_registered_sub_provider"
+        "`tests.test_container.test_register_provider_with_not_registered_sub_provider"
         ".<locals>.dep2` depends on `dep1` of type `int`, which has not been "
         "registered. To resolve this, ensure that `dep1` is registered "
         "before attempting to use it."
@@ -581,74 +589,6 @@ async def test_register_async_events(di: PyxDI) -> None:
         "event_2: before test",
         "event_2: after test",
         "event_1: after test",
-    ]
-
-
-# Module
-
-
-class TestModule(Module):
-    def configure(self, di: PyxDI) -> None:
-        di.register_provider(
-            Annotated[str, "msg1"], lambda: "Message 1", scope="singleton"
-        )
-
-    @provider(scope="singleton")
-    def provide_msg2(self) -> Annotated[str, "msg2"]:
-        return "Message 2"
-
-
-def test_register_modules() -> None:
-    di = PyxDI(modules=[TestModule])
-
-    assert di.has_provider(Annotated[str, "msg1"])
-    assert di.has_provider(Annotated[str, "msg2"])
-
-
-def test_register_module_class(di: PyxDI) -> None:
-    di.register_module(TestModule)
-
-    assert di.has_provider(Annotated[str, "msg1"])
-    assert di.has_provider(Annotated[str, "msg2"])
-
-
-def test_register_module_instance(di: PyxDI) -> None:
-    di.register_module(TestModule())
-
-    assert di.has_provider(Annotated[str, "msg1"])
-    assert di.has_provider(Annotated[str, "msg2"])
-
-
-def test_register_module_function(di: PyxDI) -> None:
-    def configure(di: PyxDI) -> None:
-        di.register_provider(str, lambda: "Message 1", scope="singleton")
-
-    di.register_module(configure)
-
-    assert di.has_provider(str)
-
-
-class OrderedModule(Module):
-    @provider(scope="singleton")
-    def dep3(self) -> Annotated[str, "dep3"]:
-        return "dep3"
-
-    @provider(scope="singleton")
-    def dep1(self) -> Annotated[str, "dep1"]:
-        return "dep1"
-
-    @provider(scope="singleton")
-    def dep2(self) -> Annotated[str, "dep2"]:
-        return "dep2"
-
-
-def test_register_module_ordered_providers(di: PyxDI) -> None:
-    di.register_module(OrderedModule)
-
-    assert list(di.providers.keys()) == [
-        Annotated[str, "dep3"],
-        Annotated[str, "dep1"],
-        Annotated[str, "dep2"],
     ]
 
 
@@ -787,7 +727,7 @@ def test_get_singleton_scoped_started_with_async_resource_provider(di: PyxDI) ->
         di.start()
 
     assert str(exc_info.value) == (
-        "The provider `tests.test_core.test_get_singleton_scoped_started_with_"
+        "The provider `tests.test_container.test_get_singleton_scoped_started_with_"
         "async_resource_provider.<locals>.provide` cannot be started in synchronous "
         "mode because it is an asynchronous provider. Please start the provider "
         "in asynchronous mode before using it."
@@ -849,7 +789,7 @@ async def test_get_singleton_scoped_async_resource_not_started(di: PyxDI) -> Non
         di.get_instance(str)
 
     assert str(exc_info.value) == (
-        "The provider `tests.test_core"
+        "The provider `tests.test_container"
         ".test_get_singleton_scoped_async_resource_not_started.<locals>.provide` "
         "cannot be started in synchronous mode because it is an asynchronous provider. "
         "Please start the provider in asynchronous mode before using it."
@@ -895,7 +835,7 @@ def test_get_async_transient_scoped(di: PyxDI) -> None:
 
     assert str(exc_info.value) == (
         "The instance for the coroutine provider "
-        "`tests.test_core.test_get_async_transient_scoped.<locals>.get_uuid` "
+        "`tests.test_container.test_get_async_transient_scoped.<locals>.get_uuid` "
         "cannot be created in synchronous mode."
     )
 
@@ -1035,7 +975,7 @@ def test_get_provider_annotation_missing(di: PyxDI) -> None:
         di._get_provider_annotation(provider)
 
     assert str(exc_info.value) == (
-        "Missing `tests.test_core.test_get_provider_annotation_missing.<locals>"
+        "Missing `tests.test_container.test_get_provider_annotation_missing.<locals>"
         ".provider` provider return annotation."
     )
 
@@ -1048,8 +988,9 @@ def test_get_provider_annotation_origin_without_args(di: PyxDI) -> None:
         di._get_provider_annotation(provider)
 
     assert str(exc_info.value) == (
-        "Cannot use `tests.test_core.test_get_provider_annotation_origin_without_args."
-        "<locals>.provider` generic type annotation without actual type."
+        "Cannot use `tests.test_container"
+        ".test_get_provider_annotation_origin_without_args.<locals>.provider` generic "
+        "type annotation without actual type."
     )
 
 
@@ -1113,8 +1054,8 @@ def test_inject_missing_annotation(di: PyxDI) -> None:
         di.inject(handler)
 
     assert str(exc_info.value) == (
-        "Missing `tests.test_core.test_inject_missing_annotation.<locals>.handler` "
-        "parameter `name` annotation."
+        "Missing `tests.test_container.test_inject_missing_annotation"
+        ".<locals>.handler` parameter `name` annotation."
     )
 
 
@@ -1126,7 +1067,7 @@ def test_inject_unknown_dependency(di: PyxDI) -> None:
         di.inject(handler)
 
     assert str(exc_info.value) == (
-        "`tests.test_core.test_inject_unknown_dependency.<locals>.handler` "
+        "`tests.test_container.test_inject_unknown_dependency.<locals>.handler` "
         "has an unknown dependency parameter `message` with an annotation of `str`."
     )
 
@@ -1249,38 +1190,19 @@ def test_provider_decorator(di: PyxDI) -> None:
     assert di.get_provider(str) == Provider(obj=ident, scope="singleton")
 
 
-# Scanner
+def test_request_decorator() -> None:
+    request(Service)
+
+    assert getattr(Service, "__scope__") == "request"
 
 
-def test_scan(di: PyxDI) -> None:
-    di.register_module(ScanModule)
-    di.scan(["tests.scan"])
+def test_transient_decorator() -> None:
+    transient(Service)
 
-    from .scan.a.a3.handlers import a_a3_handler_1, a_a3_handler_2
-
-    assert a_a3_handler_1() == "a.a1.str_provider"
-    assert a_a3_handler_2().ident == "a.a1.str_provider"
+    assert getattr(Service, "__scope__") == "transient"
 
 
-def test_scan_single_package(di: PyxDI) -> None:
-    di.register_module(ScanModule)
-    di.scan("tests.scan.a.a3.handlers")
+def test_singleton_decorator() -> None:
+    singleton(Service)
 
-    from .scan.a.a3.handlers import a_a3_handler_1
-
-    assert a_a3_handler_1() == "a.a1.str_provider"
-
-
-def test_scan_non_existing_tag(di: PyxDI) -> None:
-    di.scan(["tests.scan"], tags=["non_existing_tag"])
-
-    assert not di.providers
-
-
-def test_scan_tagged(di: PyxDI) -> None:
-    di.register_module(ScanModule)
-    di.scan(["tests.scan.a"], tags=["inject"])
-
-    from .scan.a.a3.handlers import a_a3_handler_1
-
-    assert a_a3_handler_1() == "a.a1.str_provider"
+    assert getattr(Service, "__scope__") == "singleton"

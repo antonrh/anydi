@@ -1,13 +1,25 @@
 """PyxDI public objects and functions."""
-from .core import Module, Provider, PyxDI, Scope, dep
-from .decorators import inject, provider, request, singleton, transient
+from typing import Any, cast
+
+from ._container import Container, request, singleton, transient
+from ._module import Module, provider
+from ._scanner import injectable
+from ._types import Marker, Provider, Scope
+
+# Container type alias for backward compatibility
+PyxDI = Container
+
+# Dependency marker with Any type
+dep = cast(Any, Marker())
+
 
 __all__ = [
     "dep",
-    "inject",
+    "injectable",
     "Module",
     "provider",
     "Provider",
+    "Container",
     "PyxDI",
     "Scope",
     "singleton",
