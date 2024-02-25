@@ -1,7 +1,7 @@
 import inspect
+import types
 from dataclasses import dataclass
 from functools import cached_property
-from types import MappingProxyType
 from typing import Any, Callable, Type, TypeVar, Union
 
 from typing_extensions import Annotated, Literal, TypeAlias
@@ -51,7 +51,7 @@ class Provider:
         return get_full_qualname(self.obj)
 
     @cached_property
-    def parameters(self) -> MappingProxyType[str, inspect.Parameter]:
+    def parameters(self) -> types.MappingProxyType[str, inspect.Parameter]:
         """Returns the parameters of the provider as a mapping.
 
         Returns:
