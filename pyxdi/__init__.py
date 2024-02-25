@@ -1,24 +1,26 @@
 """PyxDI public objects and functions."""
-from typing import Any, cast
+from typing import Any
 
 from ._container import Container, request, singleton, transient
 from ._module import Module, provider
-from ._scanner import injectable
+from ._scanner import inject
 from ._types import Marker, Provider, Scope
 
-# Dependency marker with Any type
-dep = cast(Any, Marker())
+
+def auto() -> Any:
+    """A marker for automatic dependency injection."""
+    return Marker()
 
 
 __all__ = [
-    "dep",
-    "injectable",
-    "Module",
-    "provider",
-    "Provider",
     "Container",
+    "Module",
+    "Provider",
     "Scope",
-    "singleton",
+    "auto",
+    "inject",
+    "provider",
     "request",
+    "singleton",
     "transient",
 ]

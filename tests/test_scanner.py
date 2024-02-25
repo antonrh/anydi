@@ -1,7 +1,7 @@
 import pytest
 
-from pyxdi import Container, injectable
-from pyxdi._scanner import InjectableDecoratorArgs  # noqa
+from pyxdi import Container, inject
+from pyxdi._scanner import InjectDecoratorArgs  # noqa
 
 from .scan_app import ScanAppModule
 
@@ -45,34 +45,34 @@ def test_scan_tagged(container: Container) -> None:
     assert a_a3_handler_1() == "a.a1.str_provider"
 
 
-def test_injectable_decorator_no_args() -> None:
-    @injectable
+def test_inject_decorator_no_args() -> None:
+    @inject
     def my_func() -> None:
         pass
 
-    assert getattr(my_func, "__injectable__") == InjectableDecoratorArgs(
+    assert getattr(my_func, "__inject__") == InjectDecoratorArgs(
         wrapped=True,
         tags=None,
     )
 
 
-def test_injectable_decorator_no_args_provided() -> None:
-    @injectable()
+def test_inject_decorator_no_args_provided() -> None:
+    @inject()
     def my_func() -> None:
         pass
 
-    assert getattr(my_func, "__injectable__") == InjectableDecoratorArgs(
+    assert getattr(my_func, "__inject__") == InjectDecoratorArgs(
         wrapped=True,
         tags=None,
     )
 
 
-def test_injectable_decorator() -> None:
-    @injectable(tags=["tag1", "tag2"])
+def test_inject_decorator() -> None:
+    @inject(tags=["tag1", "tag2"])
     def my_func() -> None:
         pass
 
-    assert getattr(my_func, "__injectable__") == InjectableDecoratorArgs(
+    assert getattr(my_func, "__inject__") == InjectDecoratorArgs(
         wrapped=True,
         tags=["tag1", "tag2"],
     )

@@ -138,10 +138,10 @@ class Scanner:
             ):
                 continue
 
-            decorator_args: InjectableDecoratorArgs = getattr(
+            decorator_args: InjectDecoratorArgs = getattr(
                 member,
-                "__injectable__",
-                InjectableDecoratorArgs(wrapped=False, tags=[]),
+                "__inject__",
+                InjectDecoratorArgs(wrapped=False, tags=[]),
             )
 
             if tags and (
@@ -186,24 +186,24 @@ class Scanner:
         return Dependency(member=member, module=module)
 
 
-class InjectableDecoratorArgs(NamedTuple):
+class InjectDecoratorArgs(NamedTuple):
     wrapped: bool
     tags: Optional[Iterable[str]]
 
 
 @overload
-def injectable(obj: Callable[P, T]) -> Callable[P, T]:
+def inject(obj: Callable[P, T]) -> Callable[P, T]:
     ...
 
 
 @overload
-def injectable(
+def inject(
     *, tags: Optional[Iterable[str]] = None
 ) -> Callable[[Callable[P, T]], Callable[P, T]]:
     ...
 
 
-def injectable(
+def inject(
     obj: Optional[Callable[P, T]] = None,
     tags: Optional[Iterable[str]] = None,
 ) -> Union[
@@ -226,11 +226,7 @@ def injectable(
     """
 
     def decorator(obj: Callable[P, T]) -> Callable[P, T]:
-        setattr(
-            obj,
-            "__injectable__",
-            InjectableDecoratorArgs(wrapped=True, tags=tags),
-        )
+        setattr(obj, "__inject__", InjectDecoratorArgs(wrapped=True, tags=tags))
         return obj
 
     if obj is None:

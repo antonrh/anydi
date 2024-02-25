@@ -1,6 +1,6 @@
-from pyxdi import injectable
+from pyxdi import inject
 
 
-@injectable(tags=["a", "a1"])
+@inject(tags=["a", "a1"])
 def a1_handler() -> None:
     pass
