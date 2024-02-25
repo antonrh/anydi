@@ -3,7 +3,6 @@ from __future__ import annotations
 
 import contextlib
 import inspect
-import logging
 import types
 import uuid
 from contextvars import ContextVar
@@ -44,6 +43,7 @@ from ._context import (
     SingletonContext,
     TransientContext,
 )
+from ._logger import logger
 from ._module import Module, ModuleRegistry
 from ._scanner import Scanner
 from ._types import AnyInterface, Interface, Marker, Provider, Scope
@@ -57,8 +57,6 @@ ALLOWED_SCOPES: Dict[Scope, List[Scope]] = {
     "request": ["request", "singleton"],
     "transient": ["transient", "singleton", "request"],
 }
-
-logger = logging.getLogger(__name__)
 
 
 @final
