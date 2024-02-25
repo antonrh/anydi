@@ -22,7 +22,7 @@ def message() -> str:
 
 di.register_provider(str, message, scope="singleton")
 
-assert di.get_instance(str) == "Hello, world!"
+assert di.resolve(str) == "Hello, world!"
 ```
 
 Alternatively, you can use the provider decorator to register a provider function. The decorator takes care of registering the provider with `PyxDI`.
@@ -38,7 +38,7 @@ def message() -> str:
     return "Hello, message!"
 
 
-assert di.get_instance(str) == "Hello, world!"
+assert di.resolve(str) == "Hello, world!"
 ```
 
 ### Annotated Providers
@@ -63,8 +63,8 @@ def message2() -> Annotated[str, "message2"]:
     return "Message2"
 
 
-assert di.get_instance(Annotated[str, "message1"]) == "Message1"
-assert di.get_instance(Annotated[str, "message2"]) == "Message2"
+assert di.resolve(Annotated[str, "message1"]) == "Message1"
+assert di.resolve(Annotated[str, "message2"]) == "Message2"
 ```
 
 In this code example, we define two providers, `message1` and `message2`, each returning a different message. The Annotated type hint with string argument allows you to specify which provider to retrieve based on the name provided within the annotation.
@@ -118,11 +118,11 @@ def root() -> t.Iterator[RootComponent]:
 
 
 # Attempt to retrieve an instance of Component
-_ = di.get_instance(Component)
+_ = di.resolve(Component)
 
-assert di.has_instance(Component)
-assert di.has_instance(ChildComponent)
-assert di.has_instance(RootComponent)
+assert di.is_resolved(Component)
+assert di.is_resolved(ChildComponent)
+assert di.is_resolved(RootComponent)
 ```
 
 If you create a `PyxDI` instance in strict mode `strict=True`, it will raise an error if you try to get an instance of a type that not exists in the container:
@@ -130,7 +130,7 @@ If you create a `PyxDI` instance in strict mode `strict=True`, it will raise an 
 ```python
 di = pyxdi.PyxDI(strict=True)
 
-_ = di.get_instance(Component)  # raises LookupError
+_ = di.resolve(Component)  # raises LookupError
 ```
 
 ### Unregistering Providers
@@ -173,15 +173,15 @@ def message() -> str:
 
 
 # Check if a provider is registered
-assert not di.has_instance(str)
+assert not di.is_resolved(str)
 
-assert di.get_instance(str) == "Hello, world!"
+assert di.resolve(str) == "Hello, world!"
 
-assert di.has_instance(str)
+assert di.is_resolved(str)
 
-di.reset_instance(str)
+di.release(str)
 
-assert not di.has_instance(str)
+assert not di.is_resolved(str)
 ```
 
 To reset a provider instance, you can use the `reset_instance` method of the PyxDI instance. This method takes the interface of the dependency to be reset. Alternatively, you can reset all instances with the `reset` method.
@@ -193,16 +193,16 @@ di = PyxDI()
 di.register_provider(str, lambda: "Hello, world!", scope="singleton")
 di.register_provider(int, lambda: 100, scope="singleton")
 
-di.get_instance(str)
-di.get_instance(int)
+di.resolve(str)
+di.resolve(int)
 
-assert di.has_instance(str)
-assert di.has_instance(int)
+assert di.is_resolved(str)
+assert di.is_resolved(int)
 
 di.reset()
 
-assert not di.has_instance(str)
-assert not di.has_instance(int)
+assert not di.is_resolved(str)
+assert not di.is_resolved(int)
 ```
 
 !!! note
@@ -235,7 +235,7 @@ def message() -> str:
     return random.choice(["hello", "hola", "ciao"])
 
 
-print(di.get_instance(str))  # will print random message
+print(di.resolve(str))  # will print random message
 ```
 
 ### `singleton` scope
@@ -259,7 +259,7 @@ def service() -> Service:
     return Service(name="demo")
 
 
-assert di.get_instance(Service) == di.get_instance(Service)
+assert di.resolve(Service) == di.resolve(Service)
 ```
 
 ### `request` scope
@@ -284,9 +284,9 @@ def request_provider() -> Request:
 
 
 with di.request_context():
-    assert di.get_instance(Request).path == "/"
+    assert di.resolve(Request).path == "/"
 
-di.get_instance(Request)  # this will raise LookupError
+di.resolve(Request)  # this will raise LookupError
 ```
 
 or using asynchronous request context:
@@ -304,7 +304,7 @@ def request_provider() -> Request:
 
 async def main() -> None:
     async with di.arequest_context():
-        assert di.get_instance(Request).path == "/"
+        assert di.resolve(Request).path == "/"
 ```
 
 ## Resource Providers
@@ -345,7 +345,7 @@ def resource_provider() -> t.Iterator[Resource]:
 
 di.start()  # start resources
 
-assert di.get_instance(Resource).name == "demo"
+assert di.resolve(Resource).name == "demo"
 
 di.close()  # close resources
 ```
@@ -388,7 +388,7 @@ async def resource_provider() -> t.AsyncIterator[Resource]:
 async def main() -> None:
     await di.astart()  # start resources
 
-    assert di.get_instance(Resource).name == "demo"
+    assert di.resolve(Resource).name == "demo"
 
     await di.aclose()  # close resources
 
@@ -435,7 +435,7 @@ def client_lifespan(client: Client) -> t.Iterator[None]:
     client.close()
 
 
-client = di.get_instance(Client)
+client = di.resolve(Client)
 
 assert not client.started
 assert not client.closed
@@ -444,7 +444,6 @@ di.start()
 
 assert client.started
 assert not client.closed
-
 
 di.close()
 
@@ -479,7 +478,7 @@ def goodbye_message() -> str:
     return "Goodbye!"
 
 
-assert di.get_instance(str) == "Goodbye!"
+assert di.resolve(str) == "Goodbye!"
 ```
 
 Note that if you try to register the provider without passing the override parameter as True, it will raise an error:

@@ -388,7 +388,7 @@ class Container:
         """Start the singleton context."""
         for interface, provider in self.providers.items():
             if provider.scope == "singleton":
-                self.get_instance(interface)  # noqa
+                self.resolve(interface)  # noqa
 
     def close(self) -> None:
         """Close the singleton context."""
@@ -418,7 +418,7 @@ class Container:
         """Start the singleton context asynchronously."""
         for interface, provider in self._providers.items():
             if provider.scope == "singleton":
-                await self.aget_instance(interface)  # noqa
+                await self.aresolve(interface)  # noqa
 
     async def aclose(self) -> None:
         """Close the singleton context asynchronously."""
@@ -470,15 +470,15 @@ class Container:
                 scoped_context.delete(interface)
 
     @overload
-    def get_instance(self, interface: Interface[T]) -> T:
+    def resolve(self, interface: Interface[T]) -> T:
         ...
 
     @overload
-    def get_instance(self, interface: T) -> T:
+    def resolve(self, interface: T) -> T:
         ...
 
-    def get_instance(self, interface: Interface[T]) -> T:
-        """Get an instance by interface.
+    def resolve(self, interface: Interface[T]) -> T:
+        """Resolve an instance by interface.
 
         Args:
             interface: The interface type.
@@ -497,15 +497,15 @@ class Container:
         return scoped_context.get(interface, provider)
 
     @overload
-    async def aget_instance(self, interface: Interface[T]) -> T:
+    async def aresolve(self, interface: Interface[T]) -> T:
         ...
 
     @overload
-    async def aget_instance(self, interface: T) -> T:
+    async def aresolve(self, interface: T) -> T:
         ...
 
-    async def aget_instance(self, interface: Interface[T]) -> T:
-        """Get an instance by interface asynchronously.
+    async def aresolve(self, interface: Interface[T]) -> T:
+        """Resolve an instance by interface asynchronously.
 
         Args:
             interface: The interface type.
@@ -523,7 +523,7 @@ class Container:
         scoped_context = self._get_scoped_context(provider.scope)
         return await scoped_context.aget(interface, provider)
 
-    def has_instance(self, interface: AnyInterface) -> bool:
+    def is_resolved(self, interface: AnyInterface) -> bool:
         """Check if an instance by interface exists.
 
         Args:
@@ -542,8 +542,8 @@ class Container:
                 return scoped_context.has(interface)
         return False
 
-    def reset_instance(self, interface: AnyInterface) -> None:
-        """Reset an instance by interface.
+    def release(self, interface: AnyInterface) -> None:
+        """Release an instance by interface.
 
         Args:
             interface: The interface type.
@@ -653,7 +653,7 @@ class Container:
                 @wraps(obj)
                 async def awrapped(*args: P.args, **kwargs: P.kwargs) -> T:
                     for name, annotation in injected_params.items():
-                        kwargs[name] = await self.aget_instance(annotation)
+                        kwargs[name] = await self.aresolve(annotation)
                     return cast(T, await obj(*args, **kwargs))
 
                 return awrapped
@@ -661,7 +661,7 @@ class Container:
             @wraps(obj)
             def wrapped(*args: P.args, **kwargs: P.kwargs) -> T:
                 for name, annotation in injected_params.items():
-                    kwargs[name] = self.get_instance(annotation)
+                    kwargs[name] = self.resolve(annotation)
                 return cast(T, obj(*args, **kwargs))
 
             return wrapped

@@ -65,7 +65,7 @@ class GetInstance(params.Depends, HasInterface):
         HasInterface.__init__(self)
 
     async def _dependency(self, container: Container = Depends(get_container)) -> Any:
-        return await container.aget_instance(self.interface)
+        return await container.aresolve(self.interface)
 
 
 def Inject() -> Any:  # noqa

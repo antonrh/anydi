@@ -97,8 +97,8 @@ def test_register_provider_via_constructor() -> None:
         }
     )
 
-    assert container.get_instance(str) == "test"
-    assert container.get_instance(int) == 1
+    assert container.resolve(str) == "test"
+    assert container.resolve(int) == 1
 
 
 def test_unregister_singleton_scoped_provider(container: Container) -> None:
@@ -168,7 +168,7 @@ def test_get_auto_registered_provider_scope_from_sub_provider_request() -> None:
         message: str
 
     with container.request_context():
-        _ = container.get_instance(Service)
+        _ = container.resolve(Service)
 
     assert container.get_provider(Service).scope == "request"
 
@@ -184,7 +184,7 @@ def test_get_auto_registered_provider_scope_from_sub_provider_transient() -> Non
     class Entity:
         id: Annotated[str, "uuid_generator"]
 
-    _ = container.get_instance(Entity)
+    _ = container.resolve(Entity)
 
     assert container.get_provider(Entity).scope == "transient"
 
@@ -201,7 +201,7 @@ def test_get_auto_registered_nested_singleton_provider() -> None:
         repository: Repository
 
     with container.request_context():
-        _ = container.get_instance(Service)
+        _ = container.resolve(Service)
 
     assert container.get_provider(Service).scope == "singleton"
 
@@ -218,7 +218,7 @@ def test_get_auto_registered_missing_scope() -> None:
         repository: Repository
 
     with pytest.raises(TypeError) as exc_info:
-        _ = container.get_instance(Service)
+        _ = container.resolve(Service)
 
     assert str(exc_info.value) == (
         "Unable to automatically register the provider interface for "
@@ -236,7 +236,7 @@ def test_get_auto_registered_with_primitive_class() -> None:
         name: str
 
     with pytest.raises(LookupError) as exc_info:
-        _ = container.get_instance(Service).name
+        _ = container.resolve(Service).name
 
     assert str(exc_info.value) == (
         "The provider interface for `str` has not been registered. "
@@ -561,7 +561,7 @@ def test_start_and_close_singleton_context(container: Container) -> None:
 
     container.start()
 
-    assert container.get_instance(str) == "test"
+    assert container.resolve(str) == "test"
 
     container.close()
 
@@ -579,7 +579,7 @@ def test_request_context(container: Container) -> None:
     container.register_provider(str, dep1, scope="request")
 
     with container.request_context():
-        assert container.get_instance(str) == "test"
+        assert container.resolve(str) == "test"
 
     assert events == ["dep1:before", "dep1:after"]
 
@@ -599,7 +599,7 @@ async def test_astart_and_aclose_singleton_context(container: Container) -> None
 
     await container.astart()
 
-    assert container.get_instance(str) == "test"
+    assert container.resolve(str) == "test"
 
     await container.aclose()
 
@@ -617,7 +617,7 @@ async def test_arequest_context(container: Container) -> None:
     container.register_provider(str, dep1, scope="request")
 
     async with container.arequest_context():
-        assert await container.aget_instance(str) == "test"
+        assert await container.aresolve(str) == "test"
 
     assert events == ["dep1:before", "dep1:after"]
 
@@ -626,16 +626,16 @@ def test_reset_resolved_instances(container: Container) -> None:
     container.register_provider(str, lambda: "test", scope="singleton")
     container.register_provider(int, lambda: 1, scope="singleton")
 
-    container.get_instance(str)
-    container.get_instance(int)
+    container.resolve(str)
+    container.resolve(int)
 
-    assert container.has_instance(str)
-    assert container.has_instance(int)
+    assert container.is_resolved(str)
+    assert container.is_resolved(int)
 
     container.reset()
 
-    assert not container.has_instance(str)
-    assert not container.has_instance(int)
+    assert not container.is_resolved(str)
+    assert not container.is_resolved(int)
 
 
 # Instance
@@ -646,7 +646,7 @@ def test_get_singleton_scoped(container: Container) -> None:
 
     container.register_provider(str, lambda: instance, scope="singleton")
 
-    assert container.get_instance(str) == instance
+    assert container.resolve(str) == instance
 
 
 def test_get_singleton_scoped_not_started(container: Container) -> None:
@@ -654,7 +654,7 @@ def test_get_singleton_scoped_not_started(container: Container) -> None:
     def message() -> t.Iterator[str]:
         yield "test"
 
-    assert container.get_instance(str) == "test"
+    assert container.resolve(str) == "test"
 
 
 def test_get_singleton_scoped_resource(container: Container) -> None:
@@ -666,7 +666,7 @@ def test_get_singleton_scoped_resource(container: Container) -> None:
     container.register_provider(str, provide, scope="singleton")
     container.start()
 
-    assert container.get_instance(str) == instance
+    assert container.resolve(str) == instance
 
 
 def test_get_singleton_scoped_started_with_async_resource_provider(
@@ -698,7 +698,7 @@ def test_get(container: Container) -> None:
 
     container.register_provider(str, provide, scope="singleton")
 
-    container.get_instance(str)
+    container.resolve(str)
 
 
 async def test_get_singleton_scoped_async_resource(container: Container) -> None:
@@ -711,7 +711,7 @@ async def test_get_singleton_scoped_async_resource(container: Container) -> None
 
     await container.astart()
 
-    assert container.get_instance(str) == instance
+    assert container.resolve(str) == instance
 
 
 async def test_get_singleton_scoped_async_and_sync_resources(
@@ -731,8 +731,8 @@ async def test_get_singleton_scoped_async_and_sync_resources(
 
     await container.astart()
 
-    assert container.get_instance(str) == instance_str
-    assert container.get_instance(int) == instance_int
+    assert container.resolve(str) == instance_str
+    assert container.resolve(int) == instance_int
 
 
 async def test_get_singleton_scoped_async_resource_not_started(
@@ -746,7 +746,7 @@ async def test_get_singleton_scoped_async_resource_not_started(
     container.register_provider(str, provide, scope="singleton")
 
     with pytest.raises(TypeError) as exc_info:
-        container.get_instance(str)
+        container.resolve(str)
 
     assert str(exc_info.value) == (
         "The provider `tests.test_container"
@@ -762,7 +762,7 @@ def test_get_request_scoped(container: Container) -> None:
     container.register_provider(str, lambda: instance, scope="request")
 
     with container.request_context():
-        assert container.get_instance(str) == instance
+        assert container.resolve(str) == instance
 
 
 def test_get_request_scoped_not_started(container: Container) -> None:
@@ -771,7 +771,7 @@ def test_get_request_scoped_not_started(container: Container) -> None:
     container.register_provider(str, lambda: instance, scope="request")
 
     with pytest.raises(LookupError) as exc_info:
-        assert container.get_instance(str)
+        assert container.resolve(str)
 
     assert str(exc_info.value) == (
         "The request context has not been started. Please ensure that the request "
@@ -782,7 +782,7 @@ def test_get_request_scoped_not_started(container: Container) -> None:
 def test_get_transient_scoped(container: Container) -> None:
     container.register_provider(uuid.UUID, uuid.uuid4, scope="transient")
 
-    assert container.get_instance(uuid.UUID) != container.get_instance(uuid.UUID)
+    assert container.resolve(uuid.UUID) != container.resolve(uuid.UUID)
 
 
 def test_get_async_transient_scoped(container: Container) -> None:
@@ -791,7 +791,7 @@ def test_get_async_transient_scoped(container: Container) -> None:
         return uuid.uuid4()
 
     with pytest.raises(TypeError) as exc_info:
-        container.get_instance(uuid.UUID)
+        container.resolve(uuid.UUID)
 
     assert str(exc_info.value) == (
         "The instance for the coroutine provider "
@@ -805,9 +805,7 @@ async def test_async_get_transient_scoped(container: Container) -> None:
     async def get_uuid() -> uuid.UUID:
         return uuid.uuid4()
 
-    assert await container.aget_instance(uuid.UUID) != await container.aget_instance(
-        uuid.UUID
-    )
+    assert await container.aresolve(uuid.UUID) != await container.aresolve(uuid.UUID)
 
 
 async def test_async_get_synchronous_resource(container: Container) -> None:
@@ -815,12 +813,12 @@ async def test_async_get_synchronous_resource(container: Container) -> None:
     def msg() -> t.Iterator[str]:
         yield "test"
 
-    assert await container.aget_instance(str) == "test"
+    assert await container.aresolve(str) == "test"
 
 
 def test_get_not_registered_instance(container: Container) -> None:
     with pytest.raises(Exception) as exc_info:
-        container.get_instance(str)
+        container.resolve(str)
 
     assert str(exc_info.value) == (
         "The provider interface for `str` has not been registered. Please ensure that "
@@ -829,18 +827,18 @@ def test_get_not_registered_instance(container: Container) -> None:
 
 
 def test_has_instance(container: Container) -> None:
-    assert not container.has_instance(str)
+    assert not container.is_resolved(str)
 
 
 def test_reset_instance(container: Container) -> None:
     container.register_provider(str, lambda: "test", scope="singleton")
-    container.get_instance(str)
+    container.resolve(str)
 
-    assert container.has_instance(str)
+    assert container.is_resolved(str)
 
-    container.reset_instance(str)
+    container.release(str)
 
-    assert not container.has_instance(str)
+    assert not container.is_resolved(str)
 
 
 def test_override(container: Container) -> None:
@@ -852,9 +850,9 @@ def test_override(container: Container) -> None:
         return origin_name
 
     with container.override(str, overriden_name):
-        assert container.get_instance(str) == overriden_name
+        assert container.resolve(str) == overriden_name
 
-    assert container.get_instance(str) == origin_name
+    assert container.resolve(str) == origin_name
 
 
 def test_override_provider_not_registered(container: Container) -> None:
@@ -873,9 +871,9 @@ def test_override_transient_provider(container: Container) -> None:
         return uuid.uuid4()
 
     with container.override(uuid.UUID, overriden_uuid):
-        assert container.get_instance(uuid.UUID) == overriden_uuid
+        assert container.resolve(uuid.UUID) == overriden_uuid
 
-    assert container.get_instance(uuid.UUID) != overriden_uuid
+    assert container.resolve(uuid.UUID) != overriden_uuid
 
 
 def test_override_resource_provider(container: Container) -> None:
@@ -887,9 +885,9 @@ def test_override_resource_provider(container: Container) -> None:
         yield origin
 
     with container.override(str, overriden):
-        assert container.get_instance(str) == overriden
+        assert container.resolve(str) == overriden
 
-    assert container.get_instance(str) == origin
+    assert container.resolve(str) == origin
 
 
 async def test_override_async_resource_provider(container: Container) -> None:
@@ -901,7 +899,7 @@ async def test_override_async_resource_provider(container: Container) -> None:
         yield origin
 
     with container.override(str, overriden):
-        assert container.get_instance(str) == overriden
+        assert container.resolve(str) == overriden
 
 
 # Inspections
