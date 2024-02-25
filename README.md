@@ -52,7 +52,7 @@ def message() -> str:
     return "Hello, world!"
 
 
-@di.inject
+@di.injectable
 def say_hello(message: str = dep) -> None:
     print(message)
 

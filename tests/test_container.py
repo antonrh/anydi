@@ -826,11 +826,11 @@ def test_get_not_registered_instance(container: Container) -> None:
     )
 
 
-def test_has_instance(container: Container) -> None:
+def test_is_resolved(container: Container) -> None:
     assert not container.is_resolved(str)
 
 
-def test_reset_instance(container: Container) -> None:
+def test_release(container: Container) -> None:
     container.register_provider(str, lambda: "test", scope="singleton")
     container.resolve(str)
 

@@ -7,11 +7,10 @@ Here's an example of how to make them work together:
 
 
 ```python
-import fastapi
-from fastapi import Path
+from fastapi import FastAPI, Path
 
 import pyxdi.ext.fastapi
-from pyxdi import PyxDI
+from pyxdi import Container
 from pyxdi.ext.fastapi import Inject
 
 
@@ -20,15 +19,15 @@ class HelloService:
         return f"Hello, {name}"
 
 
-di = PyxDI()
+container = Container()
 
 
-@di.provider(scope="singleton")
+@container.provider(scope="singleton")
 def hello_service() -> HelloService:
     return HelloService()
 
 
-app = fastapi.FastAPI()
+app = FastAPI()
 
 
 @app.get("/hello/{name}")
@@ -39,7 +38,7 @@ async def say_hello(
     return await hello_service.say_hello(name=name)
 
 
-pyxdi.ext.fastapi.install(app, di)
+pyxdi.ext.fastapi.install(app, container)
 ```
 
 !!! note
@@ -51,11 +50,10 @@ pyxdi.ext.fastapi.install(app, di)
 ```python
 from typing import Annotated
 
-import fastapi
-from fastapi import Path
+from fastapi import FastAPI, Path
 
 import pyxdi.ext.fastapi
-from pyxdi import PyxDI
+from pyxdi import Container
 from pyxdi.ext.fastapi import Inject
 
 
@@ -64,7 +62,7 @@ class HelloService:
         return f"Hello, {name}"
 
 
-di = PyxDI()
+container = Container()
 
 
 @di.provider(scope="singleton")
@@ -72,7 +70,7 @@ def hello_service() -> HelloService:
     return HelloService()
 
 
-app = fastapi.FastAPI()
+app = FastAPI()
 
 
 @app.get("/hello/{name}")
@@ -83,7 +81,7 @@ async def say_hello(
     return await hello_service.say_hello(name=name)
 
 
-pyxdi.ext.fastapi.install(app, di)
+pyxdi.ext.fastapi.install(app, container)
 ```
 
 
@@ -97,11 +95,11 @@ To do this, use the following code:
 ```python
 from fastapi import FastAPI
 
-from pyxdi import PyxDI
+from pyxdi import Container
 
-di = PyxDI()
+container = Container()
 
-app = FastAPI(on_startup=[di.astart], on_shutdown=[di.aclose])
+app = FastAPI(on_startup=[container.astart], on_shutdown=[container.aclose])
 ```
 
 or using lifespan handler:
@@ -112,16 +110,16 @@ from typing import AsyncIterator
 
 from fastapi import FastAPI
 
-from pyxdi import PyxDI
+from pyxdi import Container
 
-di = PyxDI()
+container = Container()
 
 
 @contextlib.asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncIterator[None]:
-    await di.astart()
+    await container.astart()
     yield
-    await di.aclose()
+    await container.aclose()
 
 
 app = FastAPI(lifespan=lifespan)
@@ -141,7 +139,7 @@ from fastapi import FastAPI, Path
 from starlette.middleware import Middleware
 
 import pyxdi.ext.fastapi
-from pyxdi import PyxDI
+from pyxdi import Container
 from pyxdi.ext.fastapi import Inject, RequestScopedMiddleware
 
 
@@ -157,16 +155,18 @@ class UserService:
         return User(id=user_id)
 
 
-di = PyxDI()
+container = Container()
 
 
-@di.provider(scope="request")
+@container.provider(scope="request")
 def user_service() -> UserService:
     return UserService()
 
 
 app = FastAPI(
-    middleware=[Middleware(RequestScopedMiddleware, di=di)],
+    middleware=[
+        Middleware(RequestScopedMiddleware, container=container),
+    ],
 )
 
 
@@ -179,5 +179,5 @@ async def get_user(
     return user.email
 
 
-pyxdi.ext.fastapi.install(app, di)
+pyxdi.ext.fastapi.install(app, container)
 ```

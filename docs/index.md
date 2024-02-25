@@ -37,18 +37,18 @@ poetry add pyxdi
 *app.py*
 
 ```python
-from pyxdi import PyxDI, dep
+from pyxdi import auto, Container
 
-di = PyxDI()
+container = Container()
 
 
-@di.provider(scope="singleton")
+@container.provider(scope="singleton")
 def message() -> str:
     return "Hello, world!"
 
 
-@di.inject
-def say_hello(message: str = dep) -> None:
+@container.inject
+def say_hello(message: str = auto()) -> None:
     print(message)
 
 

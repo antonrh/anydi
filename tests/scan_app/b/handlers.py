@@ -1,11 +1,11 @@
 from dataclasses import dataclass
 
-from pyxdi import auto, inject
+from pyxdi import auto, injectable
 
 from tests.fixtures import Service
 
 
-@inject
+@injectable
 def b_handler(service: Service = auto()) -> None:
     pass
 

@@ -1,9 +1,9 @@
-from pyxdi import auto, inject
+from pyxdi import auto, injectable
 
 from tests.fixtures import Service
 
 
-@inject(tags=["inject"])
+@injectable(tags=["inject"])
 def a_a3_handler_1(message: str = auto()) -> str:
     return message
 

@@ -3,7 +3,7 @@
 ## Providers
 
 Providers are the backbone of `PyxDI`. A provider is a function or a class that returns an instance of a specific type.
-Once a provider is registered with `PyxDI`, it can be used to resolve dependencies throughout the application.
+Once a provider is registered with `Container`, it can be used to resolve dependencies throughout the application.
 
 ### Registering Providers
 
@@ -11,34 +11,34 @@ To register a provider, you can use the `register_provider` method of the `PyxDI
 three arguments: the type of the object to be provided, the provider function or class, and an scope.
 
 ```python
-from pyxdi import PyxDI
+from pyxdi import Container
 
-di = PyxDI()
+container = Container()
 
 
 def message() -> str:
     return "Hello, message!"
 
 
-di.register_provider(str, message, scope="singleton")
+container.register_provider(str, message, scope="singleton")
 
-assert di.resolve(str) == "Hello, world!"
+assert container.resolve(str) == "Hello, world!"
 ```
 
 Alternatively, you can use the provider decorator to register a provider function. The decorator takes care of registering the provider with `PyxDI`.
 
 ```python
-from pyxdi import PyxDI
+from pyxdi import Container
 
-di = PyxDI()
+container = Container()
 
 
-@di.provider(scope="singleton")
+@container.provider(scope="singleton")
 def message() -> str:
     return "Hello, message!"
 
 
-assert di.resolve(str) == "Hello, world!"
+assert container.resolve(str) == "Hello, world!"
 ```
 
 ### Annotated Providers
@@ -48,23 +48,23 @@ Sometimes, it's useful to register multiple providers for the same type. For exa
 ```python
 from typing import Annotated
 
-from pyxdi import PyxDI
+from pyxdi import Container
 
-di = PyxDI()
+container = Container()
 
 
-@di.provider(scope="singleton")
+@container.provider(scope="singleton")
 def message1() -> Annotated[str, "message1"]:
     return "Message1"
 
 
-@di.provider(scope="singleton")
+@container.provider(scope="singleton")
 def message2() -> Annotated[str, "message2"]:
     return "Message2"
 
 
-assert di.resolve(Annotated[str, "message1"]) == "Message1"
-assert di.resolve(Annotated[str, "message2"]) == "Message2"
+assert container.resolve(Annotated[str, "message1"]) == "Message1"
+assert container.resolve(Annotated[str, "message2"]) == "Message2"
 ```
 
 In this code example, we define two providers, `message1` and `message2`, each returning a different message. The Annotated type hint with string argument allows you to specify which provider to retrieve based on the name provided within the annotation.
@@ -81,79 +81,79 @@ For example, suppose you have a class that depends on another class:
 from dataclasses import dataclass
 
 
-class RootComponent:
-    def start(self) -> None:
-        print("start")
+class Database:
+    def connect(self) -> None:
+        print("connect")
 
-    def close(self) -> None:
-        print("close")
-
-
-@dataclass
-class ChildComponent:
-    root: RootComponent
+    def disconnect(self) -> None:
+        print("disconnect")
 
 
 @dataclass
-class Component:
-    child: ChildComponent
+class Repository:
+    db: Database
+
+
+@dataclass
+class Service:
+    repo: Repository
 ```
 
 If you create a `PyxDI` instance in non-strict mode `strict=False`, it will automatically register a provider for `Component` and `ChildComponent` with provided `RootComponent`:
 
 ```python
-import typing as t
+from typing import Iterator
 
-from pyxdi import PyxDI
+from pyxdi import Container
 
-di = PyxDI(strict=False)
+container = Container(strict=False)
 
 
-@di.provider(scope="singleton")
-def root() -> t.Iterator[RootComponent]:
-    root = RootComponent()
-    root.start()
-    yield root
-    root.close()
+@container.provider(scope="singleton")
+def db() -> Iterator[Database]:
+    db = Database()
+    db.connect()
+    yield db
+    db.disconnect()
 
 
 # Attempt to retrieve an instance of Component
-_ = di.resolve(Component)
+_ = container.resolve(Service)
 
-assert di.is_resolved(Component)
-assert di.is_resolved(ChildComponent)
-assert di.is_resolved(RootComponent)
+assert container.is_resolved(Service)
+assert container.is_resolved(Repository)
+assert container.is_resolved(Database)
 ```
 
-If you create a `PyxDI` instance in strict mode `strict=True`, it will raise an error if you try to get an instance of a type that not exists in the container:
+If you create a `Container` instance in strict mode `strict=True`, it will raise an error if you try to get an instance of a type that not exists in the container:
 
 ```python
-di = pyxdi.PyxDI(strict=True)
+container = Container(strict=True)
 
-_ = di.resolve(Component)  # raises LookupError
+_ = container.resolve(Component)  # raises LookupError
 ```
 
 ### Unregistering Providers
 
-To unregister a provider, you can use the `unregister_provider` method of the `PyxDI` instance. The method takes
+To unregister a provider, you can use the `unregister_provider` method of the `Container` instance. The method takes
 interface of the dependency to be unregistered.
 
 ```python
-from pyxdi import PyxDI
+from pyxdi import Container
 
-di = PyxDI()
+container = Container()
 
 
-@di.provider(scope="singleton")
+@container.provider(scope="singleton")
 def message() -> str:
     return "Hello, message!"
 
 
-assert di.has_provider(str)
+assert container.has_provider(str)
 
-di.unregister_provider(str)
+container.unregister_provider(str)
 
-assert not di.has_provider(str)
+assert not container.has_provider(str)
 ```
 
 ### Resolved Providers
@@ -162,47 +162,47 @@ To check if a registered provider has a resolved instance, you can use the `has_
 This method takes the interface of the dependency to be checked.
 
 ```python
-from pyxdi import PyxDI
+from pyxdi import Container
 
-di = PyxDI()
+container = Container()
 
 
-@di.provider(scope="singleton")
+@container.provider(scope="singleton")
 def message() -> str:
     return "Hello, message!"
 
 
-# Check if a provider is registered
-assert not di.is_resolved(str)
+# Check if an instance is resolved
+assert not container.is_resolved(str)
 
-assert di.resolve(str) == "Hello, world!"
+assert container.resolve(str) == "Hello, world!"
 
-assert di.is_resolved(str)
+assert container.is_resolved(str)
 
-di.release(str)
+container.release(str)
 
-assert not di.is_resolved(str)
+assert not container.is_resolved(str)
 ```
 
-To reset a provider instance, you can use the `reset_instance` method of the PyxDI instance. This method takes the interface of the dependency to be reset. Alternatively, you can reset all instances with the `reset` method.
+To release a provider instance, you can use the `release` method of the `Container` instance. This method takes the interface of the dependency to be reset. Alternatively, you can reset all instances with the `reset` method.
 
 ```python
-from pyxdi import PyxDI
+from pyxdi import Container
 
-di = PyxDI()
-di.register_provider(str, lambda: "Hello, world!", scope="singleton")
-di.register_provider(int, lambda: 100, scope="singleton")
+container = Container()
+container.register_provider(str, lambda: "Hello, world!", scope="singleton")
+container.register_provider(int, lambda: 100, scope="singleton")
 
-di.resolve(str)
-di.resolve(int)
+container.resolve(str)
+container.resolve(int)
 
-assert di.is_resolved(str)
-assert di.is_resolved(int)
+assert container.is_resolved(str)
+assert container.is_resolved(int)
 
-di.reset()
+container.reset()
 
-assert not di.is_resolved(str)
-assert not di.is_resolved(int)
+assert not container.is_resolved(str)
+assert not container.is_resolved(int)
 ```
 
 !!! note
@@ -225,17 +225,17 @@ Providers with transient scope create a new instance of the object each time it'
 ```python
 import random
 
-from pyxdi import PyxDI
+from pyxdi import Container
 
-di = PyxDI()
+container = Container()
 
 
-@di.provider(scope="transient")
+@container.provider(scope="transient")
 def message() -> str:
     return random.choice(["hello", "hola", "ciao"])
 
 
-print(di.resolve(str))  # will print random message
+print(container.resolve(str))  # will print random message
 ```
 
 ### `singleton` scope
@@ -243,7 +243,7 @@ print(di.resolve(str))  # will print random message
 Providers with singleton scope create a single instance of the object and return it every time it's requested.
 
 ```python
-from pyxdi import PyxDI
+from pyxdi import Container
 
 
 class Service:
@@ -251,15 +251,15 @@ class Service:
         self.name = name
 
 
-di = PyxDI()
+container = Container()
 
 
-@di.provider(scope="singleton")
+@container.provider(scope="singleton")
 def service() -> Service:
     return Service(name="demo")
 
 
-assert di.resolve(Service) == di.resolve(Service)
+assert container.resolve(Service) == container.resolve(Service)
 ```
 
 ### `request` scope
@@ -267,7 +267,7 @@ assert di.resolve(Service) == di.resolve(Service)
 Providers with request scope create an instance of the object for each request. The instance is only available within the context of the request.
 
 ```python
-from pyxdi import PyxDI
+from pyxdi import Container
 
 
 class Request:
@@ -275,36 +275,36 @@ class Request:
         self.path = path
 
 
-di = PyxDI()
+container = Container()
 
 
-@di.provider(scope="request")
+@container.provider(scope="request")
 def request_provider() -> Request:
     return Request(path="/")
 
 
-with di.request_context():
-    assert di.resolve(Request).path == "/"
+with container.request_context():
+    assert container.resolve(Request).path == "/"
 
-di.resolve(Request)  # this will raise LookupError
+container.resolve(Request)  # this will raise LookupError
 ```
 
 or using asynchronous request context:
 
 ```python
-from pyxdi import PyxDI
+from pyxdi import Container
 
-di = PyxDI()
+container = Container()
 
 
-@di.provider(scope="request")
+@container.provider(scope="request")
 def request_provider() -> Request:
     return Request(path="/")
 
 
 async def main() -> None:
-    async with di.arequest_context():
-        assert di.resolve(Request).path == "/"
+    async with container.arequest_context():
+        assert (await container.aresolve(Request).path) == "/"
 ```
 
 ## Resource Providers
@@ -316,9 +316,9 @@ Resource providers are special types of providers that need to be started and st
 Here is an example of a synchronous resource provider that manages the lifecycle of a Resource object:
 
 ```python
-import typing as t
+from typing import Iterator
 
-from pyxdi import PyxDI
+from pyxdi import Container
 
 
 class Resource:
@@ -332,10 +332,10 @@ class Resource:
         print("close resource")
 
 
-di = PyxDI()
+container = Container()
 
 
-@di.provider(scope="singleton")
+@container.provider(scope="singleton")
 def resource_provider() -> t.Iterator[Resource]:
     resource = Resource(name="demo")
     resource.start()
@@ -343,11 +343,11 @@ def resource_provider() -> t.Iterator[Resource]:
     resource.close()
 
 
-di.start()  # start resources
+container.start()  # start resources
 
-assert di.resolve(Resource).name == "demo"
+assert container.resolve(Resource).name == "demo"
 
-di.close()  # close resources
+container.close()  # close resources
 ```
 
 In this example, the resource_provider function returns an iterator that yields a single Resource object. The `.start` method is called when the resource is created, and the `.close` method is called when the resource is released.
@@ -358,9 +358,9 @@ Here is an example of an asynchronous resource provider that manages the lifecyc
 
 ```python
 import asyncio
-import typing as t
+from typing import AsyncIterator
 
-from pyxdi import PyxDI
+from pyxdi import Container
 
 
 class Resource:
@@ -374,10 +374,10 @@ class Resource:
         print("close resource")
 
 
-di = PyxDI()
+container = Container()
 
 
-@di.provider(scope="singleton")
+@container.provider(scope="singleton")
 async def resource_provider() -> t.AsyncIterator[Resource]:
     resource = Resource(name="demo")
     await resource.start()
@@ -386,11 +386,11 @@ async def resource_provider() -> t.AsyncIterator[Resource]:
 
 
 async def main() -> None:
-    await di.astart()  # start resources
+    await container.astart()  # start resources
 
-    assert di.resolve(Resource).name == "demo"
+    assert (await container.resolve(Resource)).name == "demo"
 
-    await di.aclose()  # close resources
+    await container.aclose()  # close resources
 
 
 asyncio.run(main())
@@ -403,9 +403,9 @@ In this example, the `resource_provider` function returns an asynchronous iterat
 Sometimes, it can be useful to split the process of initializing and managing the lifecycle of an instance into separate providers.
 
 ```python
-import typing as t
+from typing import Iterator
 
-from pyxdi import PyxDI
+from pyxdi import Container
 
 
 class Client:
@@ -420,32 +420,32 @@ class Client:
         self.closed = True
 
 
-di = PyxDI()
+container = Container()
 
 
-@di.provider(scope="singleton")
+@container.provider(scope="singleton")
 def client_provider() -> Client:
     return Client()
 
 
-@di.provider(scope="singleton")
+@container.provider(scope="singleton")
 def client_lifespan(client: Client) -> t.Iterator[None]:
     client.start()
     yield
     client.close()
 
 
-client = di.resolve(Client)
+client = container.resolve(Client)
 
 assert not client.started
 assert not client.closed
 
-di.start()
+container.start()
 
 assert client.started
 assert not client.closed
 
-di.close()
+container.close()
 
 assert client.started
 assert client.closed
@@ -463,28 +463,28 @@ Sometimes it's necessary to override a provider with a different implementation.
 For example, suppose you have registered a singleton provider for a string:
 
 ```python
-from pyxdi import PyxDI
+from pyxdi import Container
 
-di = PyxDI()
+container = Container()
 
 
-@di.provider(scope="singleton")
+@container.provider(scope="singleton")
 def hello_message() -> str:
     return "Hello, world!"
 
 
-@di.provider(scope="singleton", override=True)
+@container.provider(scope="singleton", override=True)
 def goodbye_message() -> str:
     return "Goodbye!"
 
 
-assert di.resolve(str) == "Goodbye!"
+assert container.resolve(str) == "Goodbye!"
 ```
 
 Note that if you try to register the provider without passing the override parameter as True, it will raise an error:
 
 ```python
-@di.provider(scope="singleton")  # will raise an error
+@container.provider(scope="singleton")  # will raise an error
 def goodbye_message() -> str:
     return "Good-bye!"
 ```
@@ -492,12 +492,12 @@ def goodbye_message() -> str:
 
 ## Injecting Dependencies
 
-In order to use the dependencies that have been provided to the `PyxDI` container, they need to be injected into the functions or classes that require them. This can be done by using the `@di.inject` decorator.
+In order to use the dependencies that have been provided to the `Container`, they need to be injected into the functions or classes that require them. This can be done by using the `@container.inject` decorator.
 
-Here's an example of how to use the `@di.inject` decorator:
+Here's an example of how to use the `@container.inject` decorator:
 
 ```python
-from pyxdi import PyxDI, dep
+from pyxdi import auto, Container
 
 
 class Service:
@@ -505,16 +505,16 @@ class Service:
         self.name = name
 
 
-di = PyxDI()
+container = Container()
 
 
-@di.provider(scope="singleton")
+@container.provider(scope="singleton")
 def service() -> Service:
     return Service(name="demo")
 
 
-@di.inject
-def handler(service: Service = dep) -> None:
+@container.injectable
+def handler(service: Service = auto()) -> None:
     print(f"Hello, from service `{service.name}`")
 ```
 
@@ -529,7 +529,7 @@ handler()
 You can also call the callable object with injected dependencies using the `run` method of the `PyxDI` instance:
 
 ```python
-from pyxdi import PyxDI, dep
+from pyxdi import auto, Container
 
 
 class Service:
@@ -537,22 +537,22 @@ class Service:
         self.name = name
 
 
-di = PyxDI()
+container = Container()
 
 
-@di.provider(scope="singleton")
+@container.provider(scope="singleton")
 def service() -> Service:
     return Service(name="demo")
 
 
-def handler(service: Service = dep) -> None:
+def handler(service: Service = auto()) -> None:
     print(f"Hello, from service `{service.name}`")
 
 
-di.run(handler)
+container.run(handler)
 ```
 
-In this case, the `run` method will automatically inject the dependencies and call the handler function. Using `@di.inject` is not necessary in this case.
+In this case, the `run` method will automatically inject the dependencies and call the handler function. Using `@container.inject` is not necessary in this case.
 
 
 ### Scanning Injections
@@ -579,37 +579,37 @@ class Service:
 `handlers.py` uses the Service class:
 
 ```python
-from pyxdi import dep, inject
+from pyxdi import auto, injectable
 
 from app.services import Service
 
 
-@inject
-def my_handler(service: Service = dep) -> None:
+@injectable
+def my_handler(service: Service = auto()) -> None:
     print(f"Hello, from service `{service.name}`")
 ```
 
 `main.py` starts the DI container and scans the app `handlers.py` module:
 
 ```python
-from pyxdi import PyxDI
+from pyxdi import Container
 
 from app.services import Service
 
-di = PyxDI()
+container = Container()
 
 
-@di.provider(scope="singleton")
+@container.provider(scope="singleton")
 def service() -> Service:
     return Service(name="demo")
 
 
-di.scan(["app.handlers"])
-di.start()
+container.scan(["app.handlers"])
+container.start()
 
 # application context
 
-di.close()
+container.close()
 ```
 
 The scan method takes a list of directory paths as an argument and recursively searches those directories for Python modules containing `@inject`-decorated functions or classes.
@@ -619,24 +619,24 @@ The scan method takes a list of directory paths as an argument and recursively s
 You can also scan for providers or injectables in specific tags. To do so, you need to use the tags argument when registering providers or injectables. For example:
 
 ```python
-from pyxdi import PyxDI
+from pyxdi import Container
 
-di = PyxDI()
-di.scan(["app.handlers"], tags=["tag1"])
+container = PyxDI()
+container.scan(["app.handlers"], tags=["tag1"])
 ```
 
-This will scan for `@inject` annotated target only with defined `tags` within the `app.handlers` module.
+This will scan for `@injectable` annotated target only with defined `tags` within the `app.handlers` module.
 
 
 ## Modules
 
 `PyxDI` provides a way to organize your code and configure dependencies for the dependency injection container.
-A module is a class that extends the `pyxdi.Module` base class and contains the configuration for the container.
+A module is a class that extends the `Module` base class and contains the configuration for the container.
 
 Here's an example how to create and register simple module:
 
 ```python
-from pyxdi import Module, PyxDI, provider
+from pyxdi import Container, Module, provider
 
 
 class Repository:
@@ -649,21 +649,21 @@ class Service:
 
 
 class AppModule(Module):
-    def configure(self, di: PyxDI) -> None:
-        di.register_provider(Repository, lambda: Repository(), scope="singleton")
+    def configure(self, container: Container) -> None:
+        container.register_provider(Repository, lambda: Repository(), scope="singleton")
 
     @provider(scope="singleton")
-    def configure_service(self, repo: Repository) -> Service:
+    def service(self, repo: Repository) -> Service:
         return Service(repo=repo)
 
 
-di = PyxDI(modules=[AppModule()])
+container = Container(modules=[AppModule()])
 
 # or
-# di.register_module(AppModule())
+# container.register_module(AppModule())
 
-assert di.has_provider(Service)
-assert di.has_provider(Repository)
+assert container.has_provider(Service)
+assert container.has_provider(Repository)
 ```
 
 With `PyxDI`'s application Modules, you can keep your code organized and easily manage your dependencies.
@@ -672,13 +672,13 @@ With `PyxDI`'s application Modules, you can keep your code organized and easily 
 ## Testing
 
 To use `PyxDI` with your testing framework, you can use the `override` context manager to temporarily replace a dependency with an overridden instance
-during testing. This allows you to isolate the code being tested from its dependencies. The with `di.override()` context manager is used to ensure that
+during testing. This allows you to isolate the code being tested from its dependencies. The with `container.override()` context manager is used to ensure that
 the overridden instance is used only within the context of the with block. Once the block is exited, the original dependency is restored.
 
 ```python
 from unittest import mock
 
-from pyxdi import PyxDI, dep
+from pyxdi import auto, Container
 
 
 class Service:
@@ -689,16 +689,16 @@ class Service:
         return f"Hello, from `{self.name}` service!"
 
 
-di = PyxDI()
+container = Container()
 
 
-@di.provider(scope="singleton")
+@container.provider(scope="singleton")
 def service() -> Service:
     return Service(name="demo")
 
 
-@di.inject
-def hello_handler(service: Service = dep) -> str:
+@container.inject
+def hello_handler(service: Service = auto()) -> str:
     return service.say_hello()
 
 
@@ -706,7 +706,7 @@ def test_hello_handler() -> None:
     service_mock = mock.Mock(spec=Service)
     service_mock.say_hello.return_value = "Hello, from service mock!"
 
-    with di.override(Service, service_mock):
+    with container.override(Service, service_mock):
         assert hello_handler() == "Hello, from service mock!"
 ```
 

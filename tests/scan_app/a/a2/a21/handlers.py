@@ -1,6 +1,6 @@
-from pyxdi import auto, inject
+from pyxdi import auto, injectable
 
 
-@inject(tags=["a", "a2", "a21"])
+@injectable(tags=["a", "a2", "a21"])
 def a21_handler(message: str = auto()) -> None:
     pass

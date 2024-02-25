@@ -1,6 +1,6 @@
 import pytest
 
-from pyxdi import Container, inject
+from pyxdi import Container, injectable
 from pyxdi._scanner import InjectDecoratorArgs  # noqa
 
 from .scan_app import ScanAppModule
@@ -46,33 +46,33 @@ def test_scan_tagged(container: Container) -> None:
 
 
 def test_inject_decorator_no_args() -> None:
-    @inject
+    @injectable
     def my_func() -> None:
         pass
 
-    assert getattr(my_func, "__inject__") == InjectDecoratorArgs(
+    assert getattr(my_func, "__injectable__") == InjectDecoratorArgs(
         wrapped=True,
         tags=None,
     )
 
 
 def test_inject_decorator_no_args_provided() -> None:
-    @inject()
+    @injectable()
     def my_func() -> None:
         pass
 
-    assert getattr(my_func, "__inject__") == InjectDecoratorArgs(
+    assert getattr(my_func, "__injectable__") == InjectDecoratorArgs(
         wrapped=True,
         tags=None,
     )
 
 
 def test_inject_decorator() -> None:
-    @inject(tags=["tag1", "tag2"])
+    @injectable(tags=["tag1", "tag2"])
     def my_func() -> None:
         pass
 
-    assert getattr(my_func, "__inject__") == InjectDecoratorArgs(
+    assert getattr(my_func, "__injectable__") == InjectDecoratorArgs(
         wrapped=True,
         tags=["tag1", "tag2"],
     )

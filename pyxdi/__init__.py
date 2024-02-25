@@ -3,7 +3,7 @@ from typing import Any
 
 from ._container import Container, request, singleton, transient
 from ._module import Module, provider
-from ._scanner import inject
+from ._scanner import injectable
 from ._types import Marker, Provider, Scope
 
 
@@ -18,7 +18,7 @@ __all__ = [
     "Provider",
     "Scope",
     "auto",
-    "inject",
+    "injectable",
     "provider",
     "request",
     "singleton",
