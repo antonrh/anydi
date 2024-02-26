@@ -57,7 +57,7 @@ def get_container(request: Request) -> Container:
     return cast(Container, request.app.state.container)
 
 
-class GetInstance(params.Depends, HasInterface):
+class Resolver(params.Depends, HasInterface):
     """Parameter dependency class for injecting dependencies using PyxDI."""
 
     def __init__(self) -> None:
@@ -75,9 +75,9 @@ def Inject() -> Any:  # noqa
     of a dependency resolved by PyxDI.
 
     Returns:
-        The `InjectParam` instance representing the parameter dependency.
+        The `Resolver` instance representing the parameter dependency.
     """
-    return GetInstance()
+    return Resolver()
 
 
 def _iter_dependencies(dependant: Dependant) -> Iterator[Dependant]:
