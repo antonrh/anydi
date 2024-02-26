@@ -97,7 +97,7 @@ class Container:
         # Register providers
         providers = providers or {}
         for interface, provider in providers.items():
-            self.register_provider(interface, provider.obj, scope=provider.scope)
+            self.register(interface, provider.obj, scope=provider.scope)
 
         # Register modules
         modules = modules or []
@@ -133,7 +133,7 @@ class Container:
         """
         return interface in self._providers
 
-    def register_provider(
+    def register(
         self,
         interface: AnyInterface,
         obj: Callable[..., Any],
@@ -187,7 +187,7 @@ class Container:
         self._providers[interface] = provider
         return provider
 
-    def unregister_provider(self, interface: AnyInterface) -> None:
+    def unregister(self, interface: AnyInterface) -> None:
         """Unregister a provider by interface.
 
         Args:
@@ -254,7 +254,7 @@ class Container:
                         "failed. Please resolve this issue by using "
                         "the appropriate scope decorator."
                     ) from exc
-                return self.register_provider(interface, interface, scope=scope)
+                return self.register(interface, interface, scope=scope)
             raise LookupError(
                 f"The provider interface for `{get_full_qualname(interface)}` has "
                 "not been registered. Please ensure that the provider interface is "
@@ -611,7 +611,7 @@ class Container:
 
         def decorator(func: Callable[P, T]) -> Callable[P, T]:
             interface = self._get_provider_annotation(func)
-            self.register_provider(interface, func, scope=scope, override=override)
+            self.register(interface, func, scope=scope, override=override)
             return func
 
         return decorator

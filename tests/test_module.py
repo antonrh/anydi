@@ -12,7 +12,7 @@ def container() -> Container:
 
 class TestModule(Module):
     def configure(self, container: Container) -> None:
-        container.register_provider(
+        container.register(
             Annotated[str, "msg1"], lambda: "Message 1", scope="singleton"
         )
 
@@ -44,7 +44,7 @@ def test_register_module_instance(container: Container) -> None:
 
 def test_register_module_function(container: Container) -> None:
     def configure(container: Container) -> None:
-        container.register_provider(str, lambda: "Message 1", scope="singleton")
+        container.register(str, lambda: "Message 1", scope="singleton")
 
     container.register_module(configure)
 
