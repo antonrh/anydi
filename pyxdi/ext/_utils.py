@@ -48,7 +48,7 @@ def patch_parameter_interface(
 
     parameter = parameter.replace(annotation=interface, default=default)
 
-    if not container.strict and not container.is_registered(interface):
+    if not container.strict and not container.has_provider(interface):
         logger.debug(
             f"Callable `{get_full_qualname(call)}` injected parameter "
             f"`{parameter.name}` with an annotation of "
