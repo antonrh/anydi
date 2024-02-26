@@ -149,11 +149,11 @@ def message() -> str:
     return "Hello, message!"
 
 
-assert container.has_provider(str)
+assert container.is_registered(str)
 
 container.unregister(str)
 
-assert not container.has_provider(str)
+assert not container.is_registered(str)
 ```
 
 ### Resolved Providers
@@ -662,8 +662,8 @@ container = Container(modules=[AppModule()])
 # or
 # container.register_module(AppModule())
 
-assert container.has_provider(Service)
-assert container.has_provider(Repository)
+assert container.is_registered(Service)
+assert container.is_registered(Repository)
 ```
 
 With `PyxDI`'s application Modules, you can keep your code organized and easily manage your dependencies.

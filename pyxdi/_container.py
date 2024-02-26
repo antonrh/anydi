@@ -122,7 +122,7 @@ class Container:
         """
         return self._providers
 
-    def has_provider(self, interface: AnyInterface) -> bool:
+    def is_registered(self, interface: AnyInterface) -> bool:
         """Check if a provider is registered for the specified interface.
 
         Args:
@@ -202,13 +202,13 @@ class Container:
             - The method removes the provider reference from the internal dictionary
               of registered providers.
         """
-        if not self.has_provider(interface):
+        if not self.is_registered(interface):
             raise LookupError(
                 "The provider interface "
                 f"`{get_full_qualname(interface)}` not registered."
             )
 
-        provider = self.get_provider(interface)
+        provider = self._get_or_register_provider(interface)
 
         # Cleanup scoped context instance
         try:
@@ -222,7 +222,7 @@ class Container:
         # Cleanup provider references
         self._providers.pop(interface, None)
 
-    def get_provider(self, interface: AnyInterface) -> Provider:
+    def _get_or_register_provider(self, interface: AnyInterface) -> Provider:
         """Get the provider for the specified interface.
 
         Args:
@@ -326,7 +326,7 @@ class Container:
                     f"dependency `{parameter.name}` annotation."
                 )
             try:
-                sub_provider = self.get_provider(parameter.annotation)
+                sub_provider = self._get_or_register_provider(parameter.annotation)
             except LookupError:
                 raise LookupError(
                     f"The provider `{get_full_qualname(provider.obj)}` depends on "
@@ -359,7 +359,7 @@ class Container:
         """
         has_transient, has_request, has_singleton = False, False, False
         for parameter in get_signature(obj).parameters.values():
-            sub_provider = self.get_provider(parameter.annotation)
+            sub_provider = self._get_or_register_provider(parameter.annotation)
             if not has_transient and sub_provider.scope == "transient":
                 has_transient = True
             if not has_request and sub_provider.scope == "request":
@@ -386,7 +386,7 @@ class Container:
 
     def start(self) -> None:
         """Start the singleton context."""
-        for interface, provider in self.providers.items():
+        for interface, provider in self._providers.items():
             if provider.scope == "singleton":
                 self.resolve(interface)  # noqa
 
@@ -492,7 +492,7 @@ class Container:
         if interface in self._override_instances:
             return cast(T, self._override_instances[interface])
 
-        provider = self.get_provider(interface)
+        provider = self._get_or_register_provider(interface)
         scoped_context = self._get_scoped_context(provider.scope)
         return scoped_context.get(interface, provider)
 
@@ -519,7 +519,7 @@ class Container:
         if interface in self._override_instances:
             return cast(T, self._override_instances[interface])
 
-        provider = self.get_provider(interface)
+        provider = self._get_or_register_provider(interface)
         scoped_context = self._get_scoped_context(provider.scope)
         return await scoped_context.aget(interface, provider)
 
@@ -533,7 +533,7 @@ class Container:
             True if the instance exists, otherwise False.
         """
         try:
-            provider = self.get_provider(interface)
+            provider = self._get_or_register_provider(interface)
         except LookupError:
             pass
         else:
@@ -551,7 +551,7 @@ class Container:
         Raises:
             LookupError: If the provider for the interface is not registered.
         """
-        provider = self.get_provider(interface)
+        provider = self._get_or_register_provider(interface)
         scoped_context = self._get_scoped_context(provider.scope)
         if isinstance(scoped_context, ResourceScopedContext):
             scoped_context.delete(interface)
@@ -586,7 +586,7 @@ class Container:
         Raises:
             LookupError: If the provider for the interface is not registered.
         """
-        if not self.has_provider(interface) and self.strict:
+        if not self.is_registered(interface) and self.strict:
             raise LookupError(
                 f"The provider interface `{get_full_qualname(interface)}` "
                 "not registered."
@@ -787,7 +787,7 @@ class Container:
                 f"`{parameter.name}` annotation."
             )
 
-        if not self.has_provider(parameter.annotation):
+        if not self.is_registered(parameter.annotation):
             raise LookupError(
                 f"`{get_full_qualname(obj)}` has an unknown dependency parameter "
                 f"`{parameter.name}` with an annotation of "

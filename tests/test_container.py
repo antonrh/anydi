@@ -40,27 +40,27 @@ def test_register_provider_already_registered(container: Container) -> None:
 
 
 def test_register_provider_override(container: Container) -> None:
-    container.register(str, lambda: "test", scope="singleton")
+    container.register(str, lambda: "old", scope="singleton")
 
-    def overriden_provider_obj() -> str:
-        return "test"
+    def new_provider_obj() -> str:
+        return "new"
 
     provider = container.register(
-        str, overriden_provider_obj, scope="singleton", override=True
+        str, new_provider_obj, scope="singleton", override=True
     )
 
-    assert provider.obj == overriden_provider_obj
+    assert provider.obj == new_provider_obj
 
 
 def test_register_provider_named(container: Container) -> None:
     container.register(Annotated[str, "msg1"], lambda: "test1", scope="singleton")
     container.register(Annotated[str, "msg2"], lambda: "test2", scope="singleton")
 
-    assert Annotated[str, "msg1"] in container.providers
-    assert Annotated[str, "msg2"] in container.providers
+    assert container.is_registered(Annotated[str, "msg1"])
+    assert container.is_registered(Annotated[str, "msg2"])
 
 
-def test_register_provider_via_constructor() -> None:
+def test_register_providers_via_constructor() -> None:
     container = Container(
         providers={
             str: Provider(obj=lambda: "test", scope="singleton"),
@@ -68,8 +68,8 @@ def test_register_provider_via_constructor() -> None:
         }
     )
 
-    assert str in container.providers
-    assert int in container.providers
+    assert container.is_registered(str)
+    assert container.is_registered(int)
 
 
 def test_register_provider_with_invalid_scope(container: Container) -> None:
@@ -352,21 +352,21 @@ async def test_register_async_events(container: Container) -> None:
 def test_unregister_provider(container: Container) -> None:
     container.register(str, lambda: "test", scope="singleton")
 
-    assert str in container.providers
+    assert container.is_registered(str)
 
     container.unregister(str)
 
-    assert str not in container.providers
+    assert not container.is_registered(str)
 
 
 def test_unregister_request_scoped_provider(container: Container) -> None:
     container.register(str, lambda: "test", scope="request")
 
-    assert str in container.providers
+    assert container.is_registered(str)
 
     container.unregister(str)
 
-    assert str not in container.providers
+    assert not container.is_registered(str)
 
 
 def test_unregister_not_registered_provider(container: Container) -> None:
@@ -374,107 +374,6 @@ def test_unregister_not_registered_provider(container: Container) -> None:
         container.unregister(str)
 
     assert str(exc_info.value) == "The provider interface `str` not registered."
-
-
-# Auto register
-
-
-def test_get_auto_registered_provider_scope_defined() -> None:
-    container = Container(strict=False)
-
-    class Service:
-        __scope__ = "singleton"
-
-    assert container.get_provider(Service).scope == "singleton"
-
-
-def test_get_auto_registered_provider_scope_from_sub_provider_request() -> None:
-    container = Container(strict=False)
-
-    @container.provider(scope="request")
-    def message() -> str:
-        return "test"
-
-    @dataclass
-    class Service:
-        message: str
-
-    with container.request_context():
-        _ = container.resolve(Service)
-
-    assert container.get_provider(Service).scope == "request"
-
-
-def test_get_auto_registered_provider_scope_from_sub_provider_transient() -> None:
-    container = Container(strict=False)
-
-    @container.provider(scope="transient")
-    def uuid_generator() -> Annotated[str, "uuid_generator"]:
-        return str(uuid.uuid4())
-
-    @dataclass
-    class Entity:
-        id: Annotated[str, "uuid_generator"]
-
-    _ = container.resolve(Entity)
-
-    assert container.get_provider(Entity).scope == "transient"
-
-
-def test_get_auto_registered_nested_singleton_provider() -> None:
-    container = Container(strict=False)
-
-    @dataclass
-    class Repository:
-        __scope__ = "singleton"
-
-    @dataclass
-    class Service:
-        repository: Repository
-
-    with container.request_context():
-        _ = container.resolve(Service)
-
-    assert container.get_provider(Service).scope == "singleton"
-
-
-def test_get_auto_registered_missing_scope() -> None:
-    container = Container(strict=False)
-
-    @dataclass
-    class Repository:
-        pass
-
-    @dataclass
-    class Service:
-        repository: Repository
-
-    with pytest.raises(TypeError) as exc_info:
-        _ = container.resolve(Service)
-
-    assert str(exc_info.value) == (
-        "Unable to automatically register the provider interface for "
-        "`tests.test_container.test_get_auto_registered_missing_scope.<locals>"
-        ".Repository` because the scope detection failed. Please resolve "
-        "this issue by using the appropriate scope decorator."
-    )
-
-
-def test_get_auto_registered_with_primitive_class() -> None:
-    container = Container(strict=False)
-
-    @dataclass
-    class Service:
-        name: str
-
-    with pytest.raises(LookupError) as exc_info:
-        _ = container.resolve(Service).name
-
-    assert str(exc_info.value) == (
-        "The provider interface for `str` has not been registered. "
-        "Please ensure that the provider interface is properly registered "
-        "before attempting to use it."
-    )
 
 
 def test_inject_auto_registered_log_message(caplog: pytest.LogCaptureFixture) -> None:
@@ -766,7 +665,7 @@ async def test_async_resolve_synchronous_resource(container: Container) -> None:
     assert await container.aresolve(str) == "test"
 
 
-def test_get_not_registered_instance(container: Container) -> None:
+def test_resolve_not_registered_instance(container: Container) -> None:
     with pytest.raises(Exception) as exc_info:
         container.resolve(str)
 
@@ -776,11 +675,114 @@ def test_get_not_registered_instance(container: Container) -> None:
     )
 
 
+def test_resolve_non_strict_provider_scope_defined() -> None:
+    container = Container(strict=False)
+
+    class Service:
+        __scope__ = "singleton"
+
+    _ = container.resolve(Service)
+
+    assert container.providers == {Service: Provider(obj=Service, scope="singleton")}
+
+
+def test_resolve_non_strict_provider_scope_from_sub_provider_request() -> None:
+    container = Container(strict=False)
+
+    @container.provider(scope="request")
+    def message() -> str:
+        return "test"
+
+    @dataclass
+    class Service:
+        message: str
+
+    with container.request_context():
+        _ = container.resolve(Service)
+
+    assert container.providers == {
+        str: Provider(obj=message, scope="request"),
+        Service: Provider(obj=Service, scope="request"),
+    }
+
+
+def test_resolve_non_strict_provider_scope_from_sub_provider_transient() -> None:
+    container = Container(strict=False)
+
+    @container.provider(scope="transient")
+    def uuid_generator() -> Annotated[str, "uuid_generator"]:
+        return str(uuid.uuid4())
+
+    @dataclass
+    class Entity:
+        id: Annotated[str, "uuid_generator"]
+
+    _ = container.resolve(Entity)
+
+    assert container.providers[Entity].scope == "transient"
+
+
+def test_resolve_non_strict_nested_singleton_provider() -> None:
+    container = Container(strict=False)
+
+    @dataclass
+    class Repository:
+        __scope__ = "singleton"
+
+    @dataclass
+    class Service:
+        repository: Repository
+
+    with container.request_context():
+        _ = container.resolve(Service)
+
+    assert container.providers[Service].scope == "singleton"
+
+
+def test_resolve_non_strict_missing_scope() -> None:
+    container = Container(strict=False)
+
+    @dataclass
+    class Repository:
+        pass
+
+    @dataclass
+    class Service:
+        repository: Repository
+
+    with pytest.raises(TypeError) as exc_info:
+        _ = container.resolve(Service)
+
+    assert str(exc_info.value) == (
+        "Unable to automatically register the provider interface for "
+        "`tests.test_container.test_resolve_non_strict_missing_scope.<locals>"
+        ".Repository` because the scope detection failed. Please resolve "
+        "this issue by using the appropriate scope decorator."
+    )
+
+
+def test_resolve_non_strict_with_primitive_class() -> None:
+    container = Container(strict=False)
+
+    @dataclass
+    class Service:
+        name: str
+
+    with pytest.raises(LookupError) as exc_info:
+        _ = container.resolve(Service).name
+
+    assert str(exc_info.value) == (
+        "The provider interface for `str` has not been registered. "
+        "Please ensure that the provider interface is properly registered "
+        "before attempting to use it."
+    )
+
+
 def test_is_resolved(container: Container) -> None:
     assert not container.is_resolved(str)
 
 
-def test_release(container: Container) -> None:
+def test_release_instance(container: Container) -> None:
     container.register(str, lambda: "test", scope="singleton")
     container.resolve(str)
 
@@ -791,7 +793,7 @@ def test_release(container: Container) -> None:
     assert not container.is_resolved(str)
 
 
-def test_override(container: Container) -> None:
+def test_override_instance(container: Container) -> None:
     origin_name = "origin"
     overriden_name = "overriden"
 
@@ -805,7 +807,7 @@ def test_override(container: Container) -> None:
     assert container.resolve(str) == origin_name
 
 
-def test_override_provider_not_registered(container: Container) -> None:
+def test_override_instance_provider_not_registered(container: Container) -> None:
     with pytest.raises(LookupError) as exc_info:
         with container.override(str, "test"):
             pass
@@ -813,7 +815,7 @@ def test_override_provider_not_registered(container: Container) -> None:
     assert str(exc_info.value) == "The provider interface `str` not registered."
 
 
-def test_override_transient_provider(container: Container) -> None:
+def test_override_instance_transient_provider(container: Container) -> None:
     overriden_uuid = uuid.uuid4()
 
     @container.provider(scope="transient")
@@ -826,7 +828,7 @@ def test_override_transient_provider(container: Container) -> None:
     assert container.resolve(uuid.UUID) != overriden_uuid
 
 
-def test_override_resource_provider(container: Container) -> None:
+def test_override_instance_resource_provider(container: Container) -> None:
     origin = "origin"
     overriden = "overriden"
 
@@ -840,7 +842,7 @@ def test_override_resource_provider(container: Container) -> None:
     assert container.resolve(str) == origin
 
 
-async def test_override_async_resource_provider(container: Container) -> None:
+async def test_override_instance_async_resource_provider(container: Container) -> None:
     origin = "origin"
     overriden = "overriden"
 
