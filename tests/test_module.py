@@ -12,7 +12,7 @@ def container() -> Container:
 
 class TestModule(Module):
     def configure(self, container: Container) -> None:
-        container.register_provider(
+        container.register(
             Annotated[str, "msg1"], lambda: "Message 1", scope="singleton"
         )
 
@@ -24,31 +24,31 @@ class TestModule(Module):
 def test_register_modules() -> None:
     container = Container(modules=[TestModule])
 
-    assert container.has_provider(Annotated[str, "msg1"])
-    assert container.has_provider(Annotated[str, "msg2"])
+    assert container.is_registered(Annotated[str, "msg1"])
+    assert container.is_registered(Annotated[str, "msg2"])
 
 
 def test_register_module_class(container: Container) -> None:
     container.register_module(TestModule)
 
-    assert container.has_provider(Annotated[str, "msg1"])
-    assert container.has_provider(Annotated[str, "msg2"])
+    assert container.is_registered(Annotated[str, "msg1"])
+    assert container.is_registered(Annotated[str, "msg2"])
 
 
 def test_register_module_instance(container: Container) -> None:
     container.register_module(TestModule())
 
-    assert container.has_provider(Annotated[str, "msg1"])
-    assert container.has_provider(Annotated[str, "msg2"])
+    assert container.is_registered(Annotated[str, "msg1"])
+    assert container.is_registered(Annotated[str, "msg2"])
 
 
 def test_register_module_function(container: Container) -> None:
     def configure(container: Container) -> None:
-        container.register_provider(str, lambda: "Message 1", scope="singleton")
+        container.register(str, lambda: "Message 1", scope="singleton")
 
     container.register_module(configure)
 
-    assert container.has_provider(str)
+    assert container.is_registered(str)
 
 
 class OrderedModule(Module):

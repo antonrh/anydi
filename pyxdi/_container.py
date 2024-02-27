@@ -97,7 +97,7 @@ class Container:
         # Register providers
         providers = providers or {}
         for interface, provider in providers.items():
-            self.register_provider(interface, provider.obj, scope=provider.scope)
+            self.register(interface, provider.obj, scope=provider.scope)
 
         # Register modules
         modules = modules or []
@@ -122,7 +122,7 @@ class Container:
         """
         return self._providers
 
-    def has_provider(self, interface: AnyInterface) -> bool:
+    def is_registered(self, interface: AnyInterface) -> bool:
         """Check if a provider is registered for the specified interface.
 
         Args:
@@ -133,7 +133,7 @@ class Container:
         """
         return interface in self._providers
 
-    def register_provider(
+    def register(
         self,
         interface: AnyInterface,
         obj: Callable[..., Any],
@@ -187,7 +187,7 @@ class Container:
         self._providers[interface] = provider
         return provider
 
-    def unregister_provider(self, interface: AnyInterface) -> None:
+    def unregister(self, interface: AnyInterface) -> None:
         """Unregister a provider by interface.
 
         Args:
@@ -202,7 +202,7 @@ class Container:
             - The method removes the provider reference from the internal dictionary
               of registered providers.
         """
-        if not self.has_provider(interface):
+        if not self.is_registered(interface):
             raise LookupError(
                 "The provider interface "
                 f"`{get_full_qualname(interface)}` not registered."
@@ -254,7 +254,7 @@ class Container:
                         "failed. Please resolve this issue by using "
                         "the appropriate scope decorator."
                     ) from exc
-                return self.register_provider(interface, interface, scope=scope)
+                return self.register(interface, interface, scope=scope)
             raise LookupError(
                 f"The provider interface for `{get_full_qualname(interface)}` has "
                 "not been registered. Please ensure that the provider interface is "
@@ -586,7 +586,7 @@ class Container:
         Raises:
             LookupError: If the provider for the interface is not registered.
         """
-        if not self.has_provider(interface) and self.strict:
+        if not self.is_registered(interface) and self.strict:
             raise LookupError(
                 f"The provider interface `{get_full_qualname(interface)}` "
                 "not registered."
@@ -611,7 +611,7 @@ class Container:
 
         def decorator(func: Callable[P, T]) -> Callable[P, T]:
             interface = self._get_provider_annotation(func)
-            self.register_provider(interface, func, scope=scope, override=override)
+            self.register(interface, func, scope=scope, override=override)
             return func
 
         return decorator
@@ -787,7 +787,7 @@ class Container:
                 f"`{parameter.name}` annotation."
             )
 
-        if not self.has_provider(parameter.annotation):
+        if not self.is_registered(parameter.annotation):
             raise LookupError(
                 f"`{get_full_qualname(obj)}` has an unknown dependency parameter "
                 f"`{parameter.name}` with an annotation of "

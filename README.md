@@ -45,7 +45,7 @@ poetry add pyxdi
 from pyxdi import auto, Container
 
 container = Container()
-container.register_provider(str, lambda: "Hello, world!", scope="singleton")
+container.register(str, lambda: "Hello, world!", scope="singleton")
 
 
 @container.provider(scope="singleton")

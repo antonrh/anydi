@@ -24,28 +24,28 @@ def test_register_provider(container: Container) -> None:
     def provider_obj() -> str:
         return "test"
 
-    provider = container.register_provider(str, provider_obj, scope="transient")
+    provider = container.register(str, provider_obj, scope="transient")
 
     assert provider.obj == provider_obj
     assert provider.scope == "transient"
 
 
 def test_register_provider_already_registered(container: Container) -> None:
-    container.register_provider(str, lambda: "test", scope="singleton")
+    container.register(str, lambda: "test", scope="singleton")
 
     with pytest.raises(LookupError) as exc_info:
-        container.register_provider(str, lambda: "other", scope="singleton")
+        container.register(str, lambda: "other", scope="singleton")
 
     assert str(exc_info.value) == "The provider interface `str` already registered."
 
 
 def test_register_provider_override(container: Container) -> None:
-    container.register_provider(str, lambda: "old", scope="singleton")
+    container.register(str, lambda: "old", scope="singleton")
 
     def new_provider_obj() -> str:
         return "new"
 
-    provider = container.register_provider(
+    provider = container.register(
         str, new_provider_obj, scope="singleton", override=True
     )
 
@@ -53,19 +53,19 @@ def test_register_provider_override(container: Container) -> None:
 
 
 def test_register_provider_named(container: Container) -> None:
-    container.register_provider(
+    container.register(
         Annotated[str, "msg1"],
         lambda: "test1",
         scope="singleton",
     )
-    container.register_provider(
+    container.register(
         Annotated[str, "msg2"],
         lambda: "test2",
         scope="singleton",
     )
 
-    assert container.has_provider(Annotated[str, "msg1"])
-    assert container.has_provider(Annotated[str, "msg2"])
+    assert container.is_registered(Annotated[str, "msg1"])
+    assert container.is_registered(Annotated[str, "msg2"])
 
 
 def test_register_providers_via_constructor() -> None:
@@ -76,13 +76,13 @@ def test_register_providers_via_constructor() -> None:
         }
     )
 
-    assert container.has_provider(str)
-    assert container.has_provider(int)
+    assert container.is_registered(str)
+    assert container.is_registered(int)
 
 
 def test_register_provider_with_invalid_scope(container: Container) -> None:
     with pytest.raises(ValueError) as exc_info:
-        container.register_provider(
+        container.register(
             str,
             lambda: "test",
             scope="invalid",  # type: ignore[arg-type]
@@ -100,7 +100,7 @@ def test_register_provider_invalid_transient_resource(container: Container) -> N
         yield "test"
 
     with pytest.raises(TypeError) as exc_info:
-        container.register_provider(str, provider_obj, scope="transient")
+        container.register(str, provider_obj, scope="transient")
 
     assert str(exc_info.value) == (
         "The resource provider `tests.test_container"
@@ -117,7 +117,7 @@ def test_register_provider_invalid_transient_async_resource(
         yield "test"
 
     with pytest.raises(TypeError) as exc_info:
-        container.register_provider(str, provider_obj, scope="transient")
+        container.register(str, provider_obj, scope="transient")
 
     assert str(exc_info.value) == (
         "The resource provider `tests.test_container"
@@ -135,8 +135,8 @@ def test_register_provider_valid_resource(container: Container) -> None:
     def provider_obj2() -> Iterator[int]:
         yield 100
 
-    container.register_provider(str, provider_obj1, scope="singleton")
-    container.register_provider(int, provider_obj2, scope="request")
+    container.register(str, provider_obj1, scope="singleton")
+    container.register(int, provider_obj2, scope="request")
 
 
 def test_register_provider_valid_async_resource(container: Container) -> None:
@@ -146,13 +146,13 @@ def test_register_provider_valid_async_resource(container: Container) -> None:
     async def provider_obj2() -> AsyncIterator[int]:
         yield 100
 
-    container.register_provider(str, provider_obj1, scope="singleton")
-    container.register_provider(int, provider_obj2, scope="request")
+    container.register(str, provider_obj1, scope="singleton")
+    container.register(int, provider_obj2, scope="request")
 
 
 def test_register_invalid_provider_type(container: Container) -> None:
     with pytest.raises(TypeError) as exc_info:
-        container.register_provider(str, "Test", scope="singleton")  # type: ignore[arg-type]
+        container.register(str, "Test", scope="singleton")  # type: ignore[arg-type]
 
     assert str(exc_info.value) == (
         "The provider `Test` is invalid because it is not a callable object. Only "
@@ -165,7 +165,7 @@ def test_register_valid_class_provider(container: Container) -> None:
     class Klass:
         pass
 
-    provider = container.register_provider(str, Klass, scope="singleton")
+    provider = container.register(str, Klass, scope="singleton")
 
     assert provider.is_class
 
@@ -215,9 +215,9 @@ def test_register_provider_match_scopes(
         return f"{a} * {b} = {a * b}"
 
     try:
-        container.register_provider(int, a, scope=scope3)
-        container.register_provider(float, b, scope=scope2)
-        container.register_provider(str, mixed, scope=scope1)
+        container.register(int, a, scope=scope3)
+        container.register(float, b, scope=scope2)
+        container.register(str, mixed, scope=scope1)
     except ValueError:
         result = False
     else:
@@ -233,10 +233,10 @@ def test_register_provider_match_scopes_error(container: Container) -> None:
     def provider_str(n: int) -> str:
         return f"{n}"
 
-    container.register_provider(int, provider_int, scope="request")
+    container.register(int, provider_int, scope="request")
 
     with pytest.raises(ValueError) as exc_info:
-        container.register_provider(str, provider_str, scope="singleton")
+        container.register(str, provider_str, scope="singleton")
 
     assert str(exc_info.value) == (
         "The provider `tests.test_container.test_register_provider_match_scopes_error"
@@ -255,10 +255,10 @@ def test_register_provider_without_annotation(container: Container) -> None:
     def service(ident) -> Service:  # type: ignore[no-untyped-def]
         return Service(ident=ident)
 
-    container.register_provider(str, service_ident, scope="singleton")
+    container.register(str, service_ident, scope="singleton")
 
     with pytest.raises(TypeError) as exc_info:
-        container.register_provider(Service, service, scope="singleton")
+        container.register(Service, service, scope="singleton")
 
     assert str(exc_info.value) == (
         "Missing provider "
@@ -274,7 +274,7 @@ def test_register_provider_with_not_registered_sub_provider(
         return str(dep1)
 
     with pytest.raises(LookupError) as exc_info:
-        container.register_provider(str, dep2, scope="singleton")
+        container.register(str, dep2, scope="singleton")
 
     assert str(exc_info.value) == (
         "The provider "
@@ -358,28 +358,28 @@ async def test_register_async_events(container: Container) -> None:
 
 
 def test_unregister_provider(container: Container) -> None:
-    container.register_provider(str, lambda: "test", scope="singleton")
+    container.register(str, lambda: "test", scope="singleton")
 
-    assert container.has_provider(str)
+    assert container.is_registered(str)
 
-    container.unregister_provider(str)
+    container.unregister(str)
 
-    assert not container.has_provider(str)
+    assert not container.is_registered(str)
 
 
 def test_unregister_request_scoped_provider(container: Container) -> None:
-    container.register_provider(str, lambda: "test", scope="request")
+    container.register(str, lambda: "test", scope="request")
 
-    assert container.has_provider(str)
+    assert container.is_registered(str)
 
-    container.unregister_provider(str)
+    container.unregister(str)
 
-    assert not container.has_provider(str)
+    assert not container.is_registered(str)
 
 
 def test_unregister_not_registered_provider(container: Container) -> None:
     with pytest.raises(LookupError) as exc_info:
-        container.unregister_provider(str)
+        container.unregister(str)
 
     assert str(exc_info.value) == "The provider interface `str` not registered."
 
@@ -416,7 +416,7 @@ def test_start_and_close_singleton_context(container: Container) -> None:
         yield "test"
         events.append("dep1:after")
 
-    container.register_provider(str, dep1, scope="singleton")
+    container.register(str, dep1, scope="singleton")
 
     container.start()
 
@@ -435,7 +435,7 @@ def test_request_context(container: Container) -> None:
         yield "test"
         events.append("dep1:after")
 
-    container.register_provider(str, dep1, scope="request")
+    container.register(str, dep1, scope="request")
 
     with container.request_context():
         assert container.resolve(str) == "test"
@@ -454,7 +454,7 @@ async def test_astart_and_aclose_singleton_context(container: Container) -> None
         yield "test"
         events.append("dep1:after")
 
-    container.register_provider(str, dep1, scope="singleton")
+    container.register(str, dep1, scope="singleton")
 
     await container.astart()
 
@@ -473,7 +473,7 @@ async def test_arequest_context(container: Container) -> None:
         yield "test"
         events.append("dep1:after")
 
-    container.register_provider(str, dep1, scope="request")
+    container.register(str, dep1, scope="request")
 
     async with container.arequest_context():
         assert await container.aresolve(str) == "test"
@@ -482,8 +482,8 @@ async def test_arequest_context(container: Container) -> None:
 
 
 def test_reset_resolved_instances(container: Container) -> None:
-    container.register_provider(str, lambda: "test", scope="singleton")
-    container.register_provider(int, lambda: 1, scope="singleton")
+    container.register(str, lambda: "test", scope="singleton")
+    container.register(int, lambda: 1, scope="singleton")
 
     container.resolve(str)
     container.resolve(int)
@@ -503,7 +503,7 @@ def test_reset_resolved_instances(container: Container) -> None:
 def test_resolve_singleton_scoped(container: Container) -> None:
     instance = "test"
 
-    container.register_provider(str, lambda: instance, scope="singleton")
+    container.register(str, lambda: instance, scope="singleton")
 
     assert container.resolve(str) == instance
 
@@ -522,7 +522,7 @@ def test_resolve_singleton_scoped_resource(container: Container) -> None:
     def provide() -> Iterator[str]:
         yield instance
 
-    container.register_provider(str, provide, scope="singleton")
+    container.register(str, provide, scope="singleton")
     container.start()
 
     assert container.resolve(str) == instance
@@ -536,7 +536,7 @@ def test_resolve_singleton_scoped_started_with_async_resource_provider(
     async def provide() -> AsyncIterator[str]:
         yield instance
 
-    container.register_provider(str, provide, scope="singleton")
+    container.register(str, provide, scope="singleton")
 
     with pytest.raises(TypeError) as exc_info:
         container.start()
@@ -555,7 +555,7 @@ def test_resolve_singleton_resource(container: Container) -> None:
     def provide() -> Iterator[str]:
         yield instance
 
-    container.register_provider(str, provide, scope="singleton")
+    container.register(str, provide, scope="singleton")
 
     container.resolve(str)
 
@@ -566,7 +566,7 @@ async def test_resolve_singleton_async_resource(container: Container) -> None:
     def provide() -> Iterator[str]:
         yield instance
 
-    container.register_provider(str, provide, scope="singleton")
+    container.register(str, provide, scope="singleton")
 
     await container.astart()
 
@@ -583,8 +583,8 @@ async def test_resolve_singleton_async_and_sync_resources(container: Container) 
     async def provider_2() -> AsyncIterator[int]:
         yield instance_int
 
-    container.register_provider(str, provider_1, scope="singleton")
-    container.register_provider(int, provider_2, scope="singleton")
+    container.register(str, provider_1, scope="singleton")
+    container.register(int, provider_2, scope="singleton")
 
     await container.astart()
 
@@ -600,7 +600,7 @@ async def test_resolved_singleton_async_resource_not_started(
     async def provide() -> AsyncIterator[str]:
         yield instance
 
-    container.register_provider(str, provide, scope="singleton")
+    container.register(str, provide, scope="singleton")
 
     with pytest.raises(TypeError) as exc_info:
         container.resolve(str)
@@ -616,7 +616,7 @@ async def test_resolved_singleton_async_resource_not_started(
 def test_resolve_request_scoped(container: Container) -> None:
     instance = "test"
 
-    container.register_provider(str, lambda: instance, scope="request")
+    container.register(str, lambda: instance, scope="request")
 
     with container.request_context():
         assert container.resolve(str) == instance
@@ -625,7 +625,7 @@ def test_resolve_request_scoped(container: Container) -> None:
 def test_resolve_request_scoped_not_started(container: Container) -> None:
     instance = "test"
 
-    container.register_provider(str, lambda: instance, scope="request")
+    container.register(str, lambda: instance, scope="request")
 
     with pytest.raises(LookupError) as exc_info:
         assert container.resolve(str)
@@ -637,7 +637,7 @@ def test_resolve_request_scoped_not_started(container: Container) -> None:
 
 
 def test_resolve_transient_scoped(container: Container) -> None:
-    container.register_provider(uuid.UUID, uuid.uuid4, scope="transient")
+    container.register(uuid.UUID, uuid.uuid4, scope="transient")
 
     assert container.resolve(uuid.UUID) != container.resolve(uuid.UUID)
 
@@ -791,7 +791,7 @@ def test_is_resolved(container: Container) -> None:
 
 
 def test_release_instance(container: Container) -> None:
-    container.register_provider(str, lambda: "test", scope="singleton")
+    container.register(str, lambda: "test", scope="singleton")
     container.resolve(str)
 
     assert container.is_resolved(str)
@@ -930,7 +930,7 @@ def test_get_provider_arguments(container: Container) -> None:
     def service(a: int, /, b: float, *, c: str) -> Service:
         return Service(ident=f"{a}/{b}/{c}")
 
-    provider = container.register_provider(Service, service, scope="singleton")
+    provider = container.register(Service, service, scope="singleton")
 
     scoped_context = container._get_scoped_context("singleton")
 
@@ -956,7 +956,7 @@ async def test_async_get_provider_arguments(container: Container) -> None:
     async def service(a: int, /, b: float, *, c: str) -> Service:
         return Service(ident=f"{a}/{b}/{c}")
 
-    provider = container.register_provider(Service, service, scope="singleton")
+    provider = container.register(Service, service, scope="singleton")
 
     scoped_context = container._get_scoped_context("singleton")
 
@@ -1067,8 +1067,8 @@ async def test_inject_with_sync_and_async_resources(container: Container) -> Non
     async def service_provider(ident: str) -> AsyncIterator[Service]:
         yield Service(ident=ident)
 
-    container.register_provider(str, ident_provider, scope="singleton")
-    container.register_provider(Service, service_provider, scope="singleton")
+    container.register(str, ident_provider, scope="singleton")
+    container.register(Service, service_provider, scope="singleton")
 
     await container.astart()
 

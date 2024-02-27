@@ -7,7 +7,7 @@ Once a provider is registered with `Container`, it can be used to resolve depend
 
 ### Registering Providers
 
-To register a provider, you can use the `register_provider` method of the `Container` instance. The method takes
+To register a provider, you can use the `register` method of the `Container` instance. The method takes
 three arguments: the type of the object to be provided, the provider function or class, and an scope.
 
 ```python
@@ -20,7 +20,7 @@ def message() -> str:
     return "Hello, message!"
 
 
-container.register_provider(str, message, scope="singleton")
+container.register(str, message, scope="singleton")
 
 assert container.resolve(str) == "Hello, world!"
 ```
@@ -135,7 +135,7 @@ _ = container.resolve(Component)  # raises LookupError
 
 ### Unregistering Providers
 
-To unregister a provider, you can use the `unregister_provider` method of the `Container` instance. The method takes
+To unregister a provider, you can use the `unregister` method of the `Container` instance. The method takes
 interface of the dependency to be unregistered.
 
 ```python
@@ -149,11 +149,11 @@ def message() -> str:
     return "Hello, message!"
 
 
-assert container.has_provider(str)
+assert container.is_registered(str)
 
-container.unregister_provider(str)
+container.unregister(str)
 
-assert not container.has_provider(str)
+assert not container.is_registered(str)
 ```
 
 ### Resolved Providers
@@ -190,8 +190,8 @@ To release a provider instance, you can use the `release` method of the `Contain
 from pyxdi import Container
 
 container = Container()
-container.register_provider(str, lambda: "Hello, world!", scope="singleton")
-container.register_provider(int, lambda: 100, scope="singleton")
+container.register(str, lambda: "Hello, world!", scope="singleton")
+container.register(int, lambda: 100, scope="singleton")
 
 container.resolve(str)
 container.resolve(int)
@@ -650,7 +650,7 @@ class Service:
 
 class AppModule(Module):
     def configure(self, container: Container) -> None:
-        container.register_provider(Repository, lambda: Repository(), scope="singleton")
+        container.register(Repository, lambda: Repository(), scope="singleton")
 
     @provider(scope="singleton")
     def service(self, repo: Repository) -> Service:
@@ -662,8 +662,8 @@ container = Container(modules=[AppModule()])
 # or
 # container.register_module(AppModule())
 
-assert container.has_provider(Service)
-assert container.has_provider(Repository)
+assert container.is_registered(Service)
+assert container.is_registered(Repository)
 ```
 
 With `PyxDI`'s Modules, you can keep your code organized and easily manage your dependencies.
