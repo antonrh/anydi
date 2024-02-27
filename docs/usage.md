@@ -7,7 +7,7 @@ Once a provider is registered with `Container`, it can be used to resolve depend
 
 ### Registering Providers
 
-To register a provider, you can use the `register_provider` method of the `PyxDI` instance. The method takes
+To register a provider, you can use the `register_provider` method of the `Container` instance. The method takes
 three arguments: the type of the object to be provided, the provider function or class, and an scope.
 
 ```python
@@ -25,7 +25,7 @@ container.register_provider(str, message, scope="singleton")
 assert container.resolve(str) == "Hello, world!"
 ```
 
-Alternatively, you can use the provider decorator to register a provider function. The decorator takes care of registering the provider with `PyxDI`.
+Alternatively, you can use the provider decorator to register a provider function. The decorator takes care of registering the provider with `Container`.
 
 ```python
 from pyxdi import Container
@@ -99,7 +99,7 @@ class Service:
     repo: Repository
 ```
 
-If you create a `PyxDI` instance in non-strict mode `strict=False`, it will automatically register a provider for `Component` and `ChildComponent` with provided `RootComponent`:
+If you create a `Container` instance in non-strict mode `strict=False`, it will automatically register a provider for `Component` and `ChildComponent` with provided `RootComponent`:
 
 ```python
 from typing import Iterator
@@ -158,7 +158,7 @@ assert not container.has_provider(str)
 
 ### Resolved Providers
 
-To check if a registered provider has a resolved instance, you can use the `has_instance` method of the `PyxDI` instance.
+To check if a registered provider has a resolved instance, you can use the `is_resolved` method of the `Container` instance.
 This method takes the interface of the dependency to be checked.
 
 ```python
@@ -518,7 +518,7 @@ def handler(service: Service = auto()) -> None:
     print(f"Hello, from service `{service.name}`")
 ```
 
-Note that the service argument in the handler function has been given a default value of `dep` mark. This is done so that `PyxDI` knows which dependency to inject when the handler function is called.
+Note that the service argument in the handler function has been given a default value of `auto()` mark. This is done so that `PyxDI` knows which dependency to inject when the handler function is called.
 
 Once the dependencies have been injected, the function can be called as usual, like so:
 
@@ -526,7 +526,7 @@ Once the dependencies have been injected, the function can be called as usual, l
 handler()
 ```
 
-You can also call the callable object with injected dependencies using the `run` method of the `PyxDI` instance:
+You can also call the callable object with injected dependencies using the `run` method of the `Container` instance:
 
 ```python
 from pyxdi import auto, Container
@@ -621,7 +621,7 @@ You can also scan for providers or injectables in specific tags. To do so, you n
 ```python
 from pyxdi import Container
 
-container = PyxDI()
+container = Container()
 container.scan(["app.handlers"], tags=["tag1"])
 ```
 
@@ -666,7 +666,7 @@ assert container.has_provider(Service)
 assert container.has_provider(Repository)
 ```
 
-With `PyxDI`'s application Modules, you can keep your code organized and easily manage your dependencies.
+With `PyxDI`'s Modules, you can keep your code organized and easily manage your dependencies.
 
 
 ## Testing

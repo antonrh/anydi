@@ -137,7 +137,7 @@ from app.services import UserService
 
 
 @injectable
-def get_users(user_service: UserService = auto()) -> t.List[User]:
+def get_users(user_service: UserService = auto()) -> List[User]:
     return user_service.get_users()
 
 
