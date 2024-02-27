@@ -1,7 +1,6 @@
 # PyxDI
 
-`PyxDI` is a modern, lightweight and async-friendly Python Dependency Injection library that leverages type annotations ([PEP 484](https://peps.python.org/pep-0484/))
-to effortlessly manage dependencies in your applications.
+`PyxDI` is a lightweight Python Dependency Injection library that supports any synchronous or asynchronous code through type annotations ([PEP 484](https://peps.python.org/pep-0484/)).
 
 [![CI](https://github.com/antonrh/pyxdi/actions/workflows/ci.yml/badge.svg)](https://github.com/antonrh/pyxdi/actions/workflows/ci.yml)
 [![codecov](https://codecov.io/gh/antonrh/pyxdi/branch/main/graph/badge.svg?token=67CLD19I0C)](https://codecov.io/gh/antonrh/pyxdi)
