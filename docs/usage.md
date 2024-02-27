@@ -25,7 +25,7 @@ container.register_provider(str, message, scope="singleton")
 assert container.resolve(str) == "Hello, world!"
 ```
 
-Alternatively, you can use the provider decorator to register a provider function. The decorator takes care of registering the provider with `Container`.
+Alternatively, you can use the `@provider` decorator to register a provider function. The decorator takes care of registering the provider with `Container`.
 
 ```python
 from pyxdi import Container
