@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "anydi"
-version = "0.19.1"
+version = "0.19.2"
 description = "Dependency Injection library"
 authors = ["Anton Ruhlov <antonruhlov@gmail.com>"]
 license = "MIT"
@@ -47,7 +47,7 @@ async = ["anyio"]
 
 [tool.poetry.group.dev.dependencies]
 mypy = "^1.8.0"
-ruff = "^0.1.13"
+ruff = "^0.2.2"
 pytest = "^7.4.3"
 pytest-cov = "^4.0.0"
 fastapi = "^0.95.1"
@@ -60,11 +60,11 @@ line-length = 88
 select = ["A", "B", "C", "E", "F", "I", "W", "TID252", "T20"]
 ignore = ["A003", "B008", "B009", "B010", "D104", "D107"]
 
-[tool.ruff.isort]
+[tool.ruff.lint.isort]
 combine-as-imports = true
 forced-separate = ["tests", "app"]
 
-[tool.ruff.pydocstyle]
+[tool.ruff.lint.pydocstyle]
 convention = "google"
 
 [tool.mypy]
