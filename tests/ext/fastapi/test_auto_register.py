@@ -4,9 +4,9 @@ from typing import Any
 import pytest
 from fastapi import FastAPI
 
-import pyxdi.ext.fastapi
-from pyxdi import Container
-from pyxdi.ext.fastapi import Inject
+import anydi.ext.fastapi
+from anydi import Container
+from anydi.ext.fastapi import Inject
 
 from tests.ext.fixtures import Mail, MailService
 
@@ -22,8 +22,8 @@ def test_auto_register(caplog: pytest.LogCaptureFixture) -> None:
     ) -> Any:
         return await mail_service.send_mail(email="test@mail.com", message="test")
 
-    with caplog.at_level(logging.DEBUG, logger="pyxdi"):
-        pyxdi.ext.fastapi.install(app, container)
+    with caplog.at_level(logging.DEBUG, logger="anydi"):
+        anydi.ext.fastapi.install(app, container)
 
         assert caplog.messages == [
             "Callable `tests.ext.fastapi.test_auto_register.test_auto_register.<locals>"

@@ -4,7 +4,7 @@ import pytest
 from fastapi import FastAPI
 from starlette.testclient import TestClient
 
-from pyxdi import Container
+from anydi import Container
 
 from .app import app as _app
 

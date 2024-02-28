@@ -1,6 +1,6 @@
 from dataclasses import dataclass
 
-from pyxdi import auto, injectable
+from anydi import auto, injectable
 
 from tests.fixtures import Service
 

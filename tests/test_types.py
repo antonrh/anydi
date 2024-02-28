@@ -1,6 +1,6 @@
 from typing import AsyncIterator, Iterator
 
-from pyxdi import Provider
+from anydi import Provider
 
 from tests.fixtures import Service
 

@@ -4,7 +4,7 @@ import pytest
 from starlette.applications import Starlette
 from starlette.testclient import TestClient
 
-from pyxdi import Container
+from anydi import Container
 
 from .app import app as _app
 

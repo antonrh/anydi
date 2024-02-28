@@ -1,4 +1,4 @@
-"""PyxDI decorators module."""
+"""AnyDI decorators module."""
 from __future__ import annotations
 
 import inspect
@@ -46,18 +46,18 @@ class ModuleMeta(type):
 
 
 class Module(metaclass=ModuleMeta):
-    """A base class for defining PyxDI modules."""
+    """A base class for defining AnyDI modules."""
 
     providers: List[Tuple[str, ProviderDecoratorArgs]]
 
     def configure(self, container: Container) -> None:
-        """Configure the PyxDI container with providers and their dependencies.
+        """Configure the AnyDI container with providers and their dependencies.
 
         This method can be overridden in derived classes to provide the
         configuration logic.
 
         Args:
-            container: The PyxDI container to be configured.
+            container: The AnyDI container to be configured.
         """
 
 
@@ -99,7 +99,7 @@ class ProviderDecoratorArgs(NamedTuple):
 def provider(
     *, scope: Scope, override: bool = False
 ) -> Callable[[Callable[Concatenate[M, P], T]], Callable[Concatenate[M, P], T]]:
-    """Decorator for marking a function or method as a provider in a PyxDI module.
+    """Decorator for marking a function or method as a provider in a AnyDI module.
 
     Args:
         scope: The scope in which the provided instance should be managed.

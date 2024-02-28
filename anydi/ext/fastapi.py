@@ -1,4 +1,4 @@
-"""PyxDI FastAPI extension."""
+"""AnyDI FastAPI extension."""
 
 from typing import Any, Iterator, cast
 
@@ -7,8 +7,8 @@ from fastapi.dependencies.models import Dependant
 from fastapi.routing import APIRoute
 from starlette.requests import Request
 
-from pyxdi import Container
-from pyxdi._utils import get_signature
+from anydi import Container
+from anydi._utils import get_signature
 
 from ._utils import HasInterface, patch_parameter_interface
 from .starlette.middleware import RequestScopedMiddleware
@@ -17,15 +17,15 @@ __all__ = ["RequestScopedMiddleware", "install", "get_container", "Inject"]
 
 
 def install(app: FastAPI, container: Container) -> None:
-    """Install PyxDI into a FastAPI application.
+    """Install AnyDI into a FastAPI application.
 
     Args:
         app: The FastAPI application instance.
         container: The container.
 
-    This function installs the PyxDI container into a FastAPI application by attaching
+    This function installs the AnyDI container into a FastAPI application by attaching
     it to the application state. It also patches the route dependencies to inject the
-    required dependencies using PyxDI.
+    required dependencies using AnyDI.
     """
     app.state.container = container  # noqa
 
@@ -46,19 +46,19 @@ def install(app: FastAPI, container: Container) -> None:
 
 
 def get_container(request: Request) -> Container:
-    """Get the PyxDI container from a FastAPI request.
+    """Get the AnyDI container from a FastAPI request.
 
     Args:
         request: The FastAPI request.
 
     Returns:
-        The PyxDI container associated with the request.
+        The AnyDI container associated with the request.
     """
     return cast(Container, request.app.state.container)
 
 
 class Resolver(params.Depends, HasInterface):
-    """Parameter dependency class for injecting dependencies using PyxDI."""
+    """Parameter dependency class for injecting dependencies using AnyDI."""
 
     def __init__(self) -> None:
         super().__init__(dependency=self._dependency, use_cache=True)
@@ -72,7 +72,7 @@ def Inject() -> Any:  # noqa
     """Decorator for marking a function parameter as requiring injection.
 
     The `Inject` decorator is used to mark a function parameter as requiring injection
-    of a dependency resolved by PyxDI.
+    of a dependency resolved by AnyDI.
 
     Returns:
         The `Resolver` instance representing the parameter dependency.

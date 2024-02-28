@@ -6,7 +6,7 @@ from typing import Any, AsyncIterator, Dict, Iterator, List, Tuple, Type
 import pytest
 from typing_extensions import Annotated
 
-from pyxdi import Container, Provider, Scope, auto, request, singleton, transient
+from anydi import Container, Provider, Scope, auto, request, singleton, transient
 
 from tests.fixtures import Service
 
@@ -390,7 +390,7 @@ def test_inject_auto_registered_log_message(caplog: pytest.LogCaptureFixture) ->
 
     container = Container(strict=False)
 
-    with caplog.at_level(logging.DEBUG, logger="pyxdi"):
+    with caplog.at_level(logging.DEBUG, logger="anydi"):
 
         @container.inject
         def handler(service: Service = auto()) -> None:

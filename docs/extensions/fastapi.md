@@ -1,6 +1,6 @@
 # FastAPI Extension
 
-Integrating `PyxDI` with `FastAPI` is straightforward. Since `FastAPI` comes with its own internal dependency injection
+Integrating `AnyDI` with `FastAPI` is straightforward. Since `FastAPI` comes with its own internal dependency injection
 mechanism, there is a simple workaround for using the two together using custom `Inject` parameter instead of standard `Depends`.
 
 Here's an example of how to make them work together:
@@ -9,9 +9,9 @@ Here's an example of how to make them work together:
 ```python
 from fastapi import FastAPI, Path
 
-import pyxdi.ext.fastapi
-from pyxdi import Container
-from pyxdi.ext.fastapi import Inject
+import anydi.ext.fastapi
+from anydi import Container
+from anydi.ext.fastapi import Inject
 
 
 class HelloService:
@@ -38,23 +38,23 @@ async def say_hello(
     return await hello_service.say_hello(name=name)
 
 
-pyxdi.ext.fastapi.install(app, container)
+anydi.ext.fastapi.install(app, container)
 ```
 
 !!! note
 
     To detect a dependency interface, provide a valid type annotation.
 
-`PyxDI` also supports `Annotated` type hints, so you can use `Annotated[...]` instead of `... = Inject()` using `FastAPI` version `0.95.0` or higher:
+`AnyDI` also supports `Annotated` type hints, so you can use `Annotated[...]` instead of `... = Inject()` using `FastAPI` version `0.95.0` or higher:
 
 ```python
 from typing import Annotated
 
 from fastapi import FastAPI, Path
 
-import pyxdi.ext.fastapi
-from pyxdi import Container
-from pyxdi.ext.fastapi import Inject
+import anydi.ext.fastapi
+from anydi import Container
+from anydi.ext.fastapi import Inject
 
 
 class HelloService:
@@ -81,13 +81,13 @@ async def say_hello(
     return await hello_service.say_hello(name=name)
 
 
-pyxdi.ext.fastapi.install(app, container)
+anydi.ext.fastapi.install(app, container)
 ```
 
 
 ## Lifespan support
 
-If you need to use `PyxDI` resources in your `FastAPI` application, you can easily integrate them by including `PyxDI`
+If you need to use `AnyDI` resources in your `FastAPI` application, you can easily integrate them by including `AnyDI`
 startup and shutdown events in the `FastAPI` application's lifecycle events.
 
 To do this, use the following code:
@@ -95,7 +95,7 @@ To do this, use the following code:
 ```python
 from fastapi import FastAPI
 
-from pyxdi import Container
+from anydi import Container
 
 container = Container()
 
@@ -110,7 +110,7 @@ from typing import AsyncIterator
 
 from fastapi import FastAPI
 
-from pyxdi import Container
+from anydi import Container
 
 container = Container()
 
@@ -128,7 +128,7 @@ app = FastAPI(lifespan=lifespan)
 
 ## Request Scope
 
-To utilize `request` scoped dependencies in your `FastAPI` application with `PyxDI`, you can make use of the
+To utilize `request` scoped dependencies in your `FastAPI` application with `AnyDI`, you can make use of the
 `RequestScopedMiddleware`. This middleware enables the creation of request-specific dependency instances,
 which are instantiated and provided to the relevant request handlers throughout the lifetime of each request.
 
@@ -138,9 +138,9 @@ from dataclasses import dataclass
 from fastapi import FastAPI, Path
 from starlette.middleware import Middleware
 
-import pyxdi.ext.fastapi
-from pyxdi import Container
-from pyxdi.ext.fastapi import Inject, RequestScopedMiddleware
+import anydi.ext.fastapi
+from anydi import Container
+from anydi.ext.fastapi import Inject, RequestScopedMiddleware
 
 
 @dataclass
@@ -179,5 +179,5 @@ async def get_user(
     return user.email
 
 
-pyxdi.ext.fastapi.install(app, container)
+anydi.ext.fastapi.install(app, container)
 ```

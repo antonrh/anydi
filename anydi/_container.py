@@ -1,4 +1,4 @@
-"""PyxDI core implementation module."""
+"""AnyDI core implementation module."""
 from __future__ import annotations
 
 import contextlib
@@ -61,7 +61,7 @@ ALLOWED_SCOPES: Dict[Scope, List[Scope]] = {
 
 @final
 class Container:
-    """PyxDI is a dependency injection container.
+    """AnyDI is a dependency injection container.
 
     Args:
         modules: Optional sequence of modules to register during initialization.
@@ -76,7 +76,7 @@ class Container:
         ] = None,
         strict: bool = True,
     ) -> None:
-        """Initialize the PyxDI instance.
+        """Initialize the AnyDI instance.
 
         Args:
             modules: Optional sequence of modules to register during initialization.

@@ -1,4 +1,4 @@
-"""Shared PyxDI utils module."""
+"""Shared AnyDI utils module."""
 import builtins
 import functools
 import inspect
@@ -105,6 +105,6 @@ async def run_async(
     if not anyio:
         raise ImportError(
             "`anyio` library is not currently installed. Please make sure to install "
-            "it first, or consider using `pyxdi[full]` instead."
+            "it first, or consider using `anydi[full]` instead."
         )
     return await anyio.to_thread.run_sync(functools.partial(func, *args, **kwargs))

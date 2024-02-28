@@ -1,4 +1,4 @@
-from pyxdi import auto, injectable
+from anydi import auto, injectable
 
 
 @injectable(tags=["a", "a2", "a21"])

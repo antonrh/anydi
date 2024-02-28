@@ -1,8 +1,8 @@
 import pytest
 from typing_extensions import Annotated
 
-from pyxdi import Container, Module, provider
-from pyxdi._module import ProviderDecoratorArgs  # noqa
+from anydi import Container, Module, provider
+from anydi._module import ProviderDecoratorArgs  # noqa
 
 
 @pytest.fixture

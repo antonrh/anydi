@@ -6,8 +6,8 @@ from starlette.requests import Request
 from starlette.responses import JSONResponse
 from starlette.routing import Route
 
-from pyxdi import Container, auto
-from pyxdi.ext.starlette.middleware import RequestScopedMiddleware
+from anydi import Container, auto
+from anydi.ext.starlette.middleware import RequestScopedMiddleware
 
 from tests.ext.fixtures import MailService, UserService
 

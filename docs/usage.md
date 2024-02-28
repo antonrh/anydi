@@ -2,7 +2,7 @@
 
 ## Providers
 
-Providers are the backbone of `PyxDI`. A provider is a function or a class that returns an instance of a specific type.
+Providers are the backbone of `AnyDI`. A provider is a function or a class that returns an instance of a specific type.
 Once a provider is registered with `Container`, it can be used to resolve dependencies throughout the application.
 
 ### Registering Providers
@@ -11,7 +11,7 @@ To register a provider, you can use the `register` method of the `Container` ins
 three arguments: the type of the object to be provided, the provider function or class, and an scope.
 
 ```python
-from pyxdi import Container
+from anydi import Container
 
 container = Container()
 
@@ -28,7 +28,7 @@ assert container.resolve(str) == "Hello, world!"
 Alternatively, you can use the `@provider` decorator to register a provider function. The decorator takes care of registering the provider with `Container`.
 
 ```python
-from pyxdi import Container
+from anydi import Container
 
 container = Container()
 
@@ -48,7 +48,7 @@ Sometimes, it's useful to register multiple providers for the same type. For exa
 ```python
 from typing import Annotated
 
-from pyxdi import Container
+from anydi import Container
 
 container = Container()
 
@@ -72,7 +72,7 @@ In this code example, we define two providers, `message1` and `message2`, each r
 
 ### Strict Mode
 
-By default, `PyxDI` is in strict mode. This means that it will raise an error if you try to get an instance of a type or
+By default, `AnyDI` is in strict mode. This means that it will raise an error if you try to get an instance of a type or
 to register a provider for a type that not exists in the container.
 
 For example, suppose you have a class that depends on another class:
@@ -104,7 +104,7 @@ If you create a `Container` instance in non-strict mode `strict=False`, it will 
 ```python
 from typing import Iterator
 
-from pyxdi import Container
+from anydi import Container
 
 container = Container(strict=False)
 
@@ -139,7 +139,7 @@ To unregister a provider, you can use the `unregister` method of the `Container`
 interface of the dependency to be unregistered.
 
 ```python
-from pyxdi import Container
+from anydi import Container
 
 container = Container()
 
@@ -162,7 +162,7 @@ To check if a registered provider has a resolved instance, you can use the `is_r
 This method takes the interface of the dependency to be checked.
 
 ```python
-from pyxdi import Container
+from anydi import Container
 
 container = Container()
 
@@ -187,7 +187,7 @@ assert not container.is_resolved(str)
 To release a provider instance, you can use the `release` method of the `Container` instance. This method takes the interface of the dependency to be reset. Alternatively, you can reset all instances with the `reset` method.
 
 ```python
-from pyxdi import Container
+from anydi import Container
 
 container = Container()
 container.register(str, lambda: "Hello, world!", scope="singleton")
@@ -212,7 +212,7 @@ assert not container.is_resolved(int)
 
 ## Scopes
 
-`PyxDI` supports three different scopes for providers:
+`AnyDI` supports three different scopes for providers:
 
 * `transient`
 * `singleton`
@@ -225,7 +225,7 @@ Providers with transient scope create a new instance of the object each time it'
 ```python
 import random
 
-from pyxdi import Container
+from anydi import Container
 
 container = Container()
 
@@ -243,7 +243,7 @@ print(container.resolve(str))  # will print random message
 Providers with singleton scope create a single instance of the object and return it every time it's requested.
 
 ```python
-from pyxdi import Container
+from anydi import Container
 
 
 class Service:
@@ -267,7 +267,7 @@ assert container.resolve(Service) == container.resolve(Service)
 Providers with request scope create an instance of the object for each request. The instance is only available within the context of the request.
 
 ```python
-from pyxdi import Container
+from anydi import Container
 
 
 class Request:
@@ -292,7 +292,7 @@ container.resolve(Request)  # this will raise LookupError
 or using asynchronous request context:
 
 ```python
-from pyxdi import Container
+from anydi import Container
 
 container = Container()
 
@@ -309,7 +309,7 @@ async def main() -> None:
 
 ## Resource Providers
 
-Resource providers are special types of providers that need to be started and stopped. `PyxDI` supports synchronous and asynchronous resource providers.
+Resource providers are special types of providers that need to be started and stopped. `AnyDI` supports synchronous and asynchronous resource providers.
 
 ### Synchronous Resources
 
@@ -318,7 +318,7 @@ Here is an example of a synchronous resource provider that manages the lifecycle
 ```python
 from typing import Iterator
 
-from pyxdi import Container
+from anydi import Container
 
 
 class Resource:
@@ -360,7 +360,7 @@ Here is an example of an asynchronous resource provider that manages the lifecyc
 import asyncio
 from typing import AsyncIterator
 
-from pyxdi import Container
+from anydi import Container
 
 
 class Resource:
@@ -405,7 +405,7 @@ Sometimes, it can be useful to split the process of initializing and managing th
 ```python
 from typing import Iterator
 
-from pyxdi import Container
+from anydi import Container
 
 
 class Client:
@@ -463,7 +463,7 @@ Sometimes it's necessary to override a provider with a different implementation.
 For example, suppose you have registered a singleton provider for a string:
 
 ```python
-from pyxdi import Container
+from anydi import Container
 
 container = Container()
 
@@ -497,7 +497,7 @@ In order to use the dependencies that have been provided to the `Container`, the
 Here's an example of how to use the `@container.inject` decorator:
 
 ```python
-from pyxdi import auto, Container
+from anydi import auto, Container
 
 
 class Service:
@@ -518,7 +518,7 @@ def handler(service: Service = auto()) -> None:
     print(f"Hello, from service `{service.name}`")
 ```
 
-Note that the service argument in the handler function has been given a default value of `auto()` mark. This is done so that `PyxDI` knows which dependency to inject when the handler function is called.
+Note that the service argument in the handler function has been given a default value of `auto()` mark. This is done so that `AnyDI` knows which dependency to inject when the handler function is called.
 
 Once the dependencies have been injected, the function can be called as usual, like so:
 
@@ -529,7 +529,7 @@ handler()
 You can also call the callable object with injected dependencies using the `run` method of the `Container` instance:
 
 ```python
-from pyxdi import auto, Container
+from anydi import auto, Container
 
 
 class Service:
@@ -557,7 +557,7 @@ In this case, the `run` method will automatically inject the dependencies and ca
 
 ### Scanning Injections
 
-`PyxDI` provides a simple way to inject dependencies by scanning Python modules or packages.
+`AnyDI` provides a simple way to inject dependencies by scanning Python modules or packages.
 For example, your application might have the following structure:
 
 ```
@@ -579,7 +579,7 @@ class Service:
 `handlers.py` uses the Service class:
 
 ```python
-from pyxdi import auto, injectable
+from anydi import auto, injectable
 
 from app.services import Service
 
@@ -592,7 +592,7 @@ def my_handler(service: Service = auto()) -> None:
 `main.py` starts the DI container and scans the app `handlers.py` module:
 
 ```python
-from pyxdi import Container
+from anydi import Container
 
 from app.services import Service
 
@@ -619,7 +619,7 @@ The scan method takes a list of directory paths as an argument and recursively s
 You can also scan for providers or injectables in specific tags. To do so, you need to use the tags argument when registering providers or injectables. For example:
 
 ```python
-from pyxdi import Container
+from anydi import Container
 
 container = Container()
 container.scan(["app.handlers"], tags=["tag1"])
@@ -630,13 +630,13 @@ This will scan for `@injectable` annotated target only with defined `tags` withi
 
 ## Modules
 
-`PyxDI` provides a way to organize your code and configure dependencies for the dependency injection container.
+`AnyDI` provides a way to organize your code and configure dependencies for the dependency injection container.
 A module is a class that extends the `Module` base class and contains the configuration for the container.
 
 Here's an example how to create and register simple module:
 
 ```python
-from pyxdi import Container, Module, provider
+from anydi import Container, Module, provider
 
 
 class Repository:
@@ -666,19 +666,19 @@ assert container.is_registered(Service)
 assert container.is_registered(Repository)
 ```
 
-With `PyxDI`'s Modules, you can keep your code organized and easily manage your dependencies.
+With `AnyDI`'s Modules, you can keep your code organized and easily manage your dependencies.
 
 
 ## Testing
 
-To use `PyxDI` with your testing framework, you can use the `override` context manager to temporarily replace a dependency with an overridden instance
+To use `AnyDI` with your testing framework, you can use the `override` context manager to temporarily replace a dependency with an overridden instance
 during testing. This allows you to isolate the code being tested from its dependencies. The with `container.override()` context manager is used to ensure that
 the overridden instance is used only within the context of the with block. Once the block is exited, the original dependency is restored.
 
 ```python
 from unittest import mock
 
-from pyxdi import auto, Container
+from anydi import auto, Container
 
 
 class Service:
@@ -712,4 +712,4 @@ def test_hello_handler() -> None:
 
 ## Conclusion
 
-Check [examples](examples/basic.md) which shows how to use `PyxDI` in real-life application.
+Check [examples](examples/basic.md) which shows how to use `AnyDI` in real-life application.

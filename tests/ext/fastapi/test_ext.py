@@ -3,8 +3,8 @@ from typing import Any
 import pytest
 from fastapi import FastAPI
 
-from pyxdi import Container
-from pyxdi.ext.fastapi import Inject, install  # noqa
+from anydi import Container
+from anydi.ext.fastapi import Inject, install  # noqa
 
 
 def test_inject_param_missing_interface() -> None:

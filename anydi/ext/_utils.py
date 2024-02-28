@@ -3,9 +3,9 @@ from typing import Any, Callable
 
 from typing_extensions import Annotated, get_args, get_origin
 
-from pyxdi import Container
-from pyxdi._logger import logger
-from pyxdi._utils import get_full_qualname
+from anydi import Container
+from anydi._logger import logger
+from anydi._utils import get_full_qualname
 
 
 class HasInterface:
@@ -26,12 +26,12 @@ class HasInterface:
 def patch_parameter_interface(
     call: Callable[..., Any], parameter: inspect.Parameter, container: Container
 ) -> None:
-    """Patch a parameter to inject dependencies using PyxDI.
+    """Patch a parameter to inject dependencies using AnyDI.
 
     Args:
         call:  The call function.
         parameter: The parameter to patch.
-        container: The PyxDI container.
+        container: The AnyDI container.
     """
     interface, default = parameter.annotation, parameter.default
 

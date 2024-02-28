@@ -4,11 +4,11 @@ from starlette.requests import Request
 from starlette.responses import Response
 from starlette.types import ASGIApp
 
-from pyxdi import Container
+from anydi import Container
 
 
 class RequestScopedMiddleware(BaseHTTPMiddleware):
-    """Starlette middleware for managing request-scoped PyxDI context."""
+    """Starlette middleware for managing request-scoped AnyDI context."""
 
     def __init__(self, app: ASGIApp, container: Container) -> None:
         """Initialize the RequestScopedMiddleware.

@@ -4,10 +4,10 @@ from fastapi import Body, Depends, FastAPI
 from starlette.middleware import Middleware
 from typing_extensions import Annotated
 
-import pyxdi.ext.fastapi
-from pyxdi import Container
-from pyxdi.ext.fastapi import Inject
-from pyxdi.ext.starlette.middleware import RequestScopedMiddleware
+import anydi.ext.fastapi
+from anydi import Container
+from anydi.ext.fastapi import Inject
+from anydi.ext.starlette.middleware import RequestScopedMiddleware
 
 from tests.ext.fixtures import Mail, MailService, User, UserService
 
@@ -55,4 +55,4 @@ async def send_email_annotated(
     return await mail_service.send_mail(email=user.email, message=prefix + message)
 
 
-pyxdi.ext.fastapi.install(app, container)
+anydi.ext.fastapi.install(app, container)

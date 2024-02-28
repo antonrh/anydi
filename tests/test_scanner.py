@@ -1,7 +1,7 @@
 import pytest
 
-from pyxdi import Container, injectable
-from pyxdi._scanner import InjectDecoratorArgs  # noqa
+from anydi import Container, injectable
+from anydi._scanner import InjectDecoratorArgs  # noqa
 
 from .scan_app import ScanAppModule
 

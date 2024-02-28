@@ -1,11 +1,11 @@
 [tool.poetry]
-name = "pyxdi"
+name = "anydi"
 version = "0.18.1"
 description = "Dependency Injection library"
 authors = ["Anton Ruhlov <antonruhlov@gmail.com>"]
 license = "MIT"
 readme = "README.md"
-repository = "https://github.com/antonrh/pyxdi"
+repository = "https://github.com/antonrh/anydi"
 keywords = ["dependency injection", "dependencies", "di", "async", "asyncio", "application"]
 classifiers = [
     "Intended Audience :: Information Technology",
@@ -31,7 +31,7 @@ classifiers = [
     "Programming Language :: Python :: 3 :: Only",
 ]
 packages = [
-    { include = "pyxdi", from = "." },
+    { include = "anydi", from = "." },
 ]
 
 [tool.poetry.dependencies]

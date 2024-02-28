@@ -1,6 +1,6 @@
 # Basic example
 
-In this example, we are creating a simple application using `PyxDI`. The application has a `User` model, a `UserRepository` and `UserService` that takes an instance of UserRepository as a dependency and provides methods for creating and retrieving users.
+In this example, we are creating a simple application using `AnyDI`. The application has a `User` model, a `UserRepository` and `UserService` that takes an instance of UserRepository as a dependency and provides methods for creating and retrieving users.
 
 Here an example app structure:
 
@@ -104,10 +104,10 @@ class UserService:
 
 `modules.py`
 
-Defines two providers using PyxDI's @provider decorator. The first provider creates an instance of the InMemoryUserRepository class, which is then injected into the UserService provider when it is created.
+Defines two providers using AnyDI's @provider decorator. The first provider creates an instance of the InMemoryUserRepository class, which is then injected into the UserService provider when it is created.
 
 ```python
-from pyxdi import Module, provider
+from anydi import Module, provider
 
 from app.repositories import InMemoryUserRepository, UserRepository
 from app.services import UserService
@@ -130,7 +130,7 @@ Defines several handlers that use the UserService instance to perform operations
 ```python
 from typing import List
 
-from pyxdi import auto, injectable
+from anydi import auto, injectable
 
 from app.models import User
 from app.services import UserService
@@ -156,10 +156,10 @@ def create_user(email: str, user_service: UserService = auto()) -> User:
 
 `main.py`
 
-Creates an instance of the PyxDI class, scans for providers and request handlers, starts the dependency injection container, and runs a small test suite to ensure that everything is working correctly.
+Creates an instance of the AnyDI class, scans for providers and request handlers, starts the dependency injection container, and runs a small test suite to ensure that everything is working correctly.
 
 ```python
-from pyxdi import Container
+from anydi import Container
 
 from app.modules import AppModule
 
