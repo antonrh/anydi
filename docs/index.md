@@ -1,5 +1,8 @@
 # AnyDI
 
+> [!IMPORTANT]
+> Library renamed to `anydi` from `pyxdi` starting from version `0.19.0`.
+
 `AnyDI` is a lightweight Python Dependency Injection library that supports any synchronous or asynchronous code through type annotations ([PEP 484](https://peps.python.org/pep-0484/)).
 
 [![CI](https://github.com/antonrh/anydi/actions/workflows/ci.yml/badge.svg)](https://github.com/antonrh/anydi/actions/workflows/ci.yml)
