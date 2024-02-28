@@ -47,7 +47,6 @@ poetry add anydi
 from anydi import auto, Container
 
 container = Container()
-container.register(str, lambda: "Hello, world!", scope="singleton")
 
 
 @container.provider(scope="singleton")
