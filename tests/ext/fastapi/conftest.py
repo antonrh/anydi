@@ -1,24 +1,24 @@
-import typing as t
+from typing import cast
 
-import fastapi
 import pytest
+from fastapi import FastAPI
 from starlette.testclient import TestClient
 
-import pyxdi
+from anydi import Container
 
 from .app import app as _app
 
 
 @pytest.fixture(scope="session")
-def app() -> fastapi.FastAPI:
+def app() -> FastAPI:
     return _app
 
 
 @pytest.fixture(scope="session")
-def di(app: fastapi.FastAPI) -> pyxdi.PyxDI:
-    return t.cast(pyxdi.PyxDI, app.state.di)
+def container(app: FastAPI) -> Container:
+    return cast(Container, app.state.container)
 
 
 @pytest.fixture
-def client(app: fastapi.FastAPI) -> TestClient:
+def client(app: FastAPI) -> TestClient:
     return TestClient(app)

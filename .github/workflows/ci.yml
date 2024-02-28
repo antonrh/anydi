@@ -18,18 +18,18 @@ jobs:
           curl -sSL https://install.python-poetry.org | python3 - --version 1.6.1
           echo "PATH=${HOME}/.poetry/bin:${PATH}" >> $GITHUB_ENV
       - name: Checkout
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
       - name: Set up Python 3.10
-        uses: actions/setup-python@v4
+        uses: actions/setup-python@v5
         with:
           python-version: "3.10"
           cache: "poetry"
       - name: Install dependencies
         run: poetry install -E async
       - name: Static type checking
-        run: poetry run mypy pyxdi/ tests/
+        run: poetry run mypy anydi tests
       - name: Code formatting
-        run: poetry run ruff pyxdi/ tests/ && poetry run ruff format pyxdi/ tests/ --check
+        run: poetry run ruff anydi tests && poetry run ruff format anydi tests --check
 
 
   tests:
@@ -47,20 +47,20 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
       - name: Install poetry
         run: |
           curl -sSL https://install.python-poetry.org | python3 - --version 1.6.1
           echo "PATH=${HOME}/.poetry/bin:${PATH}" >> $GITHUB_ENV
       - name: Set up Python ${{ matrix.python }}
-        uses: actions/setup-python@v4
+        uses: actions/setup-python@v5
         with:
           python-version: ${{ matrix.python }}
           cache: "poetry"
       - name: Install dependencies
         run: poetry install
       - name: Run tests
-        run: poetry run pytest -vv --cov=pyxdi/ --cov-report=xml
+        run: poetry run pytest -vv --cov=anydi --cov-report=xml
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v3
         if: matrix.python == '3.10'

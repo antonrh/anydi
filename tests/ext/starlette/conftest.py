@@ -1,10 +1,10 @@
-import typing as t
+from typing import cast
 
 import pytest
 from starlette.applications import Starlette
 from starlette.testclient import TestClient
 
-import pyxdi
+from anydi import Container
 
 from .app import app as _app
 
@@ -15,8 +15,8 @@ def app() -> Starlette:
 
 
 @pytest.fixture(scope="session")
-def di(app: Starlette) -> pyxdi.PyxDI:
-    return t.cast(pyxdi.PyxDI, app.state.di)
+def container(app: Starlette) -> Container:
+    return cast(Container, app.state.container)
 
 
 @pytest.fixture

@@ -1,11 +1,11 @@
 [tool.poetry]
-name = "pyxdi"
+name = "anydi"
 version = "0.18.1"
 description = "Dependency Injection library"
 authors = ["Anton Ruhlov <antonruhlov@gmail.com>"]
 license = "MIT"
 readme = "README.md"
-repository = "https://github.com/antonrh/pyxdi"
+repository = "https://github.com/antonrh/anydi"
 keywords = ["dependency injection", "dependencies", "di", "async", "asyncio", "application"]
 classifiers = [
     "Intended Audience :: Information Technology",
@@ -31,11 +31,12 @@ classifiers = [
     "Programming Language :: Python :: 3 :: Only",
 ]
 packages = [
-    { include = "pyxdi", from = "." },
+    { include = "anydi", from = "." },
 ]
 
 [tool.poetry.dependencies]
 python = "^3.8"
+typing-extensions = "^4.8.0"
 anyio = { version = "^3.6.2", optional = true }
 mkdocs = { version = "^1.4.2", optional = true }
 mkdocs-material = { version = "^9.1.13", optional = true }
@@ -85,6 +86,7 @@ exclude_also = [
     "@abc.abstractmethod",
     "if TYPE_CHECKING",
     "if t.TYPE_CHECKING",
+    "@overload",
     "@t.overload",
     "raise NotImplementedError",
     "except ImportError:",
