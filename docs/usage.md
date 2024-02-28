@@ -497,7 +497,7 @@ In order to use the dependencies that have been provided to the `Container`, the
 Here's an example of how to use the `@container.inject` decorator:
 
 ```python
-from anydi import auto, Container
+from anydi import Container, dep
 
 
 class Service:
@@ -514,11 +514,11 @@ def service() -> Service:
 
 
 @container.injectable
-def handler(service: Service = auto()) -> None:
+def handler(service: Service = dep()) -> None:
     print(f"Hello, from service `{service.name}`")
 ```
 
-Note that the service argument in the handler function has been given a default value of `auto()` mark. This is done so that `AnyDI` knows which dependency to inject when the handler function is called.
+Note that the service argument in the handler function has been given a default value of `dep()` mark. This is done so that `AnyDI` knows which dependency to inject when the handler function is called.
 
 Once the dependencies have been injected, the function can be called as usual, like so:
 
@@ -529,7 +529,7 @@ handler()
 You can also call the callable object with injected dependencies using the `run` method of the `Container` instance:
 
 ```python
-from anydi import auto, Container
+from anydi import Container, dep
 
 
 class Service:
@@ -545,7 +545,7 @@ def service() -> Service:
     return Service(name="demo")
 
 
-def handler(service: Service = auto()) -> None:
+def handler(service: Service = dep()) -> None:
     print(f"Hello, from service `{service.name}`")
 
 
@@ -579,13 +579,13 @@ class Service:
 `handlers.py` uses the Service class:
 
 ```python
-from anydi import auto, injectable
+from anydi import dep, injectable
 
 from app.services import Service
 
 
 @injectable
-def my_handler(service: Service = auto()) -> None:
+def my_handler(service: Service = dep()) -> None:
     print(f"Hello, from service `{service.name}`")
 ```
 
@@ -678,7 +678,7 @@ the overridden instance is used only within the context of the with block. Once 
 ```python
 from unittest import mock
 
-from anydi import auto, Container
+from anydi import Container, dep
 
 
 class Service:
@@ -698,7 +698,7 @@ def service() -> Service:
 
 
 @container.inject
-def hello_handler(service: Service = auto()) -> str:
+def hello_handler(service: Service = dep()) -> str:
     return service.say_hello()
 
 

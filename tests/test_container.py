@@ -6,7 +6,7 @@ from typing import Any, AsyncIterator, Dict, Iterator, List, Tuple, Type
 import pytest
 from typing_extensions import Annotated
 
-from anydi import Container, Provider, Scope, auto, request, singleton, transient
+from anydi import Container, Provider, Scope, dep, request, singleton, transient
 
 from tests.fixtures import Service
 
@@ -393,7 +393,7 @@ def test_inject_auto_registered_log_message(caplog: pytest.LogCaptureFixture) ->
     with caplog.at_level(logging.DEBUG, logger="anydi"):
 
         @container.inject
-        def handler(service: Service = auto()) -> None:
+        def handler(service: Service = dep()) -> None:
             pass
 
         assert caplog.messages == [
@@ -967,7 +967,7 @@ async def test_async_get_provider_arguments(container: Container) -> None:
 
 
 def test_inject_missing_annotation(container: Container) -> None:
-    def handler(name=auto()) -> str:  # type: ignore[no-untyped-def]
+    def handler(name=dep()) -> str:  # type: ignore[no-untyped-def]
         return name  # type: ignore[no-any-return]
 
     with pytest.raises(TypeError) as exc_info:
@@ -980,7 +980,7 @@ def test_inject_missing_annotation(container: Container) -> None:
 
 
 def test_inject_unknown_dependency(container: Container) -> None:
-    def handler(message: str = auto()) -> None:
+    def handler(message: str = dep()) -> None:
         pass
 
     with pytest.raises(LookupError) as exc_info:
@@ -1002,7 +1002,7 @@ def test_inject(container: Container) -> None:
         return Service(ident=ident)
 
     @container.inject
-    def func(name: str, service: Service = auto()) -> str:
+    def func(name: str, service: Service = dep()) -> str:
         return f"{name} = {service.ident}"
 
     result = func(name="service ident")
@@ -1021,7 +1021,7 @@ def test_inject_class(container: Container) -> None:
 
     @container.inject
     class Handler:
-        def __init__(self, name: str, service: Service = auto()) -> None:
+        def __init__(self, name: str, service: Service = dep()) -> None:
             self.name = name
             self.service = service
 
@@ -1048,7 +1048,7 @@ def test_inject_dataclass(container: Container) -> None:
     @dataclass
     class Handler:
         name: str
-        service: Service = auto()
+        service: Service = dep()
 
         def handle(self) -> str:
             return f"{self.name} = {self.service.ident}"
@@ -1073,7 +1073,7 @@ async def test_inject_with_sync_and_async_resources(container: Container) -> Non
     await container.astart()
 
     @container.inject
-    async def func(name: str, service: Service = auto()) -> str:
+    async def func(name: str, service: Service = dep()) -> str:
         return f"{name} = {service.ident}"
 
     result = await func(name="service ident")
@@ -1092,8 +1092,8 @@ def test_run(container: Container) -> None:
 
     def sum_handler(
         value1: int,
-        value2: Annotated[int, "value1"] = auto(),
-        value3: Annotated[int, "value2"] = auto(),
+        value2: Annotated[int, "value1"] = dep(),
+        value3: Annotated[int, "value2"] = dep(),
     ) -> int:
         return value1 + value2 + value3
 

@@ -11,27 +11,10 @@
 
 ---
 
-## Requirements
-
-Python 3.8+
-
-and optional dependencies:
-
-* [anyio](https://github.com/agronholm/anyio) (for supporting synchronous resources with an asynchronous runtime)
-
-
 ## Installation
-
-Install using `pip`:
 
 ```shell
 pip install anydi
-```
-
-or using `poetry`:
-
-```shell
-poetry add anydi
 ```
 
 ## Quick Example
@@ -39,7 +22,7 @@ poetry add anydi
 *app.py*
 
 ```python
-from anydi import auto, Container
+from anydi import Container, dep
 
 container = Container()
 
@@ -50,7 +33,7 @@ def message() -> str:
 
 
 @container.inject
-def say_hello(message: str = auto()) -> None:
+def say_hello(message: str = dep()) -> None:
     print(message)
 
 

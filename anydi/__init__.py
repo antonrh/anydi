@@ -7,8 +7,8 @@ from ._scanner import injectable
 from ._types import Marker, Provider, Scope
 
 
-def auto() -> Any:
-    """A marker for automatic dependency injection."""
+def dep() -> Any:
+    """A marker for dependency injection."""
     return Marker()
 
 
@@ -17,7 +17,7 @@ __all__ = [
     "Module",
     "Provider",
     "Scope",
-    "auto",
+    "dep",
     "injectable",
     "provider",
     "request",
