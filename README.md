@@ -1,10 +1,10 @@
 # AnyDI
 
-<p style="text-align: center; font-style: italic">
-Modern, lightweight Dependency Injection library using type annotations.
+<p align="center">
+    <i>Modern, lightweight Dependency Injection library using type annotations.</i>
 </p>
 
-<p style="text-align: center">
+<p align="center">
     <a href="https://github.com/antonrh/anydi/actions/workflows/ci.yml" target="_blank">
         <img src="https://github.com/antonrh/anydi/actions/workflows/ci.yml/badge.svg" alt="CI">
     </a>
