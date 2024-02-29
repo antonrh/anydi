@@ -12,11 +12,16 @@ def dep() -> Any:
     return Marker()
 
 
+# Alias for dependency marker
+auto = dep
+
+
 __all__ = [
     "Container",
     "Module",
     "Provider",
     "Scope",
+    "auto",
     "dep",
     "injectable",
     "provider",
