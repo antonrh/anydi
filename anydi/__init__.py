@@ -12,7 +12,7 @@ def dep() -> Any:
     return Marker()
 
 
-# Alias for dependency marker
+# Alias for dependency auto marker
 auto = dep
 
 
