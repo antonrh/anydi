@@ -53,6 +53,9 @@ pytest-cov = "^4.0.0"
 fastapi = "^0.95.1"
 httpx = "^0.26.0"
 
+[tool.poetry.plugins.pytest11]
+anydi = "anydi.ext.pytest_plugin"
+
 [tool.ruff]
 line-length = 88
 
