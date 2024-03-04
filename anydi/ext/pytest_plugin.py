@@ -1,6 +1,5 @@
 import inspect
-from collections.abc import Callable
-from typing import Iterator, Tuple, cast
+from typing import Callable, Iterator, Tuple, cast
 
 import pytest
 
