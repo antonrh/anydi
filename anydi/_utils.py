@@ -1,4 +1,5 @@
 """Shared AnyDI utils module."""
+
 import builtins
 import functools
 import inspect

@@ -192,15 +192,13 @@ class InjectDecoratorArgs(NamedTuple):
 
 
 @overload
-def injectable(obj: Callable[P, T]) -> Callable[P, T]:
-    ...
+def injectable(obj: Callable[P, T]) -> Callable[P, T]: ...
 
 
 @overload
 def injectable(
     *, tags: Optional[Iterable[str]] = None
-) -> Callable[[Callable[P, T]], Callable[P, T]]:
-    ...
+) -> Callable[[Callable[P, T]], Callable[P, T]]: ...
 
 
 def injectable(

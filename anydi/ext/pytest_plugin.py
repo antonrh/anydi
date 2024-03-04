@@ -1,6 +1,6 @@
 import inspect
-from collections.abc import Callable, Iterator
-from typing import Tuple, cast
+from collections.abc import Callable
+from typing import Iterator, Tuple, cast
 
 import pytest
 
@@ -76,11 +76,7 @@ def _anydi_inject(
 ) -> None:
     """Inject dependencies into the test function."""
 
-    if inspect.iscoroutinefunction(request.function):
-        # Skip if the test is a coroutine function
-        return
-
-    if not _anydi_should_inject:
+    if inspect.iscoroutinefunction(request.function) or not _anydi_should_inject:
         return
 
     # Setup the container

@@ -1,4 +1,5 @@
 """AnyDI core implementation module."""
+
 from __future__ import annotations
 
 import contextlib
@@ -470,12 +471,10 @@ class Container:
                 scoped_context.delete(interface)
 
     @overload
-    def resolve(self, interface: Interface[T]) -> T:
-        ...
+    def resolve(self, interface: Interface[T]) -> T: ...
 
     @overload
-    def resolve(self, interface: T) -> T:
-        ...
+    def resolve(self, interface: T) -> T: ...
 
     def resolve(self, interface: Interface[T]) -> T:
         """Resolve an instance by interface.
@@ -497,12 +496,10 @@ class Container:
         return scoped_context.get(interface, provider)
 
     @overload
-    async def aresolve(self, interface: Interface[T]) -> T:
-        ...
+    async def aresolve(self, interface: Interface[T]) -> T: ...
 
     @overload
-    async def aresolve(self, interface: T) -> T:
-        ...
+    async def aresolve(self, interface: T) -> T: ...
 
     async def aresolve(self, interface: Interface[T]) -> T:
         """Resolve an instance by interface asynchronously.
@@ -617,12 +614,10 @@ class Container:
         return decorator
 
     @overload
-    def inject(self, obj: Callable[P, T]) -> Callable[P, T]:
-        ...
+    def inject(self, obj: Callable[P, T]) -> Callable[P, T]: ...
 
     @overload
-    def inject(self) -> Callable[[Callable[P, T]], Callable[P, T]]:
-        ...
+    def inject(self) -> Callable[[Callable[P, T]], Callable[P, T]]: ...
 
     def inject(
         self, obj: Union[Callable[P, Union[T, Awaitable[T]]], None] = None

@@ -6,11 +6,11 @@ help:
 
 lint: ## Run code linters
 	poetry run mypy anydi tests
-	poetry run ruff anydi tests
+	poetry run ruff check anydi tests
 	poetry run ruff format anydi tests --check
 
 fmt: ## Run code formatters
-	poetry run ruff anydi tests --fix
+	poetry run ruff check anydi tests --fix
 	poetry run ruff format anydi tests
 
 test:  ## Run unit tests
