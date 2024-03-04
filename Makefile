@@ -1,4 +1,4 @@
-.PHONY: help lint fmt
+.PHONY: help lint fmt test
 .DEFAULT_GOAL := help
 
 help:
