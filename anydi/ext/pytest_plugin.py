@@ -22,12 +22,15 @@ def pytest_addoption(parser: pytest.Parser) -> None:
     )
 
 
+CONTAINER_FIXTURE_NAME = "container"
+
+
 @pytest.fixture
 def anydi_setup_container(
     request: pytest.FixtureRequest,
 ) -> Iterator[Container]:
     try:
-        container = request.getfixturevalue("container")
+        container = request.getfixturevalue(CONTAINER_FIXTURE_NAME)
     except pytest.FixtureLookupError as exc:  # pragma: no cover
         exc.msg = (
             "`container` fixture is not found. Make sure to define it in your test "

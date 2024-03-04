@@ -3,6 +3,7 @@ from typing import Any, List
 import pytest
 
 from anydi import Container
+from anydi.ext import pytest_plugin
 
 
 class Service:
@@ -13,7 +14,7 @@ class UnknownService:
     pass
 
 
-@pytest.fixture
+@pytest.fixture(scope="module")
 def container() -> Container:
     container = Container(strict=True)
     container.register(Service, lambda: Service(), scope="singleton")
@@ -22,6 +23,20 @@ def container() -> Container:
 
 def test_anydi_inject_all_default(request: pytest.FixtureRequest) -> None:
     assert request.config.getini("anydi_inject_all") is False
+
+
+def test_no_container_setup(
+    request: pytest.FixtureRequest, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(pytest_plugin, "CONTAINER_FIXTURE_NAME", "container1")
+
+    with pytest.raises(pytest.FixtureLookupError) as exc_info:
+        request.getfixturevalue("anydi_setup_container")
+
+    assert exc_info.value.msg == (
+        "`container` fixture is not found. Make sure to define it in your test module "
+        "or override `anydi_setup_container` fixture."
+    )
 
 
 @pytest.fixture(autouse=True)
