@@ -1,5 +1,5 @@
 import inspect
-from typing import Callable, Iterator, Tuple, cast
+from typing import Any, Callable, Iterator, List, Tuple, cast
 
 import pytest
 
@@ -28,7 +28,7 @@ def anydi_setup_container(
 ) -> Iterator[Container]:
     try:
         container = request.getfixturevalue("container")
-    except pytest.FixtureLookupError as exc:
+    except pytest.FixtureLookupError as exc:  # pragma: no cover
         exc.msg = (
             "`container` fixture is not found. Make sure to define it in your test "
             "module or override `anydi_setup_container` fixture."
@@ -45,15 +45,23 @@ def _anydi_should_inject(request: pytest.FixtureRequest) -> bool:
     return marker is not None or inject_all
 
 
+@pytest.fixture(scope="session")
+def _anydi_unresolved() -> Iterator[List[Any]]:
+    unresolved: List[Any] = []
+    yield unresolved
+    unresolved.clear()
+
+
 @pytest.fixture
 def _anydi_injected_parameter_iterator(
     request: pytest.FixtureRequest,
-) -> Callable[[], Iterator[Tuple[str, inspect.Parameter]]]:
+    _anydi_unresolved: List[str],
+) -> Callable[[], Iterator[Tuple[str, Any]]]:
     def _iterator() -> Iterator[Tuple[str, inspect.Parameter]]:
         for name, parameter in inspect.signature(request.function).parameters.items():
             if (
                 ((interface := parameter.annotation) is parameter.empty)
-                or interface in _unresolved
+                or interface in _anydi_unresolved
                 or name in request.node.funcargs
             ):
                 continue
@@ -62,16 +70,12 @@ def _anydi_injected_parameter_iterator(
     return _iterator
 
 
-_unresolved = []
-
-
 @pytest.fixture(autouse=True)
 def _anydi_inject(
     request: pytest.FixtureRequest,
     _anydi_should_inject: bool,
-    _anydi_injected_parameter_iterator: Callable[
-        [], Iterator[Tuple[str, inspect.Parameter]]
-    ],
+    _anydi_injected_parameter_iterator: Callable[[], Iterator[Tuple[str, Any]]],
+    _anydi_unresolved: List[str],
 ) -> None:
     """Inject dependencies into the test function."""
 
@@ -85,10 +89,13 @@ def _anydi_inject(
         try:
             # Release the instance if it was already resolved
             container.release(interface)
+        except LookupError:
+            pass
+        try:
             # Resolve the instance
             instance = container.resolve(interface)
         except (LookupError, TypeError):
-            _unresolved.append(interface)
+            _anydi_unresolved.append(interface)
             continue
         request.node.funcargs[argname] = instance
 
@@ -97,12 +104,11 @@ def _anydi_inject(
 async def _anydi_ainject(
     request: pytest.FixtureRequest,
     _anydi_should_inject: bool,
-    _anydi_injected_parameter_iterator: Callable[
-        [], Iterator[Tuple[str, inspect.Parameter]]
-    ],
+    _anydi_injected_parameter_iterator: Callable[[], Iterator[Tuple[str, Any]]],
+    _anydi_unresolved: List[str],
 ) -> None:
     """Inject dependencies into the test function."""
-    if not _anydi_should_inject:
+    if not inspect.iscoroutinefunction(request.function) or not _anydi_should_inject:
         return
 
     # Setup the container
@@ -112,9 +118,12 @@ async def _anydi_ainject(
         try:
             # Release the instance if it was already resolved
             container.release(interface)
+        except LookupError:
+            pass
+        try:
             # Resolve the instance
             instance = await container.aresolve(interface)
         except (LookupError, TypeError):
-            _unresolved.append(interface)
+            _anydi_unresolved.append(interface)
             continue
         request.node.funcargs[argname] = instance
