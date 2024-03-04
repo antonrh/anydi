@@ -31,7 +31,7 @@ def anydi_setup_container(
 ) -> Iterator[Container]:
     try:
         container = request.getfixturevalue(CONTAINER_FIXTURE_NAME)
-    except pytest.FixtureLookupError as exc:  # pragma: no cover
+    except pytest.FixtureLookupError as exc:
         exc.msg = (
             "`container` fixture is not found. Make sure to define it in your test "
             "module or override `anydi_setup_container` fixture."
