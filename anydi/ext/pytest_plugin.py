@@ -92,7 +92,7 @@ def _anydi_inject(
         try:
             # Release the instance if it was already resolved
             container.release(interface)
-        except LookupError:
+        except (LookupError, TypeError):
             pass
         try:
             # Resolve the instance
@@ -121,7 +121,7 @@ async def _anydi_ainject(
         try:
             # Release the instance if it was already resolved
             container.release(interface)
-        except LookupError:
+        except (LookupError, TypeError):
             pass
         try:
             # Resolve the instance
