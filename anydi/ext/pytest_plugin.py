@@ -23,10 +23,10 @@ def pytest_addoption(parser: pytest.Parser) -> None:
     )
 
 
-@pytest.fixture(autouse=True)
+@pytest.fixture
 def anydi_setup_container(
     request: pytest.FixtureRequest,
-) -> Iterator[Container | None]:
+) -> Iterator[Container]:
     try:
         container = request.getfixturevalue("container")
     except pytest.FixtureLookupError as exc:
@@ -43,7 +43,7 @@ def anydi_setup_container(
 def _anydi_should_inject(request: pytest.FixtureRequest) -> bool:
     marker = request.node.get_closest_marker("inject")
     inject_all = cast(bool, request.config.getini("anydi_inject_all"))
-    return not marker and not inject_all
+    return marker is not None or inject_all
 
 
 @pytest.fixture
@@ -69,22 +69,22 @@ _unresolved = []
 @pytest.fixture(autouse=True)
 def _anydi_inject(
     request: pytest.FixtureRequest,
-    anydi_setup_container: Container,
     _anydi_should_inject: bool,
     _anydi_injected_parameter_iterator: Callable[
         [], Iterator[Tuple[str, inspect.Parameter]]
     ],
 ) -> None:
     """Inject dependencies into the test function."""
-    if not _anydi_should_inject:
-        return
 
     if inspect.iscoroutinefunction(request.function):
         # Skip if the test is a coroutine function
         return
 
+    if not _anydi_should_inject:
+        return
+
     # Setup the container
-    container = anydi_setup_container
+    container = cast(Container, request.getfixturevalue("anydi_setup_container"))
 
     for argname, interface in _anydi_injected_parameter_iterator():
         try:
@@ -101,7 +101,6 @@ def _anydi_inject(
 @pytest.fixture(autouse=True)
 async def _anydi_ainject(
     request: pytest.FixtureRequest,
-    anydi_setup_container: Container,
     _anydi_should_inject: bool,
     _anydi_injected_parameter_iterator: Callable[
         [], Iterator[Tuple[str, inspect.Parameter]]
@@ -112,7 +111,7 @@ async def _anydi_ainject(
         return
 
     # Setup the container
-    container = anydi_setup_container
+    container = cast(Container, request.getfixturevalue("anydi_setup_container"))
 
     for argname, interface in _anydi_injected_parameter_iterator():
         try:
