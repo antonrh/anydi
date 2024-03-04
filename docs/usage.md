@@ -710,6 +710,40 @@ def test_hello_handler() -> None:
         assert hello_handler() == "Hello, from service mock!"
 ```
 
+### Pytest Plugin
+
+`AnyDI` offers a pytest plugin that simplifies the testing process. You can annotate a test function with the `@pytest.mark.inject` decorator to automatically inject dependencies into the test function, or you can set the global configuration value `anydi_inject_all` to `True` to inject dependencies into all test functions automatically.
+
+Additionally, you need to define a `container` fixture to provide a `Container` instance for the test function, or use the `anydi_setup_container` fixture.
+
+
+```python
+from typing import Annotated
+import pytest
+
+from anydi import Container
+
+
+@pytest.fixture(scope="session")
+def container() -> Container:
+    container = Container()  # or pass your application container
+    container.register(
+        Annotated[str, "message"],
+        lambda: "Hello, world!",
+        scope="singleton",
+    )
+    return container
+
+
+@pytest.mark.inject
+def test_hello(message: Annotated[str, "message"]) -> None:
+    assert message == "Hello, world!"
+```
+
+The message argument is injected into the test function thanks to the `@pytest.mark.inject` decorator.
+
+PS! `Pytest` fixtures will always have higher priority than the `@pytest.mark.inject` decorator. This means that if both a pytest fixture and the `@pytest.mark.inject` decorator attempt to provide a value for the same name, the value from the pytest fixture will be used.
+
 ## Conclusion
 
 Check [examples](examples/basic.md) which shows how to use `AnyDI` in real-life application.

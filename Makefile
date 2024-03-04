@@ -1,4 +1,4 @@
-.PHONY: help lint fmt
+.PHONY: help lint fmt test
 .DEFAULT_GOAL := help
 
 help:
@@ -6,12 +6,13 @@ help:
 
 lint: ## Run code linters
 	poetry run mypy anydi tests
-	poetry run ruff anydi tests
+	poetry run ruff check anydi tests
 	poetry run ruff format anydi tests --check
 
 fmt: ## Run code formatters
-	poetry run ruff anydi tests --fix
+	poetry run ruff check anydi tests --fix
 	poetry run ruff format anydi tests
 
 test:  ## Run unit tests
-	poetry run pytest -vv --cov=anydi/
+	poetry run pytest -vv tests --ignore=tests/ext/test_pytest_plugin.py --cov=anydi -p no:anydi -p no:testanydi
+	poetry run pytest -vv tests/ext/test_pytest_plugin.py --cov=anydi --cov-append

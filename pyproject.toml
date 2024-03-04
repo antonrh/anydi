@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "anydi"
-version = "0.19.2"
+version = "0.20.0"
 description = "Dependency Injection library"
 authors = ["Anton Ruhlov <antonruhlov@gmail.com>"]
 license = "MIT"
@@ -47,11 +47,14 @@ async = ["anyio"]
 
 [tool.poetry.group.dev.dependencies]
 mypy = "^1.8.0"
-ruff = "^0.2.2"
-pytest = "^7.4.3"
+ruff = "^0.3.0"
+pytest = "^8.1.0"
 pytest-cov = "^4.0.0"
 fastapi = "^0.95.1"
 httpx = "^0.26.0"
+
+[tool.poetry.plugins.pytest11]
+anydi = "anydi.ext.pytest_plugin"
 
 [tool.ruff]
 line-length = 88

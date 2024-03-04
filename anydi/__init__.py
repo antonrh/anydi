@@ -1,4 +1,5 @@
 """AnyDI public objects and functions."""
+
 from typing import Any
 
 from ._container import Container, request, singleton, transient
