@@ -14,4 +14,5 @@ fmt: ## Run code formatters
 	poetry run ruff format anydi tests
 
 test:  ## Run unit tests
-	poetry run pytest -vv --cov=anydi/
+	poetry run pytest -vv tests --ignore=tests/ext/test_pytest_plugin.py --cov=anydi -p no:anydi -p no:testanydi
+	poetry run pytest -vv tests/ext/test_pytest_plugin.py --cov=anydi --cov-append
