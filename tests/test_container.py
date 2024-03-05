@@ -13,12 +13,7 @@ from tests.fixtures import Service
 
 @pytest.fixture
 def container() -> Container:
-    return Container(strict=False)
-
-
-@pytest.fixture
-def strict_container() -> Container:
-    return Container(strict=True)
+    return Container()
 
 
 def test_default_strict_disabled(container: Container) -> None:
@@ -389,11 +384,11 @@ def test_unregister_not_registered_provider(container: Container) -> None:
     assert str(exc_info.value) == "The provider interface `str` not registered."
 
 
-def test_inject_auto_registered_log_message(caplog: pytest.LogCaptureFixture) -> None:
+def test_inject_auto_registered_log_message(
+    container: Container, caplog: pytest.LogCaptureFixture
+) -> None:
     class Service:
         pass
-
-    container = Container(strict=False)
 
     with caplog.at_level(logging.DEBUG, logger="anydi"):
 
@@ -688,9 +683,7 @@ def test_resolve_not_registered_instance(container: Container) -> None:
     )
 
 
-def test_resolve_non_strict_provider_scope_defined() -> None:
-    container = Container(strict=False)
-
+def test_resolve_non_strict_provider_scope_defined(container: Container) -> None:
     class Service:
         __scope__ = "singleton"
 
@@ -699,9 +692,9 @@ def test_resolve_non_strict_provider_scope_defined() -> None:
     assert container.providers == {Service: Provider(obj=Service, scope="singleton")}
 
 
-def test_resolve_non_strict_provider_scope_from_sub_provider_request() -> None:
-    container = Container(strict=False)
-
+def test_resolve_non_strict_provider_scope_from_sub_provider_request(
+    container: Container,
+) -> None:
     @container.provider(scope="request")
     def message() -> str:
         return "test"
@@ -719,9 +712,9 @@ def test_resolve_non_strict_provider_scope_from_sub_provider_request() -> None:
     }
 
 
-def test_resolve_non_strict_provider_scope_from_sub_provider_transient() -> None:
-    container = Container(strict=False)
-
+def test_resolve_non_strict_provider_scope_from_sub_provider_transient(
+    container: Container,
+) -> None:
     @container.provider(scope="transient")
     def uuid_generator() -> Annotated[str, "uuid_generator"]:
         return str(uuid.uuid4())
@@ -735,9 +728,7 @@ def test_resolve_non_strict_provider_scope_from_sub_provider_transient() -> None
     assert container.providers[Entity].scope == "transient"
 
 
-def test_resolve_non_strict_nested_singleton_provider() -> None:
-    container = Container(strict=False)
-
+def test_resolve_non_strict_nested_singleton_provider(container: Container) -> None:
     @dataclass
     class Repository:
         __scope__ = "singleton"
@@ -752,9 +743,7 @@ def test_resolve_non_strict_nested_singleton_provider() -> None:
     assert container.providers[Service].scope == "singleton"
 
 
-def test_resolve_non_strict_missing_scope() -> None:
-    container = Container(strict=False)
-
+def test_resolve_non_strict_missing_scope(container: Container) -> None:
     @dataclass
     class Repository:
         pass
@@ -774,9 +763,7 @@ def test_resolve_non_strict_missing_scope() -> None:
     )
 
 
-def test_resolve_non_strict_with_primitive_class() -> None:
-    container = Container(strict=False)
-
+def test_resolve_non_strict_with_primitive_class(container: Container) -> None:
     @dataclass
     class Service:
         name: str
@@ -820,9 +807,11 @@ def test_override_instance(container: Container) -> None:
     assert container.resolve(str) == origin_name
 
 
-def test_override_instance_provider_not_registered(strict_container: Container) -> None:
+def test_override_instance_provider_not_registered_using_strict_mode() -> None:
+    container = Container(strict=True)
+
     with pytest.raises(LookupError) as exc_info:
-        with strict_container.override(str, "test"):
+        with container.override(str, "test"):
             pass
 
     assert str(exc_info.value) == "The provider interface `str` not registered."
@@ -984,16 +973,19 @@ def test_inject_missing_annotation(container: Container) -> None:
     )
 
 
-def test_inject_unknown_dependency(strict_container: Container) -> None:
+def test_inject_unknown_dependency_using_strict_mode() -> None:
+    container = Container(strict=True)
+
     def handler(message: str = dep()) -> None:
         pass
 
     with pytest.raises(LookupError) as exc_info:
-        strict_container.inject(handler)
+        container.inject(handler)
 
     assert str(exc_info.value) == (
-        "`tests.test_container.test_inject_unknown_dependency.<locals>.handler` "
-        "has an unknown dependency parameter `message` with an annotation of `str`."
+        "`tests.test_container.test_inject_unknown_dependency_using_strict_mode"
+        ".<locals>.handler` has an unknown dependency parameter `message` with an "
+        "annotation of `str`."
     )
 
 
