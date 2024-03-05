@@ -75,12 +75,14 @@ class Container:
         modules: Optional[
             Sequence[Union[Module, Type[Module], Callable[[Container], None]]]
         ] = None,
-        strict: bool = True,
+        strict: bool = False,
     ) -> None:
         """Initialize the AnyDI instance.
 
         Args:
+            providers: Optional mapping of providers to register during initialization.
             modules: Optional sequence of modules to register during initialization.
+            strict: Whether to enable strict mode. Defaults to False.
         """
         self._providers: Dict[Type[Any], Provider] = {}
         self._singleton_context = SingletonContext(self)

@@ -70,44 +70,39 @@ assert container.resolve(Annotated[str, "message2"]) == "Message2"
 In this code example, we define two providers, `message1` and `message2`, each returning a different message. The Annotated type hint with string argument allows you to specify which provider to retrieve based on the name provided within the annotation.
 
 
-### Strict Mode
+## Strict Mode
 
-By default, `AnyDI` is in strict mode. This means that it will raise an error if you try to get an instance of a type or
-to register a provider for a type that not exists in the container.
 
-For example, suppose you have a class that depends on another class:
+`AnyDI` operates in non-strict mode by default, meaning it doesn't require explicit registration for every type. It can dynamically resolve or auto-register dependencies, simplifying setups where manual registration for each type is impractical.
+
+Consider a scenario with class dependencies:
 
 ```python
 from dataclasses import dataclass
 
-
 class Database:
     def connect(self) -> None:
         print("connect")
-
     def disconnect(self) -> None:
         print("disconnect")
-
 
 @dataclass
 class Repository:
     db: Database
-
 
 @dataclass
 class Service:
     repo: Repository
 ```
 
-If you create a `Container` instance in non-strict mode `strict=False`, it will automatically register a provider for `Component` and `ChildComponent` with provided `RootComponent`:
+You can instantiate these classes without manually registering each one:
 
 ```python
 from typing import Iterator
 
 from anydi import Container
 
-container = Container(strict=False)
-
+container = Container()  # Non-strict mode
 
 @container.provider(scope="singleton")
 def db() -> Iterator[Database]:
@@ -116,8 +111,7 @@ def db() -> Iterator[Database]:
     yield db
     db.disconnect()
 
-
-# Attempt to retrieve an instance of Component
+# Retrieving an instance of Service
 _ = container.resolve(Service)
 
 assert container.is_resolved(Service)
@@ -125,12 +119,15 @@ assert container.is_resolved(Repository)
 assert container.is_resolved(Database)
 ```
 
-If you create a `Container` instance in strict mode `strict=True`, it will raise an error if you try to get an instance of a type that not exists in the container:
+### Enabling Strict Mode
+
+For strict checking, enable strict mode by setting `strict=True` when creating the `Container`. In strict mode, all types must be explicitly registered or have a definable provider before instantiation.
 
 ```python
 container = Container(strict=True)
 
-_ = container.resolve(Component)  # raises LookupError
+# Raises LookupError if `Service` or dependencies aren't registered.
+_ = container.resolve(Service)
 ```
 
 ### Unregistering Providers
