@@ -13,11 +13,16 @@ from tests.fixtures import Service
 
 @pytest.fixture
 def container() -> Container:
-    return Container()
+    return Container(strict=False)
 
 
-def test_default_strict_enabled(container: Container) -> None:
-    assert container.strict
+@pytest.fixture
+def strict_container() -> Container:
+    return Container(strict=True)
+
+
+def test_default_strict_disabled(container: Container) -> None:
+    assert not container.strict
 
 
 def test_register_provider(container: Container) -> None:
@@ -815,9 +820,9 @@ def test_override_instance(container: Container) -> None:
     assert container.resolve(str) == origin_name
 
 
-def test_override_instance_provider_not_registered(container: Container) -> None:
+def test_override_instance_provider_not_registered(strict_container: Container) -> None:
     with pytest.raises(LookupError) as exc_info:
-        with container.override(str, "test"):
+        with strict_container.override(str, "test"):
             pass
 
     assert str(exc_info.value) == "The provider interface `str` not registered."
@@ -979,12 +984,12 @@ def test_inject_missing_annotation(container: Container) -> None:
     )
 
 
-def test_inject_unknown_dependency(container: Container) -> None:
+def test_inject_unknown_dependency(strict_container: Container) -> None:
     def handler(message: str = dep()) -> None:
         pass
 
     with pytest.raises(LookupError) as exc_info:
-        container.inject(handler)
+        strict_container.inject(handler)
 
     assert str(exc_info.value) == (
         "`tests.test_container.test_inject_unknown_dependency.<locals>.handler` "
