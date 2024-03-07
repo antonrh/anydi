@@ -69,67 +69,6 @@ assert container.resolve(Annotated[str, "message2"]) == "Message2"
 
 In this code example, we define two providers, `message1` and `message2`, each returning a different message. The Annotated type hint with string argument allows you to specify which provider to retrieve based on the name provided within the annotation.
 
-
-## Strict Mode
-
-
-`AnyDI` operates in non-strict mode by default, meaning it doesn't require explicit registration for every type. It can dynamically resolve or auto-register dependencies, simplifying setups where manual registration for each type is impractical.
-
-Consider a scenario with class dependencies:
-
-```python
-from dataclasses import dataclass
-
-class Database:
-    def connect(self) -> None:
-        print("connect")
-    def disconnect(self) -> None:
-        print("disconnect")
-
-@dataclass
-class Repository:
-    db: Database
-
-@dataclass
-class Service:
-    repo: Repository
-```
-
-You can instantiate these classes without manually registering each one:
-
-```python
-from typing import Iterator
-
-from anydi import Container
-
-container = Container()  # Non-strict mode
-
-@container.provider(scope="singleton")
-def db() -> Iterator[Database]:
-    db = Database()
-    db.connect()
-    yield db
-    db.disconnect()
-
-# Retrieving an instance of Service
-_ = container.resolve(Service)
-
-assert container.is_resolved(Service)
-assert container.is_resolved(Repository)
-assert container.is_resolved(Database)
-```
-
-### Enabling Strict Mode
-
-For strict checking, enable strict mode by setting `strict=True` when creating the `Container`. In strict mode, all types must be explicitly registered or have a definable provider before instantiation.
-
-```python
-container = Container(strict=True)
-
-# Raises LookupError if `Service` or dependencies aren't registered.
-_ = container.resolve(Service)
-```
-
 ### Unregistering Providers
 
 To unregister a provider, you can use the `unregister` method of the `Container` instance. The method takes
@@ -206,6 +145,65 @@ assert not container.is_resolved(int)
 
     This pattern can be used while writing unit tests to ensure that each test case has a clean dependency graph.
 
+## Strict Mode
+
+
+`AnyDI` operates in non-strict mode by default, meaning it doesn't require explicit registration for every type. It can dynamically resolve or auto-register dependencies, simplifying setups where manual registration for each type is impractical.
+
+Consider a scenario with class dependencies:
+
+```python
+from dataclasses import dataclass
+
+class Database:
+    def connect(self) -> None:
+        print("connect")
+    def disconnect(self) -> None:
+        print("disconnect")
+
+@dataclass
+class Repository:
+    db: Database
+
+@dataclass
+class Service:
+    repo: Repository
+```
+
+You can instantiate these classes without manually registering each one:
+
+```python
+from typing import Iterator
+
+from anydi import Container
+
+container = Container()  # Non-strict mode
+
+@container.provider(scope="singleton")
+def db() -> Iterator[Database]:
+    db = Database()
+    db.connect()
+    yield db
+    db.disconnect()
+
+# Retrieving an instance of Service
+_ = container.resolve(Service)
+
+assert container.is_resolved(Service)
+assert container.is_resolved(Repository)
+assert container.is_resolved(Database)
+```
+
+### Enabling Strict Mode
+
+For strict checking, enable strict mode by setting `strict=True` when creating the `Container`. In strict mode, all types must be explicitly registered or have a definable provider before instantiation.
+
+```python
+container = Container(strict=True)
+
+# Raises LookupError if `Service` or dependencies aren't registered.
+_ = container.resolve(Service)
+```
 
 ## Scopes
 
