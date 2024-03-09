@@ -34,7 +34,7 @@ from typing_extensions import Annotated, ParamSpec, final, get_args, get_origin
 try:
     from types import NoneType
 except ImportError:
-    NoneType = type(None)  # type: ignore[assignment,misc]
+    NoneType = type(None)  # type: ignore[misc]
 
 
 from ._context import (

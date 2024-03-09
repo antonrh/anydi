@@ -46,8 +46,8 @@ docs = ["mkdocs", "mkdocs-material"]
 async = ["anyio"]
 
 [tool.poetry.group.dev.dependencies]
-mypy = "^1.8.0"
-ruff = "^0.3.0"
+mypy = "^1.9.0"
+ruff = "^0.3.2"
 pytest = "^8.1.0"
 pytest-cov = "^4.0.0"
 fastapi = "^0.95.1"
