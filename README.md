@@ -16,9 +16,6 @@
     </a>
 </p>
 
-> [!IMPORTANT]
-> Library renamed to `anydi` from `pyxdi` starting from version `0.19.0`.
-
 ---
 Documentation
 
