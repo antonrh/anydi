@@ -273,7 +273,7 @@ def test_register_provider_with_not_registered_sub_provider(
     def dep2(dep1: int) -> str:
         return str(dep1)
 
-    with pytest.raises(LookupError) as exc_info:
+    with pytest.raises(ValueError) as exc_info:
         container.register(str, dep2, scope="singleton")
 
     assert str(exc_info.value) == (
