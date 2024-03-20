@@ -92,12 +92,12 @@ def _anydi_inject(
         try:
             # Release the instance if it was already resolved
             container.release(interface)
-        except (LookupError, TypeError):
+        except LookupError:
             pass
         try:
             # Resolve the instance
             instance = container.resolve(interface)
-        except (LookupError, TypeError):
+        except LookupError:
             _anydi_unresolved.append(interface)
             continue
         request.node.funcargs[argname] = instance
@@ -121,12 +121,12 @@ async def _anydi_ainject(
         try:
             # Release the instance if it was already resolved
             container.release(interface)
-        except (LookupError, TypeError):
+        except LookupError:
             pass
         try:
             # Resolve the instance
             instance = await container.aresolve(interface)
-        except (LookupError, TypeError):
+        except LookupError:
             _anydi_unresolved.append(interface)
             continue
         request.node.funcargs[argname] = instance

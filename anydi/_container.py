@@ -211,7 +211,7 @@ class Container:
                 f"`{get_full_qualname(interface)}` not registered."
             )
 
-        provider = self._get_or_register_provider(interface)
+        provider = self._get_provider(interface)
 
         # Cleanup scoped context instance
         try:
@@ -224,6 +224,27 @@ class Container:
 
         # Cleanup provider references
         self._providers.pop(interface, None)
+
+    def _get_provider(self, interface: AnyInterface) -> Provider:
+        """Get provider by interface.
+
+        Args:
+            interface: The interface for which to retrieve the provider.
+
+        Returns:
+            Provider: The provider object associated with the interface.
+
+        Raises:
+            LookupError: If the provider interface has not been registered.
+        """
+        try:
+            return self._providers[interface]
+        except KeyError as exc:
+            raise LookupError(
+                f"The provider interface for `{get_full_qualname(interface)}` has "
+                "not been registered. Please ensure that the provider interface is "
+                "properly registered before attempting to use it."
+            ) from exc
 
     def _get_or_register_provider(self, interface: AnyInterface) -> Provider:
         """Get or register a provider by interface.
@@ -238,8 +259,8 @@ class Container:
             LookupError: If the provider interface has not been registered.
         """
         try:
-            return self._providers[interface]
-        except KeyError as exc:
+            return self._get_provider(interface)
+        except LookupError as exc:
             if (
                 not self.strict
                 and inspect.isclass(interface)
@@ -258,11 +279,7 @@ class Container:
                         "the appropriate scope decorator."
                     ) from exc
                 return self.register(interface, interface, scope=scope)
-            raise LookupError(
-                f"The provider interface for `{get_full_qualname(interface)}` has "
-                "not been registered. Please ensure that the provider interface is "
-                "properly registered before attempting to use it."
-            ) from exc
+            raise
 
     def _validate_provider_scope(self, provider: Provider) -> None:
         """Validate the scope of a provider.
@@ -331,7 +348,7 @@ class Container:
             try:
                 sub_provider = self._get_or_register_provider(parameter.annotation)
             except LookupError:
-                raise LookupError(
+                raise ValueError(
                     f"The provider `{get_full_qualname(provider.obj)}` depends on "
                     f"`{parameter.name}` of type "
                     f"`{get_full_qualname(parameter.annotation)}`, which "
@@ -532,7 +549,7 @@ class Container:
             True if the instance exists, otherwise False.
         """
         try:
-            provider = self._get_or_register_provider(interface)
+            provider = self._get_provider(interface)
         except LookupError:
             pass
         else:
@@ -550,7 +567,7 @@ class Container:
         Raises:
             LookupError: If the provider for the interface is not registered.
         """
-        provider = self._get_or_register_provider(interface)
+        provider = self._get_provider(interface)
         scoped_context = self._get_scoped_context(provider.scope)
         if isinstance(scoped_context, ResourceScopedContext):
             scoped_context.delete(interface)
