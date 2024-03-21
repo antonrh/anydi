@@ -265,6 +265,7 @@ class Container:
                 not self.strict
                 and inspect.isclass(interface)
                 and not is_builtin_type(interface)
+                and interface is not inspect._empty  # noqa
             ):
                 # Try to get defined scope
                 scope = getattr(interface, "__scope__", None)
