@@ -260,7 +260,7 @@ class Container:
         """
         try:
             return self._get_provider(interface)
-        except LookupError as exc:
+        except LookupError:
             if (
                 not self.strict
                 and inspect.isclass(interface)
@@ -272,14 +272,7 @@ class Container:
                 # Try to detect scope
                 if scope is None:
                     scope = self._detect_scope(interface)
-                if scope is None:
-                    raise TypeError(
-                        "Unable to automatically register the provider interface for "
-                        f"`{get_full_qualname(interface)}` because the scope detection "
-                        "failed. Please resolve this issue by using "
-                        "the appropriate scope decorator."
-                    ) from exc
-                return self.register(interface, interface, scope=scope)
+                return self.register(interface, interface, scope=scope or "transient")
             raise
 
     def _validate_provider_scope(self, provider: Provider) -> None:

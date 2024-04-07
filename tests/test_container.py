@@ -743,7 +743,7 @@ def test_resolve_non_strict_nested_singleton_provider(container: Container) -> N
     assert container.providers[Service].scope == "singleton"
 
 
-def test_resolve_non_strict_missing_scope(container: Container) -> None:
+def test_resolve_non_strict_default_scope(container: Container) -> None:
     @dataclass
     class Repository:
         pass
@@ -752,15 +752,9 @@ def test_resolve_non_strict_missing_scope(container: Container) -> None:
     class Service:
         repository: Repository
 
-    with pytest.raises(TypeError) as exc_info:
-        _ = container.resolve(Service)
+    _ = container.resolve(Service)
 
-    assert str(exc_info.value) == (
-        "Unable to automatically register the provider interface for "
-        "`tests.test_container.test_resolve_non_strict_missing_scope.<locals>"
-        ".Repository` because the scope detection failed. Please resolve "
-        "this issue by using the appropriate scope decorator."
-    )
+    assert container.providers[Service].scope == "transient"
 
 
 def test_resolve_non_strict_with_primitive_class(container: Container) -> None:
