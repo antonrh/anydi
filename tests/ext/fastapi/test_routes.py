@@ -60,5 +60,17 @@ def test_send_mail_with_annotated_params(client: TestClient) -> None:
     assert response.status_code == 200
     assert response.json() == {
         "email": TEST_EMAIL,
-        "message": "Hello, " + message,
+        "message": message,
     }
+
+
+def test_annotated_mixed(client: TestClient) -> None:
+    response = client.get("/annotated-mixed")
+
+    assert response.status_code == 200
+    assert response.json() == [
+        "message1",
+        "message1_a",
+        "message1_a_b",
+        "message2",
+    ]
