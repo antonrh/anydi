@@ -161,5 +161,5 @@ def _patch_annotated_parameter(parameter: inspect.Parameter) -> inspect.Paramete
             tp_metadata[2],
         ]
     else:
-        return parameter
+        raise TypeError("Too many annotated arguments.")  # pragma: no cover
     return parameter.replace(annotation=interface, default=default)

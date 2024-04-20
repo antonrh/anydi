@@ -20,6 +20,16 @@ def message1() -> Annotated[str, "message1"]:
 
 
 @container.provider(scope="singleton")
+def message1_a() -> Annotated[str, "message1", "a"]:
+    return "message1_a"
+
+
+@container.provider(scope="singleton")
+def message1_a_b() -> Annotated[str, "message1", "a", "b"]:
+    return "message1_a_b"
+
+
+@container.provider(scope="singleton")
 def message2() -> Annotated[str, "message2"]:
     return "message2"
 
@@ -62,9 +72,16 @@ async def send_email_annotated(
 @app.get("/annotated-mixed")
 def annotated_mixed(
     message1: Annotated[Annotated[str, "message1"], Inject()],
+    message1_a: Annotated[Annotated[str, "message1", "a"], Inject()],
+    message1_a_b: Annotated[Annotated[str, "message1", "a", "b"], Inject()],
     message2: Annotated[str, "message2"] = Inject(),
-) -> str:
-    return f"{message1} - {message2}"
+) -> Any:
+    return [
+        message1,
+        message1_a,
+        message1_a_b,
+        message2,
+    ]
 
 
 anydi.ext.fastapi.install(app, container)

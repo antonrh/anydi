@@ -68,4 +68,9 @@ def test_annotated_mixed(client: TestClient) -> None:
     response = client.get("/annotated-mixed")
 
     assert response.status_code == 200
-    assert response.json() == "message1 - message2"
+    assert response.json() == [
+        "message1",
+        "message1_a",
+        "message1_a_b",
+        "message2",
+    ]
