@@ -31,11 +31,11 @@ class ContainerConfig(AppConfig):  # type: ignore[misc]
 
     def ready(self) -> None:
         # Register Django settings
-        if getattr(settings, "ANYDI_REGISTER_SETTINGS", True):
+        if getattr(settings, "ANYDI_REGISTER_SETTINGS", False):
             self.register_settings()
 
         # Register Django components
-        if getattr(settings, "ANYDI_REGISTER_COMPONENTS", True):
+        if getattr(settings, "ANYDI_REGISTER_COMPONENTS", False):
             self.register_components()
 
         # Register modules
@@ -44,12 +44,12 @@ class ContainerConfig(AppConfig):  # type: ignore[misc]
             self.container.register_module(module_cls)
 
         # Patching the django-ninja framework if it installed
-        if getattr(settings, "ANYDI_PATCH_NINJA", True):
+        if getattr(settings, "ANYDI_PATCH_NINJA", False):
             self.patch_ninja()
 
         # Auto-injecting the container into views
         if urlconf := getattr(
-            settings, "ANYDI_AUTO_INJECT_URLCONF", settings.ROOT_URLCONF
+            settings, "ANYDI_AUTO_INJECT_URLCONF", None
         ):
             self.auto_inject_urlconf(urlconf)
 
