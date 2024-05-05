@@ -46,12 +46,14 @@ docs = ["mkdocs", "mkdocs-material"]
 async = ["anyio"]
 
 [tool.poetry.group.dev.dependencies]
-mypy = "^1.9.0"
-ruff = "^0.4.1"
+mypy = "^1.10.0"
+ruff = "^0.4.3"
 pytest = "^8.1.0"
 pytest-cov = "^5.0.0"
-fastapi = "^0.95.1"
+fastapi = "^0.100.0"
 httpx = "^0.26.0"
+django = "^4.2"
+django-ninja = "^1.1.0"
 
 [tool.poetry.plugins.pytest11]
 anydi = "anydi.ext.pytest_plugin"
@@ -73,6 +75,12 @@ convention = "google"
 [tool.mypy]
 python_version = "3.10"
 strict = true
+
+[[tool.mypy.overrides]]
+module = [
+    "django.*",
+]
+ignore_missing_imports = true
 
 [tool.pytest.ini_options]
 addopts = [
