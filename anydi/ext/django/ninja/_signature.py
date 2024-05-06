@@ -3,8 +3,8 @@ from collections.abc import Callable
 from typing import Any
 
 from django.http import HttpResponse
-from ninja.signature.details import (  # noqa
-    FuncParam,
+from ninja.signature.details import (
+    FuncParam,  # noqa
     ViewSignature as BaseViewSignature,
 )
 from ninja.signature.utils import get_path_param_names, get_typed_signature

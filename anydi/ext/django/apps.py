@@ -48,9 +48,7 @@ class ContainerConfig(AppConfig):  # type: ignore[misc]
             self.patch_ninja()
 
         # Auto-injecting the container into views
-        if urlconf := getattr(
-            settings, "ANYDI_AUTO_INJECT_URLCONF", None
-        ):
+        if urlconf := getattr(settings, "ANYDI_AUTO_INJECT_URLCONF", None):
             self.auto_inject_urlconf(urlconf)
 
     def register_settings(self) -> None:  # noqa: C901
