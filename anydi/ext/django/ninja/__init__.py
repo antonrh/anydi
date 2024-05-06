@@ -1,6 +1,6 @@
 try:
     from ninja import operation
-except ImportError as exc:
+except ImportError as exc:  # pragma: no cover
     raise ImportError(
         "'django-ninja' is not installed. "
         "Please install it using 'pip install django-ninja'."

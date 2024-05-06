@@ -20,7 +20,7 @@ class ContainerConfig(AppConfig):  # type: ignore[misc]
     label = "anydi_django"
 
     # Prefix for Django settings
-    settings_prefix = "django.conf.settings"
+    settings_prefix = "django.conf.settings."
 
     def __init__(self, app_name: str, app_module: types.ModuleType | None) -> None:
         super().__init__(app_name, app_module)
@@ -51,30 +51,36 @@ class ContainerConfig(AppConfig):  # type: ignore[misc]
         if urlconf := getattr(settings, "ANYDI_AUTO_INJECT_URLCONF", None):
             self.auto_inject_urlconf(urlconf)
 
+        # Start the container
+        if getattr(settings, "ANYDI_START_CONTAINER", False):
+            self.container.start()
+
     def register_settings(self) -> None:  # noqa: C901
         """Register Django settings into the container."""
 
         def _get_setting_value(value: Any) -> Any:
             return lambda: value
 
-        for setting_name, value in settings.__dict__.items():
+        for setting_name in dir(settings):
+            setting_value = getattr(settings, setting_name)
             if not setting_name.isupper():
                 continue
+
             self.container.register(
-                Annotated[Any, f"{self.settings_prefix}.{setting_name}"],
-                _get_setting_value(value),
+                Annotated[Any, f"{self.settings_prefix}{setting_name}"],
+                _get_setting_value(setting_value),
                 scope="singleton",
             )
 
         def _aware_settings(interface: Any) -> Any:
             origin = get_origin(interface)
             if origin is not Annotated:
-                return interface
+                return interface  # pragma: no cover
             named = interface.__metadata__[-1]
 
-            if isinstance(named, str):
+            if isinstance(named, str) and named.startswith(self.settings_prefix):
                 _, setting_name = named.rsplit(self.settings_prefix, maxsplit=1)
-                return Annotated[Any, f"{self.settings_prefix}.{setting_name}"]
+                return Annotated[Any, f"{self.settings_prefix}{setting_name}"]
             return interface
 
         def _resolve(resolve: Any) -> Any:
@@ -127,7 +133,7 @@ class ContainerConfig(AppConfig):  # type: ignore[misc]
         for pattern in iter_urlpatterns(resolver.url_patterns):
             # Skip django-ninja views
             if pattern.lookup_str.startswith("ninja."):
-                continue
+                continue  # pragma: no cover
             pattern.callback = self.container.inject(pattern.callback)
 
     @staticmethod

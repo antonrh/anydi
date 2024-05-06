@@ -54,6 +54,7 @@ fastapi = "^0.100.0"
 httpx = "^0.26.0"
 django = "^4.2"
 django-ninja = "^1.1.0"
+pytest-django = "^4.8.0"
 
 [tool.poetry.plugins.pytest11]
 anydi = "anydi.ext.pytest_plugin"
@@ -89,6 +90,7 @@ addopts = [
 ]
 xfail_strict = true
 junit_family = "xunit2"
+DJANGO_SETTINGS_MODULE = "tests.ext.django.settings"
 
 [tool.coverage.report]
 exclude_also = [
@@ -103,6 +105,12 @@ exclude_also = [
     "except ImportError:",
     "if has_signature_eval_str_arg",
     "if not anyio:",
+]
+
+[tool.coverage.run]
+omit = [
+    "anydi/ext/django/ninja/_operation.py",
+    "anydi/ext/django/ninja/_signature.py",
 ]
 
 [build-system]
