@@ -47,7 +47,7 @@ from ._context import (
 from ._logger import logger
 from ._module import Module, ModuleRegistry
 from ._scanner import Scanner
-from ._types import AnyInterface, Interface, Marker, Provider, Scope
+from ._types import AnyInterface, Interface, Provider, Scope, is_marker
 from ._utils import get_full_qualname, get_signature, is_builtin_type
 
 T = TypeVar("T", bound=Any)
@@ -760,7 +760,7 @@ class Container:
         """
         injected_params = {}
         for parameter in get_signature(obj).parameters.values():
-            if not isinstance(parameter.default, Marker):
+            if not is_marker(parameter.default):
                 continue
             try:
                 self._validate_injected_parameter(obj, parameter)

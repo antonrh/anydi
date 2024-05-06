@@ -21,7 +21,7 @@ from typing import (
 
 from typing_extensions import NamedTuple, ParamSpec
 
-from ._types import Marker
+from ._types import is_marker
 from ._utils import get_signature
 
 if TYPE_CHECKING:
@@ -163,7 +163,7 @@ class Scanner:
             else:
                 signature = get_signature(member)
             for parameter in signature.parameters.values():
-                if isinstance(parameter.default, Marker):
+                if is_marker(parameter.default):
                     dependencies.append(
                         self._create_dependency(member=member, module=module)
                     )

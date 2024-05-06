@@ -49,7 +49,7 @@ pip install anydi
 *app.py*
 
 ```python
-from anydi import Container, dep
+from anydi import auto, Container
 
 container = Container()
 
@@ -60,7 +60,7 @@ def message() -> str:
 
 
 @container.inject
-def say_hello(message: str = dep()) -> None:
+def say_hello(message: str = auto) -> None:
     print(message)
 
 

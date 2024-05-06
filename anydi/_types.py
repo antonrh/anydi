@@ -3,7 +3,7 @@ from dataclasses import dataclass
 from functools import cached_property
 from typing import Any, Callable, Type, TypeVar, Union
 
-from typing_extensions import Annotated, Literal, Mapping, TypeAlias
+from typing_extensions import Annotated, Literal, Mapping, Self, TypeAlias
 
 from ._utils import get_full_qualname, get_signature
 
@@ -18,6 +18,14 @@ class Marker:
     """A marker class for marking dependencies."""
 
     __slots__ = ()
+
+    def __call__(self) -> Self:
+        return self
+
+
+def is_marker(obj: Any) -> bool:
+    """Checks if an object is a marker."""
+    return isinstance(obj, Marker)
 
 
 @dataclass(frozen=True)
