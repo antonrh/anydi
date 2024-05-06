@@ -6,7 +6,7 @@ from typing import Any, AsyncIterator, Dict, Iterator, List, Tuple, Type
 import pytest
 from typing_extensions import Annotated
 
-from anydi import Container, Provider, Scope, dep, request, singleton, transient
+from anydi import Container, Provider, Scope, auto, dep, request, singleton, transient
 
 from tests.fixtures import Service
 
@@ -999,6 +999,34 @@ def test_inject(container: Container) -> None:
     result = func(name="service ident")
 
     assert result == "service ident = 1000"
+
+
+def test_inject_auto_marker(container: Container) -> None:
+    @container.provider(scope="singleton")
+    def message() -> str:
+        return "test"
+
+    @container.inject
+    def func(message: str = auto) -> str:
+        return message
+
+    result = func()
+
+    assert result == "test"
+
+
+def test_inject_auto_marker_call(container: Container) -> None:
+    @container.provider(scope="singleton")
+    def message() -> str:
+        return "test"
+
+    @container.inject
+    def func(message: str = auto()) -> str:
+        return message
+
+    result = func()
+
+    assert result == "test"
 
 
 def test_inject_class(container: Container) -> None:

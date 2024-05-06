@@ -1,6 +1,6 @@
 """AnyDI public objects and functions."""
 
-from typing import Any
+from typing import Any, cast
 
 from ._container import Container, request, singleton, transient
 from ._module import Module, provider
@@ -14,7 +14,7 @@ def dep() -> Any:
 
 
 # Alias for dependency auto marker
-auto = dep
+auto = cast(Any, Marker())
 
 
 __all__ = [
