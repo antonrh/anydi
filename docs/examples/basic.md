@@ -130,19 +130,19 @@ Defines several handlers that use the UserService instance to perform operations
 ```python
 from typing import List
 
-from anydi import dep, injectable
+from anydi import auto, injectable
 
 from app.models import User
 from app.services import UserService
 
 
 @injectable
-def get_users(user_service: UserService = dep()) -> List[User]:
+def get_users(user_service: UserService = auto) -> List[User]:
     return user_service.get_users()
 
 
 @injectable
-def get_user(email: str, user_service: UserService = dep()) -> User:
+def get_user(email: str, user_service: UserService = auto) -> User:
     user = user_service.get_user(email)
     if not user:
         raise Exception("User not found.")
@@ -150,7 +150,7 @@ def get_user(email: str, user_service: UserService = dep()) -> User:
 
 
 @injectable
-def create_user(email: str, user_service: UserService = dep()) -> User:
+def create_user(email: str, user_service: UserService = auto) -> User:
     return user_service.create_user(email=email)
 ```
 
