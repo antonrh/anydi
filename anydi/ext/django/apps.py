@@ -51,6 +51,10 @@ class ContainerConfig(AppConfig):  # type: ignore[misc]
         if urlconf := getattr(settings, "ANYDI_AUTO_INJECT_URLCONF", None):
             self.auto_inject_urlconf(urlconf)
 
+        # Scan packages
+        for scan_package in getattr(settings, "ANYDI_SCAN_PACKAGES", []):
+            self.container.scan(scan_package)
+
         # Start the container
         if getattr(settings, "ANYDI_START_CONTAINER", False):
             self.container.start()

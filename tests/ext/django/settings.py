@@ -15,5 +15,6 @@ ANYDI_MODULES: list[str] = ["tests.ext.django.container.configure"]
 ANYDI_PATCH_NINJA = True
 ANYDI_START_CONTAINER = True
 ANYDI_AUTO_INJECT_URLCONF = ROOT_URLCONF
+ANYDI_SCAN_PACKAGES = ["tests.ext.django.scan"]
 
 HELLO_MESSAGE = "Hello, World!"
