@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import logging
 import types
 from asyncio import get_running_loop
