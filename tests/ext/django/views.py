@@ -1,6 +1,5 @@
-from typing import Annotated
-
 from django.http import HttpRequest, HttpResponse
+from typing_extensions import Annotated
 
 import anydi
 
