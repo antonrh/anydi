@@ -18,13 +18,9 @@ def configure(container: anydi.Container) -> None:
     )
 
     @container.provider(scope="singleton")
-    def hello_service() -> HelloService:
-        return HelloService()
-
-    @container.provider(scope="singleton")
-    def start_hello_service(hello_service: HelloService) -> Iterator[None]:
-        with hello_service:
-            yield
+    def hello_service() -> Iterator[HelloService]:
+        with HelloService() as hello_service:
+            yield hello_service
 
     # @container.provider(scope="request")
     # def request_id() -> Annotated[str, "request-id"]:
