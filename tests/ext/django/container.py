@@ -1,6 +1,9 @@
 from __future__ import annotations
 
-from typing import Annotated, Iterator
+import uuid
+from typing import Iterator
+
+from typing_extensions import Annotated
 
 import anydi
 
@@ -22,3 +25,7 @@ def configure(container: anydi.Container) -> None:
     def start_hello_service(hello_service: HelloService) -> Iterator[None]:
         with hello_service:
             yield
+
+    @container.provider(scope="request")
+    def request_id() -> Annotated[str, "request-id"]:
+        return uuid.uuid4().hex

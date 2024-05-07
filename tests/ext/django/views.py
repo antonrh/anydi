@@ -24,3 +24,17 @@ def get_configured_dependency(
     message: Annotated[str, "configured-string"] = anydi.auto,
 ) -> HttpResponse:
     return HttpResponse(message)
+
+
+def get_request_scoped_dependency(
+    request: HttpRequest,
+    request_id: Annotated[str, "request-id"] = anydi.auto,
+) -> HttpResponse:
+    return HttpResponse(request_id)
+
+
+async def get_request_scoped_dependency_async(
+    request: HttpRequest,
+    request_id: Annotated[str, "request-id"] = anydi.auto,
+) -> HttpResponse:
+    return HttpResponse(request_id)

@@ -7,6 +7,8 @@ INSTALLED_APPS = ("anydi.ext.django",)
 
 ROOT_URLCONF = "tests.ext.django.urls"
 
+MIDDLEWARE = ("anydi.ext.django.middleware.request_scoped_middleware",)
+
 # AnyDI settings
 ANYDI = {
     "STRICT_MODE": False,
