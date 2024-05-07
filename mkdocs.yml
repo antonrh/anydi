@@ -24,6 +24,7 @@ nav:
   - Usage: usage.md
   - Extensions:
     - FastAPI: extensions/fastapi.md
+    - Django: extensions/django.md
   - Examples:
     - Basic: examples/basic.md
 
