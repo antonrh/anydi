@@ -8,13 +8,16 @@ INSTALLED_APPS = ("anydi.ext.django",)
 ROOT_URLCONF = "tests.ext.django.urls"
 
 # AnyDI settings
-ANYDI_STRICT_MODE = False
-ANYDI_REGISTER_SETTINGS = True
-ANYDI_REGISTER_COMPONENTS = True
-ANYDI_MODULES: list[str] = ["tests.ext.django.container.configure"]
-ANYDI_PATCH_NINJA = True
-ANYDI_START_CONTAINER = True
-ANYDI_AUTO_INJECT_URLCONF = ROOT_URLCONF
-ANYDI_SCAN_PACKAGES = ["tests.ext.django.scan"]
+ANYDI = {
+    "STRICT_MODE": False,
+    "REGISTER_SETTINGS": True,
+    "REGISTER_COMPONENTS": True,
+    "MODULES": ["tests.ext.django.container.configure"],
+    "PATCH_NINJA": True,
+    "INJECT_URLCONF": ROOT_URLCONF,
+    "START_CONTAINER": True,
+    "SCAN_PACKAGES": ["tests.ext.django.scan"],
+}
 
+# Custom settings
 HELLO_MESSAGE = "Hello, World!"
