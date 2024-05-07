@@ -13,7 +13,6 @@ class Settings(TypedDict):
     REGISTER_COMPONENTS: bool
     INJECT_URLCONF: str | None
     MODULES: Sequence[str]
-    START_CONTAINER: bool
     SCAN_PACKAGES: Sequence[str]
     PATCH_NINJA: bool
 
@@ -26,7 +25,6 @@ DEFAULTS = Settings(
     MODULES=[],
     PATCH_NINJA=False,
     INJECT_URLCONF=None,
-    START_CONTAINER=False,
     SCAN_PACKAGES=[],
 )
 

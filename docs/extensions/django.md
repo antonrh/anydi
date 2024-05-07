@@ -64,7 +64,6 @@ The `HelloService` will be automatically injected into the hello view through th
 * `REGISTER_COMPONENTS: bool` - If `True`, the container will register Django components such as the database and cache.
 * `INJECT_URLCONF: str | None` - Specifies the URL configuration where dependencies should be injected.
 * `MODULES: Sequence[str]` - Lists the modules to be scanned for dependencies.
-* `START_CONTAINER: bool` - If `True`, the container will be started automatically.
 * `SCAN_PACKAGES: Sequence[str]` - Designates the packages to be scanned for dependencies.
 * `PATCH_NINJA: bool` - If `True`, the container will modify the `ninja` framework to support dependency injection.
 

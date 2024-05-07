@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import logging
 import types
-from asyncio import get_running_loop
 from typing import Callable, cast
 
 from django.apps import AppConfig
@@ -81,14 +80,3 @@ class ContainerConfig(AppConfig):  # type: ignore[misc]
         # Scan packages
         for scan_package in self.settings["SCAN_PACKAGES"]:
             self.container.scan(scan_package)
-
-        # Start the container
-        if self.settings["START_CONTAINER"]:
-            try:
-                get_running_loop()
-            except RuntimeError:
-                logger.warning(
-                    "Starting the container is only supported in an async context."
-                )
-            else:
-                self.container.start()

@@ -17,7 +17,6 @@ ANYDI = {
     "MODULES": ["tests.ext.django.container.configure"],
     "PATCH_NINJA": True,
     "INJECT_URLCONF": ROOT_URLCONF,
-    "START_CONTAINER": True,
     "SCAN_PACKAGES": ["tests.ext.django.scan"],
 }
 
