@@ -100,3 +100,57 @@ def hello(request: HttpRequest, hello_service: HelloService = anydi.auto) -> dic
 ```
 
 The `HelloService` will be automatically injected into the hello endpoint using the provided marker `anydi.auto`.
+
+
+## Modules
+
+To add modules to the container, you can use the `MODULES` setting:
+
+```python
+ANYDI = {
+    "MODULES": [
+        "yourproject.user.UserModule",
+        "yourproject.payment.PaymentModule",
+    ],
+}
+```
+
+Assume you have a module that provides a `UserService` class:
+
+```python
+from anydi import provider
+
+from yourproject.user.service import UserService
+
+
+class UserModule:
+    @provider(scope="singleton")
+    def user_service(self) -> UserService:
+        return UserService()
+```
+
+You can now use the UserService in your views as demonstrated in the Quick Start section.
+
+
+## Custom Container
+
+To use a custom container, you can specify the `CONTAINER_FACTORY` setting:
+
+```python
+ANYDI = {
+    "CONTAINER_FACTORY": "yourproject.config.container.get_container",
+}
+```
+
+In `yourproject/config/container.py`:
+
+```python
+from anydi import Container
+
+
+def get_container() -> Container:
+    container = Container(strict=True)
+    # Add custom container configuration here
+    return container
+```
+
