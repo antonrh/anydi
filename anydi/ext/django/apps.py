@@ -1,18 +1,24 @@
+import logging
 import types
+from asyncio import get_running_loop
 from functools import wraps
-from typing import Annotated, Any, get_origin
+from typing import Any, Callable, cast
 
 from django.apps import AppConfig
 from django.conf import settings
 from django.core.cache import BaseCache, caches
+from django.core.exceptions import ImproperlyConfigured
 from django.db import connections
 from django.db.backends.base.base import BaseDatabaseWrapper
 from django.urls import get_resolver
 from django.utils.module_loading import import_string
+from typing_extensions import Annotated, get_origin
 
 import anydi
 
 from ._utils import iter_urlpatterns
+
+logger = logging.getLogger(__name__)
 
 
 class ContainerConfig(AppConfig):  # type: ignore[misc]
@@ -25,11 +31,23 @@ class ContainerConfig(AppConfig):  # type: ignore[misc]
     def __init__(self, app_name: str, app_module: types.ModuleType | None) -> None:
         super().__init__(app_name, app_module)
         # Create a container
-        self.container = anydi.Container(
-            strict=getattr(settings, "ANYDI_STRICT_MODE", False),
-        )
+        container_getter_path = getattr(settings, "ANYDI_CONTAINER_GETTER", None)
+        if container_getter_path:
+            try:
+                container_getter = cast(
+                    Callable[[], anydi.Container], import_string(container_getter_path)
+                )
+            except ImportError as exc:
+                raise ImproperlyConfigured(
+                    f"Cannot import container getter '{container_getter_path}'."
+                ) from exc
+            self.container = container_getter()
+        else:
+            self.container = anydi.Container(
+                strict=getattr(settings, "ANYDI_STRICT_MODE", False),
+            )
 
-    def ready(self) -> None:
+    def ready(self) -> None:  # noqa: C901
         # Register Django settings
         if getattr(settings, "ANYDI_REGISTER_SETTINGS", False):
             self.register_settings()
@@ -40,7 +58,12 @@ class ContainerConfig(AppConfig):  # type: ignore[misc]
 
         # Register modules
         for module_path in getattr(settings, "ANYDI_MODULES", []):
-            module_cls = import_string(module_path)
+            try:
+                module_cls = import_string(module_path)
+            except ImportError as exc:
+                raise ImproperlyConfigured(
+                    f"Cannot import module '{module_path}'."
+                ) from exc
             self.container.register_module(module_cls)
 
         # Patching the django-ninja framework if it installed
@@ -57,7 +80,14 @@ class ContainerConfig(AppConfig):  # type: ignore[misc]
 
         # Start the container
         if getattr(settings, "ANYDI_START_CONTAINER", False):
-            self.container.start()
+            try:
+                get_running_loop()
+            except RuntimeError:
+                logger.warning(
+                    "Starting the container is only supported in an async context."
+                )
+            else:
+                self.container.start()
 
     def register_settings(self) -> None:  # noqa: C901
         """Register Django settings into the container."""
@@ -120,7 +150,6 @@ class ContainerConfig(AppConfig):  # type: ignore[misc]
             )
 
         # Register database connections
-
         def _get_connection(alias: str) -> Any:
             return lambda: connections[alias]
 
