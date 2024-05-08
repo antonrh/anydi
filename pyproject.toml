@@ -60,7 +60,7 @@ anydi = "anydi.ext.pytest_plugin"
 line-length = 88
 
 [tool.ruff.lint]
-select = ["A", "B", "C", "E", "F", "I", "W", "TID252", "T20"]
+select = ["A", "B", "C", "E", "F", "I", "W", "TID252", "T20", "UP"]
 ignore = ["A003", "B008", "B009", "B010", "D104", "D107"]
 
 [tool.ruff.lint.isort]

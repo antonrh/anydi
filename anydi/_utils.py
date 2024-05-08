@@ -1,10 +1,12 @@
 """Shared AnyDI utils module."""
 
+from __future__ import annotations
+
 import builtins
 import functools
 import inspect
 import sys
-from typing import Any, Callable, Dict, Type, TypeVar
+from typing import Any, Callable, TypeVar
 
 from typing_extensions import Annotated, ParamSpec, get_origin
 
@@ -53,7 +55,7 @@ def get_full_qualname(obj: Any) -> str:
     return f"{module_name}.{qualname}"
 
 
-def is_builtin_type(tp: Type[Any]) -> bool:
+def is_builtin_type(tp: type[Any]) -> bool:
     """
     Check if the given type is a built-in type.
     Args:
@@ -78,7 +80,7 @@ def get_signature(obj: Callable[..., Any]) -> inspect.Signature:
     Returns:
         The signature of the callable object.
     """
-    signature_kwargs: Dict[str, Any] = {}
+    signature_kwargs: dict[str, Any] = {}
     if sys.version_info >= (3, 10):
         signature_kwargs["eval_str"] = True
     return inspect.signature(obj, **signature_kwargs)

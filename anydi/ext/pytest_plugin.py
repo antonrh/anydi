@@ -1,5 +1,7 @@
+from __future__ import annotations
+
 import inspect
-from typing import Any, Callable, Iterator, List, Tuple, cast
+from typing import Any, Callable, Iterator, cast
 
 import pytest
 
@@ -49,8 +51,8 @@ def _anydi_should_inject(request: pytest.FixtureRequest) -> bool:
 
 
 @pytest.fixture(scope="session")
-def _anydi_unresolved() -> Iterator[List[Any]]:
-    unresolved: List[Any] = []
+def _anydi_unresolved() -> Iterator[list[Any]]:
+    unresolved: list[Any] = []
     yield unresolved
     unresolved.clear()
 
@@ -58,9 +60,9 @@ def _anydi_unresolved() -> Iterator[List[Any]]:
 @pytest.fixture
 def _anydi_injected_parameter_iterator(
     request: pytest.FixtureRequest,
-    _anydi_unresolved: List[str],
-) -> Callable[[], Iterator[Tuple[str, Any]]]:
-    def _iterator() -> Iterator[Tuple[str, inspect.Parameter]]:
+    _anydi_unresolved: list[str],
+) -> Callable[[], Iterator[tuple[str, Any]]]:
+    def _iterator() -> Iterator[tuple[str, inspect.Parameter]]:
         for name, parameter in inspect.signature(request.function).parameters.items():
             if (
                 ((interface := parameter.annotation) is parameter.empty)
@@ -77,8 +79,8 @@ def _anydi_injected_parameter_iterator(
 def _anydi_inject(
     request: pytest.FixtureRequest,
     _anydi_should_inject: bool,
-    _anydi_injected_parameter_iterator: Callable[[], Iterator[Tuple[str, Any]]],
-    _anydi_unresolved: List[str],
+    _anydi_injected_parameter_iterator: Callable[[], Iterator[tuple[str, Any]]],
+    _anydi_unresolved: list[str],
 ) -> None:
     """Inject dependencies into the test function."""
 
@@ -107,8 +109,8 @@ def _anydi_inject(
 async def _anydi_ainject(
     request: pytest.FixtureRequest,
     _anydi_should_inject: bool,
-    _anydi_injected_parameter_iterator: Callable[[], Iterator[Tuple[str, Any]]],
-    _anydi_unresolved: List[str],
+    _anydi_injected_parameter_iterator: Callable[[], Iterator[tuple[str, Any]]],
+    _anydi_unresolved: list[str],
 ) -> None:
     """Inject dependencies into the test function."""
     if not inspect.iscoroutinefunction(request.function) or not _anydi_should_inject:
