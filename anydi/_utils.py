@@ -32,17 +32,7 @@ P = ParamSpec("P")
 
 
 def get_full_qualname(obj: Any) -> str:
-    """Get the fully qualified name of an object.
-
-    This function returns the fully qualified name of the given object,
-    which includes both the module name and the object's qualname.
-
-    Args:
-        obj: The object for which to retrieve the fully qualified name.
-
-    Returns:
-        The fully qualified name of the object.
-    """
+    """Get the fully qualified name of an object."""
     origin = get_origin(obj)
     if origin is Annotated:
         metadata = ", ".join(
@@ -67,13 +57,7 @@ def get_full_qualname(obj: Any) -> str:
 
 
 def is_builtin_type(tp: type[Any]) -> bool:
-    """
-    Check if the given type is a built-in type.
-    Args:
-        tp (type): The type to check.
-    Returns:
-        bool: True if the type is a built-in type, False otherwise.
-    """
+    """Check if the given type is a built-in type."""
     return tp.__module__ == builtins.__name__
 
 
@@ -91,20 +75,23 @@ def get_typed_annotation(annotation: Any, globalns: dict[str, Any]) -> Any:
     return annotation
 
 
-def get_typed_return_annotation(call: Callable[..., Any]) -> Any:
+def get_typed_return_annotation(obj: Callable[..., Any]) -> Any:
     """Get the typed return annotation of a callable object."""
-    signature = inspect.signature(call)
+    signature = inspect.signature(obj)
     annotation = signature.return_annotation
     if annotation is inspect.Signature.empty:
         return None
-    globalns = getattr(call, "__globals__", {})
+    globalns = getattr(obj, "__globals__", {})
     return get_typed_annotation(annotation, globalns)
 
 
 def get_typed_parameters(obj: Callable[..., Any]) -> list[inspect.Parameter]:
     """Get the typed parameters of a callable object."""
+    globalns = getattr(obj, "__globals__", {})
     return [
-        parameter.replace()
+        parameter.replace(
+            annotation=get_typed_annotation(parameter.annotation, globalns)
+        )
         for name, parameter in inspect.signature(obj).parameters.items()
     ]
 
@@ -115,19 +102,7 @@ async def run_async(
     *args: P.args,
     **kwargs: P.kwargs,
 ) -> T:
-    """Runs the given function asynchronously using the `anyio` library.
-
-    Args:
-        func: The function to run asynchronously.
-        args: The positional arguments to pass to the function.
-        kwargs: The keyword arguments to pass to the function.
-
-    Returns:
-        The result of the function.
-
-    Raises:
-        ImportError: If the `anyio` library is not installed.
-    """
+    """Runs the given function asynchronously using the `anyio` library."""
     if not anyio:
         raise ImportError(
             "`anyio` library is not currently installed. Please make sure to install "
