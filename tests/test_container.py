@@ -888,17 +888,17 @@ def test_get_provider_annotation_missing(container: Container) -> None:
     )
 
 
-def test_get_provider_annotation_origin_without_args(container: Container) -> None:
-    def provider() -> list:  # type: ignore[type-arg]
-        return []
+def test_get_provider_annotation_resource_without_args(container: Container) -> None:
+    def provider() -> Iterator:  # type: ignore[type-arg]
+        yield
 
     with pytest.raises(TypeError) as exc_info:
         container._get_provider_annotation(provider)
 
     assert str(exc_info.value) == (
         "Cannot use `tests.test_container"
-        ".test_get_provider_annotation_origin_without_args.<locals>.provider` generic "
-        "type annotation without actual type."
+        ".test_get_provider_annotation_resource_without_args.<locals>.provider` "
+        "resource type annotation without actual type."
     )
 
 

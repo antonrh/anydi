@@ -29,7 +29,7 @@ from typing import (
     overload,
 )
 
-from typing_extensions import Annotated, ParamSpec, final, get_args, get_origin
+from typing_extensions import ParamSpec, final, get_args, get_origin
 
 try:
     from types import NoneType
@@ -730,23 +730,17 @@ class Container:
                 f"Missing `{get_full_qualname(obj)}` provider return annotation."
             )
 
-        origin = get_origin(annotation) or annotation
-        args = get_args(annotation)
-
-        # Supported generic types
-        if origin in (list, dict, tuple, Annotated):
+        if get_origin(annotation) in (get_origin(Iterator), get_origin(AsyncIterator)):
+            args = get_args(annotation)
             if args:
-                return annotation
+                return args[0]
             else:
                 raise TypeError(
-                    f"Cannot use `{get_full_qualname(obj)}` generic type annotation "
+                    f"Cannot use `{get_full_qualname(obj)}` resource type annotation "
                     "without actual type."
                 )
 
-        try:
-            return args[0]
-        except IndexError:
-            return annotation
+        return annotation
 
     def _get_injected_params(self, obj: Callable[..., Any]) -> Dict[str, Any]:
         """Get the injected parameters of a callable object.
