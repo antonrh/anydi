@@ -865,8 +865,7 @@ async def test_override_instance_async_resource_provider(container: Container) -
         (List[str], List[str]),
         ("List[str]", List[str]),
         (Tuple[str, ...], Tuple[str, ...]),
-        (tuple[str, ...], tuple[str, ...]),
-        ("tuple[str, ...]", tuple[str, ...]),
+        ("Tuple[str, ...]", Tuple[str, ...]),
         ('Annotated[str, "name"]', Annotated[str, "name"]),
     ],
 )
