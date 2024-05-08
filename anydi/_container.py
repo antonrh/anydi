@@ -15,21 +15,16 @@ from typing import (
     Awaitable,
     Callable,
     ContextManager,
-    Dict,
     Iterable,
     Iterator,
-    List,
     Mapping,
-    Optional,
     Sequence,
-    Type,
     TypeVar,
-    Union,
     cast,
     overload,
 )
 
-from typing_extensions import Annotated, ParamSpec, final, get_args, get_origin
+from typing_extensions import ParamSpec, final, get_args, get_origin
 
 try:
     from types import NoneType
@@ -53,7 +48,7 @@ from ._utils import get_full_qualname, get_signature, is_builtin_type
 T = TypeVar("T", bound=Any)
 P = ParamSpec("P")
 
-ALLOWED_SCOPES: Dict[Scope, List[Scope]] = {
+ALLOWED_SCOPES: dict[Scope, list[Scope]] = {
     "singleton": ["singleton"],
     "request": ["request", "singleton"],
     "transient": ["transient", "singleton", "request"],
@@ -71,10 +66,9 @@ class Container:
     def __init__(
         self,
         *,
-        providers: Optional[Mapping[Type[Any], Provider]] = None,
-        modules: Optional[
-            Sequence[Union[Module, Type[Module], Callable[[Container], None]]]
-        ] = None,
+        providers: Mapping[type[Any], Provider] | None = None,
+        modules: Sequence[Module | type[Module] | Callable[[Container], None]]
+        | None = None,
         strict: bool = False,
     ) -> None:
         """Initialize the AnyDI instance.
@@ -84,13 +78,13 @@ class Container:
             modules: Optional sequence of modules to register during initialization.
             strict: Whether to enable strict mode. Defaults to False.
         """
-        self._providers: Dict[Type[Any], Provider] = {}
+        self._providers: dict[type[Any], Provider] = {}
         self._singleton_context = SingletonContext(self)
         self._transient_context = TransientContext(self)
-        self._request_context_var: ContextVar[Optional[RequestContext]] = ContextVar(
+        self._request_context_var: ContextVar[RequestContext | None] = ContextVar(
             "request_context", default=None
         )
-        self._override_instances: Dict[Type[Any], Any] = {}
+        self._override_instances: dict[type[Any], Any] = {}
         self._strict = strict
 
         # Components
@@ -117,7 +111,7 @@ class Container:
         return self._strict
 
     @property
-    def providers(self) -> Dict[Type[Any], Provider]:
+    def providers(self) -> dict[type[Any], Provider]:
         """Get the registered providers.
 
         Returns:
@@ -363,7 +357,7 @@ class Container:
                     "registered with matching scopes."
                 )
 
-    def _detect_scope(self, obj: Callable[..., Any]) -> Optional[Scope]:
+    def _detect_scope(self, obj: Callable[..., Any]) -> Scope | None:
         """Detect the scope for a provider.
 
         Args:
@@ -389,7 +383,7 @@ class Container:
         return None
 
     def register_module(
-        self, module: Union[Module, Type[Module], Callable[[Container], None]]
+        self, module: Module | type[Module] | Callable[[Container], None]
     ) -> None:
         """Register a module as a callable, module type, or module instance.
 
@@ -633,14 +627,11 @@ class Container:
     def inject(self) -> Callable[[Callable[P, T]], Callable[P, T]]: ...
 
     def inject(
-        self, obj: Union[Callable[P, Union[T, Awaitable[T]]], None] = None
-    ) -> Union[
-        Callable[
-            [Callable[P, Union[T, Awaitable[T]]]],
-            Callable[P, Union[T, Awaitable[T]]],
-        ],
-        Callable[P, Union[T, Awaitable[T]]],
-    ]:
+        self, obj: Callable[P, T | Awaitable[T]] | None = None
+    ) -> (
+        Callable[[Callable[P, T | Awaitable[T]]], Callable[P, T | Awaitable[T]]]
+        | Callable[P, T | Awaitable[T]]
+    ):
         """Decorator to inject dependencies into a callable.
 
         Args:
@@ -652,8 +643,8 @@ class Container:
         """
 
         def decorator(
-            obj: Callable[P, Union[T, Awaitable[T]]],
-        ) -> Callable[P, Union[T, Awaitable[T]]]:
+            obj: Callable[P, T | Awaitable[T]],
+        ) -> Callable[P, T | Awaitable[T]]:
             injected_params = self._get_injected_params(obj)
 
             if inspect.iscoroutinefunction(obj):
@@ -694,12 +685,9 @@ class Container:
     def scan(
         self,
         /,
-        packages: Union[
-            Union[types.ModuleType, str],
-            Iterable[Union[types.ModuleType, str]],
-        ],
+        packages: types.ModuleType | str | Iterable[types.ModuleType | str],
         *,
-        tags: Optional[Iterable[str]] = None,
+        tags: Iterable[str] | None = None,
     ) -> None:
         """Scan packages or modules for decorated members and inject dependencies.
 
@@ -730,25 +718,19 @@ class Container:
                 f"Missing `{get_full_qualname(obj)}` provider return annotation."
             )
 
-        origin = get_origin(annotation) or annotation
-        args = get_args(annotation)
-
-        # Supported generic types
-        if origin in (list, dict, tuple, Annotated):
+        if get_origin(annotation) in (get_origin(Iterator), get_origin(AsyncIterator)):
+            args = get_args(annotation)
             if args:
-                return annotation
+                return args[0]
             else:
                 raise TypeError(
-                    f"Cannot use `{get_full_qualname(obj)}` generic type annotation "
+                    f"Cannot use `{get_full_qualname(obj)}` resource type annotation "
                     "without actual type."
                 )
 
-        try:
-            return args[0]
-        except IndexError:
-            return annotation
+        return annotation
 
-    def _get_injected_params(self, obj: Callable[..., Any]) -> Dict[str, Any]:
+    def _get_injected_params(self, obj: Callable[..., Any]) -> dict[str, Any]:
         """Get the injected parameters of a callable object.
 
         Args:

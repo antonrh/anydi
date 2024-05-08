@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import inspect
-from typing import TYPE_CHECKING, Any, Callable, Dict, List, Tuple, Type, TypeVar, Union
+from typing import TYPE_CHECKING, Any, Callable, TypeVar
 
 from typing_extensions import Concatenate, NamedTuple, ParamSpec
 
@@ -24,7 +24,7 @@ class ModuleMeta(type):
     and stores it in the `providers` attribute.
     """
 
-    def __new__(cls, name: str, bases: Tuple[type, ...], attrs: Dict[str, Any]) -> Any:
+    def __new__(cls, name: str, bases: tuple[type, ...], attrs: dict[str, Any]) -> Any:
         """Create a new instance of the ModuleMeta class.
 
         This method extracts provider information from the class attributes and
@@ -49,7 +49,7 @@ class ModuleMeta(type):
 class Module(metaclass=ModuleMeta):
     """A base class for defining AnyDI modules."""
 
-    providers: List[Tuple[str, ProviderDecoratorArgs]]
+    providers: list[tuple[str, ProviderDecoratorArgs]]
 
     def configure(self, container: Container) -> None:
         """Configure the AnyDI container with providers and their dependencies.
@@ -67,7 +67,7 @@ class ModuleRegistry:
         self.container = container
 
     def register(
-        self, module: Union[Module, Type[Module], Callable[[Container], None]]
+        self, module: Module | type[Module] | Callable[[Container], None]
     ) -> None:
         """Register a module as a callable, module type, or module instance.
 

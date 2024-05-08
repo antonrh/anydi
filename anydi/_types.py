@@ -1,9 +1,9 @@
 import inspect
 from dataclasses import dataclass
 from functools import cached_property
-from typing import Any, Callable, Type, TypeVar, Union
+from typing import Any, Callable, Mapping, Type, TypeVar, Union
 
-from typing_extensions import Annotated, Literal, Mapping, Self, TypeAlias
+from typing_extensions import Annotated, Literal, Self, TypeAlias
 
 from ._utils import get_full_qualname, get_signature
 
