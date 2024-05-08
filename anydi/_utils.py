@@ -6,7 +6,7 @@ import builtins
 import functools
 import inspect
 import sys
-from typing import Any, Callable, TypeVar
+from typing import Any, Callable, ForwardRef, TypeVar, cast
 
 from typing_extensions import Annotated, ParamSpec, get_origin
 
@@ -14,6 +14,17 @@ try:
     import anyio  # noqa
 except ImportError:
     anyio = None  # type: ignore[assignment]
+
+
+if sys.version_info < (3, 9):  # pragma: nocover
+
+    def evaluate_forwardref(type_: ForwardRef, globalns: Any, localns: Any) -> Any:
+        return type_._evaluate(globalns, localns)  # noqa
+
+else:
+
+    def evaluate_forwardref(type_: ForwardRef, globalns: Any, localns: Any) -> Any:
+        return cast(Any, type_)._evaluate(globalns, localns, set())  # noqa
 
 
 T = TypeVar("T")
@@ -66,20 +77,32 @@ def is_builtin_type(tp: type[Any]) -> bool:
     return tp.__module__ == builtins.__name__
 
 
-@functools.lru_cache(maxsize=None)
+def make_forwardref(annotation: str, globalns: dict[str, Any]) -> Any:
+    """Create a forward reference from a string annotation."""
+    forward_ref = ForwardRef(annotation)
+    return evaluate_forwardref(forward_ref, globalns, globalns)
+
+
+def get_typed_annotation(annotation: Any, globalns: dict[str, Any]) -> Any:
+    """Get the typed annotation of a parameter."""
+    if isinstance(annotation, str):
+        annotation = ForwardRef(annotation)
+        annotation = evaluate_forwardref(annotation, globalns, globalns)
+    return annotation
+
+
+def get_typed_return_annotation(call: Callable[..., Any]) -> Any:
+    """Get the typed return annotation of a callable object."""
+    signature = inspect.signature(call)
+    annotation = signature.return_annotation
+    if annotation is inspect.Signature.empty:
+        return None
+    globalns = getattr(call, "__globals__", {})
+    return get_typed_annotation(annotation, globalns)
+
+
 def get_typed_signature(obj: Callable[..., Any]) -> inspect.Signature:
-    """Get the signature of a callable object.
-
-    This function uses the `inspect.signature` function to retrieve the signature
-    of the given callable object. It applies an LRU cache decorator to improve
-    performance by caching the signatures of previously inspected objects.
-
-    Args:
-        obj: The callable object to inspect.
-
-    Returns:
-        The signature of the callable object.
-    """
+    """Get the signature of a callable object."""
     signature_kwargs: dict[str, Any] = {}
     if sys.version_info >= (3, 10):
         signature_kwargs["eval_str"] = True

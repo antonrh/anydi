@@ -43,7 +43,12 @@ from ._logger import logger
 from ._module import Module, ModuleRegistry
 from ._scanner import Scanner
 from ._types import AnyInterface, Interface, Provider, Scope, is_marker
-from ._utils import get_full_qualname, get_typed_signature, is_builtin_type
+from ._utils import (
+    get_full_qualname,
+    get_typed_return_annotation,
+    get_typed_signature,
+    is_builtin_type,
+)
 
 T = TypeVar("T", bound=Any)
 P = ParamSpec("P")
@@ -711,9 +716,9 @@ class Container:
         Raises:
             TypeError: If the provider return annotation is missing or invalid.
         """
-        annotation = get_typed_signature(obj).return_annotation
+        annotation = get_typed_return_annotation(obj)
 
-        if annotation is inspect._empty:  # noqa
+        if annotation is None:
             raise TypeError(
                 f"Missing `{get_full_qualname(obj)}` provider return annotation."
             )
