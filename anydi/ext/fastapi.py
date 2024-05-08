@@ -13,7 +13,7 @@ from starlette.requests import Request
 from typing_extensions import Annotated, get_args, get_origin
 
 from anydi import Container
-from anydi._utils import get_full_qualname, get_signature
+from anydi._utils import get_full_qualname, get_typed_parameters
 
 from .starlette.middleware import RequestScopedMiddleware
 
@@ -47,7 +47,7 @@ def install(app: FastAPI, container: Container) -> None:
             call, *params = dependant.cache_key
             if not call:
                 continue  # pragma: no cover
-            for parameter in get_signature(call).parameters.values():
+            for parameter in get_typed_parameters(call):
                 _patch_route_parameter(call, parameter, container)
 
 

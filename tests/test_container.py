@@ -863,7 +863,10 @@ async def test_override_instance_async_resource_provider(container: Container) -
         (AsyncIterator[Service], Service),
         (Dict[str, Any], Dict[str, Any]),
         (List[str], List[str]),
+        ("List[str]", List[str]),
         (Tuple[str, ...], Tuple[str, ...]),
+        ("Tuple[str, ...]", Tuple[str, ...]),
+        ('Annotated[str, "name"]', Annotated[str, "name"]),
     ],
 )
 def test_get_supported_provider_annotation(
