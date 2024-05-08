@@ -6,7 +6,7 @@ import builtins
 import functools
 import inspect
 import sys
-from typing import Any, Callable, TypeVar
+from typing import Any, Callable, ForwardRef, TypeVar, cast
 
 from typing_extensions import Annotated, ParamSpec, get_origin
 
@@ -16,22 +16,23 @@ except ImportError:
     anyio = None  # type: ignore[assignment]
 
 
+if sys.version_info < (3, 9):  # pragma: nocover
+
+    def evaluate_forwardref(type_: ForwardRef, globalns: Any, localns: Any) -> Any:
+        return type_._evaluate(globalns, localns)  # noqa
+
+else:
+
+    def evaluate_forwardref(type_: ForwardRef, globalns: Any, localns: Any) -> Any:
+        return cast(Any, type_)._evaluate(globalns, localns, set())  # noqa
+
+
 T = TypeVar("T")
 P = ParamSpec("P")
 
 
 def get_full_qualname(obj: Any) -> str:
-    """Get the fully qualified name of an object.
-
-    This function returns the fully qualified name of the given object,
-    which includes both the module name and the object's qualname.
-
-    Args:
-        obj: The object for which to retrieve the fully qualified name.
-
-    Returns:
-        The fully qualified name of the object.
-    """
+    """Get the fully qualified name of an object."""
     origin = get_origin(obj)
     if origin is Annotated:
         metadata = ", ".join(
@@ -56,34 +57,43 @@ def get_full_qualname(obj: Any) -> str:
 
 
 def is_builtin_type(tp: type[Any]) -> bool:
-    """
-    Check if the given type is a built-in type.
-    Args:
-        tp (type): The type to check.
-    Returns:
-        bool: True if the type is a built-in type, False otherwise.
-    """
+    """Check if the given type is a built-in type."""
     return tp.__module__ == builtins.__name__
 
 
-@functools.lru_cache(maxsize=None)
-def get_signature(obj: Callable[..., Any]) -> inspect.Signature:
-    """Get the signature of a callable object.
+def make_forwardref(annotation: str, globalns: dict[str, Any]) -> Any:
+    """Create a forward reference from a string annotation."""
+    forward_ref = ForwardRef(annotation)
+    return evaluate_forwardref(forward_ref, globalns, globalns)
 
-    This function uses the `inspect.signature` function to retrieve the signature
-    of the given callable object. It applies an LRU cache decorator to improve
-    performance by caching the signatures of previously inspected objects.
 
-    Args:
-        obj: The callable object to inspect.
+def get_typed_annotation(annotation: Any, globalns: dict[str, Any]) -> Any:
+    """Get the typed annotation of a parameter."""
+    if isinstance(annotation, str):
+        annotation = ForwardRef(annotation)
+        annotation = evaluate_forwardref(annotation, globalns, globalns)
+    return annotation
 
-    Returns:
-        The signature of the callable object.
-    """
-    signature_kwargs: dict[str, Any] = {}
-    if sys.version_info >= (3, 10):
-        signature_kwargs["eval_str"] = True
-    return inspect.signature(obj, **signature_kwargs)
+
+def get_typed_return_annotation(obj: Callable[..., Any]) -> Any:
+    """Get the typed return annotation of a callable object."""
+    signature = inspect.signature(obj)
+    annotation = signature.return_annotation
+    if annotation is inspect.Signature.empty:
+        return None
+    globalns = getattr(obj, "__globals__", {})
+    return get_typed_annotation(annotation, globalns)
+
+
+def get_typed_parameters(obj: Callable[..., Any]) -> list[inspect.Parameter]:
+    """Get the typed parameters of a callable object."""
+    globalns = getattr(obj, "__globals__", {})
+    return [
+        parameter.replace(
+            annotation=get_typed_annotation(parameter.annotation, globalns)
+        )
+        for name, parameter in inspect.signature(obj).parameters.items()
+    ]
 
 
 async def run_async(
@@ -92,19 +102,7 @@ async def run_async(
     *args: P.args,
     **kwargs: P.kwargs,
 ) -> T:
-    """Runs the given function asynchronously using the `anyio` library.
-
-    Args:
-        func: The function to run asynchronously.
-        args: The positional arguments to pass to the function.
-        kwargs: The keyword arguments to pass to the function.
-
-    Returns:
-        The result of the function.
-
-    Raises:
-        ImportError: If the `anyio` library is not installed.
-    """
+    """Runs the given function asynchronously using the `anyio` library."""
     if not anyio:
         raise ImportError(
             "`anyio` library is not currently installed. Please make sure to install "
