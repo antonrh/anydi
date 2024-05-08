@@ -10,8 +10,6 @@ from typing import (
     Any,
     Callable,
     Iterable,
-    List,
-    Optional,
     TypeVar,
     Union,
     cast,
@@ -56,9 +54,9 @@ class Scanner:
     def scan(
         self,
         /,
-        packages: Union[Union[ModuleType, str], Iterable[Union[ModuleType, str]]],
+        packages: ModuleType | str | Iterable[ModuleType | str],
         *,
-        tags: Optional[Iterable[str]] = None,
+        tags: Iterable[str] | None = None,
     ) -> None:
         """Scan packages or modules for decorated members and inject dependencies.
 
@@ -68,10 +66,10 @@ class Scanner:
             tags: Optional list of tags to filter the scanned members. Only members
                 with at least one matching tag will be scanned. Defaults to None.
         """
-        dependencies: List[Dependency] = []
+        dependencies: list[Dependency] = []
 
         if isinstance(packages, Iterable) and not isinstance(packages, str):
-            scan_packages: Iterable[Union[ModuleType, str]] = packages
+            scan_packages: Iterable[ModuleType | str] = packages
         else:
             scan_packages = cast(Iterable[Union[ModuleType, str]], [packages])
 
@@ -84,10 +82,10 @@ class Scanner:
 
     def _scan_package(
         self,
-        package: Union[ModuleType, str],
+        package: ModuleType | str,
         *,
-        tags: Optional[Iterable[str]] = None,
-    ) -> List[Dependency]:
+        tags: Iterable[str] | None = None,
+    ) -> list[Dependency]:
         """Scan a package or module for decorated members.
 
         Args:
@@ -107,7 +105,7 @@ class Scanner:
         if not package_path:
             return self._scan_module(package, tags=tags)
 
-        dependencies: List[Dependency] = []
+        dependencies: list[Dependency] = []
 
         for module_info in pkgutil.walk_packages(
             path=package_path, prefix=package.__name__ + "."
@@ -119,7 +117,7 @@ class Scanner:
 
     def _scan_module(
         self, module: ModuleType, *, tags: Iterable[str]
-    ) -> List[Dependency]:
+    ) -> list[Dependency]:
         """Scan a module for decorated members.
 
         Args:
@@ -130,7 +128,7 @@ class Scanner:
         Returns:
             A list of scanned dependencies.
         """
-        dependencies: List[Dependency] = []
+        dependencies: list[Dependency] = []
 
         for _, member in inspect.getmembers(module):
             if getattr(member, "__module__", None) != module.__name__ or not callable(
@@ -188,7 +186,7 @@ class Scanner:
 
 class InjectDecoratorArgs(NamedTuple):
     wrapped: bool
-    tags: Optional[Iterable[str]]
+    tags: Iterable[str] | None
 
 
 @overload
@@ -197,20 +195,14 @@ def injectable(obj: Callable[P, T]) -> Callable[P, T]: ...
 
 @overload
 def injectable(
-    *, tags: Optional[Iterable[str]] = None
+    *, tags: Iterable[str] | None = None
 ) -> Callable[[Callable[P, T]], Callable[P, T]]: ...
 
 
 def injectable(
-    obj: Optional[Callable[P, T]] = None,
-    tags: Optional[Iterable[str]] = None,
-) -> Union[
-    Callable[
-        [Callable[P, T]],
-        Callable[P, T],
-    ],
-    Callable[P, T],
-]:
+    obj: Callable[P, T] | None = None,
+    tags: Iterable[str] | None = None,
+) -> Callable[[Callable[P, T]], Callable[P, T]] | Callable[P, T]:
     """Decorator for marking a function or method as requiring dependency injection.
 
     Args:

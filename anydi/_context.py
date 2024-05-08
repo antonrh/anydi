@@ -3,7 +3,7 @@ from __future__ import annotations
 import abc
 import contextlib
 from types import TracebackType
-from typing import TYPE_CHECKING, Any, Dict, List, Tuple, Type, TypeVar, cast
+from typing import TYPE_CHECKING, Any, TypeVar, cast
 
 from typing_extensions import Self, final
 
@@ -87,7 +87,7 @@ class ScopedContext(abc.ABC):
 
     def _get_provider_arguments(
         self, provider: Provider
-    ) -> Tuple[List[Any], Dict[str, Any]]:
+    ) -> tuple[list[Any], dict[str, Any]]:
         """Retrieve the arguments for a provider.
 
         Args:
@@ -107,7 +107,7 @@ class ScopedContext(abc.ABC):
 
     async def _aget_provider_arguments(
         self, provider: Provider
-    ) -> Tuple[List[Any], Dict[str, Any]]:
+    ) -> tuple[list[Any], dict[str, Any]]:
         """Asynchronously retrieve the arguments for a provider.
 
         Args:
@@ -132,7 +132,7 @@ class ResourceScopedContext(ScopedContext):
     def __init__(self, container: Container) -> None:
         """Initialize the ScopedContext."""
         super().__init__(container)
-        self._instances: Dict[Type[Any], Any] = {}
+        self._instances: dict[type[Any], Any] = {}
         self._stack = contextlib.ExitStack()
         self._async_stack = contextlib.AsyncExitStack()
 
@@ -237,7 +237,7 @@ class ResourceScopedContext(ScopedContext):
 
     def __exit__(
         self,
-        exc_type: Type[BaseException] | None,
+        exc_type: type[BaseException] | None,
         exc_val: BaseException | None,
         exc_tb: TracebackType | None,
     ) -> None:
@@ -265,7 +265,7 @@ class ResourceScopedContext(ScopedContext):
 
     async def __aexit__(
         self,
-        exc_type: Type[BaseException] | None,
+        exc_type: type[BaseException] | None,
         exc_val: BaseException | None,
         exc_tb: TracebackType | None,
     ) -> None:
