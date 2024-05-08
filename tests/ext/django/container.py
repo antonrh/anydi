@@ -22,12 +22,6 @@ def configure(container: anydi.Container) -> None:
         with HelloService() as hello_service:
             yield hello_service
 
-    # @container.provider(scope="request")
-    # def request_id() -> Annotated[str, "request-id"]:
-    #     return uuid.uuid4().hex
-
-    container.register(
-        Annotated[str, "request-id"],
-        lambda: uuid.uuid4().hex,
-        scope="request",
-    )
+    @container.provider(scope="request")
+    def request_id() -> Annotated[str, "request-id"]:
+        return uuid.uuid4().hex

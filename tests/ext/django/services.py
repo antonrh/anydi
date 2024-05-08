@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 from types import TracebackType
-from typing import Type
 
 from typing_extensions import Self
 
@@ -22,7 +21,7 @@ class HelloService:
 
     def __exit__(
         self,
-        exc_type: Type[BaseException] | None,
+        exc_type: type[BaseException] | None,
         exc_val: BaseException | None,
         exc_tb: TracebackType | None,
     ) -> None:
