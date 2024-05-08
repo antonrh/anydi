@@ -67,7 +67,7 @@ def is_builtin_type(tp: type[Any]) -> bool:
 
 
 @functools.lru_cache(maxsize=None)
-def get_signature(obj: Callable[..., Any]) -> inspect.Signature:
+def get_typed_signature(obj: Callable[..., Any]) -> inspect.Signature:
     """Get the signature of a callable object.
 
     This function uses the `inspect.signature` function to retrieve the signature

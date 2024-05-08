@@ -20,7 +20,7 @@ from typing import (
 from typing_extensions import NamedTuple, ParamSpec
 
 from ._types import is_marker
-from ._utils import get_signature
+from ._utils import get_typed_signature
 
 if TYPE_CHECKING:
     from ._container import Container
@@ -157,9 +157,9 @@ class Scanner:
 
             # Get by Marker
             if inspect.isclass(member):
-                signature = get_signature(member.__init__)
+                signature = get_typed_signature(member.__init__)
             else:
-                signature = get_signature(member)
+                signature = get_typed_signature(member)
             for parameter in signature.parameters.values():
                 if is_marker(parameter.default):
                     dependencies.append(

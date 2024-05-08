@@ -5,7 +5,7 @@ from typing import Any, Callable, Mapping, Type, TypeVar, Union
 
 from typing_extensions import Annotated, Literal, Self, TypeAlias
 
-from ._utils import get_full_qualname, get_signature
+from ._utils import get_full_qualname, get_typed_signature
 
 Scope = Literal["transient", "singleton", "request"]
 
@@ -64,7 +64,7 @@ class Provider:
         Returns:
             The parameters of the provider.
         """
-        return get_signature(self.obj).parameters
+        return get_typed_signature(self.obj).parameters
 
     @cached_property
     def is_class(self) -> bool:

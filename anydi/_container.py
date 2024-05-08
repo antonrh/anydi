@@ -43,7 +43,7 @@ from ._logger import logger
 from ._module import Module, ModuleRegistry
 from ._scanner import Scanner
 from ._types import AnyInterface, Interface, Provider, Scope, is_marker
-from ._utils import get_full_qualname, get_signature, is_builtin_type
+from ._utils import get_full_qualname, get_typed_signature, is_builtin_type
 
 T = TypeVar("T", bound=Any)
 P = ParamSpec("P")
@@ -366,7 +366,7 @@ class Container:
             The auto scope, or None if the auto scope cannot be detected.
         """
         has_transient, has_request, has_singleton = False, False, False
-        for parameter in get_signature(obj).parameters.values():
+        for parameter in get_typed_signature(obj).parameters.values():
             sub_provider = self._get_or_register_provider(parameter.annotation)
             if not has_transient and sub_provider.scope == "transient":
                 has_transient = True
@@ -711,7 +711,7 @@ class Container:
         Raises:
             TypeError: If the provider return annotation is missing or invalid.
         """
-        annotation = get_signature(obj).return_annotation
+        annotation = get_typed_signature(obj).return_annotation
 
         if annotation is inspect._empty:  # noqa
             raise TypeError(
@@ -741,7 +741,7 @@ class Container:
                 of the injected parameters.
         """
         injected_params = {}
-        for parameter in get_signature(obj).parameters.values():
+        for parameter in get_typed_signature(obj).parameters.values():
             if not is_marker(parameter.default):
                 continue
             try:
