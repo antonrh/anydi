@@ -1,7 +1,9 @@
+from __future__ import annotations
+
 import logging
 import uuid
 from dataclasses import dataclass
-from typing import Any, AsyncIterator, Dict, Iterator, List, Tuple, Type
+from typing import Any, AsyncIterator, Dict, Iterator, List, Tuple
 
 import pytest
 from typing_extensions import Annotated
@@ -870,7 +872,7 @@ async def test_override_instance_async_resource_provider(container: Container) -
     ],
 )
 def test_get_supported_provider_annotation(
-    container: Container, annotation: Type[Any], expected: Type[Any]
+    container: Container, annotation: type[Any], expected: type[Any]
 ) -> None:
     def provider() -> annotation:  # type: ignore[valid-type]
         return object()
