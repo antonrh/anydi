@@ -1,11 +1,11 @@
 import inspect
 from dataclasses import dataclass
 from functools import cached_property
-from typing import Any, Callable, Mapping, Type, TypeVar, Union
+from typing import Any, Callable, Type, TypeVar, Union
 
 from typing_extensions import Annotated, Literal, Self, TypeAlias
 
-from ._utils import get_full_qualname, get_typed_signature
+from ._utils import get_full_qualname, get_typed_parameters
 
 Scope = Literal["transient", "singleton", "request"]
 
@@ -58,13 +58,13 @@ class Provider:
         return get_full_qualname(self.obj)
 
     @cached_property
-    def parameters(self) -> Mapping[str, inspect.Parameter]:
+    def parameters(self) -> list[inspect.Parameter]:
         """Returns the parameters of the provider as a mapping.
 
         Returns:
             The parameters of the provider.
         """
-        return get_typed_signature(self.obj).parameters
+        return get_typed_parameters(self.obj)
 
     @cached_property
     def is_class(self) -> bool:

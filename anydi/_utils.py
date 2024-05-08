@@ -101,12 +101,12 @@ def get_typed_return_annotation(call: Callable[..., Any]) -> Any:
     return get_typed_annotation(annotation, globalns)
 
 
-def get_typed_signature(obj: Callable[..., Any]) -> inspect.Signature:
-    """Get the signature of a callable object."""
-    signature_kwargs: dict[str, Any] = {}
-    if sys.version_info >= (3, 10):
-        signature_kwargs["eval_str"] = True
-    return inspect.signature(obj, **signature_kwargs)
+def get_typed_parameters(obj: Callable[..., Any]) -> list[inspect.Parameter]:
+    """Get the typed parameters of a callable object."""
+    return [
+        parameter.replace()
+        for name, parameter in inspect.signature(obj).parameters.items()
+    ]
 
 
 async def run_async(

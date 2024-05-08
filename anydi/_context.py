@@ -97,7 +97,7 @@ class ScopedContext(abc.ABC):
             The arguments for the provider.
         """
         args, kwargs = [], {}
-        for parameter in provider.parameters.values():
+        for parameter in provider.parameters:
             instance = self.container.resolve(parameter.annotation)
             if parameter.kind == parameter.POSITIONAL_ONLY:
                 args.append(instance)
@@ -117,7 +117,7 @@ class ScopedContext(abc.ABC):
             The arguments for the provider.
         """
         args, kwargs = [], {}
-        for parameter in provider.parameters.values():
+        for parameter in provider.parameters:
             instance = await self.container.aresolve(parameter.annotation)
             if parameter.kind == parameter.POSITIONAL_ONLY:
                 args.append(instance)
