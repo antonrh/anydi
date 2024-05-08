@@ -33,7 +33,7 @@ class ContainerConfig(AppConfig):  # type: ignore[misc]
                 )
             except ImportError as exc:
                 raise ImproperlyConfigured(
-                    f"Cannot import container getter '{container_factory_path}'."
+                    f"Cannot import container factory '{container_factory_path}'."
                 ) from exc
             self.container = container_factory()
         else:
