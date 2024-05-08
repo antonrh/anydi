@@ -98,3 +98,59 @@ def say_hello(message: str = Inject()) -> dict[str, str]:
 # Install the container into the FastAPI app
 anydi.ext.fastapi.install(app, container)
 ```
+
+
+
+## Django Ninja Example
+
+*container.py*
+
+```python
+from anydi import Container
+
+
+def get_container() -> Container:
+    container = Container()
+
+    @container.provider(scope="singleton")
+    def message() -> str:
+        return "Hello, World!"
+
+    return container
+```
+
+*settings.py*
+
+```python
+INSTALLED_APPS = [
+    ...
+    "anydi.ext.django",
+]
+
+ANYDI = {
+    "CONTAINER_FACTORY": "myapp.container.get_container",
+    "PATCH_NINJA": True,
+}
+```
+
+*urls.py*
+
+```python
+from django.http import HttpRequest
+from django.urls import path
+from ninja import NinjaAPI
+
+from anydi import auto
+
+api = NinjaAPI()
+
+
+@api.get("/hello")
+def say_hello(request: HttpRequest, message: str = auto) -> dict[str, str]:
+    return {"message": message}
+
+
+urlpatterns = [
+    path("api/", api.urls),
+]
+```

@@ -6,7 +6,7 @@ import builtins
 import functools
 import inspect
 import sys
-from typing import Any, Callable, ForwardRef, TypeVar, cast
+from typing import Any, AsyncIterator, Callable, ForwardRef, Iterator, TypeVar, cast
 
 from typing_extensions import Annotated, ParamSpec, get_origin
 
@@ -94,6 +94,17 @@ def get_typed_parameters(obj: Callable[..., Any]) -> list[inspect.Parameter]:
         )
         for name, parameter in inspect.signature(obj).parameters.items()
     ]
+
+
+_resource_origins = (
+    get_origin(Iterator),
+    get_origin(AsyncIterator),
+)
+
+
+def has_resource_origin(origin: Any) -> bool:
+    """Check if the given origin is a resource origin."""
+    return origin in _resource_origins
 
 
 async def run_async(

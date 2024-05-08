@@ -47,6 +47,7 @@ from ._utils import (
     get_full_qualname,
     get_typed_parameters,
     get_typed_return_annotation,
+    has_resource_origin,
     is_builtin_type,
 )
 
@@ -723,7 +724,9 @@ class Container:
                 f"Missing `{get_full_qualname(obj)}` provider return annotation."
             )
 
-        if get_origin(annotation) in (get_origin(Iterator), get_origin(AsyncIterator)):
+        origin = get_origin(annotation)
+
+        if has_resource_origin(origin):
             args = get_args(annotation)
             if args:
                 return args[0]
