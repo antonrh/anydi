@@ -11,7 +11,7 @@ from ninja.signature.details import (
 )
 from ninja.signature.utils import get_path_param_names, get_typed_signature
 
-from anydi._types import Marker  # noqa
+from anydi._types import is_marker  # noqa
 
 
 class ViewSignature(BaseViewSignature):
@@ -46,7 +46,7 @@ class ViewSignature(BaseViewSignature):
                 continue
 
             # Skip default values that are anydi dependency markers
-            if isinstance(arg.default, Marker):
+            if is_marker(arg.default):
                 self.dependencies.append((name, arg.annotation))
                 continue
 

@@ -75,7 +75,10 @@ class ContainerConfig(AppConfig):  # type: ignore[misc]
 
         # Auto-injecting the container into views
         if urlconf := self.settings["INJECT_URLCONF"]:
-            inject_urlpatterns(self.container, urlconf=urlconf)
+            if isinstance(urlconf, str):
+                urlconf = [urlconf]
+            for u in urlconf:
+                inject_urlpatterns(self.container, urlconf=u)
 
         # Scan packages
         for scan_package in self.settings["SCAN_PACKAGES"]:
