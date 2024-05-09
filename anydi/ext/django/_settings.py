@@ -11,7 +11,7 @@ class Settings(TypedDict):
     STRICT_MODE: bool
     REGISTER_SETTINGS: bool
     REGISTER_COMPONENTS: bool
-    INJECT_URLCONF: str | None
+    INJECT_URLCONF: str | Sequence[str] | None
     MODULES: Sequence[str]
     SCAN_PACKAGES: Sequence[str]
     PATCH_NINJA: bool

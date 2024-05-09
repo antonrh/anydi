@@ -94,10 +94,14 @@ def inject_urlpatterns(container: anydi.Container, *, urlconf: str) -> None:
     """Auto-inject the container into views."""
     resolver = get_resolver(urlconf)
     for pattern in iter_urlpatterns(resolver.url_patterns):
+        # Skip already injected views
+        if hasattr(pattern.callback, "_injected"):
+            continue
         # Skip django-ninja views
         if pattern.lookup_str.startswith("ninja."):
             continue  # pragma: no cover
         pattern.callback = container.inject(pattern.callback)
+        pattern.callback._injected = True  # type: ignore[attr-defined]
 
 
 def iter_urlpatterns(

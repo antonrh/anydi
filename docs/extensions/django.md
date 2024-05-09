@@ -62,7 +62,7 @@ The `HelloService` will be automatically injected into the hello view through th
 * `STRICT_MODE: bool` - Determines the container's behavior when a dependency cannot be resolved. If set to `True`, the container will raise an exception. If `False`, it will attempt to automatically create the dependency.
 * `REGISTER_SETTINGS: bool` - If `True`, the container will register the Django settings within it.
 * `REGISTER_COMPONENTS: bool` - If `True`, the container will register Django components such as the database and cache.
-* `INJECT_URLCONF: str | None` - Specifies the URL configuration where dependencies should be injected.
+* `INJECT_URLCONF: str | Sequence[str] | None` - Specifies the URL configuration where dependencies should be injected.
 * `MODULES: Sequence[str]` - Lists the modules to be scanned for dependencies.
 * `SCAN_PACKAGES: Sequence[str]` - Designates the packages to be scanned for dependencies.
 * `PATCH_NINJA: bool` - If `True`, the container will modify the `ninja` framework to support dependency injection.
