@@ -1,4 +1,5 @@
-import typing as t
+import sys
+from typing import Any, Type, Union
 
 import pytest
 from typing_extensions import Annotated
@@ -18,7 +19,7 @@ from tests.fixtures import Service
         (Service, False),
     ],
 )
-def test_is_builtin_type(tp: t.Type[t.Any], expected: bool) -> None:
+def test_is_builtin_type(tp: Type[Any], expected: bool) -> None:
     assert is_builtin_type(tp) == expected
 
 
@@ -28,16 +29,40 @@ def test_is_builtin_type(tp: t.Type[t.Any], expected: bool) -> None:
         (int, "int"),
         (Service, "tests.fixtures.Service"),
         (Service(ident="test"), "tests.fixtures.Service"),
-        (
+        pytest.param(
             Annotated[Service, "service"],
-            'Annotated[tests.fixtures.Service, "service"]]',
+            'typing.Annotated[tests.fixtures.Service, "service"]',
+            marks=pytest.mark.skipif(
+                sys.version_info < (3, 9), reason="Requires Python 3.9"
+            ),
+        ),
+        pytest.param(
+            Annotated[Service, "service"],
+            'typing_extensions.Annotated[tests.fixtures.Service, "service"]',
+            marks=pytest.mark.skipif(
+                sys.version_info >= (3, 9), reason="Requires Python 3.9"
+            ),
         ),
         (lambda x: x, "tests.test_utils.<lambda>"),
         (123, "int"),
         ("hello", "str"),
+        pytest.param(
+            Union[str, int],
+            "typing.Union[str, int]",
+            marks=pytest.mark.skipif(
+                sys.version_info < (3, 10), reason="Requires Python 3.10"
+            ),
+        ),
+        pytest.param(
+            Union[str, int],
+            "typing._SpecialForm[str, int]",
+            marks=pytest.mark.skipif(
+                sys.version_info >= (3, 10), reason="Requires Python 3.8 and 3.9"
+            ),
+        ),
     ],
 )
-def test_get_full_qualname(obj: t.Any, expected_qualname: str) -> None:
+def test_get_full_qualname(obj: Any, expected_qualname: str) -> None:
     qualname = get_full_qualname(obj)
 
     assert qualname == expected_qualname

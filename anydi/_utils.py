@@ -8,7 +8,7 @@ import inspect
 import sys
 from typing import Any, AsyncIterator, Callable, ForwardRef, Iterator, TypeVar, cast
 
-from typing_extensions import Annotated, ParamSpec, get_origin
+from typing_extensions import ParamSpec, get_args, get_origin
 
 try:
     import anyio  # noqa
@@ -33,27 +33,28 @@ P = ParamSpec("P")
 
 def get_full_qualname(obj: Any) -> str:
     """Get the fully qualified name of an object."""
-    origin = get_origin(obj)
-    if origin is Annotated:
-        metadata = ", ".join(
-            [
-                f'"{arg}"' if isinstance(arg, str) else str(arg)
-                for arg in obj.__metadata__
-            ]
-        )
-        return f"Annotated[{get_full_qualname(obj.__args__[0])}, {metadata}]]"
-
     qualname = getattr(obj, "__qualname__", None)
-    module_name = getattr(obj, "__module__", None)
+    module = getattr(obj, "__module__", None)
+
     if qualname is None:
         qualname = type(obj).__qualname__
 
-    if module_name is None:
-        module_name = type(obj).__module__
+    if module is None:
+        module = type(obj).__module__
 
-    if module_name == builtins.__name__:
+    if module == builtins.__name__:
         return qualname
-    return f"{module_name}.{qualname}"
+
+    origin = get_origin(obj)
+
+    if origin:
+        args = ", ".join(
+            get_full_qualname(arg) if not isinstance(arg, str) else f'"{arg}"'
+            for arg in get_args(obj)
+        )
+        return f"{get_full_qualname(origin)}[{args}]"
+
+    return f"{module}.{qualname}"
 
 
 def is_builtin_type(tp: type[Any]) -> bool:
@@ -61,17 +62,19 @@ def is_builtin_type(tp: type[Any]) -> bool:
     return tp.__module__ == builtins.__name__
 
 
-def make_forwardref(annotation: str, globalns: dict[str, Any]) -> Any:
-    """Create a forward reference from a string annotation."""
-    forward_ref = ForwardRef(annotation)
-    return evaluate_forwardref(forward_ref, globalns, globalns)
-
-
-def get_typed_annotation(annotation: Any, globalns: dict[str, Any]) -> Any:
+def get_typed_annotation(
+    annotation: Any,
+    globalns: dict[str, Any],
+    module: Any = None,
+    is_class: bool = False,
+) -> Any:
     """Get the typed annotation of a parameter."""
     if isinstance(annotation, str):
-        annotation = ForwardRef(annotation)
-        annotation = evaluate_forwardref(annotation, globalns, globalns)
+        if sys.version_info < (3, 9):
+            annotation = ForwardRef(annotation)
+        else:
+            annotation = ForwardRef(annotation, module=module, is_class=is_class)
+        annotation = evaluate_forwardref(annotation, globalns, {})
     return annotation
 
 
@@ -82,15 +85,24 @@ def get_typed_return_annotation(obj: Callable[..., Any]) -> Any:
     if annotation is inspect.Signature.empty:
         return None
     globalns = getattr(obj, "__globals__", {})
-    return get_typed_annotation(annotation, globalns)
+    module = getattr(obj, "__module__", None)
+    is_class = inspect.isclass(obj)
+    return get_typed_annotation(annotation, globalns, module=module, is_class=is_class)
 
 
 def get_typed_parameters(obj: Callable[..., Any]) -> list[inspect.Parameter]:
     """Get the typed parameters of a callable object."""
     globalns = getattr(obj, "__globals__", {})
+    module = getattr(obj, "__module__", None)
+    is_class = inspect.isclass(obj)
     return [
         parameter.replace(
-            annotation=get_typed_annotation(parameter.annotation, globalns)
+            annotation=get_typed_annotation(
+                parameter.annotation,
+                globalns,
+                module=module,
+                is_class=is_class,
+            )
         )
         for name, parameter in inspect.signature(obj).parameters.items()
     ]
