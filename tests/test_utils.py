@@ -39,12 +39,16 @@ def test_is_builtin_type(tp: Type[Any], expected: bool) -> None:
         pytest.param(
             Union[str, int],
             "typing.Union[str, int]",
-            marks=pytest.mark.skipif(sys.version_info < (3, 10)),
+            marks=pytest.mark.skipif(
+                sys.version_info < (3, 10), reason="Requires Python 3.10"
+            ),
         ),
         pytest.param(
             Union[str, int],
             "typing._SpecialForm[str, int]",
-            marks=pytest.mark.skipif(sys.version_info >= (3, 10)),
+            marks=pytest.mark.skipif(
+                sys.version_info >= (3, 10), reason="Requires Python 3.8 and 3.9"
+            ),
         ),
     ],
 )
