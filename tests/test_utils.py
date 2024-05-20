@@ -29,9 +29,19 @@ def test_is_builtin_type(tp: Type[Any], expected: bool) -> None:
         (int, "int"),
         (Service, "tests.fixtures.Service"),
         (Service(ident="test"), "tests.fixtures.Service"),
-        (
+        pytest.param(
             Annotated[Service, "service"],
             'typing.Annotated[tests.fixtures.Service, "service"]',
+            marks=pytest.mark.skipif(
+                sys.version_info >= (3, 9), reason="Requires Python 3.9"
+            ),
+        ),
+        pytest.param(
+            Annotated[Service, "service"],
+            'typing_extensions.Annotated[tests.fixtures.Service, "service"]',
+            marks=pytest.mark.skipif(
+                sys.version_info < (3, 9), reason="Requires Python 3.9"
+            ),
         ),
         (lambda x: x, "tests.test_utils.<lambda>"),
         (123, "int"),
