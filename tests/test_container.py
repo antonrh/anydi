@@ -1,7 +1,7 @@
 import logging
 import uuid
 from dataclasses import dataclass
-from typing import Any, AsyncIterator, Dict, Iterator, List, Tuple, Type
+from typing import Any, AsyncIterator, Dict, Iterator, List, Sequence, Tuple, Type
 
 import pytest
 from typing_extensions import Annotated
@@ -769,6 +769,22 @@ def test_resolve_non_strict_with_primitive_class(container: Container) -> None:
         "The provider interface for `str` has not been registered. "
         "Please ensure that the provider interface is properly registered "
         "before attempting to use it."
+    )
+
+
+def test_resolve_non_strict_with_custom_type(container: Container) -> None:
+    class Klass:
+        def __init__(self, value: "str | Sequence[str] | int | list[str]") -> None:
+            self.value = value
+
+    with pytest.raises(LookupError) as exc_info:
+        _ = container.resolve(Klass)
+
+    assert str(exc_info.value) == (
+        "The provider interface for "
+        "`typing.Union[str, collections.abc.Sequence[str], int, list]` has not "
+        "been registered. Please ensure that the provider interface is properly "
+        "registered before attempting to use it."
     )
 
 

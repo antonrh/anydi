@@ -30,11 +30,12 @@ def test_is_builtin_type(tp: t.Type[t.Any], expected: bool) -> None:
         (Service(ident="test"), "tests.fixtures.Service"),
         (
             Annotated[Service, "service"],
-            'Annotated[tests.fixtures.Service, "service"]]',
+            'typing.Annotated[tests.fixtures.Service, "service"]',
         ),
         (lambda x: x, "tests.test_utils.<lambda>"),
         (123, "int"),
         ("hello", "str"),
+        (str | int, "types.UnionType[str, int]"),
     ],
 )
 def test_get_full_qualname(obj: t.Any, expected_qualname: str) -> None:

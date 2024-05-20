@@ -6,6 +6,7 @@ from typing import Any, Callable, Iterator, cast
 import pytest
 
 from anydi import Container
+from anydi._utils import get_typed_parameters
 
 
 def pytest_configure(config: pytest.Config) -> None:
@@ -63,14 +64,14 @@ def _anydi_injected_parameter_iterator(
     _anydi_unresolved: list[str],
 ) -> Callable[[], Iterator[tuple[str, Any]]]:
     def _iterator() -> Iterator[tuple[str, inspect.Parameter]]:
-        for name, parameter in inspect.signature(request.function).parameters.items():
+        for parameter in get_typed_parameters(request.function):
             if (
                 ((interface := parameter.annotation) is parameter.empty)
                 or interface in _anydi_unresolved
-                or name in request.node.funcargs
+                or parameter.name in request.node.funcargs
             ):
                 continue
-            yield name, interface
+            yield parameter.name, interface
 
     return _iterator
 
