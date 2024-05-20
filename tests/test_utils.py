@@ -1,3 +1,4 @@
+import sys
 from typing import Any, Type, Union
 
 import pytest
@@ -35,7 +36,16 @@ def test_is_builtin_type(tp: Type[Any], expected: bool) -> None:
         (lambda x: x, "tests.test_utils.<lambda>"),
         (123, "int"),
         ("hello", "str"),
-        (Union[str, int], "typing.Union[str, int]"),
+        pytest.param(
+            Union[str, int],
+            "typing.Union[str, int]",
+            marks=pytest.mark.skipif(sys.version_info < (3, 10)),
+        ),
+        pytest.param(
+            Union[str, int],
+            "typing._SpecialForm[str, int]",
+            marks=pytest.mark.skipif(sys.version_info >= (3, 10)),
+        ),
     ],
 )
 def test_get_full_qualname(obj: Any, expected_qualname: str) -> None:
