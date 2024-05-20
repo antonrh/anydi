@@ -794,7 +794,7 @@ def test_resolve_non_strict_with_custom_type(container: Container) -> None:
 
     assert str(exc_info.value) == (
         "The provider interface for "
-        "`typing.Union[str, collections.abc.Sequence[str], int, list]` has not "
+        "`typing.Union[str, collections.abc.Sequence[str], int, list[str]]` has not "
         "been registered. Please ensure that the provider interface is properly "
         "registered before attempting to use it."
     )
