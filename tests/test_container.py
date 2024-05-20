@@ -785,7 +785,7 @@ def test_resolve_non_strict_with_primitive_class(container: Container) -> None:
 def test_resolve_non_strict_with_custom_type(container: Container) -> None:
     class Klass:
         def __init__(
-            self, value: "Union[str, Sequence[str] | int | List[str]]"
+            self, value: "Union[str, Sequence[str], int, List[str]]"
         ) -> None:
             self.value = value
 
