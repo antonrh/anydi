@@ -1,7 +1,17 @@
 import logging
 import uuid
 from dataclasses import dataclass
-from typing import Any, AsyncIterator, Dict, Iterator, List, Sequence, Tuple, Type
+from typing import (
+    Any,
+    AsyncIterator,
+    Dict,
+    Iterator,
+    List,
+    Sequence,
+    Tuple,
+    Type,
+    Union,
+)
 
 import pytest
 from typing_extensions import Annotated
@@ -774,7 +784,9 @@ def test_resolve_non_strict_with_primitive_class(container: Container) -> None:
 
 def test_resolve_non_strict_with_custom_type(container: Container) -> None:
     class Klass:
-        def __init__(self, value: "str | Sequence[str] | int | list[str]") -> None:
+        def __init__(
+            self, value: "Union[str, Sequence[str] | int | List[str]]"
+        ) -> None:
             self.value = value
 
     with pytest.raises(LookupError) as exc_info:
