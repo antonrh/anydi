@@ -70,7 +70,10 @@ def get_typed_annotation(
 ) -> Any:
     """Get the typed annotation of a parameter."""
     if isinstance(annotation, str):
-        annotation = ForwardRef(annotation, module=module, is_class=is_class)
+        if sys.version_info < (3, 9):
+            annotation = ForwardRef(annotation)
+        else:
+            annotation = ForwardRef(annotation, module=module, is_class=is_class)
         annotation = evaluate_forwardref(annotation, globalns, {})
     return annotation
 
