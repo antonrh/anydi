@@ -1,4 +1,4 @@
-import typing as t
+from typing import Any, Type, Union
 
 import pytest
 from typing_extensions import Annotated
@@ -18,7 +18,7 @@ from tests.fixtures import Service
         (Service, False),
     ],
 )
-def test_is_builtin_type(tp: t.Type[t.Any], expected: bool) -> None:
+def test_is_builtin_type(tp: Type[Any], expected: bool) -> None:
     assert is_builtin_type(tp) == expected
 
 
@@ -35,10 +35,10 @@ def test_is_builtin_type(tp: t.Type[t.Any], expected: bool) -> None:
         (lambda x: x, "tests.test_utils.<lambda>"),
         (123, "int"),
         ("hello", "str"),
-        (str | int, "types.UnionType[str, int]"),
+        (Union[str, int], "typing.Union[str, int]"),
     ],
 )
-def test_get_full_qualname(obj: t.Any, expected_qualname: str) -> None:
+def test_get_full_qualname(obj: Any, expected_qualname: str) -> None:
     qualname = get_full_qualname(obj)
 
     assert qualname == expected_qualname
