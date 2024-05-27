@@ -6,6 +6,7 @@ import contextlib
 import inspect
 import types
 import uuid
+from collections import defaultdict
 from contextvars import ContextVar
 from functools import wraps
 from typing import (
@@ -24,7 +25,7 @@ from typing import (
     overload,
 )
 
-from typing_extensions import ParamSpec, final, get_args, get_origin
+from typing_extensions import ParamSpec, Self, final, get_args, get_origin
 
 try:
     from types import NoneType
@@ -85,6 +86,7 @@ class Container:
             strict: Whether to enable strict mode. Defaults to False.
         """
         self._providers: dict[type[Any], Provider] = {}
+        self._providers_cache: dict[Scope, list[type[Any]]] = defaultdict(list)
         self._singleton_context = SingletonContext(self)
         self._transient_context = TransientContext(self)
         self._request_context_var: ContextVar[RequestContext | None] = ContextVar(
@@ -174,7 +176,7 @@ class Container:
 
         if interface in self._providers:
             if override:
-                self._providers[interface] = provider
+                self._set_provider(interface, provider)
                 return provider
 
             raise LookupError(
@@ -187,7 +189,7 @@ class Container:
         self._validate_provider_type(provider)
         self._validate_provider_match_scopes(interface, provider)
 
-        self._providers[interface] = provider
+        self._set_provider(interface, provider)
         return provider
 
     def unregister(self, interface: AnyInterface) -> None:
@@ -274,6 +276,17 @@ class Container:
                     scope = self._detect_scope(interface)
                 return self.register(interface, interface, scope=scope or "transient")
             raise
+
+    def _set_provider(self, interface: AnyInterface, provider: Provider) -> None:
+        """Set a provider by interface.
+
+        Args:
+            interface: The interface for which to set the provider.
+            provider: The provider object to set.
+        """
+        self._providers[interface] = provider
+        if provider.is_resource:
+            self._providers_cache[provider.scope].append(interface)
 
     def _validate_provider_scope(self, provider: Provider) -> None:
         """Validate the scope of a provider.
@@ -398,11 +411,23 @@ class Container:
         """
         self._modules.register(module)
 
+    def __enter__(self) -> Self:
+        """Enter the singleton context."""
+        self.start()
+        return self
+
+    def __exit__(
+        self,
+        exc_type: type[BaseException] | None,
+        exc_val: BaseException | None,
+        exc_tb: types.TracebackType | None,
+    ) -> None:
+        """Exit the singleton context."""
+        self.close()
+
     def start(self) -> None:
         """Start the singleton context."""
-        for interface, provider in self._providers.items():
-            if provider.scope == "singleton":
-                self.resolve(interface)  # noqa
+        self._singleton_context.start()
 
     def close(self) -> None:
         """Close the singleton context."""
@@ -427,6 +452,20 @@ class Container:
         with context:
             yield
             self._request_context_var.reset(token)
+
+    async def __aenter__(self) -> Self:
+        """Enter the singleton context."""
+        await self.astart()
+        return self
+
+    async def __aexit__(
+        self,
+        exc_type: type[BaseException] | None,
+        exc_val: BaseException | None,
+        exc_tb: types.TracebackType | None,
+    ) -> None:
+        """Exit the singleton context."""
+        await self.aclose()
 
     async def astart(self) -> None:
         """Start the singleton context asynchronously."""

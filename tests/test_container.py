@@ -309,20 +309,17 @@ def test_register_events(container: Container) -> None:
         yield
         events.append(f"event_1: after {message}")
 
-    @container.provider(scope="singleton")
+    @container.provider(scope="request")
     def event_2(message: str) -> Iterator[None]:
         events.append(f"event_2: before {message}")
         yield
         events.append(f"event_2: after {message}")
 
-    container.start()
-
-    assert events == [
-        "event_1: before test",
-        "event_2: before test",
-    ]
-
-    container.close()
+    with container, container.request_context():
+        assert events == [
+            "event_1: before test",
+            "event_2: before test",
+        ]
 
     assert events == [
         "event_1: before test",
@@ -345,20 +342,17 @@ async def test_register_async_events(container: Container) -> None:
         yield
         events.append(f"event_1: after {message}")
 
-    @container.provider(scope="singleton")
+    @container.provider(scope="request")
     def event_2(message: str) -> Iterator[None]:
         events.append(f"event_2: before {message}")
         yield
         events.append(f"event_2: after {message}")
 
-    await container.astart()
-
-    assert events == [
-        "event_1: before test",
-        "event_2: before test",
-    ]
-
-    await container.aclose()
+    async with container, container.arequest_context():
+        assert events == [
+            "event_1: before test",
+            "event_2: before test",
+        ]
 
     assert events == [
         "event_1: before test",
