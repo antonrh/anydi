@@ -172,7 +172,7 @@ class Container:
 
         # Create Event type
         if provider.is_resource and (interface is NoneType or interface is None):
-            interface = type(f"Event{uuid.uuid4().hex}", (), {})
+            interface = type(f"Event_{uuid.uuid4().hex}", (), {})
 
         if interface in self._providers:
             if override:
