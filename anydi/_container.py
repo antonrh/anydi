@@ -518,7 +518,10 @@ class Container:
     def reset(self) -> None:
         """Reset resolved instances."""
         for interface, provider in self._providers.items():
-            scoped_context = self._get_scoped_context(provider.scope)
+            try:
+                scoped_context = self._get_scoped_context(provider.scope)
+            except LookupError:
+                continue
             if isinstance(scoped_context, ResourceScopedContext):
                 scoped_context.delete(interface)
 
