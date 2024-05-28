@@ -3,11 +3,11 @@ from __future__ import annotations
 import abc
 import contextlib
 from types import TracebackType
-from typing import TYPE_CHECKING, Any, TypeVar, cast
+from typing import TYPE_CHECKING, Any, ClassVar, TypeVar, cast
 
 from typing_extensions import Self, final
 
-from ._types import AnyInterface, Interface, Provider
+from ._types import AnyInterface, Interface, Provider, Scope
 from ._utils import run_async
 
 if TYPE_CHECKING:
@@ -18,6 +18,8 @@ T = TypeVar("T")
 
 class ScopedContext(abc.ABC):
     """ScopedContext base class."""
+
+    scope: ClassVar[Scope]
 
     def __init__(self, container: Container) -> None:
         self.container = container
@@ -233,6 +235,7 @@ class ResourceScopedContext(ScopedContext):
         Returns:
             The scoped context.
         """
+        self.start()
         return self
 
     def __exit__(
@@ -251,6 +254,11 @@ class ResourceScopedContext(ScopedContext):
         self.close()
         return
 
+    def start(self) -> None:
+        """Start the scoped context."""
+        for interface in self.container._providers_cache.get(self.scope, []):  # noqa
+            self.container.resolve(interface)
+
     def close(self) -> None:
         """Close the scoped context."""
         self._stack.close()
@@ -261,6 +269,7 @@ class ResourceScopedContext(ScopedContext):
         Returns:
             The scoped context.
         """
+        await self.astart()
         return self
 
     async def __aexit__(
@@ -279,6 +288,11 @@ class ResourceScopedContext(ScopedContext):
         await self.aclose()
         return
 
+    async def astart(self) -> None:
+        """Start the scoped context asynchronously."""
+        for interface in self.container._providers_cache.get(self.scope, []):  # noqa
+            await self.container.aresolve(interface)
+
     async def aclose(self) -> None:
         """Close the scoped context asynchronously."""
         await run_async(self._stack.close)
@@ -289,15 +303,21 @@ class ResourceScopedContext(ScopedContext):
 class SingletonContext(ResourceScopedContext):
     """A scoped context representing the "singleton" scope."""
 
+    scope = "singleton"
+
 
 @final
 class RequestContext(ResourceScopedContext):
     """A scoped context representing the "request" scope."""
 
+    scope = "request"
+
 
 @final
 class TransientContext(ScopedContext):
     """A scoped context representing the "transient" scope."""
+
+    scope = "transient"
 
     def get(self, interface: Interface[T], provider: Provider) -> T:
         """Get an instance of a dependency from the transient context.
