@@ -65,7 +65,7 @@ class HelloService:
 container = Container()
 
 
-@di.provider(scope="singleton")
+@container.provider(scope="singleton")
 def hello_service() -> HelloService:
     return HelloService()
 
