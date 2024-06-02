@@ -94,17 +94,18 @@ def _anydi_inject(
     container = cast(Container, request.getfixturevalue("anydi_setup_container"))
 
     for argname, interface in _anydi_injected_parameter_iterator():
+        # Skip if the interface is not registered
+        if container.strict and not container.is_registered(interface):
+            continue
+
         # Release the instance if it was already resolved
         if container.is_resolved(interface):
             container.release(interface)
 
         try:
-            # Resolve the instance
-            instance = container.resolve(interface)
+            request.node.funcargs[argname] = container.resolve(interface)
         except LookupError:
             _anydi_unresolved.append(interface)
-            continue
-        request.node.funcargs[argname] = instance
 
 
 @pytest.fixture(autouse=True)
@@ -122,14 +123,15 @@ async def _anydi_ainject(
     container = cast(Container, request.getfixturevalue("anydi_setup_container"))
 
     for argname, interface in _anydi_injected_parameter_iterator():
+        # Skip if the interface is not registered
+        if container.strict and not container.is_registered(interface):
+            continue
+
         # Release the instance if it was already resolved
         if container.is_resolved(interface):
             container.release(interface)
 
         try:
-            # Resolve the instance
-            instance = await container.aresolve(interface)
+            request.node.funcargs[argname] = await container.aresolve(interface)
         except LookupError:
             _anydi_unresolved.append(interface)
-            continue
-        request.node.funcargs[argname] = instance
