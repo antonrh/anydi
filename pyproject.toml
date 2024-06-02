@@ -36,10 +36,10 @@ packages = [
 
 [tool.poetry.dependencies]
 python = "^3.8"
-typing-extensions = "^4.8.0"
+typing-extensions = "^4.12.1"
 anyio = { version = "^3.6.2", optional = true }
 mkdocs = { version = "^1.4.2", optional = true }
-mkdocs-material = { version = "^9.1.13", optional = true }
+mkdocs-material = { version = "^9.5.21", optional = true }
 
 [tool.poetry.extras]
 docs = ["mkdocs", "mkdocs-material"]
