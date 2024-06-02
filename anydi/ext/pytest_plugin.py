@@ -6,7 +6,6 @@ from typing import Any, Callable, Iterator, cast
 import pytest
 
 from anydi import Container
-from anydi._types import is_marker
 from anydi._utils import get_typed_parameters
 
 
@@ -23,12 +22,6 @@ def pytest_addoption(parser: pytest.Parser) -> None:
         help="Inject all dependencies",
         type="bool",
         default=False,
-    )
-    parser.addini(
-        "anydi_inject_auto",
-        help="Automatically inject dependencies",
-        type="bool",
-        default=True,
     )
 
 
@@ -71,17 +64,15 @@ def _anydi_injected_parameter_iterator(
     _anydi_unresolved: list[str],
 ) -> Callable[[], Iterator[tuple[str, Any]]]:
     registered_fixtures = request.session._fixturemanager._arg2fixturedefs  # noqa
-    inject_auto = cast(bool, request.config.getini("anydi_inject_auto"))
 
     def _iterator() -> Iterator[tuple[str, inspect.Parameter]]:
         for parameter in get_typed_parameters(request.function):
             interface = parameter.annotation
-            if interface is parameter.empty:
-                continue
-            if not inject_auto and is_marker(parameter.default):
-                yield parameter.name, interface
-                continue
-            if interface in _anydi_unresolved or parameter.name in registered_fixtures:
+            if (
+                interface is parameter.empty
+                or interface in _anydi_unresolved
+                or parameter.name in registered_fixtures
+            ):
                 continue
             yield parameter.name, interface
 
@@ -104,17 +95,18 @@ def _anydi_inject(
     container = cast(Container, request.getfixturevalue("anydi_setup_container"))
 
     for argname, interface in _anydi_injected_parameter_iterator():
+        # Skip if the interface is not registered
+        if container.strict and not container.is_registered(interface):
+            continue
+
         # Release the instance if it was already resolved
         if container.is_resolved(interface):
             container.release(interface)
 
         try:
-            # Resolve the instance
-            instance = container.resolve(interface)
-        except LookupError:
+            request.node.funcargs[argname] = container.resolve(interface)
+        except Exception:  # noqa
             _anydi_unresolved.append(interface)
-            continue
-        request.node.funcargs[argname] = instance
 
 
 @pytest.fixture(autouse=True)
@@ -132,14 +124,15 @@ async def _anydi_ainject(
     container = cast(Container, request.getfixturevalue("anydi_setup_container"))
 
     for argname, interface in _anydi_injected_parameter_iterator():
+        # Skip if the interface is not registered
+        if container.strict and not container.is_registered(interface):
+            continue
+
         # Release the instance if it was already resolved
         if container.is_resolved(interface):
             container.release(interface)
 
         try:
-            # Resolve the instance
-            instance = await container.aresolve(interface)
-        except LookupError:
+            request.node.funcargs[argname] = await container.aresolve(interface)
+        except Exception:  # noqa
             _anydi_unresolved.append(interface)
-            continue
-        request.node.funcargs[argname] = instance
