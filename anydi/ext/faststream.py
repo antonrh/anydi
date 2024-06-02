@@ -53,7 +53,8 @@ class Resolver(HasInterface, Depends):
         super().__init__(dependency=self._dependency, use_cache=True, cast=True)
 
     async def _dependency(self, context: ContextRepo) -> Any:
-        return get_container(context.get("broker")).resolve(self.interface)
+        container = get_container(context.get("broker"))
+        return await container.aresolve(self.interface)
 
 
 def Inject() -> Any:  # noqa
