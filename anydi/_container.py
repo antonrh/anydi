@@ -225,7 +225,7 @@ class Container:
                 scoped_context.delete(interface)
 
         # Cleanup provider references
-        self._providers.pop(interface, None)
+        self._delete_provider(interface)
 
     def _get_provider(self, interface: AnyInterface) -> Provider:
         """Get provider by interface.
@@ -287,6 +287,16 @@ class Container:
         self._providers[interface] = provider
         if provider.is_resource:
             self._providers_cache[provider.scope].append(interface)
+
+    def _delete_provider(self, interface: AnyInterface) -> None:
+        """Delete a provider by interface.
+
+        Args:
+            interface: The interface for which to delete the provider.
+        """
+        provider = self._providers.pop(interface, None)
+        if provider is not None and provider.is_resource:
+            self._providers_cache[provider.scope].remove(interface)
 
     def _validate_provider_scope(self, provider: Provider) -> None:
         """Validate the scope of a provider.
