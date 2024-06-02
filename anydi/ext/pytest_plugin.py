@@ -24,6 +24,7 @@ def pytest_addoption(parser: pytest.Parser) -> None:
         default=False,
     )
 
+
 CONTAINER_FIXTURE_NAME = "container"
 
 
@@ -104,7 +105,7 @@ def _anydi_inject(
 
         try:
             request.node.funcargs[argname] = container.resolve(interface)
-        except LookupError:
+        except Exception:  # noqa
             _anydi_unresolved.append(interface)
 
 
@@ -133,5 +134,5 @@ async def _anydi_ainject(
 
         try:
             request.node.funcargs[argname] = await container.aresolve(interface)
-        except LookupError:
+        except Exception:  # noqa
             _anydi_unresolved.append(interface)
