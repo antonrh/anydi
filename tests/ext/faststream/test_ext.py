@@ -1,10 +1,10 @@
 from typing import Any
 
 import pytest
-from fastapi import FastAPI
+from faststream.redis import RedisBroker
 
 from anydi import Container
-from anydi.ext.fastapi import Inject, install
+from anydi.ext.faststream import Inject, install
 
 
 def test_inject_param_missing_interface() -> None:
@@ -23,17 +23,17 @@ def test_install_without_annotation() -> None:
     def message() -> str:
         return "Hello"
 
-    app = FastAPI()
+    broker = RedisBroker()
 
-    @app.get("/hello")
+    @broker.subscriber("hello")
     def say_hello(message=Inject()) -> Any:  # type: ignore[no-untyped-def]
         return message
 
     with pytest.raises(TypeError) as exc_info:
-        install(app, container)
+        install(broker, container)
 
     assert str(exc_info.value) == (
-        "Missing `tests.ext.fastapi.test_ext.test_install_without_annotation"
+        "Missing `tests.ext.faststream.test_ext.test_install_without_annotation"
         ".<locals>.say_hello` parameter `message` annotation."
     )
 
@@ -41,17 +41,17 @@ def test_install_without_annotation() -> None:
 def test_install_unknown_annotation() -> None:
     container = Container(strict=True)
 
-    app = FastAPI()
+    broker = RedisBroker()
 
-    @app.get("/hello")
+    @broker.subscriber("hello")
     def say_hello(message: str = Inject()) -> Any:
         return message
 
     with pytest.raises(LookupError) as exc_info:
-        install(app, container)
+        install(broker, container)
 
     assert str(exc_info.value) == (
-        "`tests.ext.fastapi.test_ext.test_install_unknown_annotation"
+        "`tests.ext.faststream.test_ext.test_install_unknown_annotation"
         ".<locals>.say_hello` has an unknown dependency parameter `message` "
         "with an annotation of `str`."
     )
