@@ -26,10 +26,20 @@ def install(broker: BrokerUsecase[Any, Any], container: Container) -> None:
     """
     broker._container = container  # type: ignore[attr-defined]
 
-    for subscriber in broker._subscribers.values():  # noqa
-        call = subscriber.calls[0].handler._original_call  # noqa
+    for handler in _get_broken_handlers(broker):
+        call = handler._original_call  # noqa
         for parameter in get_typed_parameters(call):
             patch_call_parameter(call, parameter, container)
+
+
+def _get_broken_handlers(broker: BrokerUsecase[Any, Any]) -> list[Any]:
+    if hasattr(broker, "handlers"):
+        return [handler.calls[0][0] for handler in broker.handlers.values()]
+    # faststream > 0.5.0
+    return [
+        subscriber.calls[0].handler
+        for subscriber in broker._subscribers.values()  # noqa
+    ]
 
 
 def get_container(broker: BrokerUsecase[Any, Any]) -> Container:
