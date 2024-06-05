@@ -479,9 +479,7 @@ class Container:
 
     async def astart(self) -> None:
         """Start the singleton context asynchronously."""
-        for interface, provider in self._providers.items():
-            if provider.scope == "singleton":
-                await self.aresolve(interface)  # noqa
+        await self._singleton_context.astart()
 
     async def aclose(self) -> None:
         """Close the singleton context asynchronously."""
