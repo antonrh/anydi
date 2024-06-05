@@ -30,6 +30,17 @@ def is_marker(obj: Any) -> bool:
     return isinstance(obj, Marker)
 
 
+class Event:
+    """Represents an event object."""
+
+    __slots__ = ()
+
+
+def is_event_type(cls: Any) -> bool:
+    """Checks if an object is an event type."""
+    return issubclass(cls, Event)
+
+
 @dataclass(frozen=True)
 class Provider:
     """Represents a provider object.
