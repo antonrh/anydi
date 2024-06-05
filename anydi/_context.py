@@ -7,7 +7,7 @@ from typing import TYPE_CHECKING, Any, ClassVar, TypeVar, cast
 
 from typing_extensions import Self, final
 
-from ._types import AnyInterface, Interface, Provider, Scope
+from ._types import AnyInterface, Interface, Provider, Scope, is_event_type
 from ._utils import run_async
 
 if TYPE_CHECKING:
@@ -254,9 +254,10 @@ class ResourceScopedContext(ScopedContext):
         self.close()
         return
 
+    @abc.abstractmethod
     def start(self) -> None:
         """Start the scoped context."""
-        for interface in self.container._providers_cache.get(self.scope, []):  # noqa
+        for interface in self.container._resource_cache.get(self.scope, []):  # noqa
             self.container.resolve(interface)
 
     def close(self) -> None:
@@ -288,10 +289,9 @@ class ResourceScopedContext(ScopedContext):
         await self.aclose()
         return
 
+    @abc.abstractmethod
     async def astart(self) -> None:
         """Start the scoped context asynchronously."""
-        for interface in self.container._providers_cache.get(self.scope, []):  # noqa
-            await self.container.aresolve(interface)
 
     async def aclose(self) -> None:
         """Close the scoped context asynchronously."""
@@ -305,12 +305,36 @@ class SingletonContext(ResourceScopedContext):
 
     scope = "singleton"
 
+    def start(self) -> None:
+        """Start the scoped context."""
+        for interface in self.container._resource_cache.get(self.scope, []):  # noqa
+            self.container.resolve(interface)
+
+    async def astart(self) -> None:
+        """Start the scoped context asynchronously."""
+        for interface in self.container._resource_cache.get(self.scope, []):  # noqa
+            await self.container.aresolve(interface)
+
 
 @final
 class RequestContext(ResourceScopedContext):
     """A scoped context representing the "request" scope."""
 
     scope = "request"
+
+    def start(self) -> None:
+        """Start the scoped context."""
+        for interface in self.container._resource_cache.get(self.scope, []):  # noqa
+            if not is_event_type(interface):
+                continue
+            self.container.resolve(interface)
+
+    async def astart(self) -> None:
+        """Start the scoped context asynchronously."""
+        for interface in self.container._resource_cache.get(self.scope, []):  # noqa
+            if not is_event_type(interface):
+                continue
+            await self.container.aresolve(interface)
 
 
 @final

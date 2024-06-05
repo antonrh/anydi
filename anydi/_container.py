@@ -11,11 +11,9 @@ from contextvars import ContextVar
 from functools import wraps
 from typing import (
     Any,
-    AsyncContextManager,
     AsyncIterator,
     Awaitable,
     Callable,
-    ContextManager,
     Iterable,
     Iterator,
     Mapping,
@@ -43,7 +41,7 @@ from ._context import (
 from ._logger import logger
 from ._module import Module, ModuleRegistry
 from ._scanner import Scanner
-from ._types import AnyInterface, Interface, Provider, Scope, is_marker
+from ._types import AnyInterface, Event, Interface, Provider, Scope, is_marker
 from ._utils import (
     get_full_qualname,
     get_typed_parameters,
@@ -86,7 +84,7 @@ class Container:
             strict: Whether to enable strict mode. Defaults to False.
         """
         self._providers: dict[type[Any], Provider] = {}
-        self._providers_cache: dict[Scope, list[type[Any]]] = defaultdict(list)
+        self._resource_cache: dict[Scope, list[type[Any]]] = defaultdict(list)
         self._singleton_context = SingletonContext(self)
         self._transient_context = TransientContext(self)
         self._request_context_var: ContextVar[RequestContext | None] = ContextVar(
@@ -172,7 +170,7 @@ class Container:
 
         # Create Event type
         if provider.is_resource and (interface is NoneType or interface is None):
-            interface = type(f"Event_{uuid.uuid4().hex}", (), {})
+            interface = type(f"Event_{uuid.uuid4().hex}", (Event,), {})
 
         if interface in self._providers:
             if override:
@@ -286,7 +284,7 @@ class Container:
         """
         self._providers[interface] = provider
         if provider.is_resource:
-            self._providers_cache[provider.scope].append(interface)
+            self._resource_cache[provider.scope].append(interface)
 
     def _delete_provider(self, interface: AnyInterface) -> None:
         """Delete a provider by interface.
@@ -296,7 +294,7 @@ class Container:
         """
         provider = self._providers.pop(interface, None)
         if provider is not None and provider.is_resource:
-            self._providers_cache[provider.scope].remove(interface)
+            self._resource_cache[provider.scope].remove(interface)
 
     def _validate_provider_scope(self, provider: Provider) -> None:
         """Validate the scope of a provider.
@@ -443,19 +441,12 @@ class Container:
         """Close the singleton context."""
         self._singleton_context.close()
 
-    def request_context(self) -> ContextManager[None]:
+    @contextlib.contextmanager
+    def request_context(self) -> Iterator[None]:
         """Obtain a context manager for the request-scoped context.
 
         Returns:
             A context manager for the request-scoped context.
-        """
-        return contextlib.contextmanager(self._request_context)()
-
-    def _request_context(self) -> Iterator[None]:
-        """Internal method that manages the request-scoped context.
-
-        Yields:
-            Yield control to the code block within the request context.
         """
         context = RequestContext(self)
         token = self._request_context_var.set(context)
@@ -485,19 +476,12 @@ class Container:
         """Close the singleton context asynchronously."""
         await self._singleton_context.aclose()
 
-    def arequest_context(self) -> AsyncContextManager[None]:
+    @contextlib.asynccontextmanager
+    async def arequest_context(self) -> AsyncIterator[None]:
         """Obtain an async context manager for the request-scoped context.
 
         Returns:
             An async context manager for the request-scoped context.
-        """
-        return contextlib.asynccontextmanager(self._arequest_context)()
-
-    async def _arequest_context(self) -> AsyncIterator[None]:
-        """Internal method that manages the async request-scoped context.
-
-        Yields:
-            Yield control to the code block within the request context.
         """
         context = RequestContext(self)
         token = self._request_context_var.set(context)
