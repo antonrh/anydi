@@ -315,6 +315,13 @@ def test_register_events(container: Container) -> None:
         yield
         events.append(f"event_2: after {message}")
 
+    # Ensure that non-event is not called
+    @container.provider(scope="request")
+    def non_event(message: str) -> Iterator[int]:
+        events.append(f"non_event: before {message}")
+        yield 1
+        events.append(f"non_event: after {message}")
+
     with container, container.request_context():
         assert events == [
             "event_1: before test",
@@ -347,6 +354,13 @@ async def test_register_async_events(container: Container) -> None:
         events.append(f"event_2: before {message}")
         yield
         events.append(f"event_2: after {message}")
+
+    # Ensure that non-event is not called
+    @container.provider(scope="request")
+    async def non_event(message: str) -> AsyncIterator[int]:
+        events.append(f"non_event: before {message}")
+        yield 1
+        events.append(f"non_event: after {message}")
 
     async with container, container.arequest_context():
         assert events == [
