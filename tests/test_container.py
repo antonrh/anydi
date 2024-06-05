@@ -632,6 +632,30 @@ async def test_resolved_singleton_async_resource_not_started(
     )
 
 
+def test_resolve_singleton_annotated_resource(container: Container) -> None:
+    instance = "test"
+
+    @container.provider(scope="singleton")
+    def provide() -> Iterator[Annotated[str, "message"]]:
+        yield instance
+
+    result = container.resolve(Annotated[str, "message"])
+
+    assert result == instance
+
+
+async def test_resolve_singleton_annotated_async_resource(container: Container) -> None:
+    instance = "test"
+
+    @container.provider(scope="singleton")
+    async def provide() -> AsyncIterator[Annotated[str, "message"]]:
+        yield instance
+
+    result = await container.aresolve(Annotated[str, "message"])
+
+    assert result == instance
+
+
 def test_resolve_request_scoped(container: Container) -> None:
     instance = "test"
 
@@ -653,6 +677,34 @@ def test_resolve_request_scoped_not_started(container: Container) -> None:
         "The request context has not been started. Please ensure that the request "
         "context is properly initialized before attempting to use it."
     )
+
+
+def test_resolve_request_scoped_annotated_resource(container: Container) -> None:
+    instance = "test"
+
+    @container.provider(scope="request")
+    def provide() -> Iterator[Annotated[str, "message"]]:
+        yield instance
+
+    with container.request_context():
+        result = container.resolve(Annotated[str, "message"])
+
+    assert result == instance
+
+
+async def test_resolve_request_scoped_annotated_async_resource(
+    container: Container,
+) -> None:
+    instance = "test"
+
+    @container.provider(scope="request")
+    async def provide() -> AsyncIterator[Annotated[str, "message"]]:
+        yield instance
+
+    async with container.arequest_context():
+        result = await container.aresolve(Annotated[str, "message"])
+
+    assert result == instance
 
 
 def test_resolve_transient_scoped(container: Container) -> None:

@@ -36,9 +36,9 @@ class Event:
     __slots__ = ()
 
 
-def is_event_type(cls: Any) -> bool:
+def is_event_type(obj: Any) -> bool:
     """Checks if an object is an event type."""
-    return issubclass(cls, Event)
+    return inspect.isclass(obj) and issubclass(obj, Event)
 
 
 @dataclass(frozen=True)
