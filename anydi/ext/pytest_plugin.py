@@ -99,10 +99,6 @@ def _anydi_inject(
         if container.strict and not container.is_registered(interface):
             continue
 
-        # Release the instance if it was already resolved
-        if container.is_resolved(interface):
-            container.release(interface)
-
         try:
             request.node.funcargs[argname] = container.resolve(interface)
         except Exception:  # noqa
@@ -127,10 +123,6 @@ async def _anydi_ainject(
         # Skip if the interface is not registered
         if container.strict and not container.is_registered(interface):
             continue
-
-        # Release the instance if it was already resolved
-        if container.is_resolved(interface):
-            container.release(interface)
 
         try:
             request.node.funcargs[argname] = await container.aresolve(interface)
