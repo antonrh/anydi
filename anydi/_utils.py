@@ -6,7 +6,7 @@ import builtins
 import functools
 import inspect
 import sys
-from typing import Any, AsyncIterator, Callable, ForwardRef, Iterator, TypeVar, cast
+from typing import Any, AsyncIterator, Callable, ForwardRef, Iterator, TypeVar
 
 from typing_extensions import ParamSpec, get_args, get_origin
 
@@ -16,15 +16,12 @@ except ImportError:
     anyio = None  # type: ignore[assignment]
 
 
-if sys.version_info < (3, 9):  # pragma: nocover
-
-    def evaluate_forwardref(type_: ForwardRef, globalns: Any, localns: Any) -> Any:
+def evaluate_forwardref(type_: ForwardRef, globalns: Any, localns: Any) -> Any:
+    if sys.version_info < (3, 9):
         return type_._evaluate(globalns, localns)  # noqa
-
-else:
-
-    def evaluate_forwardref(type_: ForwardRef, globalns: Any, localns: Any) -> Any:
-        return cast(Any, type_)._evaluate(globalns, localns, set())  # noqa
+    elif sys.version_info >= (3, 11):
+        return type_._evaluate(globalns, localns, frozenset(), frozenset())  # noqa
+    return type_._evaluate(globalns, localns, frozenset())  # noqa
 
 
 T = TypeVar("T")
