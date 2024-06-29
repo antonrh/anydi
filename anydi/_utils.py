@@ -20,7 +20,9 @@ def evaluate_forwardref(type_: ForwardRef, globalns: Any, localns: Any) -> Any:
     if sys.version_info < (3, 9):
         return type_._evaluate(globalns, localns)  # noqa
     elif sys.version_info > (3, 11):
-        return type_._evaluate(globalns, localns, frozenset(), frozenset())  # noqa
+        return type_._evaluate(  # noqa
+            globalns, localns, frozenset(), recursive_guard=frozenset()
+        )
     return type_._evaluate(globalns, localns, frozenset())  # noqa
 
 
