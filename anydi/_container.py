@@ -431,7 +431,7 @@ class Container:
         exc_tb: types.TracebackType | None,
     ) -> None:
         """Exit the singleton context."""
-        self.close()
+        self._singleton_context.__exit__(exc_type, exc_val, exc_tb)
 
     def start(self) -> None:
         """Start the singleton context."""
@@ -466,7 +466,7 @@ class Container:
         exc_tb: types.TracebackType | None,
     ) -> None:
         """Exit the singleton context."""
-        await self.aclose()
+        await self._singleton_context.__aexit__(exc_type, exc_val, exc_tb)
 
     async def astart(self) -> None:
         """Start the singleton context asynchronously."""
