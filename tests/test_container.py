@@ -946,10 +946,11 @@ def test_resource_delegated_exception(container: Container) -> None:
             yield resource
         except Exception:  # noqa
             resource.rollback()
+            raise
         else:
             resource.commit()
 
-    with container.request_context():
+    with pytest.raises(ValueError), container.request_context():
         resource = container.resolve(Resource)
         resource.run()
         raise ValueError
@@ -967,13 +968,15 @@ async def test_async_resource_delegated_exception(container: Container) -> None:
             yield resource
         except Exception:  # noqa
             resource.rollback()
+            raise
         else:
             resource.commit()
 
-    async with container.arequest_context():
-        resource = await container.aresolve(Resource)
-        resource.run()
-        raise ValueError
+    with pytest.raises(ValueError):
+        async with container.arequest_context():
+            resource = await container.aresolve(Resource)
+            resource.run()
+            raise ValueError
 
     assert resource.called
     assert not resource.committed
