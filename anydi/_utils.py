@@ -16,6 +16,10 @@ except ImportError:
     anyio = None  # type: ignore[assignment]
 
 
+T = TypeVar("T")
+P = ParamSpec("P")
+
+
 def evaluate_forwardref(type_: ForwardRef, globalns: Any, localns: Any) -> Any:
     if sys.version_info < (3, 9):
         return type_._evaluate(globalns, localns)  # noqa
@@ -24,10 +28,6 @@ def evaluate_forwardref(type_: ForwardRef, globalns: Any, localns: Any) -> Any:
             globalns, localns, frozenset(), recursive_guard=frozenset()
         )
     return type_._evaluate(globalns, localns, frozenset())  # noqa
-
-
-T = TypeVar("T")
-P = ParamSpec("P")
 
 
 def get_full_qualname(obj: Any) -> str:
@@ -71,6 +71,8 @@ def get_typed_annotation(
     if isinstance(annotation, str):
         if sys.version_info < (3, 9):
             annotation = ForwardRef(annotation)
+        elif sys.version_info < (3, 10):
+            annotation = ForwardRef(annotation, module=module)
         else:
             annotation = ForwardRef(annotation, module=module, is_class=is_class)
         annotation = evaluate_forwardref(annotation, globalns, {})
