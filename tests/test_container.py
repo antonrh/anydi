@@ -19,7 +19,7 @@ from typing_extensions import Annotated
 
 from anydi import Container, Provider, Scope, auto, dep, request, singleton, transient
 
-from tests.fixtures import Service
+from tests.fixtures import Resource, Service
 
 
 @pytest.fixture
@@ -877,14 +877,14 @@ def test_release_instance(container: Container) -> None:
 
 def test_override_instance(container: Container) -> None:
     origin_name = "origin"
-    overriden_name = "overriden"
+    overridden_name = "overridden"
 
     @container.provider(scope="singleton")
     def name() -> str:
         return origin_name
 
-    with container.override(str, overriden_name):
-        assert container.resolve(str) == overriden_name
+    with container.override(str, overridden_name):
+        assert container.resolve(str) == overridden_name
 
     assert container.resolve(str) == origin_name
 
@@ -900,42 +900,87 @@ def test_override_instance_provider_not_registered_using_strict_mode() -> None:
 
 
 def test_override_instance_transient_provider(container: Container) -> None:
-    overriden_uuid = uuid.uuid4()
+    overridden_uuid = uuid.uuid4()
 
     @container.provider(scope="transient")
     def uuid_provider() -> uuid.UUID:
         return uuid.uuid4()
 
-    with container.override(uuid.UUID, overriden_uuid):
-        assert container.resolve(uuid.UUID) == overriden_uuid
+    with container.override(uuid.UUID, overridden_uuid):
+        assert container.resolve(uuid.UUID) == overridden_uuid
 
-    assert container.resolve(uuid.UUID) != overriden_uuid
+    assert container.resolve(uuid.UUID) != overridden_uuid
 
 
 def test_override_instance_resource_provider(container: Container) -> None:
     origin = "origin"
-    overriden = "overriden"
+    overridden = "overridden"
 
     @container.provider(scope="singleton")
     def message() -> Iterator[str]:
         yield origin
 
-    with container.override(str, overriden):
-        assert container.resolve(str) == overriden
+    with container.override(str, overridden):
+        assert container.resolve(str) == overridden
 
     assert container.resolve(str) == origin
 
 
 async def test_override_instance_async_resource_provider(container: Container) -> None:
     origin = "origin"
-    overriden = "overriden"
+    overridden = "overridden"
 
     @container.provider(scope="singleton")
     async def message() -> AsyncIterator[str]:
         yield origin
 
-    with container.override(str, overriden):
-        assert container.resolve(str) == overriden
+    with container.override(str, overridden):
+        assert container.resolve(str) == overridden
+
+
+def test_resource_delegated_exception(container: Container) -> None:
+    @container.provider(scope="request")
+    def resource_provider() -> Iterator[Resource]:
+        resource = Resource()
+        try:
+            yield resource
+        except Exception:  # noqa
+            resource.rollback()
+            raise
+        else:
+            resource.commit()
+
+    with pytest.raises(ValueError), container.request_context():
+        resource = container.resolve(Resource)
+        resource.run()
+        raise ValueError
+
+    assert resource.called
+    assert not resource.committed
+    assert resource.rolled_back
+
+
+async def test_async_resource_delegated_exception(container: Container) -> None:
+    @container.provider(scope="request")
+    async def resource_provider() -> AsyncIterator[Resource]:
+        resource = Resource()
+        try:
+            yield resource
+        except Exception:  # noqa
+            resource.rollback()
+            raise
+        else:
+            resource.commit()
+
+    with pytest.raises(ValueError):
+        async with container.arequest_context():
+            resource = await container.aresolve(Resource)
+            resource.run()
+            raise ValueError
+
+    assert resource.called
+    assert not resource.committed
+    assert resource.rolled_back
 
 
 # Inspections

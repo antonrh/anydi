@@ -429,9 +429,9 @@ class Container:
         exc_type: type[BaseException] | None,
         exc_val: BaseException | None,
         exc_tb: types.TracebackType | None,
-    ) -> None:
+    ) -> bool:
         """Exit the singleton context."""
-        self.close()
+        return self._singleton_context.__exit__(exc_type, exc_val, exc_tb)
 
     def start(self) -> None:
         """Start the singleton context."""
@@ -464,9 +464,9 @@ class Container:
         exc_type: type[BaseException] | None,
         exc_val: BaseException | None,
         exc_tb: types.TracebackType | None,
-    ) -> None:
+    ) -> bool:
         """Exit the singleton context."""
-        await self.aclose()
+        return await self._singleton_context.__aexit__(exc_type, exc_val, exc_tb)
 
     async def astart(self) -> None:
         """Start the singleton context asynchronously."""
