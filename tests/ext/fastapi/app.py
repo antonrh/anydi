@@ -39,9 +39,6 @@ def user_service() -> UserService:
     return UserService()
 
 
-a = 1
-
-
 @container.provider(scope="request")
 def mail_service() -> MailService:
     return MailService()
