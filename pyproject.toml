@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "anydi"
-version = "0.27.0a8"
+version = "0.27.0"
 description = "Dependency Injection library"
 authors = ["Anton Ruhlov <antonruhlov@gmail.com>"]
 license = "MIT"
