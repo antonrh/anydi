@@ -243,7 +243,7 @@ class ResourceScopedContext(ScopedContext):
         exc_type: type[BaseException] | None,
         exc_val: BaseException | None,
         exc_tb: TracebackType | None,
-    ) -> None:
+    ) -> bool:
         """Exit the context.
 
         Args:
@@ -251,8 +251,7 @@ class ResourceScopedContext(ScopedContext):
             exc_val: The exception instance, if any.
             exc_tb: The traceback, if any.
         """
-        self.close()
-        return
+        return self._stack.__exit__(exc_type, exc_val, exc_tb)
 
     @abc.abstractmethod
     def start(self) -> None:
@@ -262,7 +261,7 @@ class ResourceScopedContext(ScopedContext):
 
     def close(self) -> None:
         """Close the scoped context."""
-        self._stack.close()
+        self._stack.__exit__(None, None, None)
 
     async def __aenter__(self) -> Self:
         """Enter the context asynchronously.
@@ -278,7 +277,7 @@ class ResourceScopedContext(ScopedContext):
         exc_type: type[BaseException] | None,
         exc_val: BaseException | None,
         exc_tb: TracebackType | None,
-    ) -> None:
+    ) -> bool:
         """Exit the context asynchronously.
 
         Args:
@@ -286,8 +285,9 @@ class ResourceScopedContext(ScopedContext):
             exc_val: The exception instance, if any.
             exc_tb: The traceback, if any.
         """
-        await self.aclose()
-        return
+        return await run_async(
+            self.__exit__, exc_type, exc_val, exc_tb
+        ) or await self._async_stack.__aexit__(exc_type, exc_val, exc_tb)
 
     @abc.abstractmethod
     async def astart(self) -> None:
@@ -295,8 +295,7 @@ class ResourceScopedContext(ScopedContext):
 
     async def aclose(self) -> None:
         """Close the scoped context asynchronously."""
-        await run_async(self._stack.close)
-        await self._async_stack.aclose()
+        await self.__aexit__(None, None, None)
 
 
 @final

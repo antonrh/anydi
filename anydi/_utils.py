@@ -6,7 +6,7 @@ import builtins
 import functools
 import inspect
 import sys
-from typing import Any, AsyncIterator, Callable, ForwardRef, Iterator, TypeVar, cast
+from typing import Any, AsyncIterator, Callable, ForwardRef, Iterator, TypeVar
 
 from typing_extensions import ParamSpec, get_args, get_origin
 
@@ -16,19 +16,18 @@ except ImportError:
     anyio = None  # type: ignore[assignment]
 
 
-if sys.version_info < (3, 9):  # pragma: nocover
-
-    def evaluate_forwardref(type_: ForwardRef, globalns: Any, localns: Any) -> Any:
-        return type_._evaluate(globalns, localns)  # noqa
-
-else:
-
-    def evaluate_forwardref(type_: ForwardRef, globalns: Any, localns: Any) -> Any:
-        return cast(Any, type_)._evaluate(globalns, localns, set())  # noqa
-
-
 T = TypeVar("T")
 P = ParamSpec("P")
+
+
+def evaluate_forwardref(type_: ForwardRef, globalns: Any, localns: Any) -> Any:
+    if sys.version_info < (3, 9):
+        return type_._evaluate(globalns, localns)  # noqa
+    elif sys.version_info >= (3, 12):
+        return type_._evaluate(  # noqa
+            globalns, localns, frozenset(), recursive_guard=frozenset()
+        )
+    return type_._evaluate(globalns, localns, frozenset())  # noqa
 
 
 def get_full_qualname(obj: Any) -> str:
@@ -70,10 +69,12 @@ def get_typed_annotation(
 ) -> Any:
     """Get the typed annotation of a parameter."""
     if isinstance(annotation, str):
-        if sys.version_info < (3, 9):
-            annotation = ForwardRef(annotation)
-        else:
+        if sys.version_info >= (3, 10, 2):
             annotation = ForwardRef(annotation, module=module, is_class=is_class)
+        elif sys.version_info >= (3, 10, 0):
+            annotation = ForwardRef(annotation, module=module)
+        else:
+            annotation = ForwardRef(annotation)
         annotation = evaluate_forwardref(annotation, globalns, {})
     return annotation
 
