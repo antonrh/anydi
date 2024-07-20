@@ -251,7 +251,7 @@ class ResourceScopedContext(ScopedContext):
             exc_val: The exception instance, if any.
             exc_tb: The traceback, if any.
         """
-        return self._stack.__exit__(exc_type, exc_val, exc_tb)
+        return self._stack.__exit__(exc_type, exc_val, exc_tb)  # type: ignore[return-value]
 
     @abc.abstractmethod
     def start(self) -> None:
