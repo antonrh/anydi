@@ -20,16 +20,6 @@ T = TypeVar("T")
 P = ParamSpec("P")
 
 
-def evaluate_forwardref(type_: ForwardRef, globalns: Any, localns: Any) -> Any:
-    if sys.version_info < (3, 9):
-        return type_._evaluate(globalns, localns)  # noqa
-    elif sys.version_info >= (3, 12):
-        return type_._evaluate(  # noqa
-            globalns, localns, frozenset(), recursive_guard=frozenset()
-        )
-    return type_._evaluate(globalns, localns, frozenset())  # noqa
-
-
 def get_full_qualname(obj: Any) -> str:
     """Get the fully qualified name of an object."""
     qualname = getattr(obj, "__qualname__", None)
@@ -59,6 +49,12 @@ def get_full_qualname(obj: Any) -> str:
 def is_builtin_type(tp: type[Any]) -> bool:
     """Check if the given type is a built-in type."""
     return tp.__module__ == builtins.__name__
+
+
+def evaluate_forwardref(type_: ForwardRef, globalns: Any, localns: Any) -> Any:
+    if sys.version_info < (3, 9):
+        return type_._evaluate(globalns, localns)
+    return type_._evaluate(globalns, localns, recursive_guard=frozenset())
 
 
 def get_typed_annotation(
