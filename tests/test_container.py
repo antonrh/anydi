@@ -15,7 +15,7 @@ from typing import (
 )
 
 import pytest
-from typing_extensions import Annotated
+from typing_extensions import Annotated, Self
 
 from anydi import Container, Provider, Scope, auto, dep, request, singleton, transient
 
@@ -860,6 +860,58 @@ def test_resolve_non_strict_with_custom_type(container: Container) -> None:
     )
 
 
+def test_resolve_non_strict_with_as_context_manager(container: Container) -> None:
+    class Service:
+        __scope__ = "singleton"
+
+        def __init__(self) -> None:
+            self.entered = False
+            self.exited = False
+
+        def __enter__(self) -> Self:
+            self.entered = True
+            return self
+
+        def __exit__(self, exc_type: Any, exc_value: Any, traceback: Any) -> None:
+            self.exited = True
+
+    service = container.resolve(Service)
+
+    assert service.entered
+
+    container.close()
+
+    assert service.exited
+
+
+async def test_resolve_non_strict_with_as_async_context_manager(
+    container: Container,
+) -> None:
+    class Service:
+        __scope__ = "singleton"
+
+        def __init__(self) -> None:
+            self.entered = False
+            self.exited = False
+
+        async def __aenter__(self) -> Self:
+            self.entered = True
+            return self
+
+        async def __aexit__(
+            self, exc_type: Any, exc_value: Any, traceback: Any
+        ) -> None:
+            self.exited = True
+
+    service = await container.aresolve(Service)
+
+    assert service.entered
+
+    await container.aclose()
+
+    assert service.exited
+
+
 def test_is_resolved(container: Container) -> None:
     assert not container.is_resolved(str)
 
@@ -939,9 +991,10 @@ async def test_override_instance_async_resource_provider(container: Container) -
 
 
 def test_resource_delegated_exception(container: Container) -> None:
+    resource = Resource()
+
     @container.provider(scope="request")
     def resource_provider() -> Iterator[Resource]:
-        resource = Resource()
         try:
             yield resource
         except Exception:  # noqa
@@ -961,9 +1014,10 @@ def test_resource_delegated_exception(container: Container) -> None:
 
 
 async def test_async_resource_delegated_exception(container: Container) -> None:
+    resource = Resource()
+
     @container.provider(scope="request")
     async def resource_provider() -> AsyncIterator[Resource]:
-        resource = Resource()
         try:
             yield resource
         except Exception:  # noqa

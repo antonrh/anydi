@@ -195,6 +195,14 @@ class ResourceScopedContext(ScopedContext):
         """
         return interface in self._instances
 
+    def _create_instance(self, provider: Provider) -> Any:
+        """Create an instance using the provider."""
+        instance = super()._create_instance(provider)
+        # Enter the context manager if the instance is closable.
+        if hasattr(instance, "__enter__") and hasattr(instance, "__exit__"):
+            self._stack.enter_context(instance)
+        return instance
+
     def _create_resource(self, provider: Provider) -> Any:
         """Create a resource using the provider.
 
@@ -207,6 +215,14 @@ class ResourceScopedContext(ScopedContext):
         args, kwargs = self._get_provider_arguments(provider)
         cm = contextlib.contextmanager(provider.obj)(*args, **kwargs)
         return self._stack.enter_context(cm)
+
+    async def _acreate_instance(self, provider: Provider) -> Any:
+        """Create an instance asynchronously using the provider."""
+        instance = await super()._acreate_instance(provider)
+        # Enter the context manager if the instance is closable.
+        if hasattr(instance, "__aenter__") and hasattr(instance, "__aexit__"):
+            await self._async_stack.enter_async_context(instance)
+        return instance
 
     async def _acreate_resource(self, provider: Provider) -> Any:
         """Create a resource asynchronously using the provider.
