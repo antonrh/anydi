@@ -38,15 +38,15 @@ python = "^3.8"
 typing-extensions = "^4.12.1"
 anyio = { version = "^3.6.2", optional = true }
 mkdocs = { version = "^1.4.2", optional = true }
-mkdocs-material = { version = "^9.5.21", optional = true }
+mkdocs-material = { version = "^9.5.29", optional = true }
 
 [tool.poetry.extras]
 docs = ["mkdocs", "mkdocs-material"]
 async = ["anyio"]
 
 [tool.poetry.group.dev.dependencies]
-mypy = "^1.11.0"
-ruff = "^0.5.4"
+mypy = "^1.11.1"
+ruff = "^0.6.1"
 pytest = "^8.3.1"
 pytest-cov = "^5.0.0"
 fastapi = "^0.100.0"
@@ -64,7 +64,7 @@ anydi = "anydi.ext.pytest_plugin"
 line-length = 88
 
 [tool.ruff.lint]
-select = ["A", "B", "C", "E", "F", "I", "W", "TID252", "T20", "UP"]
+select = ["A", "B", "C", "E", "F", "I", "W", "TID252", "T20", "UP", "FURB"]
 ignore = ["A003", "B008", "B009", "B010", "D104", "D107"]
 
 [tool.ruff.lint.isort]

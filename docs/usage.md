@@ -194,6 +194,43 @@ assert container.is_resolved(Repository)
 assert container.is_resolved(Database)
 ```
 
+
+Here's an improved version of the documentation with some enhancements for clarity, completeness, and formatting:
+
+### Automatic Resource Management
+
+When your class dependencies implement the context manager protocol by defining the `__enter__/__aenter__` and `__exit__/__aexit__` methods, these resources are automatically managed by the container for `singleton` and `request` scoped providers.
+
+```python
+from anydi import Container, singleton
+
+
+@singleton
+class Connection:
+    def __init__(self) -> None:
+        self.connected = False
+        self.disconnected = False
+
+    def __enter__(self) -> None:
+        self.connected = True
+
+    def __exit__(self, exc_type, exc_val, exc_tb) -> None:
+        self.connected = False
+        self.disconnected = True
+
+
+container = Container(strict=False)
+connection = container.resolve(Connection)
+
+assert container.is_resolved(Connection)
+assert connection.connected
+
+container.close()
+
+assert connection.disconnected
+```
+
+
 ### Enabling Strict Mode
 
 For strict checking, enable strict mode by setting `strict=True` when creating the `Container`. In strict mode, all types must be explicitly registered or have a definable provider before instantiation.
