@@ -25,6 +25,7 @@ nav:
   - Extensions:
     - FastAPI: extensions/fastapi.md
     - FastStream: extensions/faststream.md
+    - Pydantic Settings: extensions/pydantic_settings.md
     - Django: extensions/django.md
   - Examples:
     - Basic: examples/basic.md
