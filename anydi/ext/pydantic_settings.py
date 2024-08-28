@@ -27,7 +27,7 @@ def install(
 
     all_fields = {**settings.model_fields, **settings.model_computed_fields}
     for setting_name, field_info in all_fields.items():
-        if use_any and not isinstance(field_info, (FieldInfo, ComputedFieldInfo)):
+        if use_any and isinstance(field_info, (FieldInfo, ComputedFieldInfo)):
             interface: Any = Any
         elif isinstance(field_info, ComputedFieldInfo):
             interface = field_info.return_type
