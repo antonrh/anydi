@@ -56,6 +56,7 @@ django-ninja = "^1.1.0"
 pytest-django = "^4.8.0"
 faststream = "^0.5.10"
 redis = "^5.0.4"
+pydantic-settings = "^2.4.0"
 
 [tool.poetry.plugins.pytest11]
 anydi = "anydi.ext.pytest_plugin"

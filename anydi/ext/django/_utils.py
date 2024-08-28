@@ -1,7 +1,4 @@
-from __future__ import annotations
-
 from collections.abc import Iterator
-from functools import wraps
 from typing import Any
 
 from django.conf import settings
@@ -9,15 +6,20 @@ from django.core.cache import BaseCache, caches
 from django.db import connections
 from django.db.backends.base.base import BaseDatabaseWrapper
 from django.urls import URLPattern, URLResolver, get_resolver
-from typing_extensions import Annotated, get_origin
+from typing_extensions import Annotated
 
 import anydi
+from anydi.ext._utils import patch_any_typed_annotated
 
 
 def register_settings(
     container: anydi.Container, prefix: str = "django.conf.setting."
 ) -> None:
     """Register Django settings into the container."""
+
+    # Ensure prefix ends with a dot
+    if prefix[-1] != ".":
+        prefix += "."
 
     def _get_setting_value(value: Any) -> Any:
         return lambda: value
@@ -33,35 +35,8 @@ def register_settings(
             scope="singleton",
         )
 
-    def _resolve(resolve: Any) -> Any:
-        @wraps(resolve)
-        def wrapper(interface: Any) -> Any:
-            return resolve(_aware_settings(interface, prefix))
-
-        return wrapper
-
-    def _aresolve(resolve: Any) -> Any:
-        @wraps(resolve)
-        async def wrapper(interface: Any) -> Any:
-            return await resolve(_aware_settings(interface, prefix))
-
-        return wrapper
-
-    # Patch resolvers
-    container.resolve = _resolve(container.resolve)  # type: ignore[method-assign]  # noqa
-    container.aresolve = _aresolve(container.aresolve)  # type: ignore[method-assign]  # noqa
-
-
-def _aware_settings(interface: Any, prefix: str) -> Any:
-    origin = get_origin(interface)
-    if origin is not Annotated:
-        return interface  # pragma: no cover
-    named = interface.__metadata__[-1]
-
-    if isinstance(named, str) and named.startswith(prefix):
-        _, setting_name = named.rsplit(prefix, maxsplit=1)
-        return Annotated[Any, f"{prefix}{setting_name}"]
-    return interface
+    # Patch AnyDI to resolve Any types for annotated settings
+    patch_any_typed_annotated(container, prefix=prefix)
 
 
 def register_components(container: anydi.Container) -> None:
