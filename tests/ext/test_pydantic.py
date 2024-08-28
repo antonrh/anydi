@@ -18,7 +18,11 @@ class Settings(BaseSettings):
         return "computed"
 
 
-def test_get_settings() -> None:
+class DBSettings(BaseSettings):
+    db_url: str = "sqlite://:memory:"
+
+
+def test_install_settings() -> None:
     container = Container()
 
     anydi.ext.pydantic_settings.install(Settings(), container, prefix="settings")
@@ -29,14 +33,25 @@ def test_get_settings() -> None:
     assert container.resolve(Annotated[str, "settings.param_computed"]) == "computed"
 
 
-def test_get_settings_use_any() -> None:
+def test_install_multiple_settings() -> None:
+    container = Container()
+
+    anydi.ext.pydantic_settings.install(
+        [Settings(), DBSettings()], container, prefix="settings."
+    )
+
+    assert container.resolve(Annotated[str, "settings.param_str"]) == "test"
+    assert container.resolve(Annotated[str, "settings.db_url"]) == "sqlite://:memory:"
+
+
+def test_install_settings_allow_any() -> None:
     container = Container(strict=False)
 
     anydi.ext.pydantic_settings.install(
         Settings(),
         container,
         prefix="settings",
-        use_any=True,
+        allow_any=True,
     )
 
     assert container.resolve(Annotated[Any, "settings.param_str"]) == "test"

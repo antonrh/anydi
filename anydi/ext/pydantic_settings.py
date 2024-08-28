@@ -1,4 +1,6 @@
-from typing import Any, Callable
+from __future__ import annotations
+
+from typing import Any, Callable, Iterable
 
 from pydantic.fields import ComputedFieldInfo, FieldInfo  # noqa
 from pydantic_settings import BaseSettings
@@ -10,11 +12,11 @@ from ._utils import patch_any_typed_annotated
 
 
 def install(
-    settings: BaseSettings,
+    settings: BaseSettings | Iterable[BaseSettings],
     container: Container,
     *,
     prefix: str = ".settings",
-    use_any: bool = False,
+    allow_any: bool = False,
 ) -> None:
     """Install Pydantic settings into an AnyDI container."""
 
@@ -22,25 +24,33 @@ def install(
     if prefix[-1] != ".":
         prefix += "."
 
-    def _get_setting_value(setting_value: Any) -> Callable[[], Any]:
-        return lambda: setting_value
+    def _register_settings(_settings: BaseSettings) -> None:
+        all_fields = {**_settings.model_fields, **_settings.model_computed_fields}
+        for setting_name, field_info in all_fields.items():
+            if allow_any and isinstance(field_info, (FieldInfo, ComputedFieldInfo)):
+                interface: Any = Any
+            elif isinstance(field_info, ComputedFieldInfo):
+                interface = field_info.return_type
+            elif isinstance(field_info, FieldInfo):
+                interface = field_info.annotation
+            else:
+                continue
 
-    all_fields = {**settings.model_fields, **settings.model_computed_fields}
-    for setting_name, field_info in all_fields.items():
-        if use_any and isinstance(field_info, (FieldInfo, ComputedFieldInfo)):
-            interface: Any = Any
-        elif isinstance(field_info, ComputedFieldInfo):
-            interface = field_info.return_type
-        elif isinstance(field_info, FieldInfo):
-            interface = field_info.annotation
-        else:
-            continue
+            container.register(
+                Annotated[interface, f"{prefix}{setting_name}"],
+                _get_setting_value(getattr(_settings, setting_name)),
+                scope="singleton",
+            )
 
-        container.register(
-            Annotated[interface, f"{prefix}{setting_name}"],
-            _get_setting_value(getattr(settings, setting_name)),
-            scope="singleton",
-        )
+    if isinstance(settings, BaseSettings):
+        _register_settings(settings)
+    else:
+        for _settings in settings:
+            _register_settings(_settings)
 
-    if use_any:
+    if allow_any:
         patch_any_typed_annotated(container, prefix=prefix)
+
+
+def _get_setting_value(setting_value: Any) -> Callable[[], Any]:
+    return lambda: setting_value
