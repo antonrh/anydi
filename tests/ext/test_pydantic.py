@@ -1,5 +1,3 @@
-from typing import Any
-
 from pydantic import computed_field
 from pydantic_settings import BaseSettings
 from typing_extensions import Annotated
@@ -42,19 +40,3 @@ def test_install_multiple_settings() -> None:
 
     assert container.resolve(Annotated[str, "settings.param_str"]) == "test"
     assert container.resolve(Annotated[str, "settings.db_url"]) == "sqlite://:memory:"
-
-
-def test_install_settings_allow_any() -> None:
-    container = Container(strict=False)
-
-    anydi.ext.pydantic_settings.install(
-        Settings(),
-        container,
-        prefix="settings",
-        allow_any=True,
-    )
-
-    assert container.resolve(Annotated[Any, "settings.param_str"]) == "test"
-    assert container.resolve(Annotated[Any, "settings.param_int"]) == 42
-    assert container.resolve(Annotated[Any, "settings.param_float"]) == 3.14
-    assert container.resolve(Annotated[Any, "settings.param_computed"]) == "computed"

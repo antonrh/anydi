@@ -92,6 +92,7 @@ class Container:
         )
         self._override_instances: dict[type[Any], Any] = {}
         self._strict = strict
+        self._interface_hooks: list[Callable[[Any], Any]] = []
 
         # Components
         self._modules = ModuleRegistry(self)

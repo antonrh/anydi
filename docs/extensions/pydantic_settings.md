@@ -43,14 +43,3 @@ anydi.ext.pydantic_settings.install(Settings(), container, prefix="my_settings")
 
 app_name = container.resolve(Annotated[str, "my_settings.app_name"])
 ```
-
-## Allow Any type
-
-By default, the Pydantic Settings extension will raise an error if the setting is not found in the Pydantic model.
-You can allow any type by setting the `allow_any` parameter to `True`:
-
-```python
-anydi.ext.pydantic_settings.install(Settings(), container, allow_any=True)
-
-app_name = container.resolve(Annotated[Any, "settings.app_name"])
-```
