@@ -13,7 +13,7 @@ def install(
     settings: BaseSettings | Iterable[BaseSettings],
     container: Container,
     *,
-    prefix: str = ".settings",
+    prefix: str = "settings.",
 ) -> None:
     """Install Pydantic settings into an AnyDI container."""
 
