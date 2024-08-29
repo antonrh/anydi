@@ -11,16 +11,17 @@ from django.db.backends.base.base import BaseDatabaseWrapper
 from django.urls import URLPattern, URLResolver, get_resolver
 from typing_extensions import Annotated, get_origin
 
-import anydi
+from anydi import Container
 
 
 def register_settings(
-    container: anydi.Container, prefix: str = "django.conf.setting."
+    container: Container, prefix: str = "django.conf.setting."
 ) -> None:
     """Register Django settings into the container."""
 
-    def _get_setting_value(value: Any) -> Any:
-        return lambda: value
+    # Ensure prefix ends with a dot
+    if prefix[-1] != ".":
+        prefix += "."
 
     for setting_name in dir(settings):
         setting_value = getattr(settings, setting_name)
@@ -33,38 +34,11 @@ def register_settings(
             scope="singleton",
         )
 
-    def _resolve(resolve: Any) -> Any:
-        @wraps(resolve)
-        def wrapper(interface: Any) -> Any:
-            return resolve(_aware_settings(interface, prefix))
-
-        return wrapper
-
-    def _aresolve(resolve: Any) -> Any:
-        @wraps(resolve)
-        async def wrapper(interface: Any) -> Any:
-            return await resolve(_aware_settings(interface, prefix))
-
-        return wrapper
-
-    # Patch resolvers
-    container.resolve = _resolve(container.resolve)  # type: ignore[method-assign]  # noqa
-    container.aresolve = _aresolve(container.aresolve)  # type: ignore[method-assign]  # noqa
+    # Patch AnyDI to resolve Any types for annotated settings
+    _patch_any_typed_annotated(container, prefix=prefix)
 
 
-def _aware_settings(interface: Any, prefix: str) -> Any:
-    origin = get_origin(interface)
-    if origin is not Annotated:
-        return interface  # pragma: no cover
-    named = interface.__metadata__[-1]
-
-    if isinstance(named, str) and named.startswith(prefix):
-        _, setting_name = named.rsplit(prefix, maxsplit=1)
-        return Annotated[Any, f"{prefix}{setting_name}"]
-    return interface
-
-
-def register_components(container: anydi.Container) -> None:
+def register_components(container: Container) -> None:
     """Register Django components into the container."""
 
     # Register caches
@@ -90,7 +64,7 @@ def register_components(container: anydi.Container) -> None:
         )
 
 
-def inject_urlpatterns(container: anydi.Container, *, urlconf: str) -> None:
+def inject_urlpatterns(container: Container, *, urlconf: str) -> None:
     """Auto-inject the container into views."""
     resolver = get_resolver(urlconf)
     for pattern in iter_urlpatterns(resolver.url_patterns):
@@ -113,3 +87,42 @@ def iter_urlpatterns(
             yield from iter_urlpatterns(url_pattern.url_patterns)
         else:
             yield url_pattern
+
+
+def _get_setting_value(value: Any) -> Any:
+    return lambda: value
+
+
+def _any_typed_interface(interface: Any, prefix: str) -> Any:
+    origin = get_origin(interface)
+    if origin is not Annotated:
+        return interface  # pragma: no cover
+    named = interface.__metadata__[-1]
+
+    if isinstance(named, str) and named.startswith(prefix):
+        _, setting_name = named.rsplit(prefix, maxsplit=1)
+        return Annotated[Any, f"{prefix}{setting_name}"]
+    return interface
+
+
+def _patch_any_typed_annotated(container: Container, *, prefix: str) -> None:
+    def _patch_resolve(resolve: Any) -> Any:
+        @wraps(resolve)
+        def wrapper(interface: Any) -> Any:
+            return resolve(_any_typed_interface(interface, prefix))
+
+        return wrapper
+
+    def _patch_aresolve(resolve: Any) -> Any:
+        @wraps(resolve)
+        async def wrapper(interface: Any) -> Any:
+            return await resolve(_any_typed_interface(interface, prefix))
+
+        return wrapper
+
+    container.resolve = _patch_resolve(  # type: ignore[method-assign]
+        container.resolve
+    )
+    container.aresolve = _patch_aresolve(  # type: ignore[method-assign]
+        container.aresolve
+    )
