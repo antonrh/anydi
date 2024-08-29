@@ -8,6 +8,7 @@ from typing import TYPE_CHECKING, Any, Callable, TypeVar
 from typing_extensions import Concatenate, NamedTuple, ParamSpec
 
 from ._types import Scope
+from ._utils import import_string
 
 if TYPE_CHECKING:
     from ._container import Container
@@ -67,21 +68,27 @@ class ModuleRegistry:
         self.container = container
 
     def register(
-        self, module: Module | type[Module] | Callable[[Container], None]
+        self, module: Module | type[Module] | Callable[[Container], None] | str
     ) -> None:
         """Register a module as a callable, module type, or module instance.
 
         Args:
             module: The module to register.
         """
+
         # Callable Module
         if inspect.isfunction(module):
             module(self.container)
             return
 
+        # Module path
+        if isinstance(module, str):
+            module = import_string(module)
+
         # Class based Module or Module type
         if inspect.isclass(module) and issubclass(module, Module):
             module = module()
+
         if isinstance(module, Module):
             module.configure(self.container)
             for provider_name, decorator_args in module.providers:

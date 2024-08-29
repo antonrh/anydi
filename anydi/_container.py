@@ -72,7 +72,7 @@ class Container:
         self,
         *,
         providers: Mapping[type[Any], Provider] | None = None,
-        modules: Sequence[Module | type[Module] | Callable[[Container], None]]
+        modules: Sequence[Module | type[Module] | Callable[[Container], None] | str]
         | None = None,
         strict: bool = False,
     ) -> None:
@@ -410,7 +410,7 @@ class Container:
         return None
 
     def register_module(
-        self, module: Module | type[Module] | Callable[[Container], None]
+        self, module: Module | type[Module] | Callable[[Container], None] | str
     ) -> None:
         """Register a module as a callable, module type, or module instance.
 
