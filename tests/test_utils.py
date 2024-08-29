@@ -4,7 +4,8 @@ from typing import Any, Type, Union
 import pytest
 from typing_extensions import Annotated
 
-from anydi._utils import get_full_qualname, is_builtin_type
+from anydi import Container
+from anydi._utils import get_full_qualname, import_string, is_builtin_type
 
 from tests.fixtures import Service
 
@@ -66,3 +67,12 @@ def test_get_full_qualname(obj: Any, expected_qualname: str) -> None:
     qualname = get_full_qualname(obj)
 
     assert qualname == expected_qualname
+
+
+def test_import_string() -> None:
+    assert import_string("anydi.Container") is Container
+
+
+def test_import_string_invalid_path() -> None:
+    with pytest.raises(ImportError):
+        import_string("anydi.InvalidClass")

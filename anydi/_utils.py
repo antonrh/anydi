@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import builtins
 import functools
+import importlib
 import inspect
 import sys
 from typing import Any, AsyncIterator, Callable, ForwardRef, Iterator, TypeVar
@@ -129,3 +130,27 @@ async def run_async(
             "it first, or consider using `anydi[full]` instead."
         )
     return await anyio.to_thread.run_sync(functools.partial(func, *args, **kwargs))
+
+
+def import_string(dotted_path: str) -> Any:
+    """
+    Import a module or a specific attribute from a module using its dotted string path.
+
+    Args:
+        dotted_path: The dotted path to the object to import.
+
+    Returns:
+        object: The imported module or attribute/class/function.
+
+    Raises:
+        ImportError: If the import fails.
+    """
+    try:
+        module_path, _, attribute_name = dotted_path.rpartition(".")
+        if module_path:
+            module = importlib.import_module(module_path)
+            return getattr(module, attribute_name)
+        else:
+            return importlib.import_module(attribute_name)
+    except (ImportError, AttributeError) as exc:
+        raise ImportError(f"Cannot import '{dotted_path}': {exc}") from exc

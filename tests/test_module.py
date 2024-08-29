@@ -42,6 +42,13 @@ def test_register_module_instance(container: Container) -> None:
     assert container.is_registered(Annotated[str, "msg2"])
 
 
+def test_register_module_path(container: Container) -> None:
+    container.register_module("tests.test_module.TestModule")
+
+    assert container.is_registered(Annotated[str, "msg1"])
+    assert container.is_registered(Annotated[str, "msg2"])
+
+
 def test_register_module_function(container: Container) -> None:
     def configure(container: Container) -> None:
         container.register(str, lambda: "Message 1", scope="singleton")
