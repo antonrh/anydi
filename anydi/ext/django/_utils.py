@@ -106,23 +106,23 @@ def _any_typed_interface(interface: Any, prefix: str) -> Any:
 
 
 def _patch_any_typed_annotated(container: Container, *, prefix: str) -> None:
-    def _patched_resolve(resolve: Any) -> Any:
+    def _patch_resolve(resolve: Any) -> Any:
         @wraps(resolve)
         def wrapper(interface: Any) -> Any:
             return resolve(_any_typed_interface(interface, prefix))
 
         return wrapper
 
-    def _patched_aresolve(resolve: Any) -> Any:
+    def _patch_aresolve(resolve: Any) -> Any:
         @wraps(resolve)
         async def wrapper(interface: Any) -> Any:
             return await resolve(_any_typed_interface(interface, prefix))
 
         return wrapper
 
-    container.resolve = _patched_resolve(  # type: ignore[method-assign]
+    container.resolve = _patch_resolve(  # type: ignore[method-assign]
         container.resolve
     )
-    container.aresolve = _patched_aresolve(  # type: ignore[method-assign]
+    container.aresolve = _patch_aresolve(  # type: ignore[method-assign]
         container.aresolve
     )
