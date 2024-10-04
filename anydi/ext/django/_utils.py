@@ -15,7 +15,7 @@ from anydi import Container
 
 
 def register_settings(
-    container: Container, prefix: str = "django.conf.setting."
+    container: Container, prefix: str = "django.conf.settings."
 ) -> None:
     """Register Django settings into the container."""
 
