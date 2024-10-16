@@ -1,12 +1,15 @@
 from __future__ import annotations
 
 import inspect
+import logging
 from typing import Any, Callable, Iterator, cast
 
 import pytest
 
 from anydi import Container
 from anydi._utils import get_typed_parameters
+
+logger = logging.getLogger(__name__)
 
 
 def pytest_configure(config: pytest.Config) -> None:
@@ -102,6 +105,7 @@ def _anydi_inject(
         try:
             request.node.funcargs[argname] = container.resolve(interface)
         except Exception:  # noqa
+            logger.warning(f"Failed to resolve dependency for argument '{argname}'.")
             _anydi_unresolved.append(interface)
 
 
@@ -127,4 +131,5 @@ async def _anydi_ainject(
         try:
             request.node.funcargs[argname] = await container.aresolve(interface)
         except Exception:  # noqa
+            logger.warning(f"Failed to resolve dependency for argument '{argname}'.")
             _anydi_unresolved.append(interface)
