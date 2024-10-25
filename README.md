@@ -23,7 +23,7 @@ http://anydi.readthedocs.io/
 
 ---
 
-`AnyDI` is a modern, lightweight Dependency Injection library suitable for any synchronous or asynchronous applications with Python 3.8+, based on type annotations ([PEP 484](https://peps.python.org/pep-0484/)).
+`AnyDI` is a modern, lightweight Dependency Injection library suitable for any synchronous or asynchronous applications with Python 3.9+, based on type annotations ([PEP 484](https://peps.python.org/pep-0484/)).
 
 The key features are:
 

@@ -53,8 +53,6 @@ def is_builtin_type(tp: type[Any]) -> bool:
 
 
 def evaluate_forwardref(type_: ForwardRef, globalns: Any, localns: Any) -> Any:
-    if sys.version_info < (3, 9):
-        return type_._evaluate(globalns, localns)
     return type_._evaluate(globalns, localns, recursive_guard=frozenset())
 
 
