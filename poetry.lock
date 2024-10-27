@@ -544,6 +544,20 @@ files = [
 ]
 
 [[package]]
+name = "inspect313"
+version = "0.1.0"
+description = "Backport of `inspect` module from Python3.13"
+optional = false
+python-versions = ">=3.8,<4.0"
+files = [
+    {file = "inspect313-0.1.0-py3-none-any.whl", hash = "sha256:ad21191a2a715a0d5c231c66848829d3e00ae754c7cc3f6416e258eb2bf85207"},
+    {file = "inspect313-0.1.0.tar.gz", hash = "sha256:9dcedd40bc006043da1ff3fa720d3c25c0dc2e28c5f543e539df3a1b5064c1e6"},
+]
+
+[package.dependencies]
+typing-extensions = ">=4.10,<5.0"
+
+[[package]]
 name = "jinja2"
 version = "3.1.4"
 description = "A very fast and expressive template engine."
@@ -1559,4 +1573,4 @@ docs = ["mkdocs", "mkdocs-material"]
 [metadata]
 lock-version = "2.0"
 python-versions = "^3.9"
-content-hash = "7e59d09d440fc1c9d8f0bc858419d27b78e0eae1f5611d8b0c3712ab2854d920"
+content-hash = "1177452e146d58ec5fcebcf8f34588a059c1b77ea4eb475405252a312ee0493b"

@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import inspect
 import logging
 from typing import Any, cast
 
@@ -11,6 +10,7 @@ from faststream import ContextRepo
 from faststream.broker.core.usecase import BrokerUsecase
 
 from anydi import Container
+from anydi._utils import get_signature
 
 from ._utils import HasInterface, patch_call_parameter
 
@@ -32,7 +32,7 @@ def install(broker: BrokerUsecase[Any, Any], container: Container) -> None:
 
     for handler in _get_broken_handlers(broker):
         call = handler._original_call  # noqa
-        for parameter in inspect.signature(call, eval_str=True).parameters.values():
+        for parameter in get_signature(call).parameters.values():
             patch_call_parameter(call, parameter, container)
 
 

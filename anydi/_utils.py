@@ -5,9 +5,15 @@ from __future__ import annotations
 import builtins
 import functools
 import importlib
+import sys
 from typing import Any, AsyncIterator, Callable, Iterator, TypeVar
 
 from typing_extensions import ParamSpec, get_args, get_origin
+
+if sys.version_info < (3, 10):
+    import inspect313 as inspect  # type: ignore
+else:
+    import inspect
 
 try:
     import anyio  # noqa
@@ -43,6 +49,10 @@ def get_full_qualname(obj: Any) -> str:
         return f"{get_full_qualname(origin)}[{args}]"
 
     return f"{module}.{qualname}"
+
+
+def get_signature(obj: Any) -> inspect.Signature:
+    return inspect.signature(obj, eval_str=True)
 
 
 def is_builtin_type(tp: type[Any]) -> bool:
