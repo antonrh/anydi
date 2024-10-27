@@ -20,7 +20,6 @@ from typing import (
 from typing_extensions import NamedTuple, ParamSpec
 
 from ._types import is_marker
-from ._utils import get_typed_parameters
 
 if TYPE_CHECKING:
     from ._container import Container
@@ -157,9 +156,13 @@ class Scanner:
 
             # Get by Marker
             if inspect.isclass(member):
-                parameters = get_typed_parameters(member.__init__)
+                parameters = inspect.signature(
+                    member.__init__, eval_str=True
+                ).parameters.values()
             else:
-                parameters = get_typed_parameters(member)
+                parameters = inspect.signature(
+                    member, eval_str=True
+                ).parameters.values()
             for parameter in parameters:
                 if is_marker(parameter.default):
                     dependencies.append(

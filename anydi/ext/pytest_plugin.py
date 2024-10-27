@@ -7,7 +7,6 @@ from typing import Any, Callable, Iterator, cast
 import pytest
 
 from anydi import Container
-from anydi._utils import get_typed_parameters
 
 logger = logging.getLogger(__name__)
 
@@ -69,7 +68,9 @@ def _anydi_injected_parameter_iterator(
     registered_fixtures = request.session._fixturemanager._arg2fixturedefs  # noqa
 
     def _iterator() -> Iterator[tuple[str, inspect.Parameter]]:
-        for parameter in get_typed_parameters(request.function):
+        for parameter in inspect.signature(
+            request.function, eval_str=True
+        ).parameters.values():
             interface = parameter.annotation
             if (
                 interface is parameter.empty

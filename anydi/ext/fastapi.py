@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import inspect
 import logging
 from typing import Any, Iterator, cast
 
@@ -11,7 +12,6 @@ from fastapi.routing import APIRoute
 from starlette.requests import Request
 
 from anydi import Container
-from anydi._utils import get_typed_parameters
 
 from ._utils import HasInterface, patch_call_parameter
 from .starlette.middleware import RequestScopedMiddleware
@@ -46,7 +46,7 @@ def install(app: FastAPI, container: Container) -> None:
             call, *params = dependant.cache_key
             if not call:
                 continue  # pragma: no cover
-            for parameter in get_typed_parameters(call):
+            for parameter in inspect.signature(call, eval_str=True).parameters.values():
                 patch_call_parameter(call, parameter, container)
 
 
