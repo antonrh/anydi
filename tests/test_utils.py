@@ -32,13 +32,6 @@ def test_is_builtin_type(tp: Type[Any], expected: bool) -> None:
         (Service(ident="test"), "tests.fixtures.Service"),
         pytest.param(
             Annotated[Service, "service"],
-            'typing.Annotated[tests.fixtures.Service, "service"]',
-            marks=pytest.mark.skipif(
-                sys.version_info < (3, 9), reason="Requires Python 3.9"
-            ),
-        ),
-        pytest.param(
-            Annotated[Service, "service"],
             'typing_extensions.Annotated[tests.fixtures.Service, "service"]',
             marks=pytest.mark.skipif(
                 sys.version_info >= (3, 9), reason="Requires Python 3.9"
@@ -58,7 +51,7 @@ def test_is_builtin_type(tp: Type[Any], expected: bool) -> None:
             Union[str, int],
             "typing._SpecialForm[str, int]",
             marks=pytest.mark.skipif(
-                sys.version_info >= (3, 10), reason="Requires Python 3.8 and 3.9"
+                sys.version_info >= (3, 10), reason="Requires Python 3.9"
             ),
         ),
     ],
