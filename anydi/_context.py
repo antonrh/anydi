@@ -23,6 +23,7 @@ class ScopedContext(abc.ABC):
 
     def __init__(self, container: Container) -> None:
         self.container = container
+        self._instances: dict[type[Any], Any] = {}
 
     @abc.abstractmethod
     def get(self, interface: Interface[T], provider: Provider) -> T:
@@ -100,7 +101,10 @@ class ScopedContext(abc.ABC):
         """
         args, kwargs = [], {}
         for parameter in provider.parameters:
-            instance = self.container.resolve(parameter.annotation)
+            if parameter.annotation in self._instances:
+                instance = self._instances[parameter.annotation]
+            else:
+                instance = self.container.resolve(parameter.annotation)
             if parameter.kind == parameter.POSITIONAL_ONLY:
                 args.append(instance)
             else:
@@ -120,7 +124,10 @@ class ScopedContext(abc.ABC):
         """
         args, kwargs = [], {}
         for parameter in provider.parameters:
-            instance = await self.container.aresolve(parameter.annotation)
+            if parameter.annotation in self._instances:
+                instance = self._instances[parameter.annotation]
+            else:
+                instance = await self.container.aresolve(parameter.annotation)
             if parameter.kind == parameter.POSITIONAL_ONLY:
                 args.append(instance)
             else:
@@ -134,7 +141,6 @@ class ResourceScopedContext(ScopedContext):
     def __init__(self, container: Container) -> None:
         """Initialize the ScopedContext."""
         super().__init__(container)
-        self._instances: dict[type[Any], Any] = {}
         self._stack = contextlib.ExitStack()
         self._async_stack = contextlib.AsyncExitStack()
 
