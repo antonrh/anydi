@@ -12,6 +12,8 @@ from typing_extensions import get_origin
 from ._types import Event, Scope, is_event_type
 from ._utils import get_full_qualname, get_typed_parameters, get_typed_return_annotation
 
+_sentinel = object()
+
 
 class CallableKind(IntEnum):
     CLASS = 1
@@ -31,7 +33,9 @@ class Provider:
         "_parameters",
     )
 
-    def __init__(self, *, call: Callable[..., Any], scope: Scope) -> None:
+    def __init__(
+        self, *, call: Callable[..., Any], scope: Scope, interface: Any = _sentinel
+    ) -> None:
         self._call = call
         self._scope = scope
         self._qualname = get_full_qualname(call)
@@ -43,7 +47,7 @@ class Provider:
         self._validate_scope()
 
         # Detect the interface of callable provider
-        self._detect_interface()
+        self._detect_interface(interface)
 
         # Set parameters
         self._parameters = get_typed_parameters(call)
@@ -110,14 +114,15 @@ class Provider:
                 "object. Only callable providers are allowed."
             )
 
-    def _detect_interface(self) -> None:
+    def _detect_interface(self, interface: Any) -> None:
         """Detect the interface of callable provider."""
         # If the callable is a class, return the class itself
         if self._kind == CallableKind.CLASS:
             self._interface = self._call
             return
 
-        interface = get_typed_return_annotation(self._call)
+        if interface is _sentinel:
+            interface = get_typed_return_annotation(self._call)
 
         # If the callable is an iterator, return the actual type
         if get_origin(interface) in [Iterator, AsyncIterator]:
@@ -132,6 +137,10 @@ class Provider:
                     f"Cannot use `{self}` resource type annotation "
                     "without actual type argument."
                 )
+
+        # None interface is not allowed
+        if interface is None or interface is NoneType:
+            raise TypeError(f"Missing `{self}` provider return annotation.")
 
         # Set the interface
         self._interface = interface

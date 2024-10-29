@@ -72,6 +72,20 @@ class TestProvider:
         assert provider.is_event
         assert issubclass(provider.interface, Event)
 
+    def test_construct_with_interface(self) -> None:
+        provider = Provider(call=lambda: "hello", scope="singleton", interface=str)
+
+        assert provider.interface is str
+
+    def test_construct_with_none(self) -> None:
+        with pytest.raises(TypeError) as exc_info:
+            Provider(call=lambda: "hello", scope="singleton", interface=None)
+
+        assert str(exc_info.value) == (
+            "Missing `tests.test_provider.TestProvider.test_construct_with_none."
+            "<locals>.<lambda>` provider return annotation."
+        )
+
     def test_construct_not_callable(self) -> None:
         with pytest.raises(TypeError) as exc_info:
             Provider(call="Test", scope="singleton")  # type: ignore[arg-type]
