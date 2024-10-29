@@ -104,17 +104,6 @@ def get_typed_parameters(obj: Callable[..., Any]) -> list[inspect.Parameter]:
     ]
 
 
-_resource_origins = (
-    get_origin(Iterator),
-    get_origin(AsyncIterator),
-)
-
-
-def has_resource_origin(origin: Any) -> bool:
-    """Check if the given origin is a resource origin."""
-    return origin in _resource_origins
-
-
 async def run_async(
     func: Callable[P, T],
     /,
