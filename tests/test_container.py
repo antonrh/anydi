@@ -5,19 +5,17 @@ from dataclasses import dataclass
 from typing import (
     Any,
     AsyncIterator,
-    Dict,
     Iterator,
     List,
     Sequence,
-    Tuple,
-    Type,
     Union,
 )
 
 import pytest
 from typing_extensions import Annotated, Self
 
-from anydi import Container, Provider, Scope, auto, dep, request, singleton, transient
+from anydi import Container, Scope, auto, dep, request, singleton, transient
+from anydi._provider import Provider
 
 from tests.fixtures import Resource, Service
 
@@ -37,7 +35,7 @@ def test_register_provider(container: Container) -> None:
 
     provider = container.register(str, provider_obj, scope="transient")
 
-    assert provider.obj == provider_obj
+    assert provider.call == provider_obj
     assert provider.scope == "transient"
 
 
@@ -60,7 +58,7 @@ def test_register_provider_override(container: Container) -> None:
         str, new_provider_obj, scope="singleton", override=True
     )
 
-    assert provider.obj == new_provider_obj
+    assert provider.call == new_provider_obj
 
 
 def test_register_provider_named(container: Container) -> None:
@@ -81,29 +79,14 @@ def test_register_provider_named(container: Container) -> None:
 
 def test_register_providers_via_constructor() -> None:
     container = Container(
-        providers={
-            str: Provider(obj=lambda: "test", scope="singleton"),
-            int: Provider(obj=lambda: 1, scope="singleton"),
-        }
+        providers=[
+            Provider(call=lambda: "test", scope="singleton", interface=str),
+            Provider(call=lambda: 1, scope="singleton", interface=int),
+        ]
     )
 
     assert container.is_registered(str)
     assert container.is_registered(int)
-
-
-def test_register_provider_with_invalid_scope(container: Container) -> None:
-    with pytest.raises(ValueError) as exc_info:
-        container.register(
-            str,
-            lambda: "test",
-            scope="invalid",  # type: ignore[arg-type]
-        )
-
-    assert str(exc_info.value) == (
-        "The scope provided is invalid. Only the following scopes are supported: "
-        "transient, singleton, request. Please use one of the supported scopes when "
-        "registering a provider."
-    )
 
 
 def test_register_provider_invalid_transient_resource(container: Container) -> None:
@@ -116,8 +99,7 @@ def test_register_provider_invalid_transient_resource(container: Container) -> N
     assert str(exc_info.value) == (
         "The resource provider `tests.test_container"
         ".test_register_provider_invalid_transient_resource.<locals>.provider_obj` is "
-        "attempting to register with a transient scope, which is not allowed. Please "
-        "update the provider's scope to an appropriate value before registering it."
+        "attempting to register with a transient scope, which is not allowed."
     )
 
 
@@ -134,8 +116,7 @@ def test_register_provider_invalid_transient_async_resource(
         "The resource provider `tests.test_container"
         ".test_register_provider_invalid_transient_async_resource"
         ".<locals>.provider_obj` is attempting to register with a transient scope, "
-        "which is not allowed. Please update the provider's scope to an "
-        "appropriate value before registering it."
+        "which is not allowed."
     )
 
 
@@ -167,18 +148,8 @@ def test_register_invalid_provider_type(container: Container) -> None:
 
     assert str(exc_info.value) == (
         "The provider `Test` is invalid because it is not a callable object. Only "
-        "callable providers are allowed. Please update the provider to a callable "
-        "object before attempting to register it."
+        "callable providers are allowed."
     )
-
-
-def test_register_valid_class_provider(container: Container) -> None:
-    class Klass:
-        pass
-
-    provider = container.register(str, Klass, scope="singleton")
-
-    assert provider.is_class
 
 
 @pytest.mark.parametrize(
@@ -760,7 +731,7 @@ def test_resolve_non_strict_provider_scope_defined(container: Container) -> None
 
     _ = container.resolve(Service)
 
-    assert container.providers == {Service: Provider(obj=Service, scope="singleton")}
+    assert container.providers == {Service: Provider(call=Service, scope="singleton")}
 
 
 def test_resolve_non_strict_provider_scope_from_sub_provider_request(
@@ -778,8 +749,8 @@ def test_resolve_non_strict_provider_scope_from_sub_provider_request(
         _ = container.resolve(Service)
 
     assert container.providers == {
-        str: Provider(obj=message, scope="request"),
-        Service: Provider(obj=Service, scope="request"),
+        str: Provider(call=message, scope="request"),
+        Service: Provider(call=Service, scope="request"),
     }
 
 
@@ -1040,58 +1011,6 @@ async def test_async_resource_delegated_exception(container: Container) -> None:
 # Inspections
 
 
-@pytest.mark.parametrize(
-    "annotation, expected",
-    [
-        (str, str),
-        (int, int),
-        (Service, Service),
-        (Iterator[Service], Service),
-        (AsyncIterator[Service], Service),
-        (Dict[str, Any], Dict[str, Any]),
-        (List[str], List[str]),
-        ("List[str]", List[str]),
-        (Tuple[str, ...], Tuple[str, ...]),
-        ("Tuple[str, ...]", Tuple[str, ...]),
-        ('Annotated[str, "name"]', Annotated[str, "name"]),
-    ],
-)
-def test_get_supported_provider_annotation(
-    container: Container, annotation: Type[Any], expected: Type[Any]
-) -> None:
-    def provider() -> annotation:  # type: ignore[valid-type]
-        return object()
-
-    assert container._get_provider_annotation(provider) == expected
-
-
-def test_get_provider_annotation_missing(container: Container) -> None:
-    def provider():  # type: ignore[no-untyped-def]
-        return object()
-
-    with pytest.raises(TypeError) as exc_info:
-        container._get_provider_annotation(provider)
-
-    assert str(exc_info.value) == (
-        "Missing `tests.test_container.test_get_provider_annotation_missing.<locals>"
-        ".provider` provider return annotation."
-    )
-
-
-def test_get_provider_annotation_resource_without_args(container: Container) -> None:
-    def provider() -> Iterator:  # type: ignore[type-arg]
-        yield
-
-    with pytest.raises(TypeError) as exc_info:
-        container._get_provider_annotation(provider)
-
-    assert str(exc_info.value) == (
-        "Cannot use `tests.test_container"
-        ".test_get_provider_annotation_resource_without_args.<locals>.provider` "
-        "resource type annotation without actual type."
-    )
-
-
 def test_get_provider_arguments(container: Container) -> None:
     @container.provider(scope="singleton")
     def a() -> int:
@@ -1316,7 +1235,7 @@ def test_provider_decorator(container: Container) -> None:
     def ident() -> str:
         return "1000"
 
-    assert container.providers[str] == Provider(obj=ident, scope="singleton")
+    assert container.providers[str] == Provider(call=ident, scope="singleton")
 
 
 def test_request_decorator() -> None:

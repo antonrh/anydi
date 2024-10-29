@@ -5,7 +5,6 @@ from __future__ import annotations
 import contextlib
 import inspect
 import types
-import uuid
 from collections import defaultdict
 from contextvars import ContextVar
 from functools import wraps
@@ -16,14 +15,13 @@ from typing import (
     Callable,
     Iterable,
     Iterator,
-    Mapping,
     Sequence,
     TypeVar,
     cast,
     overload,
 )
 
-from typing_extensions import ParamSpec, Self, final, get_args, get_origin
+from typing_extensions import ParamSpec, Self, final
 
 try:
     from types import NoneType
@@ -40,13 +38,12 @@ from ._context import (
 )
 from ._logger import logger
 from ._module import Module, ModuleRegistry
+from ._provider import Provider
 from ._scanner import Scanner
-from ._types import AnyInterface, Event, Interface, Provider, Scope, is_marker
+from ._types import AnyInterface, Interface, Scope, is_marker
 from ._utils import (
     get_full_qualname,
     get_typed_parameters,
-    get_typed_return_annotation,
-    has_resource_origin,
     is_builtin_type,
 )
 
@@ -71,7 +68,7 @@ class Container:
     def __init__(
         self,
         *,
-        providers: Mapping[type[Any], Provider] | None = None,
+        providers: Sequence[Provider] | None = None,
         modules: Sequence[Module | type[Module] | Callable[[Container], None] | str]
         | None = None,
         strict: bool = False,
@@ -98,9 +95,9 @@ class Container:
         self._scanner = Scanner(self)
 
         # Register providers
-        providers = providers or {}
-        for interface, provider in providers.items():
-            self.register(interface, provider.obj, scope=provider.scope)
+        providers = providers or []
+        for provider in providers:
+            self._register_provider(provider)
 
         # Register modules
         modules = modules or []
@@ -144,50 +141,27 @@ class Container:
         scope: Scope,
         override: bool = False,
     ) -> Provider:
-        """Register a provider for the specified interface.
+        """Register a provider for the specified interface."""
+        provider = Provider(call=obj, scope=scope, interface=interface)
+        return self._register_provider(provider, override=override)
 
-        Args:
-            interface: The interface for which the provider is being registered.
-            obj: The provider function or callable object.
-            scope: The scope of the provider.
-            override: If True, override an existing provider for the interface
-                if one is already registered. Defaults to False.
-
-        Returns:
-            The registered provider.
-
-        Raises:
-            LookupError: If a provider for the interface is already registered
-              and override is False.
-
-        Notes:
-            - If the provider is a resource or an asynchronous resource, and the
-              interface is None, an Event type will be automatically created and used
-              as the interface.
-            - The provider will be validated for its scope, type, and matching scopes.
-        """
-        provider = Provider(obj=obj, scope=scope)
-
-        # Create Event type
-        if provider.is_resource and (interface is NoneType or interface is None):
-            interface = type(f"Event_{uuid.uuid4().hex}", (Event,), {})
-
-        if interface in self._providers:
+    def _register_provider(
+        self, provider: Provider, *, override: bool = False
+    ) -> Provider:
+        if provider.interface in self._providers:
             if override:
-                self._set_provider(interface, provider)
+                self._set_provider(provider)
                 return provider
 
             raise LookupError(
-                f"The provider interface `{get_full_qualname(interface)}` "
+                f"The provider interface `{get_full_qualname(provider.interface)}` "
                 "already registered."
             )
 
         # Validate provider
-        self._validate_provider_scope(provider)
-        self._validate_provider_type(provider)
         self._validate_provider_match_scopes(provider)
 
-        self._set_provider(interface, provider)
+        self._set_provider(provider)
         return provider
 
     def unregister(self, interface: AnyInterface) -> None:
@@ -275,16 +249,15 @@ class Container:
                 return self.register(interface, interface, scope=scope or "transient")
             raise
 
-    def _set_provider(self, interface: AnyInterface, provider: Provider) -> None:
+    def _set_provider(self, provider: Provider) -> None:
         """Set a provider by interface.
 
         Args:
-            interface: The interface for which to set the provider.
             provider: The provider object to set.
         """
-        self._providers[interface] = provider
+        self._providers[provider.interface] = provider
         if provider.is_resource:
-            self._resource_cache[provider.scope].append(interface)
+            self._resource_cache[provider.scope].append(provider.interface)
 
     def _delete_provider(self, interface: AnyInterface) -> None:
         """Delete a provider by interface.
@@ -295,49 +268,6 @@ class Container:
         provider = self._providers.pop(interface, None)
         if provider is not None and provider.is_resource:
             self._resource_cache[provider.scope].remove(interface)
-
-    def _validate_provider_scope(self, provider: Provider) -> None:
-        """Validate the scope of a provider.
-
-        Args:
-            provider: The provider to validate.
-
-        Raises:
-            ValueError: If the scope provided is invalid.
-        """
-        if provider.scope not in get_args(Scope):
-            raise ValueError(
-                "The scope provided is invalid. Only the following scopes are "
-                f"supported: {', '.join(get_args(Scope))}. Please use one of the "
-                "supported scopes when registering a provider."
-            )
-
-    def _validate_provider_type(self, provider: Provider) -> None:
-        """Validate the type of provider.
-
-        Args:
-            provider: The provider to validate.
-
-        Raises:
-            TypeError: If the provider has an invalid type.
-        """
-        if provider.is_function or provider.is_class:
-            return
-
-        if provider.is_resource:
-            if provider.scope == "transient":
-                raise TypeError(
-                    f"The resource provider `{provider}` is attempting to register "
-                    "with a transient scope, which is not allowed. Please update the "
-                    "provider's scope to an appropriate value before registering it."
-                )
-            return
-
-        raise TypeError(
-            f"The provider `{provider.obj}` is invalid because it is not a callable "
-            "object. Only callable providers are allowed. Please update the provider "
-            "to a callable object before attempting to register it."
-        )
 
     def _validate_provider_match_scopes(self, provider: Provider) -> None:
         """Validate that the provider and its dependencies have matching scopes.
@@ -361,8 +291,7 @@ class Container:
                 sub_provider = self._get_or_register_provider(parameter.annotation)
             except LookupError:
                 raise ValueError(
-                    f"The provider `{get_full_qualname(provider.obj)}` depends on "
-                    f"`{parameter.name}` of type "
+                    f"The provider `{provider}` depends on `{parameter.name}` of type "
                     f"`{get_full_qualname(parameter.annotation)}`, which "
                     "has not been registered. To resolve this, ensure that "
                     f"`{parameter.name}` is registered before attempting to use it."
@@ -650,8 +579,8 @@ class Container:
         """
 
         def decorator(func: Callable[P, T]) -> Callable[P, T]:
-            interface = self._get_provider_annotation(func)
-            self.register(interface, func, scope=scope, override=override)
+            provider = Provider(call=func, scope=scope)
+            self._register_provider(provider, override=override)
             return func
 
         return decorator
@@ -734,39 +663,6 @@ class Container:
                 with at least one matching tag will be scanned. Defaults to None.
         """
         self._scanner.scan(packages, tags=tags)
-
-    def _get_provider_annotation(self, obj: Callable[..., Any]) -> Any:
-        """Retrieve the provider return annotation from a callable object.
-
-        Args:
-            obj: The callable object (provider).
-
-        Returns:
-            The provider return annotation.
-
-        Raises:
-            TypeError: If the provider return annotation is missing or invalid.
-        """
-        annotation = get_typed_return_annotation(obj)
-
-        if annotation is None:
-            raise TypeError(
-                f"Missing `{get_full_qualname(obj)}` provider return annotation."
-            )
-
-        origin = get_origin(annotation)
-
-        if has_resource_origin(origin):
-            args = get_args(annotation)
-            if args:
-                return args[0]
-            else:
-                raise TypeError(
-                    f"Cannot use `{get_full_qualname(obj)}` resource type annotation "
-                    "without actual type."
-                )
-
-        return annotation
 
     def _get_injected_params(self, obj: Callable[..., Any]) -> dict[str, Any]:
         """Get the injected parameters of a callable object.

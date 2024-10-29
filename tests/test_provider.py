@@ -1,9 +1,11 @@
-from typing import Any, AsyncIterator, Callable, Iterator
+from typing import Annotated, Any, AsyncIterator, Callable, Iterator
 
 import pytest
 
 from anydi._provider import CallableKind, Provider
 from anydi._types import Event
+
+from tests.fixtures import Service
 
 
 def func() -> str:
@@ -56,6 +58,32 @@ class TestProvider:
 
         assert provider.kind == kind
         assert provider.interface is interface
+
+    @pytest.mark.parametrize(
+        "annotation, expected",
+        [
+            (str, str),
+            (int, int),
+            (Service, Service),
+            (Iterator[Service], Service),
+            (AsyncIterator[Service], Service),
+            (dict[str, Any], dict[str, Any]),
+            (list[str], list[str]),
+            ("list[str]", list[str]),
+            (tuple[str, ...], tuple[str, ...]),
+            ("tuple[str, ...]", tuple[str, ...]),
+            ('Annotated[str, "name"]', Annotated[str, "name"]),
+        ],
+    )
+    def test_construct_interface(
+        self, annotation: type[Any], expected: type[Any]
+    ) -> None:
+        def call() -> annotation:  # type: ignore[valid-type]
+            return object()
+
+        provider = Provider(call=call, scope="singleton")
+
+        assert provider.interface == expected
 
     @pytest.mark.parametrize(
         "call, kind",

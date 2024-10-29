@@ -55,6 +55,18 @@ class Provider:
     def __str__(self) -> str:
         return self._qualname
 
+    def __eq__(self, other: object) -> bool:
+        if not isinstance(other, Provider):
+            return NotImplemented
+        return (
+            self._call == other._call
+            and self._scope == other._scope
+            and self._qualname == other._qualname
+            and self._kind == other._kind
+            and self._interface == other._interface
+            and self._parameters == other._parameters
+        )
+
     @property
     def call(self) -> Callable[..., Any]:
         return self._call
