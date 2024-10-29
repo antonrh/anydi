@@ -3,7 +3,7 @@ from __future__ import annotations
 import inspect
 from dataclasses import dataclass
 from functools import cached_property
-from typing import Any, Callable, Type, TypeVar, Union
+from typing import Any, Callable, TypeVar, Union
 
 from typing_extensions import Annotated, Literal, Self, TypeAlias
 
@@ -12,8 +12,8 @@ from ._utils import get_full_qualname, get_typed_parameters
 Scope = Literal["transient", "singleton", "request"]
 
 T = TypeVar("T")
-AnyInterface: TypeAlias = Union[Type[Any], Annotated[Any, ...]]
-Interface: TypeAlias = Type[T]
+AnyInterface: TypeAlias = Union[type[Any], Annotated[Any, ...]]
+Interface: TypeAlias = type[T]
 
 
 class Marker:

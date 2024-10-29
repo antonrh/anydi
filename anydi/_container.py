@@ -185,7 +185,7 @@ class Container:
         # Validate provider
         self._validate_provider_scope(provider)
         self._validate_provider_type(provider)
-        self._validate_provider_match_scopes(interface, provider)
+        self._validate_provider_match_scopes(provider)
 
         self._set_provider(interface, provider)
         return provider
@@ -339,20 +339,16 @@ class Container:
             "to a callable object before attempting to register it."
         )
 
-    def _validate_provider_match_scopes(
-        self, interface: AnyInterface, provider: Provider
-    ) -> None:
+    def _validate_provider_match_scopes(self, provider: Provider) -> None:
         """Validate that the provider and its dependencies have matching scopes.
 
         Args:
-            interface: The interface associated with the provider.
             provider: The provider to validate.
 
         Raises:
             ValueError: If the provider and its dependencies have mismatched scopes.
             TypeError: If a dependency is missing an annotation.
         """
-        related_providers = []
 
         for parameter in provider.parameters:
             if parameter.annotation is inspect._empty:  # noqa
@@ -360,6 +356,7 @@ class Container:
                     f"Missing provider `{provider}` "
                     f"dependency `{parameter.name}` annotation."
                 )
+
             try:
                 sub_provider = self._get_or_register_provider(parameter.annotation)
             except LookupError:
@@ -370,16 +367,15 @@ class Container:
                     "has not been registered. To resolve this, ensure that "
                     f"`{parameter.name}` is registered before attempting to use it."
                 ) from None
-            related_providers.append(sub_provider)
 
-        for related_provider in related_providers:
-            left_scope, right_scope = related_provider.scope, provider.scope
+            left_scope, right_scope = sub_provider.scope, provider.scope
             allowed_scopes = ALLOWED_SCOPES.get(right_scope) or []
+
             if left_scope not in allowed_scopes:
                 raise ValueError(
                     f"The provider `{provider}` with a {provider.scope} scope was "
                     "attempted to be registered with the provider "
-                    f"`{related_provider}` with a `{related_provider.scope}` scope, "
+                    f"`{sub_provider}` with a `{sub_provider.scope}` scope, "
                     "which is not allowed. Please ensure that all providers are "
                     "registered with matching scopes."
                 )
@@ -442,7 +438,7 @@ class Container:
         self._singleton_context.close()
 
     @contextlib.contextmanager
-    def request_context(self) -> Iterator[None]:
+    def request_context(self) -> Iterator[RequestContext]:
         """Obtain a context manager for the request-scoped context.
 
         Returns:
@@ -451,7 +447,7 @@ class Container:
         context = RequestContext(self)
         token = self._request_context_var.set(context)
         with context:
-            yield
+            yield context
             self._request_context_var.reset(token)
 
     async def __aenter__(self) -> Self:
@@ -477,7 +473,7 @@ class Container:
         await self._singleton_context.aclose()
 
     @contextlib.asynccontextmanager
-    async def arequest_context(self) -> AsyncIterator[None]:
+    async def arequest_context(self) -> AsyncIterator[RequestContext]:
         """Obtain an async context manager for the request-scoped context.
 
         Returns:
@@ -486,7 +482,7 @@ class Container:
         context = RequestContext(self)
         token = self._request_context_var.set(context)
         async with context:
-            yield
+            yield context
             self._request_context_var.reset(token)
 
     def _get_request_context(self) -> RequestContext:
