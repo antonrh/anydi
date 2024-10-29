@@ -1,0 +1,100 @@
+from typing import Any, AsyncIterator, Callable, Iterator
+
+import pytest
+
+from anydi._provider import CallableKind, Provider
+from anydi._types import Event
+
+
+def func() -> str:
+    return "func"
+
+
+class Class:
+    pass
+
+
+def generator() -> Iterator[str]:
+    yield "generator"
+
+
+async def async_generator() -> AsyncIterator[str]:
+    yield "async_generator"
+
+
+async def coro() -> str:
+    return "coro"
+
+
+def event() -> Iterator[None]:
+    yield
+
+
+async def async_event() -> AsyncIterator[None]:
+    yield
+
+
+def iterator() -> Iterator:  # type: ignore[type-arg]
+    yield
+
+
+class TestProvider:
+    @pytest.mark.parametrize(
+        "call, kind, interface",
+        [
+            (func, CallableKind.FUNCTION, str),
+            (Class, CallableKind.CLASS, Class),
+            (generator, CallableKind.GENERATOR, str),
+            (async_generator, CallableKind.ASYNC_GENERATOR, str),
+            (coro, CallableKind.COROUTINE, str),
+        ],
+    )
+    def test_construct(
+        self, call: Callable[..., Any], kind: CallableKind, interface: Any
+    ) -> None:
+        provider = Provider(call=call, scope="singleton")
+
+        assert provider.kind == kind
+        assert provider.interface is interface
+
+    @pytest.mark.parametrize(
+        "call, kind",
+        [(event, CallableKind.GENERATOR), (async_event, CallableKind.ASYNC_GENERATOR)],
+    )
+    def test_construct_event(
+        self,
+        call: Callable[..., Any],
+        kind: CallableKind,
+    ) -> None:
+        provider = Provider(call=call, scope="singleton")
+
+        assert provider.kind == kind
+        assert provider.is_event
+        assert issubclass(provider.interface, Event)
+
+    def test_construct_not_callable(self) -> None:
+        with pytest.raises(TypeError) as exc_info:
+            Provider(call="Test", scope="singleton")  # type: ignore[arg-type]
+
+        assert str(exc_info.value) == (
+            "The provider `Test` is invalid because it is not a callable object. "
+            "Only callable providers are allowed."
+        )
+
+    def test_construct_iterator_no_arg_not_allowed(self) -> None:
+        with pytest.raises(TypeError) as exc_info:
+            Provider(call=iterator, scope="singleton")
+
+        assert str(exc_info.value) == (
+            "Cannot use `tests.test_provider.iterator` resource type annotation "
+            "without actual type argument."
+        )
+
+    def test_construct_transient_resource_not_allowed(self) -> None:
+        with pytest.raises(TypeError) as exc_info:
+            Provider(call=generator, scope="transient")
+
+        assert str(exc_info.value) == (
+            "The resource provider `tests.test_provider.generator` is attempting to "
+            "register with a transient scope, which is not allowed."
+        )
