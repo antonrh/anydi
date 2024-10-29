@@ -4,10 +4,15 @@ import inspect
 import uuid
 from collections.abc import AsyncIterator, Iterator
 from enum import IntEnum
-from types import NoneType
 from typing import Any, Callable, get_args
 
 from typing_extensions import get_origin
+
+try:
+    from types import NoneType
+except ImportError:
+    NoneType = type(None)  # type: ignore[misc]
+
 
 from ._types import Event, Scope, is_event_type
 from ._utils import get_full_qualname, get_typed_parameters, get_typed_return_annotation

@@ -23,12 +23,6 @@ from typing import (
 
 from typing_extensions import ParamSpec, Self, final
 
-try:
-    from types import NoneType
-except ImportError:
-    NoneType = type(None)  # type: ignore[misc]
-
-
 from ._context import (
     RequestContext,
     ResourceScopedContext,

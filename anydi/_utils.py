@@ -7,7 +7,7 @@ import functools
 import importlib
 import inspect
 import sys
-from typing import Any, AsyncIterator, Callable, ForwardRef, Iterator, TypeVar
+from typing import Any, Callable, ForwardRef, TypeVar
 
 from typing_extensions import ParamSpec, get_args, get_origin
 
