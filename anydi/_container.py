@@ -465,7 +465,7 @@ class Container:
 
         provider = self._get_or_register_provider(interface)
         scoped_context = self._get_scoped_context(provider.scope)
-        return scoped_context.get(interface, provider)
+        return cast(T, scoped_context.get(provider))
 
     @overload
     async def aresolve(self, interface: Interface[T]) -> T: ...
@@ -490,7 +490,7 @@ class Container:
 
         provider = self._get_or_register_provider(interface)
         scoped_context = self._get_scoped_context(provider.scope)
-        return await scoped_context.aget(interface, provider)
+        return cast(T, await scoped_context.aget(provider))
 
     def is_resolved(self, interface: AnyInterface) -> bool:
         """Check if an instance by interface exists.

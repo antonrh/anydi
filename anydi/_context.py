@@ -8,7 +8,7 @@ from typing import TYPE_CHECKING, Any, ClassVar, TypeVar, cast
 from typing_extensions import Self, final
 
 from ._provider import CallableKind, Provider
-from ._types import AnyInterface, Interface, Scope, is_event_type
+from ._types import AnyInterface, Scope, is_event_type
 from ._utils import run_async
 
 if TYPE_CHECKING:
@@ -27,11 +27,10 @@ class ScopedContext(abc.ABC):
         self._instances: dict[type[Any], Any] = {}
 
     @abc.abstractmethod
-    def get(self, interface: Interface[T], provider: Provider) -> T:
+    def get(self, provider: Provider) -> Any:
         """Get an instance of a dependency from the scoped context.
 
         Args:
-            interface: The interface of the dependency.
             provider: The provider for the instance.
 
         Returns:
@@ -39,11 +38,10 @@ class ScopedContext(abc.ABC):
         """
 
     @abc.abstractmethod
-    async def aget(self, interface: Interface[T], provider: Provider) -> T:
+    async def aget(self, provider: Provider) -> T:
         """Get an async instance of a dependency from the scoped context.
 
         Args:
-            interface: The interface of the dependency.
             provider: The provider for the instance.
 
         Returns:
@@ -145,17 +143,16 @@ class ResourceScopedContext(ScopedContext):
         self._stack = contextlib.ExitStack()
         self._async_stack = contextlib.AsyncExitStack()
 
-    def get(self, interface: Interface[T], provider: Provider) -> T:
+    def get(self, provider: Provider) -> Any:
         """Get an instance of a dependency from the scoped context.
 
         Args:
-            interface: The interface of the dependency.
             provider: The provider for the instance.
 
         Returns:
             An instance of the dependency.
         """
-        instance = self._instances.get(interface)
+        instance = self._instances.get(provider.interface)
         if instance is None:
             if provider.kind == CallableKind.GENERATOR:
                 instance = self._create_resource(provider)
@@ -167,20 +164,19 @@ class ResourceScopedContext(ScopedContext):
                 )
             else:
                 instance = self._create_instance(provider)
-            self._instances[interface] = instance
-        return cast(T, instance)
+            self._instances[provider.interface] = instance
+        return instance
 
-    async def aget(self, interface: Interface[T], provider: Provider) -> T:
+    async def aget(self, provider: Provider) -> T:
         """Get an async instance of a dependency from the scoped context.
 
         Args:
-            interface: The interface of the dependency.
             provider: The provider for the instance.
 
         Returns:
             An async instance of the dependency.
         """
-        instance = self._instances.get(interface)
+        instance = self._instances.get(provider.interface)
         if instance is None:
             if provider.kind == CallableKind.GENERATOR:
                 instance = await run_async(self._create_resource, provider)
@@ -188,7 +184,7 @@ class ResourceScopedContext(ScopedContext):
                 instance = await self._acreate_resource(provider)
             else:
                 instance = await self._acreate_instance(provider)
-            self._instances[interface] = instance
+            self._instances[provider.interface] = instance
         return cast(T, instance)
 
     def has(self, interface: AnyInterface) -> bool:
@@ -365,28 +361,24 @@ class TransientContext(ScopedContext):
 
     scope = "transient"
 
-    def get(self, interface: Interface[T], provider: Provider) -> T:
+    def get(self, provider: Provider) -> Any:
         """Get an instance of a dependency from the transient context.
 
         Args:
-            interface: The interface of the dependency.
             provider: The provider for the instance.
 
         Returns:
             An instance of the dependency.
         """
-        instance = self._create_instance(provider)
-        return cast(T, instance)
+        return self._create_instance(provider)
 
-    async def aget(self, interface: Interface[T], provider: Provider) -> T:
+    async def aget(self, provider: Provider) -> Any:
         """Get an async instance of a dependency from the transient context.
 
         Args:
-            interface: The interface of the dependency.
             provider: The provider for the instance.
 
         Returns:
             An instance of the dependency.
         """
-        instance = await self._acreate_instance(provider)
-        return cast(T, instance)
+        return await self._acreate_instance(provider)
