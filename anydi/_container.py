@@ -264,43 +264,33 @@ class Container:
             self._resource_cache[provider.scope].remove(interface)
 
     def _validate_provider_match_scopes(self, provider: Provider) -> None:
-        """Validate that the provider and its dependencies have matching scopes.
-
-        Args:
-            provider: The provider to validate.
-
-        Raises:
-            ValueError: If the provider and its dependencies have mismatched scopes.
-            TypeError: If a dependency is missing an annotation.
-        """
+        """Validate that the provider and its dependencies have matching scopes."""
 
         for parameter in provider.parameters:
-            if parameter.annotation is inspect._empty:  # noqa
+            annotation = parameter.annotation
+
+            if annotation is inspect._empty:  # noqa
                 raise TypeError(
                     f"Missing provider `{provider}` "
                     f"dependency `{parameter.name}` annotation."
                 )
 
             try:
-                sub_provider = self._get_or_register_provider(parameter.annotation)
+                sub_provider = self._get_or_register_provider(annotation)
             except LookupError:
                 raise ValueError(
                     f"The provider `{provider}` depends on `{parameter.name}` of type "
-                    f"`{get_full_qualname(parameter.annotation)}`, which "
+                    f"`{get_full_qualname(annotation)}`, which "
                     "has not been registered. To resolve this, ensure that "
                     f"`{parameter.name}` is registered before attempting to use it."
                 ) from None
 
-            left_scope, right_scope = sub_provider.scope, provider.scope
-            allowed_scopes = ALLOWED_SCOPES.get(right_scope) or []
-
-            if left_scope not in allowed_scopes:
+            # Check scope compatibility
+            if sub_provider.scope not in ALLOWED_SCOPES.get(provider.scope, []):
                 raise ValueError(
-                    f"The provider `{provider}` with a {provider.scope} scope was "
-                    "attempted to be registered with the provider "
-                    f"`{sub_provider}` with a `{sub_provider.scope}` scope, "
-                    "which is not allowed. Please ensure that all providers are "
-                    "registered with matching scopes."
+                    f"The provider `{provider}` with a `{provider.scope}` scope cannot "
+                    f"depend on `{sub_provider}` with a `{sub_provider.scope}` scope. "
+                    "Please ensure all providers are registered with matching scopes."
                 )
 
     def _detect_scope(self, call: Callable[..., Any]) -> Scope | None:
@@ -312,7 +302,7 @@ class Container:
             scope = sub_provider.scope
 
             if scope == "transient":
-                return scope
+                return "transient"
             scopes_found.add(scope)
 
             # If all scopes are found, we can return based on priority order

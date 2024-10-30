@@ -221,11 +221,10 @@ def test_register_provider_match_scopes_error(container: Container) -> None:
         container.register(str, provider_str, scope="singleton")
 
     assert str(exc_info.value) == (
-        "The provider `tests.test_container.test_register_provider_match_scopes_error"
-        ".<locals>.provider_str` with a singleton scope was attempted to be registered "
-        "with the provider `tests.test_container"
-        ".test_register_provider_match_scopes_error.<locals>.provider_int` with a "
-        "`request` scope, which is not allowed. Please ensure that all providers are "
+        "The provider `tests.test_container.test_register_provider_match_scopes_error."
+        "<locals>.provider_str` with a `singleton` scope cannot depend on "
+        "`tests.test_container.test_register_provider_match_scopes_error.<locals>."
+        "provider_int` with a `request` scope. Please ensure all providers are "
         "registered with matching scopes."
     )
 
