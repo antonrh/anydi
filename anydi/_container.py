@@ -303,29 +303,28 @@ class Container:
                     "registered with matching scopes."
                 )
 
-    def _detect_scope(self, obj: Callable[..., Any]) -> Scope | None:
-        """Detect the scope for a provider.
+    def _detect_scope(self, call: Callable[..., Any]) -> Scope | None:
+        """Detect the scope for a callable."""
+        scopes_found = set()
 
-        Args:
-            obj: The provider to detect the auto scope for.
-        Returns:
-            The auto scope, or None if the auto scope cannot be detected.
-        """
-        has_transient, has_request, has_singleton = False, False, False
-        for parameter in get_typed_parameters(obj):
+        for parameter in get_typed_parameters(call):
             sub_provider = self._get_or_register_provider(parameter.annotation)
-            if not has_transient and sub_provider.scope == "transient":
-                has_transient = True
-            if not has_request and sub_provider.scope == "request":
-                has_request = True
-            if not has_singleton and sub_provider.scope == "singleton":
-                has_singleton = True
-        if has_transient:
-            return "transient"
-        if has_request:
+            scope = sub_provider.scope
+
+            if scope == "transient":
+                return scope
+            scopes_found.add(scope)
+
+            # If all scopes are found, we can return based on priority order
+            if {"transient", "request", "singleton"}.issubset(scopes_found):
+                break
+
+        # Determine scope based on priority
+        if "request" in scopes_found:
             return "request"
-        if has_singleton:
+        if "singleton" in scopes_found:
             return "singleton"
+
         return None
 
     def register_module(
