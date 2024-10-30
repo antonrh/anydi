@@ -15,7 +15,7 @@ except ImportError:
 
 
 from ._types import Event, Scope, is_event_type
-from ._utils import get_full_qualname, get_typed_parameters, get_typed_return_annotation
+from ._utils import get_full_qualname, get_typed_annotation
 
 _sentinel = object()
 
@@ -35,13 +35,18 @@ class Provider:
         "_qualname",
         "_kind",
         "_interface",
+        "_signature",
         "_parameters",
+        "_call_module",
+        "_call_globals",
     )
 
     def __init__(
         self, *, call: Callable[..., Any], scope: Scope, interface: Any = _sentinel
     ) -> None:
         self._call = call
+        self._call_module = getattr(call, "__module__", None)
+        self._call_globals = getattr(call, "__globals__", {})
         self._scope = scope
         self._qualname = get_full_qualname(call)
 
@@ -51,11 +56,14 @@ class Provider:
         # Validate the scope of the provider
         self._validate_scope()
 
-        # Detect the interface of callable provider
+        # Get the signature
+        self._signature = inspect.signature(call)
+
+        # Detect the interface
         self._detect_interface(interface)
 
-        # Set parameters
-        self._parameters = get_typed_parameters(call)
+        # Detect the parameters
+        self._detect_parameters()
 
     def __str__(self) -> str:
         return self._qualname
@@ -66,10 +74,7 @@ class Provider:
         return (
             self._call == other._call
             and self._scope == other._scope
-            and self._qualname == other._qualname
-            and self._kind == other._kind
             and self._interface == other._interface
-            and self._parameters == other._parameters
         )
 
     @property
@@ -139,10 +144,10 @@ class Provider:
             return
 
         if interface is _sentinel:
-            interface = get_typed_return_annotation(self._call)
+            interface = self._resolve_interface(interface)
 
         # If the callable is an iterator, return the actual type
-        if get_origin(interface) in [Iterator, AsyncIterator]:
+        if get_origin(interface) in {Iterator, AsyncIterator}:
             if args := get_args(interface):
                 interface = args[0]
                 # If the callable is a generator, return the resource type
@@ -156,8 +161,32 @@ class Provider:
                 )
 
         # None interface is not allowed
-        if interface is None or interface is NoneType:
+        if interface in {None, NoneType}:
             raise TypeError(f"Missing `{self}` provider return annotation.")
 
         # Set the interface
         self._interface = interface
+
+    def _resolve_interface(self, interface: Any) -> Any:
+        """Resolve the interface of the callable provider."""
+        interface = self._signature.return_annotation
+        if interface is inspect._empty:  # noqa
+            return None
+        return get_typed_annotation(
+            interface,
+            self._call_globals,
+            module=self._call_module,
+        )
+
+    def _detect_parameters(self) -> None:
+        """Detect the parameters of the callable provider."""
+        self._parameters = [
+            parameter.replace(
+                annotation=get_typed_annotation(
+                    parameter.annotation,
+                    self._call_globals,
+                    module=self._call_module,
+                )
+            )
+            for name, parameter in self._signature.parameters.items()
+        ]
