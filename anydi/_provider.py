@@ -31,14 +31,14 @@ class CallableKind(IntEnum):
 class Provider:
     __slots__ = (
         "_call",
+        "_call_module",
+        "_call_globals",
         "_scope",
         "_qualname",
         "_kind",
         "_interface",
         "_signature",
         "_parameters",
-        "_call_module",
-        "_call_globals",
     )
 
     def __init__(
