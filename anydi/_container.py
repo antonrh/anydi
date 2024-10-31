@@ -59,13 +59,6 @@ class Container:
         | None = None,
         strict: bool = False,
     ) -> None:
-        """Initialize the AnyDI instance.
-
-        Args:
-            providers: Optional mapping of providers to register during initialization.
-            modules: Optional sequence of modules to register during initialization.
-            strict: Whether to enable strict mode. Defaults to False.
-        """
         self._providers: dict[type[Any], Provider] = {}
         self._resource_cache: dict[Scope, list[type[Any]]] = defaultdict(list)
         self._singleton_context = SingletonContext(self)
@@ -92,31 +85,16 @@ class Container:
 
     @property
     def strict(self) -> bool:
-        """Check if strict mode is enabled.
-
-        Returns:
-            True if strict mode is enabled, False otherwise.
-        """
+        """Check if strict mode is enabled."""
         return self._strict
 
     @property
     def providers(self) -> dict[type[Any], Provider]:
-        """Get the registered providers.
-
-        Returns:
-            A dictionary containing the registered providers.
-        """
+        """Get the registered providers."""
         return self._providers
 
     def is_registered(self, interface: AnyInterface) -> bool:
-        """Check if a provider is registered for the specified interface.
-
-        Args:
-            interface: The interface to check for a registered provider.
-
-        Returns:
-            True if a provider is registered for the interface, False otherwise.
-        """
+        """Check if a provider is registered for the specified interface."""
         return interface in self._providers
 
     def register(
@@ -150,20 +128,7 @@ class Container:
         return provider
 
     def unregister(self, interface: AnyInterface) -> None:
-        """Unregister a provider by interface.
-
-        Args:
-            interface: The interface of the provider to unregister.
-
-        Raises:
-            LookupError: If the provider interface is not registered.
-
-        Notes:
-            - The method cleans up any scoped context instance associated with
-              the provider's scope.
-            - The method removes the provider reference from the internal dictionary
-              of registered providers.
-        """
+        """Unregister a provider by interface."""
         if not self.is_registered(interface):
             raise LookupError(
                 "The provider interface "
@@ -185,17 +150,7 @@ class Container:
         self._delete_provider(provider)
 
     def _get_provider(self, interface: AnyInterface) -> Provider:
-        """Get provider by interface.
-
-        Args:
-            interface: The interface for which to retrieve the provider.
-
-        Returns:
-            Provider: The provider object associated with the interface.
-
-        Raises:
-            LookupError: If the provider interface has not been registered.
-        """
+        """Get provider by interface."""
         try:
             return self._providers[interface]
         except KeyError as exc:
@@ -238,15 +193,7 @@ class Container:
             self._resource_cache[provider.scope].remove(provider.interface)
 
     def _validate_provider_match_scopes(self, provider: Provider) -> None:
-        """Validate that the provider and its dependencies have matching scopes.
-
-        Args:
-            provider: The provider to validate.
-
-        Raises:
-            ValueError: If the provider and its dependencies have mismatched scopes.
-            TypeError: If a dependency is missing an annotation.
-        """
+        """Validate that the provider and its dependencies have matching scopes."""
 
         for parameter in provider.parameters:
             if parameter.annotation is inspect.Parameter.empty:
@@ -278,29 +225,28 @@ class Container:
                     "registered with matching scopes."
                 )
 
-    def _detect_scope(self, obj: Callable[..., Any]) -> Scope | None:
-        """Detect the scope for a provider.
+    def _detect_scope(self, call: Callable[..., Any]) -> Scope | None:
+        """Detect the scope for a callable."""
+        scopes_found = set()
 
-        Args:
-            obj: The provider to detect the auto scope for.
-        Returns:
-            The auto scope, or None if the auto scope cannot be detected.
-        """
-        has_transient, has_request, has_singleton = False, False, False
-        for parameter in get_typed_parameters(obj):
+        for parameter in get_typed_parameters(call):
             sub_provider = self._get_or_register_provider(parameter.annotation)
-            if not has_transient and sub_provider.scope == "transient":
-                has_transient = True
-            if not has_request and sub_provider.scope == "request":
-                has_request = True
-            if not has_singleton and sub_provider.scope == "singleton":
-                has_singleton = True
-        if has_transient:
-            return "transient"
-        if has_request:
+            scope = sub_provider.scope
+
+            if scope == "transient":
+                return "transient"
+            scopes_found.add(scope)
+
+            # If all scopes are found, we can return based on priority order
+            if {"transient", "request", "singleton"}.issubset(scopes_found):
+                break
+
+        # Determine scope based on priority
+        if "request" in scopes_found:
             return "request"
-        if has_singleton:
+        if "singleton" in scopes_found:
             return "singleton"
+
         return None
 
     def register_module(
