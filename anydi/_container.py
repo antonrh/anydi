@@ -45,11 +45,7 @@ ALLOWED_SCOPES: dict[Scope, list[Scope]] = {
 
 @final
 class Container:
-    """AnyDI is a dependency injection container.
-
-    Args:
-        modules: Optional sequence of modules to register during initialization.
-    """
+    """AnyDI is a dependency injection container."""
 
     def __init__(
         self,
@@ -100,13 +96,13 @@ class Container:
     def register(
         self,
         interface: AnyInterface,
-        obj: Callable[..., Any],
+        call: Callable[..., Any],
         *,
         scope: Scope,
         override: bool = False,
     ) -> Provider:
         """Register a provider for the specified interface."""
-        provider = Provider(call=obj, scope=scope, interface=interface)
+        provider = Provider(call=call, scope=scope, interface=interface)
         return self._register_provider(provider, override=override)
 
     def _register_provider(
@@ -477,18 +473,18 @@ class Container:
         """Scan packages or modules for decorated members and inject dependencies."""
         self._scanner.scan(packages, tags=tags)
 
-    def _get_injected_params(self, obj: Callable[..., Any]) -> dict[str, Any]:
+    def _get_injected_params(self, call: Callable[..., Any]) -> dict[str, Any]:
         """Get the injected parameters of a callable object."""
         injected_params = {}
-        for parameter in get_typed_parameters(obj):
+        for parameter in get_typed_parameters(call):
             if not is_marker(parameter.default):
                 continue
             try:
-                self._validate_injected_parameter(obj, parameter)
+                self._validate_injected_parameter(call, parameter)
             except LookupError as exc:
                 if not self.strict:
                     logger.debug(
-                        f"Cannot validate the `{get_full_qualname(obj)}` parameter "
+                        f"Cannot validate the `{get_full_qualname(call)}` parameter "
                         f"`{parameter.name}` with an annotation of "
                         f"`{get_full_qualname(parameter.annotation)} due to being "
                         "in non-strict mode. It will be validated at the first call."
@@ -499,18 +495,18 @@ class Container:
         return injected_params
 
     def _validate_injected_parameter(
-        self, obj: Callable[..., Any], parameter: inspect.Parameter
+        self, call: Callable[..., Any], parameter: inspect.Parameter
     ) -> None:
         """Validate an injected parameter."""
         if parameter.annotation is inspect.Parameter.empty:
             raise TypeError(
-                f"Missing `{get_full_qualname(obj)}` parameter "
+                f"Missing `{get_full_qualname(call)}` parameter "
                 f"`{parameter.name}` annotation."
             )
 
         if not self.is_registered(parameter.annotation):
             raise LookupError(
-                f"`{get_full_qualname(obj)}` has an unknown dependency parameter "
+                f"`{get_full_qualname(call)}` has an unknown dependency parameter "
                 f"`{parameter.name}` with an annotation of "
                 f"`{get_full_qualname(parameter.annotation)}`."
             )
