@@ -1,5 +1,6 @@
+from typing import Annotated
+
 import pytest
-from typing_extensions import Annotated
 
 from anydi import Container, Module, provider
 from anydi._module import ProviderDecoratorArgs  # noqa

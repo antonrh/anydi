@@ -6,8 +6,9 @@ import builtins
 import functools
 import importlib
 import inspect
+import re
 import sys
-from typing import Any, AsyncIterator, Callable, ForwardRef, Iterator, TypeVar
+from typing import Any, Callable, ForwardRef, TypeVar
 
 from typing_extensions import ParamSpec, get_args, get_origin
 
@@ -23,28 +24,23 @@ P = ParamSpec("P")
 
 def get_full_qualname(obj: Any) -> str:
     """Get the fully qualified name of an object."""
-    qualname = getattr(obj, "__qualname__", None)
-    module = getattr(obj, "__module__", None)
-
-    if qualname is None:
-        qualname = type(obj).__qualname__
-
-    if module is None:
-        module = type(obj).__module__
-
-    if module == builtins.__name__:
-        return qualname
+    # Get module and qualname with defaults to handle non-types directly
+    module = getattr(obj, "__module__", type(obj).__module__)
+    qualname = getattr(obj, "__qualname__", type(obj).__qualname__)
 
     origin = get_origin(obj)
-
+    # If origin exists, handle generics recursively
     if origin:
-        args = ", ".join(
-            get_full_qualname(arg) if not isinstance(arg, str) else f'"{arg}"'
-            for arg in get_args(obj)
-        )
+        args = ", ".join(get_full_qualname(arg) for arg in get_args(obj))
         return f"{get_full_qualname(origin)}[{args}]"
 
-    return f"{module}.{qualname}"
+    # Substitute standard library prefixes for clarity
+    full_qualname = f"{module}.{qualname}"
+    return re.sub(
+        r"\b(builtins|typing|typing_extensions|collections\.abc|types)\.",
+        "",
+        full_qualname,
+    )
 
 
 def is_builtin_type(tp: type[Any]) -> bool:
@@ -102,17 +98,6 @@ def get_typed_parameters(obj: Callable[..., Any]) -> list[inspect.Parameter]:
         )
         for name, parameter in inspect.signature(obj).parameters.items()
     ]
-
-
-_resource_origins = (
-    get_origin(Iterator),
-    get_origin(AsyncIterator),
-)
-
-
-def has_resource_origin(origin: Any) -> bool:
-    """Check if the given origin is a resource origin."""
-    return origin in _resource_origins
 
 
 async def run_async(
