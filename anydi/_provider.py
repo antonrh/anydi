@@ -167,10 +167,10 @@ class Provider:
         # Set the interface
         self._interface = interface
 
-    def _resolve_interface(self, interface: Any, __signature: inspect.Signature) -> Any:
+    def _resolve_interface(self, interface: Any, signature: inspect.Signature) -> Any:
         """Resolve the interface of the callable provider."""
-        interface = __signature.return_annotation
-        if interface is inspect._empty:  # noqa
+        interface = signature.return_annotation
+        if interface is inspect.Signature.empty:
             return None
         return get_typed_annotation(
             interface,
@@ -188,5 +188,5 @@ class Provider:
                     module=self._call_module,
                 )
             )
-            for name, parameter in signature.parameters.items()
+            for parameter in signature.parameters.values()
         ]

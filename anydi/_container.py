@@ -508,7 +508,7 @@ class Container:
         Raises:
             TypeError: If the parameter annotation is missing or an unknown dependency.
         """
-        if parameter.annotation is inspect._empty:  # noqa
+        if parameter.annotation is inspect.Parameter.empty:  # noqa
             raise TypeError(
                 f"Missing `{get_full_qualname(obj)}` parameter "
                 f"`{parameter.name}` annotation."

@@ -64,7 +64,7 @@ def get_typed_parameters(call: Callable[..., Any]) -> list[inspect.Parameter]:
                 parameter.annotation, globalns, module=module
             )
         )
-        for name, parameter in inspect.signature(call).parameters.items()
+        for parameter in inspect.signature(call).parameters.values()
     ]
 
 

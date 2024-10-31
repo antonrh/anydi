@@ -3,7 +3,7 @@ from __future__ import annotations
 import abc
 import contextlib
 from types import TracebackType
-from typing import TYPE_CHECKING, Any, ClassVar, TypeVar, cast
+from typing import TYPE_CHECKING, Any, ClassVar
 
 from typing_extensions import Self, final
 
@@ -13,8 +13,6 @@ from ._utils import run_async
 
 if TYPE_CHECKING:
     from ._container import Container
-
-T = TypeVar("T")
 
 
 class ScopedContext(abc.ABC):
@@ -38,7 +36,7 @@ class ScopedContext(abc.ABC):
         """
 
     @abc.abstractmethod
-    async def aget(self, provider: Provider) -> T:
+    async def aget(self, provider: Provider) -> Any:
         """Get an async instance of a dependency from the scoped context.
 
         Args:
@@ -167,7 +165,7 @@ class ResourceScopedContext(ScopedContext):
             self._instances[provider.interface] = instance
         return instance
 
-    async def aget(self, provider: Provider) -> T:
+    async def aget(self, provider: Provider) -> Any:
         """Get an async instance of a dependency from the scoped context.
 
         Args:
@@ -185,7 +183,7 @@ class ResourceScopedContext(ScopedContext):
             else:
                 instance = await self._acreate_instance(provider)
             self._instances[provider.interface] = instance
-        return cast(T, instance)
+        return instance
 
     def has(self, interface: AnyInterface) -> bool:
         """Check if the scoped context has an instance of the dependency.
