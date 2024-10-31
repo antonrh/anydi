@@ -6,22 +6,10 @@ import contextlib
 import inspect
 import types
 from collections import defaultdict
-from collections.abc import (
-    AsyncIterator,
-    Awaitable,
-    Iterable,
-    Iterator,
-    Sequence,
-)
+from collections.abc import AsyncIterator, Awaitable, Iterable, Iterator, Sequence
 from contextvars import ContextVar
 from functools import wraps
-from typing import (
-    Any,
-    Callable,
-    TypeVar,
-    cast,
-    overload,
-)
+from typing import Any, Callable, TypeVar, cast, overload
 
 from typing_extensions import ParamSpec, Self, final
 
@@ -43,11 +31,7 @@ from ._module import Module, ModuleRegistry
 from ._provider import Provider
 from ._scanner import Scanner
 from ._types import AnyInterface, Interface, Scope, is_marker
-from ._utils import (
-    get_full_qualname,
-    get_typed_parameters,
-    is_builtin_type,
-)
+from ._utils import get_full_qualname, get_typed_parameters, is_builtin_type
 
 T = TypeVar("T", bound=Any)
 P = ParamSpec("P")
@@ -151,7 +135,6 @@ class Container:
         self, provider: Provider, *, override: bool = False
     ) -> Provider:
         """Register a provider."""
-
         if provider.interface in self._providers:
             if override:
                 self._set_provider(provider)
@@ -162,9 +145,7 @@ class Container:
                 "already registered."
             )
 
-        # Validate the provider scope matching
         self._validate_provider_match_scopes(provider)
-
         self._set_provider(provider)
         return provider
 
@@ -201,7 +182,7 @@ class Container:
                 scoped_context.delete(interface)
 
         # Cleanup provider references
-        self._delete_provider(interface)
+        self._delete_provider(provider)
 
     def _get_provider(self, interface: AnyInterface) -> Provider:
         """Get provider by interface.
@@ -225,17 +206,7 @@ class Container:
             ) from exc
 
     def _get_or_register_provider(self, interface: AnyInterface) -> Provider:
-        """Get or register a provider by interface.
-
-        Args:
-            interface: The interface for which to retrieve the provider.
-
-        Returns:
-            Provider: The provider object associated with the interface.
-
-        Raises:
-            LookupError: If the provider interface has not been registered.
-        """
+        """Get or register a provider by interface."""
         try:
             return self._get_provider(interface)
         except LookupError:
@@ -259,11 +230,12 @@ class Container:
         if provider.is_resource:
             self._resource_cache[provider.scope].append(provider.interface)
 
-    def _delete_provider(self, interface: AnyInterface) -> None:
-        """Delete a provider by interface."""
-        provider = self._providers.pop(interface, None)
-        if provider is not None and provider.is_resource:
-            self._resource_cache[provider.scope].remove(interface)
+    def _delete_provider(self, provider: Provider) -> None:
+        """Delete a provider."""
+        if provider.interface in self._providers:
+            del self._providers[provider.interface]
+        if provider.is_resource:
+            self._resource_cache[provider.scope].remove(provider.interface)
 
     def _validate_provider_match_scopes(self, provider: Provider) -> None:
         """Validate that the provider and its dependencies have matching scopes.
@@ -446,23 +418,13 @@ class Container:
     def resolve(self, interface: T) -> T: ...
 
     def resolve(self, interface: Interface[T]) -> T:
-        """Resolve an instance by interface.
-
-        Args:
-            interface: The interface type.
-
-        Returns:
-            The instance of the interface.
-
-        Raises:
-            LookupError: If the provider for the interface is not registered.
-        """
+        """Resolve an instance by interface."""
         if interface in self._override_instances:
             return cast(T, self._override_instances[interface])
 
         provider = self._get_or_register_provider(interface)
         scoped_context = self._get_scoped_context(provider.scope)
-        return scoped_context.get(interface, provider)
+        return cast(T, scoped_context.get(provider))
 
     @overload
     async def aresolve(self, interface: Interface[T]) -> T: ...
@@ -471,23 +433,13 @@ class Container:
     async def aresolve(self, interface: T) -> T: ...
 
     async def aresolve(self, interface: Interface[T]) -> T:
-        """Resolve an instance by interface asynchronously.
-
-        Args:
-            interface: The interface type.
-
-        Returns:
-            The instance of the interface.
-
-        Raises:
-            LookupError: If the provider for the interface is not registered.
-        """
+        """Resolve an instance by interface asynchronously."""
         if interface in self._override_instances:
             return cast(T, self._override_instances[interface])
 
         provider = self._get_or_register_provider(interface)
         scoped_context = self._get_scoped_context(provider.scope)
-        return await scoped_context.aget(interface, provider)
+        return cast(T, await scoped_context.aget(provider))
 
     def is_resolved(self, interface: AnyInterface) -> bool:
         """Check if an instance by interface exists.
@@ -540,17 +492,8 @@ class Container:
 
     @contextlib.contextmanager
     def override(self, interface: AnyInterface, instance: Any) -> Iterator[None]:
-        """Override the provider for the specified interface with a specific instance.
-
-        Args:
-            interface: The interface type to override.
-            instance: The instance to use as the override.
-
-        Yields:
-            None
-
-        Raises:
-            LookupError: If the provider for the interface is not registered.
+        """
+        Override the provider for the specified interface with a specific instance.
         """
         if not self.is_registered(interface) and self.strict:
             raise LookupError(
@@ -564,16 +507,7 @@ class Container:
     def provider(
         self, *, scope: Scope, override: bool = False
     ) -> Callable[[Callable[P, T]], Callable[P, T]]:
-        """Decorator to register a provider function with the specified scope.
-
-        Args:
-            scope : The scope of the provider.
-            override: Whether the provider should override an existing provider
-                for the same interface. Defaults to False.
-
-        Returns:
-            The decorator function.
-        """
+        """Decorator to register a provider function with the specified scope."""
 
         def decorator(func: Callable[P, T]) -> Callable[P, T]:
             provider = Provider(call=func, scope=scope)
@@ -583,66 +517,49 @@ class Container:
         return decorator
 
     @overload
-    def inject(self, obj: Callable[P, T]) -> Callable[P, T]: ...
+    def inject(self, func: Callable[P, T]) -> Callable[P, T]: ...
 
     @overload
     def inject(self) -> Callable[[Callable[P, T]], Callable[P, T]]: ...
 
     def inject(
-        self, obj: Callable[P, T | Awaitable[T]] | None = None
+        self, func: Callable[P, T | Awaitable[T]] | None = None
     ) -> (
         Callable[[Callable[P, T | Awaitable[T]]], Callable[P, T | Awaitable[T]]]
         | Callable[P, T | Awaitable[T]]
     ):
-        """Decorator to inject dependencies into a callable.
-
-        Args:
-            obj: The callable object to be decorated. If None, returns
-                the decorator itself.
-
-        Returns:
-            The decorated callable object or decorator function.
-        """
+        """Decorator to inject dependencies into a callable."""
 
         def decorator(
-            obj: Callable[P, T | Awaitable[T]],
+            wrapped: Callable[P, T | Awaitable[T]],
         ) -> Callable[P, T | Awaitable[T]]:
-            injected_params = self._get_injected_params(obj)
+            injected_params = self._get_injected_params(wrapped)
 
-            if inspect.iscoroutinefunction(obj):
+            if inspect.iscoroutinefunction(wrapped):
 
-                @wraps(obj)
-                async def awrapped(*args: P.args, **kwargs: P.kwargs) -> T:
+                @wraps(wrapped)
+                async def awrapper(*args: P.args, **kwargs: P.kwargs) -> T:
                     for name, annotation in injected_params.items():
                         kwargs[name] = await self.aresolve(annotation)
-                    return cast(T, await obj(*args, **kwargs))
+                    return cast(T, await wrapped(*args, **kwargs))
 
-                return awrapped
+                return awrapper
 
-            @wraps(obj)
-            def wrapped(*args: P.args, **kwargs: P.kwargs) -> T:
+            @wraps(wrapped)
+            def wrapper(*args: P.args, **kwargs: P.kwargs) -> T:
                 for name, annotation in injected_params.items():
                     kwargs[name] = self.resolve(annotation)
-                return cast(T, obj(*args, **kwargs))
+                return cast(T, wrapped(*args, **kwargs))
 
-            return wrapped
+            return wrapper
 
-        if obj is None:
+        if func is None:
             return decorator
-        return decorator(obj)
+        return decorator(func)
 
-    def run(self, obj: Callable[P, T], /, *args: P.args, **kwargs: P.kwargs) -> T:
-        """Run the given function with injected dependencies.
-
-        Args:
-            obj: The callable object.
-            args: The positional arguments to pass to the object.
-            kwargs: The keyword arguments to pass to the object.
-
-        Returns:
-            The result of the callable object.
-        """
-        return self.inject(obj)(*args, **kwargs)
+    def run(self, func: Callable[P, T], /, *args: P.args, **kwargs: P.kwargs) -> T:
+        """Run the given function with injected dependencies."""
+        return self.inject(func)(*args, **kwargs)
 
     def scan(
         self,
@@ -651,26 +568,11 @@ class Container:
         *,
         tags: Iterable[str] | None = None,
     ) -> None:
-        """Scan packages or modules for decorated members and inject dependencies.
-
-        Args:
-            packages: A single package or module to scan,
-                or an iterable of packages or modules to scan.
-            tags: Optional list of tags to filter the scanned members. Only members
-                with at least one matching tag will be scanned. Defaults to None.
-        """
+        """Scan packages or modules for decorated members and inject dependencies."""
         self._scanner.scan(packages, tags=tags)
 
     def _get_injected_params(self, obj: Callable[..., Any]) -> dict[str, Any]:
-        """Get the injected parameters of a callable object.
-
-        Args:
-            obj: The callable object.
-
-        Returns:
-            A dictionary containing the names and annotations
-                of the injected parameters.
-        """
+        """Get the injected parameters of a callable object."""
         injected_params = {}
         for parameter in get_typed_parameters(obj):
             if not is_marker(parameter.default):
@@ -693,15 +595,7 @@ class Container:
     def _validate_injected_parameter(
         self, obj: Callable[..., Any], parameter: inspect.Parameter
     ) -> None:
-        """Validate an injected parameter.
-
-        Args:
-            obj: The callable object.
-            parameter: The parameter to validate.
-
-        Raises:
-            TypeError: If the parameter annotation is missing or an unknown dependency.
-        """
+        """Validate an injected parameter."""
         if parameter.annotation is inspect.Parameter.empty:
             raise TypeError(
                 f"Missing `{get_full_qualname(obj)}` parameter "
@@ -717,39 +611,18 @@ class Container:
 
 
 def transient(target: T) -> T:
-    """Decorator for marking a class as transient scope.
-
-    Args:
-        target: The target class to be decorated.
-
-    Returns:
-        The decorated target class.
-    """
+    """Decorator for marking a class as transient scope."""
     setattr(target, "__scope__", "transient")
     return target
 
 
 def request(target: T) -> T:
-    """Decorator for marking a class as request scope.
-
-    Args:
-        target: The target class to be decorated.
-
-    Returns:
-        The decorated target class.
-    """
+    """Decorator for marking a class as request scope."""
     setattr(target, "__scope__", "request")
     return target
 
 
 def singleton(target: T) -> T:
-    """Decorator for marking a class as singleton scope.
-
-    Args:
-        target: The target class to be decorated.
-
-    Returns:
-        The decorated target class.
-    """
+    """Decorator for marking a class as singleton scope."""
     setattr(target, "__scope__", "singleton")
     return target
