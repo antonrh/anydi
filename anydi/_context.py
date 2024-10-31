@@ -7,7 +7,8 @@ from typing import TYPE_CHECKING, Any, ClassVar, TypeVar, cast
 
 from typing_extensions import Self, final
 
-from ._types import AnyInterface, Interface, Provider, Scope, is_event_type
+from ._provider import CallableKind, Provider
+from ._types import AnyInterface, Interface, Scope, is_event_type
 from ._utils import run_async
 
 if TYPE_CHECKING:
@@ -62,13 +63,13 @@ class ScopedContext(abc.ABC):
             TypeError: If the provider's instance is a coroutine provider
                 and synchronous mode is used.
         """
-        if provider.is_coroutine:
+        if provider.kind == CallableKind.COROUTINE:
             raise TypeError(
                 f"The instance for the coroutine provider `{provider}` cannot be "
                 "created in synchronous mode."
             )
         args, kwargs = self._get_provider_arguments(provider)
-        return provider.obj(*args, **kwargs)
+        return provider.call(*args, **kwargs)
 
     async def _acreate_instance(self, provider: Provider) -> Any:
         """Create an instance asynchronously using the provider.
@@ -84,9 +85,9 @@ class ScopedContext(abc.ABC):
                 and asynchronous mode is used.
         """
         args, kwargs = await self._aget_provider_arguments(provider)
-        if provider.is_coroutine:
-            return await provider.obj(*args, **kwargs)
-        return await run_async(provider.obj, *args, **kwargs)
+        if provider.kind == CallableKind.COROUTINE:
+            return await provider.call(*args, **kwargs)
+        return await run_async(provider.call, *args, **kwargs)
 
     def _get_provider_arguments(
         self, provider: Provider
@@ -160,9 +161,9 @@ class ResourceScopedContext(ScopedContext):
         """
         instance = self._instances.get(interface)
         if instance is None:
-            if provider.is_generator:
+            if provider.kind == CallableKind.GENERATOR:
                 instance = self._create_resource(provider)
-            elif provider.is_async_generator:
+            elif provider.kind == CallableKind.ASYNC_GENERATOR:
                 raise TypeError(
                     f"The provider `{provider}` cannot be started in synchronous mode "
                     "because it is an asynchronous provider. Please start the provider "
@@ -185,9 +186,9 @@ class ResourceScopedContext(ScopedContext):
         """
         instance = self._instances.get(interface)
         if instance is None:
-            if provider.is_generator:
+            if provider.kind == CallableKind.GENERATOR:
                 instance = await run_async(self._create_resource, provider)
-            elif provider.is_async_generator:
+            elif provider.kind == CallableKind.ASYNC_GENERATOR:
                 instance = await self._acreate_resource(provider)
             else:
                 instance = await self._acreate_instance(provider)
@@ -223,7 +224,7 @@ class ResourceScopedContext(ScopedContext):
             The created resource.
         """
         args, kwargs = self._get_provider_arguments(provider)
-        cm = contextlib.contextmanager(provider.obj)(*args, **kwargs)
+        cm = contextlib.contextmanager(provider.call)(*args, **kwargs)
         return self._stack.enter_context(cm)
 
     async def _acreate_instance(self, provider: Provider) -> Any:
@@ -244,7 +245,7 @@ class ResourceScopedContext(ScopedContext):
             The created resource.
         """
         args, kwargs = await self._aget_provider_arguments(provider)
-        cm = contextlib.asynccontextmanager(provider.obj)(*args, **kwargs)
+        cm = contextlib.asynccontextmanager(provider.call)(*args, **kwargs)
         return await self._async_stack.enter_async_context(cm)
 
     def delete(self, interface: AnyInterface) -> None:
