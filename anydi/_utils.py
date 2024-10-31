@@ -96,7 +96,7 @@ def get_typed_parameters(obj: Callable[..., Any]) -> list[inspect.Parameter]:
                 is_class=is_class,
             )
         )
-        for name, parameter in inspect.signature(obj).parameters.items()
+        for parameter in inspect.signature(obj).parameters.values()
     ]
 
 

@@ -17,7 +17,7 @@ from ._utils import inject_urlpatterns, register_components, register_settings
 logger = logging.getLogger(__name__)
 
 
-class ContainerConfig(AppConfig):  # type: ignore[misc]
+class ContainerConfig(AppConfig):
     name = "anydi.ext.django"
     label = "anydi_django"
 

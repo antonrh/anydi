@@ -99,7 +99,9 @@ class ScopedContext(abc.ABC):
         Returns:
             The arguments for the provider.
         """
-        args, kwargs = [], {}
+        args: list[Any] = []
+        kwargs: dict[str, Any] = {}
+
         for parameter in provider.parameters:
             if parameter.annotation in self._instances:
                 instance = self._instances[parameter.annotation]
@@ -122,7 +124,9 @@ class ScopedContext(abc.ABC):
         Returns:
             The arguments for the provider.
         """
-        args, kwargs = [], {}
+        args: list[Any] = []
+        kwargs: dict[str, Any] = {}
+
         for parameter in provider.parameters:
             if parameter.annotation in self._instances:
                 instance = self._instances[parameter.annotation]
