@@ -1,10 +1,10 @@
 from __future__ import annotations
 
-from typing import Any, Callable, Iterable
+from collections.abc import Iterable
+from typing import Annotated, Any, Callable
 
 from pydantic.fields import ComputedFieldInfo, FieldInfo  # noqa
 from pydantic_settings import BaseSettings
-from typing_extensions import Annotated
 
 from anydi import Container
 

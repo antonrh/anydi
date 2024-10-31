@@ -1,4 +1,4 @@
-from typing import Any, List
+from typing import Any
 
 import pytest
 
@@ -40,7 +40,7 @@ def test_no_container_setup(
 
 
 @pytest.fixture(autouse=True)
-def _clean_unresolved(_anydi_unresolved: List[Any]) -> None:
+def _clean_unresolved(_anydi_unresolved: list[Any]) -> None:
     _anydi_unresolved.clear()
 
 

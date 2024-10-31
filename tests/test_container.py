@@ -1,21 +1,12 @@
 import logging
 import sys
 import uuid
+from collections.abc import AsyncIterator, Iterator, Sequence
 from dataclasses import dataclass
-from typing import (
-    Any,
-    AsyncIterator,
-    Dict,
-    Iterator,
-    List,
-    Sequence,
-    Tuple,
-    Type,
-    Union,
-)
+from typing import Annotated, Any, Union
 
 import pytest
-from typing_extensions import Annotated, Self
+from typing_extensions import Self
 
 from anydi import Container, Provider, Scope, auto, dep, request, singleton, transient
 
@@ -846,7 +837,7 @@ def test_resolve_non_strict_with_primitive_class(container: Container) -> None:
 @pytest.mark.skipif(sys.version_info < (3, 10), reason="Requires Python 3.10")
 def test_resolve_non_strict_with_custom_type(container: Container) -> None:
     class Klass:
-        def __init__(self, value: "Union[str, Sequence[str], int, List[str]]") -> None:
+        def __init__(self, value: "Union[str, Sequence[str], int, list[str]]") -> None:
             self.value = value
 
     with pytest.raises(LookupError) as exc_info:
@@ -854,7 +845,7 @@ def test_resolve_non_strict_with_custom_type(container: Container) -> None:
 
     assert str(exc_info.value) == (
         "The provider interface for "
-        "`typing.Union[str, collections.abc.Sequence[str], int, list[str]]` has not "
+        "`Union[str, Sequence[str], int, list[str]]` has not "
         "been registered. Please ensure that the provider interface is properly "
         "registered before attempting to use it."
     )
@@ -1048,16 +1039,16 @@ async def test_async_resource_delegated_exception(container: Container) -> None:
         (Service, Service),
         (Iterator[Service], Service),
         (AsyncIterator[Service], Service),
-        (Dict[str, Any], Dict[str, Any]),
-        (List[str], List[str]),
-        ("List[str]", List[str]),
-        (Tuple[str, ...], Tuple[str, ...]),
-        ("Tuple[str, ...]", Tuple[str, ...]),
+        (dict[str, Any], dict[str, Any]),
+        (list[str], list[str]),
+        ("list[str]", list[str]),
+        (tuple[str, ...], tuple[str, ...]),
+        ("tuple[str, ...]", tuple[str, ...]),
         ('Annotated[str, "name"]', Annotated[str, "name"]),
     ],
 )
 def test_get_supported_provider_annotation(
-    container: Container, annotation: Type[Any], expected: Type[Any]
+    container: Container, annotation: type[Any], expected: type[Any]
 ) -> None:
     def provider() -> annotation:  # type: ignore[valid-type]
         return object()

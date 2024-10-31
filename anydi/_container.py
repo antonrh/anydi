@@ -7,17 +7,19 @@ import inspect
 import types
 import uuid
 from collections import defaultdict
-from contextvars import ContextVar
-from functools import wraps
-from typing import (
-    Any,
+from collections.abc import (
     AsyncIterator,
     Awaitable,
-    Callable,
     Iterable,
     Iterator,
     Mapping,
     Sequence,
+)
+from contextvars import ContextVar
+from functools import wraps
+from typing import (
+    Any,
+    Callable,
     TypeVar,
     cast,
     overload,
@@ -46,7 +48,6 @@ from ._utils import (
     get_full_qualname,
     get_typed_parameters,
     get_typed_return_annotation,
-    has_resource_origin,
     is_builtin_type,
 )
 
@@ -754,9 +755,10 @@ class Container:
                 f"Missing `{get_full_qualname(obj)}` provider return annotation."
             )
 
+        iterator_types = {Iterator, AsyncIterator}
         origin = get_origin(annotation)
 
-        if has_resource_origin(origin):
+        if annotation in iterator_types or origin in iterator_types:
             args = get_args(annotation)
             if args:
                 return args[0]

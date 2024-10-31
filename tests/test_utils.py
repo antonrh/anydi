@@ -1,8 +1,7 @@
 import sys
-from typing import Any, Type, Union
+from typing import Annotated, Any, Union
 
 import pytest
-from typing_extensions import Annotated
 
 from anydi import Container
 from anydi._utils import get_full_qualname, import_string, is_builtin_type
@@ -20,7 +19,7 @@ from tests.fixtures import Service
         (Service, False),
     ],
 )
-def test_is_builtin_type(tp: Type[Any], expected: bool) -> None:
+def test_is_builtin_type(tp: type[Any], expected: bool) -> None:
     assert is_builtin_type(tp) == expected
 
 
@@ -32,7 +31,7 @@ def test_is_builtin_type(tp: Type[Any], expected: bool) -> None:
         (Service(ident="test"), "tests.fixtures.Service"),
         pytest.param(
             Annotated[Service, "service"],
-            'typing_extensions.Annotated[tests.fixtures.Service, "service"]',
+            'Annotated[tests.fixtures.Service, "service"]',
             marks=pytest.mark.skipif(
                 sys.version_info >= (3, 9), reason="Requires Python 3.9"
             ),
@@ -40,16 +39,17 @@ def test_is_builtin_type(tp: Type[Any], expected: bool) -> None:
         (lambda x: x, "tests.test_utils.<lambda>"),
         (123, "int"),
         ("hello", "str"),
+        (list[str], "list[str]"),
         pytest.param(
             Union[str, int],
-            "typing.Union[str, int]",
+            "Union[str, int]",
             marks=pytest.mark.skipif(
                 sys.version_info < (3, 10), reason="Requires Python 3.10"
             ),
         ),
         pytest.param(
             Union[str, int],
-            "typing._SpecialForm[str, int]",
+            "_SpecialForm[str, int]",
             marks=pytest.mark.skipif(
                 sys.version_info >= (3, 10), reason="Requires Python 3.9"
             ),

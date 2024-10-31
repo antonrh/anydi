@@ -4,9 +4,9 @@ from __future__ import annotations
 
 import inspect
 import logging
-from typing import Any, Callable
+from typing import Annotated, Any, Callable
 
-from typing_extensions import Annotated, get_args, get_origin
+from typing_extensions import get_args, get_origin
 
 from anydi import Container
 from anydi._utils import get_full_qualname

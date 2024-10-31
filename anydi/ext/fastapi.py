@@ -3,7 +3,8 @@
 from __future__ import annotations
 
 import logging
-from typing import Any, Iterator, cast
+from collections.abc import Iterator
+from typing import Any, cast
 
 from fastapi import Depends, FastAPI, params
 from fastapi.dependencies.models import Dependant
