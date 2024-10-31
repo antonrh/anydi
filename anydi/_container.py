@@ -13,12 +13,6 @@ from typing import Any, Callable, TypeVar, cast, overload
 
 from typing_extensions import ParamSpec, Self, final
 
-try:
-    from types import NoneType
-except ImportError:
-    NoneType = type(None)  # type: ignore[misc]
-
-
 from ._context import (
     RequestContext,
     ResourceScopedContext,
@@ -220,7 +214,7 @@ class Container:
 
     def _detect_scope(self, call: Callable[..., Any]) -> Scope | None:
         """Detect the scope for a callable."""
-        scopes_found = set()
+        scopes = set()
 
         for parameter in get_typed_parameters(call):
             sub_provider = self._get_or_register_provider(parameter.annotation)
@@ -228,16 +222,16 @@ class Container:
 
             if scope == "transient":
                 return "transient"
-            scopes_found.add(scope)
+            scopes.add(scope)
 
             # If all scopes are found, we can return based on priority order
-            if {"transient", "request", "singleton"}.issubset(scopes_found):
+            if {"transient", "request", "singleton"}.issubset(scopes):
                 break
 
         # Determine scope based on priority
-        if "request" in scopes_found:
+        if "request" in scopes:
             return "request"
-        if "singleton" in scopes_found:
+        if "singleton" in scopes:
             return "singleton"
 
         return None
