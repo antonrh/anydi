@@ -48,52 +48,27 @@ def is_builtin_type(tp: type[Any]) -> bool:
     return tp.__module__ == builtins.__name__
 
 
-def evaluate_forwardref(type_: ForwardRef, globalns: Any, localns: Any) -> Any:
-    return type_._evaluate(globalns, localns, recursive_guard=frozenset())
-
-
 def get_typed_annotation(
-    annotation: Any,
-    globalns: dict[str, Any],
-    module: Any = None,
-    is_class: bool = False,
+    annotation: Any, globalns: dict[str, Any], module: Any = None
 ) -> Any:
-    """Get the typed annotation of a parameter."""
+    """Get the typed annotation of a callable object."""
     if isinstance(annotation, str):
-        if sys.version_info >= (3, 10, 2):
-            annotation = ForwardRef(annotation, module=module, is_class=is_class)
-        elif sys.version_info >= (3, 10, 0):
-            annotation = ForwardRef(annotation, module=module)
+        if sys.version_info >= (3, 10):
+            ref = ForwardRef(annotation, module=module)
         else:
-            annotation = ForwardRef(annotation)
-        annotation = evaluate_forwardref(annotation, globalns, {})
+            ref = ForwardRef(annotation)
+        annotation = ref._evaluate(globalns, globalns, recursive_guard=frozenset())  # noqa
     return annotation
-
-
-def get_typed_return_annotation(obj: Callable[..., Any]) -> Any:
-    """Get the typed return annotation of a callable object."""
-    signature = inspect.signature(obj)
-    annotation = signature.return_annotation
-    if annotation is inspect.Signature.empty:
-        return None
-    globalns = getattr(obj, "__globals__", {})
-    module = getattr(obj, "__module__", None)
-    is_class = inspect.isclass(obj)
-    return get_typed_annotation(annotation, globalns, module=module, is_class=is_class)
 
 
 def get_typed_parameters(obj: Callable[..., Any]) -> list[inspect.Parameter]:
     """Get the typed parameters of a callable object."""
     globalns = getattr(obj, "__globals__", {})
     module = getattr(obj, "__module__", None)
-    is_class = inspect.isclass(obj)
     return [
         parameter.replace(
             annotation=get_typed_annotation(
-                parameter.annotation,
-                globalns,
-                module=module,
-                is_class=is_class,
+                parameter.annotation, globalns, module=module
             )
         )
         for parameter in inspect.signature(obj).parameters.values()
