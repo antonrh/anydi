@@ -32,13 +32,6 @@ P = ParamSpec("P")
 
 @dataclass(frozen=True)
 class Dependency:
-    """Represents a scanned dependency.
-
-    Attributes:
-        member: The member object that represents the dependency.
-        module: The module where the dependency is defined.
-    """
-
     member: Any
     module: ModuleType
 
@@ -58,14 +51,7 @@ class Scanner:
         *,
         tags: Iterable[str] | None = None,
     ) -> None:
-        """Scan packages or modules for decorated members and inject dependencies.
-
-        Args:
-            packages: A single package or module to scan,
-                or an iterable of packages or modules to scan.
-            tags: Optional list of tags to filter the scanned members. Only members
-                with at least one matching tag will be scanned. Defaults to None.
-        """
+        """Scan packages or modules for decorated members and inject dependencies."""
         dependencies: list[Dependency] = []
 
         if isinstance(packages, Iterable) and not isinstance(packages, str):
@@ -86,16 +72,7 @@ class Scanner:
         *,
         tags: Iterable[str] | None = None,
     ) -> list[Dependency]:
-        """Scan a package or module for decorated members.
-
-        Args:
-            package: The package or module to scan.
-            tags: Optional list of tags to filter the scanned members. Only members
-                with at least one matching tag will be scanned. Defaults to None.
-
-        Returns:
-            A list of scanned dependencies.
-        """
+        """Scan a package or module for decorated members."""
         tags = tags or []
         if isinstance(package, str):
             package = importlib.import_module(package)
@@ -118,16 +95,7 @@ class Scanner:
     def _scan_module(
         self, module: ModuleType, *, tags: Iterable[str]
     ) -> list[Dependency]:
-        """Scan a module for decorated members.
-
-        Args:
-            module: The module to scan.
-            tags: List of tags to filter the scanned members. Only members with at
-                least one matching tag will be scanned.
-
-        Returns:
-            A list of scanned dependencies.
-        """
+        """Scan a module for decorated members."""
         dependencies: list[Dependency] = []
 
         for _, member in inspect.getmembers(module):
@@ -170,15 +138,7 @@ class Scanner:
         return dependencies
 
     def _create_dependency(self, member: Any, module: ModuleType) -> Dependency:
-        """Create a `Dependency` object from the scanned member and module.
-
-        Args:
-            member: The scanned member.
-            module: The module containing the scanned member.
-
-        Returns:
-            A `ScannedDependency` object.
-        """
+        """Create a `Dependency` object from the scanned member and module."""
         if hasattr(member, "__wrapped__"):
             member = member.__wrapped__
         return Dependency(member=member, module=module)
@@ -190,7 +150,7 @@ class InjectDecoratorArgs(NamedTuple):
 
 
 @overload
-def injectable(obj: Callable[P, T]) -> Callable[P, T]: ...
+def injectable(func: Callable[P, T]) -> Callable[P, T]: ...
 
 
 @overload
@@ -200,26 +160,16 @@ def injectable(
 
 
 def injectable(
-    obj: Callable[P, T] | None = None,
+    func: Callable[P, T] | None = None,
     tags: Iterable[str] | None = None,
 ) -> Callable[[Callable[P, T]], Callable[P, T]] | Callable[P, T]:
-    """Decorator for marking a function or method as requiring dependency injection.
+    """Decorator for marking a function or method as requiring dependency injection."""
 
-    Args:
-        obj: The target function or method to be decorated.
-        tags: Optional tags to associate with the injection point.
+    def decorator(inner: Callable[P, T]) -> Callable[P, T]:
+        setattr(inner, "__injectable__", InjectDecoratorArgs(wrapped=True, tags=tags))
+        return inner
 
-    Returns:
-        If `obj` is provided, returns the decorated target function or method.
-        If `obj` is not provided, returns a decorator that can be used to mark
-        a function or method as requiring dependency injection.
-    """
-
-    def decorator(obj: Callable[P, T]) -> Callable[P, T]:
-        setattr(obj, "__injectable__", InjectDecoratorArgs(wrapped=True, tags=tags))
-        return obj
-
-    if obj is None:
+    if func is None:
         return decorator
 
-    return decorator(obj)
+    return decorator(func)

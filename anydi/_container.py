@@ -55,14 +55,14 @@ class Container:
         | None = None,
         strict: bool = False,
     ) -> None:
-        self._providers: dict[type[Any], Provider] = {}
+        self._providers: dict[Any, Provider] = {}
         self._resource_cache: dict[Scope, list[type[Any]]] = defaultdict(list)
         self._singleton_context = SingletonContext(self)
         self._transient_context = TransientContext(self)
         self._request_context_var: ContextVar[RequestContext | None] = ContextVar(
             "request_context", default=None
         )
-        self._override_instances: dict[type[Any], Any] = {}
+        self._override_instances: dict[Any, Any] = {}
         self._strict = strict
 
         # Components
@@ -192,33 +192,30 @@ class Container:
         """Validate that the provider and its dependencies have matching scopes."""
 
         for parameter in provider.parameters:
-            if parameter.annotation is inspect.Parameter.empty:
+            annotation = parameter.annotation
+
+            if annotation is inspect._empty:  # noqa
                 raise TypeError(
                     f"Missing provider `{provider}` "
                     f"dependency `{parameter.name}` annotation."
                 )
 
             try:
-                sub_provider = self._get_or_register_provider(parameter.annotation)
+                sub_provider = self._get_or_register_provider(annotation)
             except LookupError:
                 raise ValueError(
-                    f"The provider `{provider}` depends on "
-                    f"`{parameter.name}` of type "
-                    f"`{get_full_qualname(parameter.annotation)}`, which "
+                    f"The provider `{provider}` depends on `{parameter.name}` of type "
+                    f"`{get_full_qualname(annotation)}`, which "
                     "has not been registered. To resolve this, ensure that "
                     f"`{parameter.name}` is registered before attempting to use it."
                 ) from None
 
-            left_scope, right_scope = sub_provider.scope, provider.scope
-            allowed_scopes = ALLOWED_SCOPES.get(right_scope) or []
-
-            if left_scope not in allowed_scopes:
+            # Check scope compatibility
+            if sub_provider.scope not in ALLOWED_SCOPES.get(provider.scope, []):
                 raise ValueError(
-                    f"The provider `{provider}` with a {provider.scope} scope was "
-                    "attempted to be registered with the provider "
-                    f"`{sub_provider}` with a `{sub_provider.scope}` scope, "
-                    "which is not allowed. Please ensure that all providers are "
-                    "registered with matching scopes."
+                    f"The provider `{provider}` with a `{provider.scope}` scope cannot "
+                    f"depend on `{sub_provider}` with a `{sub_provider.scope}` scope. "
+                    "Please ensure all providers are registered with matching scopes."
                 )
 
     def _detect_scope(self, call: Callable[..., Any]) -> Scope | None:
@@ -411,10 +408,10 @@ class Container:
     ) -> Callable[[Callable[P, T]], Callable[P, T]]:
         """Decorator to register a provider function with the specified scope."""
 
-        def decorator(func: Callable[P, T]) -> Callable[P, T]:
-            provider = Provider(call=func, scope=scope)
+        def decorator(call: Callable[P, T]) -> Callable[P, T]:
+            provider = Provider(call=call, scope=scope)
             self._register_provider(provider, override=override)
-            return func
+            return call
 
         return decorator
 
@@ -433,25 +430,25 @@ class Container:
         """Decorator to inject dependencies into a callable."""
 
         def decorator(
-            wrapped: Callable[P, T | Awaitable[T]],
+            inner: Callable[P, T | Awaitable[T]],
         ) -> Callable[P, T | Awaitable[T]]:
-            injected_params = self._get_injected_params(wrapped)
+            injected_params = self._get_injected_params(inner)
 
-            if inspect.iscoroutinefunction(wrapped):
+            if inspect.iscoroutinefunction(inner):
 
-                @wraps(wrapped)
+                @wraps(inner)
                 async def awrapper(*args: P.args, **kwargs: P.kwargs) -> T:
                     for name, annotation in injected_params.items():
                         kwargs[name] = await self.aresolve(annotation)
-                    return cast(T, await wrapped(*args, **kwargs))
+                    return cast(T, await inner(*args, **kwargs))
 
                 return awrapper
 
-            @wraps(wrapped)
+            @wraps(inner)
             def wrapper(*args: P.args, **kwargs: P.kwargs) -> T:
                 for name, annotation in injected_params.items():
                     kwargs[name] = self.resolve(annotation)
-                return cast(T, wrapped(*args, **kwargs))
+                return cast(T, inner(*args, **kwargs))
 
             return wrapper
 

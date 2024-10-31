@@ -83,15 +83,15 @@ def test_register_providers_via_constructor() -> None:
 
 
 def test_register_provider_invalid_transient_resource(container: Container) -> None:
-    def provider_obj() -> Iterator[str]:
+    def provider_call() -> Iterator[str]:
         yield "test"
 
     with pytest.raises(TypeError) as exc_info:
-        container.register(str, provider_obj, scope="transient")
+        container.register(str, provider_call, scope="transient")
 
     assert str(exc_info.value) == (
         "The resource provider `tests.test_container"
-        ".test_register_provider_invalid_transient_resource.<locals>.provider_obj` is "
+        ".test_register_provider_invalid_transient_resource.<locals>.provider_call` is "
         "attempting to register with a transient scope, which is not allowed."
     )
 
@@ -99,40 +99,40 @@ def test_register_provider_invalid_transient_resource(container: Container) -> N
 def test_register_provider_invalid_transient_async_resource(
     container: Container,
 ) -> None:
-    async def provider_obj() -> AsyncIterator[str]:
+    async def provider_call() -> AsyncIterator[str]:
         yield "test"
 
     with pytest.raises(TypeError) as exc_info:
-        container.register(str, provider_obj, scope="transient")
+        container.register(str, provider_call, scope="transient")
 
     assert str(exc_info.value) == (
         "The resource provider `tests.test_container"
         ".test_register_provider_invalid_transient_async_resource"
-        ".<locals>.provider_obj` is attempting to register with a transient scope, "
+        ".<locals>.provider_call` is attempting to register with a transient scope, "
         "which is not allowed."
     )
 
 
 def test_register_provider_valid_resource(container: Container) -> None:
-    def provider_obj1() -> Iterator[str]:
+    def provider_call1() -> Iterator[str]:
         yield "test"
 
-    def provider_obj2() -> Iterator[int]:
+    def provider_call2() -> Iterator[int]:
         yield 100
 
-    container.register(str, provider_obj1, scope="singleton")
-    container.register(int, provider_obj2, scope="request")
+    container.register(str, provider_call1, scope="singleton")
+    container.register(int, provider_call2, scope="request")
 
 
 def test_register_provider_valid_async_resource(container: Container) -> None:
-    async def provider_obj1() -> AsyncIterator[str]:
+    async def provider_call1() -> AsyncIterator[str]:
         yield "test"
 
-    async def provider_obj2() -> AsyncIterator[int]:
+    async def provider_call2() -> AsyncIterator[int]:
         yield 100
 
-    container.register(str, provider_obj1, scope="singleton")
-    container.register(int, provider_obj2, scope="request")
+    container.register(str, provider_call1, scope="singleton")
+    container.register(int, provider_call2, scope="request")
 
 
 def test_register_invalid_provider_type(container: Container) -> None:
@@ -214,11 +214,10 @@ def test_register_provider_match_scopes_error(container: Container) -> None:
         container.register(str, provider_str, scope="singleton")
 
     assert str(exc_info.value) == (
-        "The provider `tests.test_container.test_register_provider_match_scopes_error"
-        ".<locals>.provider_str` with a singleton scope was attempted to be registered "
-        "with the provider `tests.test_container"
-        ".test_register_provider_match_scopes_error.<locals>.provider_int` with a "
-        "`request` scope, which is not allowed. Please ensure that all providers are "
+        "The provider `tests.test_container.test_register_provider_match_scopes_error."
+        "<locals>.provider_str` with a `singleton` scope cannot depend on "
+        "`tests.test_container.test_register_provider_match_scopes_error.<locals>."
+        "provider_int` with a `request` scope. Please ensure all providers are "
         "registered with matching scopes."
     )
 

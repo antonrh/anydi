@@ -19,26 +19,9 @@ P = ParamSpec("P")
 
 
 class ModuleMeta(type):
-    """A metaclass used for the Module base class.
-
-    This metaclass extracts provider information from the class attributes
-    and stores it in the `providers` attribute.
-    """
+    """A metaclass used for the Module base class."""
 
     def __new__(cls, name: str, bases: tuple[type, ...], attrs: dict[str, Any]) -> Any:
-        """Create a new instance of the ModuleMeta class.
-
-        This method extracts provider information from the class attributes and
-        stores it in the `providers` attribute.
-
-        Args:
-            name: The name of the class.
-            bases: The base classes of the class.
-            attrs: The attributes of the class.
-
-        Returns:
-            The new instance of the class.
-        """
         attrs["providers"] = [
             (name, getattr(value, "__provider__"))
             for name, value in attrs.items()
@@ -53,14 +36,7 @@ class Module(metaclass=ModuleMeta):
     providers: list[tuple[str, ProviderDecoratorArgs]]
 
     def configure(self, container: Container) -> None:
-        """Configure the AnyDI container with providers and their dependencies.
-
-        This method can be overridden in derived classes to provide the
-        configuration logic.
-
-        Args:
-            container: The AnyDI container to be configured.
-        """
+        """Configure the AnyDI container with providers and their dependencies."""
 
 
 class ModuleRegistry:
@@ -70,11 +46,7 @@ class ModuleRegistry:
     def register(
         self, module: Module | type[Module] | Callable[[Container], None] | str
     ) -> None:
-        """Register a module as a callable, module type, or module instance.
-
-        Args:
-            module: The module to register.
-        """
+        """Register a module as a callable, module type, or module instance."""
 
         # Callable Module
         if inspect.isfunction(module):
@@ -107,16 +79,7 @@ class ProviderDecoratorArgs(NamedTuple):
 def provider(
     *, scope: Scope, override: bool = False
 ) -> Callable[[Callable[Concatenate[M, P], T]], Callable[Concatenate[M, P], T]]:
-    """Decorator for marking a function or method as a provider in a AnyDI module.
-
-    Args:
-        scope: The scope in which the provided instance should be managed.
-        override: Whether the provider should override existing providers
-            with the same interface.
-
-    Returns:
-        A decorator that marks the target function or method as a provider.
-    """
+    """Decorator for marking a function or method as a provider in a AnyDI module."""
 
     def decorator(
         target: Callable[Concatenate[M, P], T],
