@@ -265,7 +265,7 @@ class Container:
                 not self.strict
                 and inspect.isclass(interface)
                 and not is_builtin_type(interface)
-                and interface is not inspect._empty  # noqa
+                and interface is not inspect.Parameter.empty
             ):
                 # Try to get defined scope
                 scope = getattr(interface, "__scope__", None)
@@ -351,7 +351,7 @@ class Container:
         """
 
         for parameter in provider.parameters:
-            if parameter.annotation is inspect._empty:  # noqa
+            if parameter.annotation is inspect.Parameter.empty:
                 raise TypeError(
                     f"Missing provider `{provider}` "
                     f"dependency `{parameter.name}` annotation."
@@ -809,7 +809,7 @@ class Container:
         Raises:
             TypeError: If the parameter annotation is missing or an unknown dependency.
         """
-        if parameter.annotation is inspect._empty:  # noqa
+        if parameter.annotation is inspect.Parameter.empty:
             raise TypeError(
                 f"Missing `{get_full_qualname(obj)}` parameter "
                 f"`{parameter.name}` annotation."
