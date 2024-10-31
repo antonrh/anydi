@@ -124,11 +124,7 @@ class Scanner:
                 continue
 
             # Get by Marker
-            if inspect.isclass(member):
-                parameters = get_typed_parameters(member.__init__)
-            else:
-                parameters = get_typed_parameters(member)
-            for parameter in parameters:
+            for parameter in get_typed_parameters(member):
                 if is_marker(parameter.default):
                     dependencies.append(
                         self._create_dependency(member=member, module=module)
