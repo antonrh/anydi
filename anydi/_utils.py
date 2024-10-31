@@ -93,15 +93,6 @@ async def run_async(
 def import_string(dotted_path: str) -> Any:
     """
     Import a module or a specific attribute from a module using its dotted string path.
-
-    Args:
-        dotted_path: The dotted path to the object to import.
-
-    Returns:
-        object: The imported module or attribute/class/function.
-
-    Raises:
-        ImportError: If the import fails.
     """
     try:
         module_path, _, attribute_name = dotted_path.rpartition(".")

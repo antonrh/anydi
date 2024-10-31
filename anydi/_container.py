@@ -49,14 +49,14 @@ class Container:
         | None = None,
         strict: bool = False,
     ) -> None:
-        self._providers: dict[Any, Provider] = {}
+        self._providers: dict[type[Any], Provider] = {}
         self._resource_cache: dict[Scope, list[type[Any]]] = defaultdict(list)
         self._singleton_context = SingletonContext(self)
         self._transient_context = TransientContext(self)
         self._request_context_var: ContextVar[RequestContext | None] = ContextVar(
             "request_context", default=None
         )
-        self._override_instances: dict[Any, Any] = {}
+        self._override_instances: dict[type[Any], Any] = {}
         self._strict = strict
 
         # Components
