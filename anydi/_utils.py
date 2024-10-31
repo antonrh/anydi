@@ -6,6 +6,7 @@ import builtins
 import functools
 import importlib
 import inspect
+import re
 import sys
 from typing import Any, Callable, ForwardRef, TypeVar
 
@@ -32,9 +33,6 @@ def get_full_qualname(obj: Any) -> str:
     if module is None:
         module = type(obj).__module__
 
-    if module == builtins.__name__:
-        return qualname
-
     origin = get_origin(obj)
 
     if origin:
@@ -44,7 +42,11 @@ def get_full_qualname(obj: Any) -> str:
         )
         return f"{get_full_qualname(origin)}[{args}]"
 
-    return f"{module}.{qualname}"
+    return re.sub(
+        r"\b(builtins|typing|typing_extensions|collections\.abc|types)\.",
+        "",
+        f"{module}.{qualname}",
+    )
 
 
 def is_builtin_type(tp: type[Any]) -> bool:

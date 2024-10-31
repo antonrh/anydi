@@ -1,9 +1,9 @@
 from __future__ import annotations
 
 import inspect
-from typing import Any, TypeVar, Union
+from typing import Annotated, Any, TypeVar, Union
 
-from typing_extensions import Annotated, Literal, Self, TypeAlias
+from typing_extensions import Literal, Self, TypeAlias
 
 Scope = Literal["transient", "singleton", "request"]
 

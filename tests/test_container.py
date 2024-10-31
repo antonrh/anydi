@@ -1,18 +1,12 @@
 import logging
 import sys
 import uuid
+from collections.abc import AsyncIterator, Iterator, Sequence
 from dataclasses import dataclass
-from typing import (
-    Any,
-    AsyncIterator,
-    Iterator,
-    List,
-    Sequence,
-    Union,
-)
+from typing import Annotated, Any, Union
 
 import pytest
-from typing_extensions import Annotated, Self
+from typing_extensions import Self
 
 from anydi import Container, Scope, auto, dep, request, singleton, transient
 from anydi._provider import Provider
@@ -816,7 +810,7 @@ def test_resolve_non_strict_with_primitive_class(container: Container) -> None:
 @pytest.mark.skipif(sys.version_info < (3, 10), reason="Requires Python 3.10")
 def test_resolve_non_strict_with_custom_type(container: Container) -> None:
     class Klass:
-        def __init__(self, value: "Union[str, Sequence[str], int, List[str]]") -> None:
+        def __init__(self, value: "Union[str, Sequence[str], int, list[str]]") -> None:
             self.value = value
 
     with pytest.raises(LookupError) as exc_info:
@@ -824,7 +818,7 @@ def test_resolve_non_strict_with_custom_type(container: Container) -> None:
 
     assert str(exc_info.value) == (
         "The provider interface for "
-        "`typing.Union[str, collections.abc.Sequence[str], int, list[str]]` has not "
+        "`Union[str, Sequence[str], int, list[str]]` has not "
         "been registered. Please ensure that the provider interface is properly "
         "registered before attempting to use it."
     )

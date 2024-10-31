@@ -1,5 +1,4 @@
 from dataclasses import dataclass
-from typing import Dict
 
 TEST_EMAIL = "test@mail.com"
 
@@ -12,7 +11,7 @@ class User:
 
 class UserService:
     def __init__(self) -> None:
-        self._users: Dict[int, User] = {}
+        self._users: dict[int, User] = {}
 
     async def create_user(self, id_: int, email: str) -> User:
         user = User(id=id_, email=email)

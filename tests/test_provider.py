@@ -1,4 +1,5 @@
-from typing import Annotated, Any, AsyncIterator, Callable, Iterator
+from collections.abc import AsyncIterator, Iterator
+from typing import Annotated, Any, Callable
 
 import pytest
 

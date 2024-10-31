@@ -2,14 +2,14 @@ from __future__ import annotations
 
 from collections.abc import Iterator
 from functools import wraps
-from typing import Any
+from typing import Annotated, Any
 
 from django.conf import settings
 from django.core.cache import BaseCache, caches
 from django.db import connections
 from django.db.backends.base.base import BaseDatabaseWrapper
 from django.urls import URLPattern, URLResolver, get_resolver
-from typing_extensions import Annotated, get_origin
+from typing_extensions import get_origin
 
 from anydi import Container
 

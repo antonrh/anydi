@@ -1,8 +1,7 @@
-from typing import Any
+from typing import Annotated, Any
 
 from fastapi import Body, Depends, FastAPI
 from starlette.middleware import Middleware
-from typing_extensions import Annotated
 
 import anydi.ext.fastapi
 from anydi import Container

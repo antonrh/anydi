@@ -4,14 +4,14 @@ import inspect
 import uuid
 from collections.abc import AsyncIterator, Iterator
 from enum import IntEnum
-from typing import Any, Callable, get_args
+from typing import Any, Callable
 
-from typing_extensions import get_origin
+from typing_extensions import get_args, get_origin
 
 try:
-    from types import NoneType
+    from types import NoneType  # type: ignore[attr-defined]
 except ImportError:
-    NoneType = type(None)  # type: ignore[misc]
+    NoneType = type(None)
 
 
 from ._types import Event, Scope, is_event_type
@@ -37,7 +37,6 @@ class Provider:
         "_qualname",
         "_kind",
         "_interface",
-        "_signature",
         "_parameters",
     )
 
@@ -57,13 +56,13 @@ class Provider:
         self._validate_scope()
 
         # Get the signature
-        self._signature = inspect.signature(call)
+        signature = inspect.signature(call)
 
         # Detect the interface
-        self._detect_interface(interface)
+        self._detect_interface(interface, signature)
 
         # Detect the parameters
-        self._detect_parameters()
+        self._detect_parameters(signature)
 
     def __str__(self) -> str:
         return self._qualname
@@ -136,7 +135,7 @@ class Provider:
                 "object. Only callable providers are allowed."
             )
 
-    def _detect_interface(self, interface: Any) -> None:
+    def _detect_interface(self, interface: Any, signature: inspect.Signature) -> None:
         """Detect the interface of callable provider."""
         # If the callable is a class, return the class itself
         if self._kind == CallableKind.CLASS:
@@ -144,10 +143,11 @@ class Provider:
             return
 
         if interface is _sentinel:
-            interface = self._resolve_interface(interface)
+            interface = self._resolve_interface(interface, signature)
 
         # If the callable is an iterator, return the actual type
-        if get_origin(interface) in {Iterator, AsyncIterator}:
+        iterator_types = {Iterator, AsyncIterator}
+        if interface in iterator_types or get_origin(interface) in iterator_types:
             if args := get_args(interface):
                 interface = args[0]
                 # If the callable is a generator, return the resource type
@@ -167,9 +167,9 @@ class Provider:
         # Set the interface
         self._interface = interface
 
-    def _resolve_interface(self, interface: Any) -> Any:
+    def _resolve_interface(self, interface: Any, __signature: inspect.Signature) -> Any:
         """Resolve the interface of the callable provider."""
-        interface = self._signature.return_annotation
+        interface = __signature.return_annotation
         if interface is inspect._empty:  # noqa
             return None
         return get_typed_annotation(
@@ -178,7 +178,7 @@ class Provider:
             module=self._call_module,
         )
 
-    def _detect_parameters(self) -> None:
+    def _detect_parameters(self, signature: inspect.Signature) -> None:
         """Detect the parameters of the callable provider."""
         self._parameters = [
             parameter.replace(
@@ -188,5 +188,5 @@ class Provider:
                     module=self._call_module,
                 )
             )
-            for name, parameter in self._signature.parameters.items()
+            for name, parameter in signature.parameters.items()
         ]

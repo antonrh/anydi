@@ -1,9 +1,8 @@
 from __future__ import annotations
 
 import uuid
-from typing import Iterator
-
-from typing_extensions import Annotated
+from collections.abc import Iterator
+from typing import Annotated
 
 import anydi
 

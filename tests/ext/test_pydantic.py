@@ -1,6 +1,7 @@
+from typing import Annotated
+
 from pydantic import computed_field
 from pydantic_settings import BaseSettings
-from typing_extensions import Annotated
 
 import anydi.ext.pydantic_settings
 from anydi import Container

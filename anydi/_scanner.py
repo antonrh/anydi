@@ -3,13 +3,13 @@ from __future__ import annotations
 import importlib
 import inspect
 import pkgutil
+from collections.abc import Iterable
 from dataclasses import dataclass
 from types import ModuleType
 from typing import (
     TYPE_CHECKING,
     Any,
     Callable,
-    Iterable,
     TypeVar,
     Union,
     cast,

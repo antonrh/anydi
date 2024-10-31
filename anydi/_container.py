@@ -6,16 +6,12 @@ import contextlib
 import inspect
 import types
 from collections import defaultdict
+from collections.abc import AsyncIterator, Awaitable, Iterable, Iterator, Sequence
 from contextvars import ContextVar
 from functools import wraps
 from typing import (
     Any,
-    AsyncIterator,
-    Awaitable,
     Callable,
-    Iterable,
-    Iterator,
-    Sequence,
     TypeVar,
     cast,
     overload,
