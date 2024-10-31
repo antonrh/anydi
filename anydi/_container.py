@@ -252,11 +252,7 @@ class Container:
     def register_module(
         self, module: Module | type[Module] | Callable[[Container], None] | str
     ) -> None:
-        """Register a module as a callable, module type, or module instance.
-
-        Args:
-            module: The module to register.
-        """
+        """Register a module as a callable, module type, or module instance."""
         self._modules.register(module)
 
     def __enter__(self) -> Self:
@@ -283,11 +279,7 @@ class Container:
 
     @contextlib.contextmanager
     def request_context(self) -> Iterator[RequestContext]:
-        """Obtain a context manager for the request-scoped context.
-
-        Returns:
-            A context manager for the request-scoped context.
-        """
+        """Obtain a context manager for the request-scoped context."""
         context = RequestContext(self)
         token = self._request_context_var.set(context)
         with context:
@@ -318,11 +310,7 @@ class Container:
 
     @contextlib.asynccontextmanager
     async def arequest_context(self) -> AsyncIterator[RequestContext]:
-        """Obtain an async context manager for the request-scoped context.
-
-        Returns:
-            An async context manager for the request-scoped context.
-        """
+        """Obtain an async context manager for the request-scoped context."""
         context = RequestContext(self)
         token = self._request_context_var.set(context)
         async with context:
@@ -330,14 +318,7 @@ class Container:
             self._request_context_var.reset(token)
 
     def _get_request_context(self) -> RequestContext:
-        """Get the current request context.
-
-        Returns:
-            RequestContext: The current request context.
-
-        Raises:
-            LookupError: If the request context has not been started.
-        """
+        """Get the current request context."""
         request_context = self._request_context_var.get()
         if request_context is None:
             raise LookupError(
@@ -388,14 +369,7 @@ class Container:
         return cast(T, await scoped_context.aget(provider))
 
     def is_resolved(self, interface: AnyInterface) -> bool:
-        """Check if an instance by interface exists.
-
-        Args:
-            interface: The interface type.
-
-        Returns:
-            True if the instance exists, otherwise False.
-        """
+        """Check if an instance by interface exists."""
         try:
             provider = self._get_provider(interface)
         except LookupError:
@@ -407,28 +381,14 @@ class Container:
         return False
 
     def release(self, interface: AnyInterface) -> None:
-        """Release an instance by interface.
-
-        Args:
-            interface: The interface type.
-
-        Raises:
-            LookupError: If the provider for the interface is not registered.
-        """
+        """Release an instance by interface."""
         provider = self._get_provider(interface)
         scoped_context = self._get_scoped_context(provider.scope)
         if isinstance(scoped_context, ResourceScopedContext):
             scoped_context.delete(interface)
 
     def _get_scoped_context(self, scope: Scope) -> ScopedContext:
-        """Get the scoped context based on the specified scope.
-
-        Args:
-            scope: The scope of the provider.
-
-        Returns:
-            The scoped context, or None if the scope is not applicable.
-        """
+        """Get the scoped context based on the specified scope."""
         if scope == "singleton":
             return self._singleton_context
         elif scope == "request":
