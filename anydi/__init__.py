@@ -4,8 +4,9 @@ from typing import Any, cast
 
 from ._container import Container, request, singleton, transient
 from ._module import Module, provider
+from ._provider import Provider
 from ._scanner import injectable
-from ._types import Marker, Provider, Scope
+from ._types import Marker, Scope
 
 
 def dep() -> Any:
