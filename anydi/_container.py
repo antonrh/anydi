@@ -150,7 +150,9 @@ class Container:
                 "properly registered before attempting to use it."
             ) from exc
 
-    def _get_or_register_provider(self, interface: AnyInterface) -> Provider:
+    def _get_or_register_provider(
+        self, interface: AnyInterface, parent_scope: Scope | None = None
+    ) -> Provider:
         """Get or register a provider by interface."""
         try:
             return self._get_provider(interface)
@@ -162,7 +164,7 @@ class Container:
                 and interface is not inspect.Parameter.empty
             ):
                 # Try to get defined scope
-                scope = getattr(interface, "__scope__", None)
+                scope = getattr(interface, "__scope__", parent_scope)
                 # Try to detect scope
                 if scope is None:
                     scope = self._detect_scope(interface)
@@ -195,7 +197,9 @@ class Container:
                 )
 
             try:
-                sub_provider = self._get_or_register_provider(annotation)
+                sub_provider = self._get_or_register_provider(
+                    annotation, parent_scope=provider.scope
+                )
             except LookupError:
                 raise ValueError(
                     f"The provider `{provider}` depends on `{parameter.name}` of type "
