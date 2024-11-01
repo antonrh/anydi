@@ -430,6 +430,10 @@ class Container:
         def decorator(
             inner: Callable[P, T | Awaitable[T]],
         ) -> Callable[P, T | Awaitable[T]]:
+            # Check if the inner callable has already been wrapped
+            if hasattr(inner, "__inject_wrapper__"):
+                return inner.__inject_wrapper__
+
             injected_params = self._get_injected_params(inner)
 
             if inspect.iscoroutinefunction(inner):
@@ -447,6 +451,9 @@ class Container:
                 for name, annotation in injected_params.items():
                     kwargs[name] = self.resolve(annotation)
                 return cast(T, inner(*args, **kwargs))
+
+            # Store the wrapper to avoid multiple wrapping
+            inner.__inject_wrapper__ = wrapper
 
             return wrapper
 
