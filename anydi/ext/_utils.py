@@ -32,7 +32,7 @@ def patch_annotated_parameter(parameter: inspect.Parameter) -> inspect.Parameter
     """Patch an annotated parameter to resolve the default value."""
     if not (
         get_origin(parameter.annotation) is Annotated
-        and parameter.default is parameter.empty
+        and parameter.default is inspect.Parameter.empty
     ):
         return parameter
 

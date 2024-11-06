@@ -190,7 +190,7 @@ class Container:
         for parameter in provider.parameters:
             annotation = parameter.annotation
 
-            if annotation is inspect._empty:  # noqa
+            if annotation is inspect.Parameter.empty:
                 raise TypeError(
                     f"Missing provider `{provider}` "
                     f"dependency `{parameter.name}` annotation."
