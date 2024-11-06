@@ -432,7 +432,7 @@ class Container:
         ) -> Callable[P, T | Awaitable[T]]:
             # Check if the inner callable has already been wrapped
             if hasattr(inner, "__inject_wrapper__"):
-                return inner.__inject_wrapper__
+                return cast(Callable[P, T | Awaitable[T]], inner.__inject_wrapper__)
 
             injected_params = self._get_injected_params(inner)
 
@@ -444,6 +444,8 @@ class Container:
                         kwargs[name] = await self.aresolve(annotation)
                     return cast(T, await inner(*args, **kwargs))
 
+                inner.__inject_wrapper__ = awrapper  # type: ignore[attr-defined]
+
                 return awrapper
 
             @wraps(inner)
@@ -452,8 +454,7 @@ class Container:
                     kwargs[name] = self.resolve(annotation)
                 return cast(T, inner(*args, **kwargs))
 
-            # Store the wrapper to avoid multiple wrapping
-            inner.__inject_wrapper__ = wrapper
+            inner.__inject_wrapper__ = wrapper  # type: ignore[attr-defined]
 
             return wrapper
 

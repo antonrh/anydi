@@ -98,7 +98,6 @@ class TestProvider:
         provider = Provider(call=call, scope="singleton")
 
         assert provider.kind == kind
-        assert provider.is_event
         assert issubclass(provider.interface, Event)
 
     def test_construct_with_interface(self) -> None:

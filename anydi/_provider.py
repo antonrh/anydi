@@ -14,7 +14,7 @@ except ImportError:
     NoneType = type(None)  # type: ignore[misc]
 
 
-from ._types import Event, Scope, is_event_type
+from ._types import Event, Scope
 from ._utils import get_full_qualname, get_typed_annotation
 
 _sentinel = object()
@@ -103,11 +103,6 @@ class Provider:
             CallableKind.GENERATOR,
             CallableKind.ASYNC_GENERATOR,
         }
-
-    @property
-    def is_event(self) -> bool:
-        """Check if the provider is an event."""
-        return is_event_type(self._interface)
 
     def _validate_scope(self) -> None:
         """Validate the scope of the provider."""
