@@ -3,7 +3,9 @@ from __future__ import annotations
 import inspect
 from collections.abc import Awaitable
 from functools import wraps
-from typing import TYPE_CHECKING, Any, Callable, ParamSpec, TypeVar, cast
+from typing import TYPE_CHECKING, Any, Callable, TypeVar, cast
+
+from typing_extensions import ParamSpec
 
 from ._logger import logger
 from ._types import is_marker
