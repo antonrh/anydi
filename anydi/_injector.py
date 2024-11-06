@@ -3,7 +3,7 @@ from __future__ import annotations
 import inspect
 from collections.abc import Awaitable
 from functools import wraps
-from typing import TYPE_CHECKING, Any, Callable, TypeVar, cast
+from typing import TYPE_CHECKING, Any, Callable, TypeVar, Union, cast
 
 from typing_extensions import ParamSpec
 
@@ -29,7 +29,7 @@ class Injector:
     ) -> Callable[P, T | Awaitable[T]]:
         # Check if the inner callable has already been wrapped
         if hasattr(call, "__inject_wrapper__"):
-            return cast(Callable[P, T | Awaitable[T]], call.__inject_wrapper__)
+            return cast(Callable[P, Union[T, Awaitable[T]]], call.__inject_wrapper__)
 
         injected_params = self._get_injected_params(call)
 
