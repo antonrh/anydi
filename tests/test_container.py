@@ -254,7 +254,7 @@ def test_register_provider_with_not_registered_sub_provider(
         "The provider "
         "`tests.test_container.test_register_provider_with_not_registered_sub_provider"
         ".<locals>.dep2` depends on `dep1` of type `int`, which has not been "
-        "registered. To resolve this, ensure that `dep1` is registered "
+        "registered or set. To resolve this, ensure that `dep1` is registered "
         "before attempting to use it."
     )
 
@@ -670,6 +670,42 @@ async def test_resolve_request_scoped_annotated_async_resource(
     assert result == instance
 
 
+def test_resolve_request_scoped_unresolved_yet(container: Container) -> None:
+    class Request:
+        def __init__(self, path: str) -> None:
+            self.path = path
+
+    @container.provider(scope="request")
+    def req_path(req: Request) -> str:
+        return req.path
+
+    with container.request_context() as ctx:
+        ctx.set(Request, Request(path="test"))
+        assert container.resolve(str) == "test"
+
+
+def test_resolve_request_scoped_unresolved_error(container: Container) -> None:
+    class Request:
+        def __init__(self, path: str) -> None:
+            self.path = path
+
+    @container.provider(scope="request")
+    def req_path(req: Request) -> str:
+        return req.path
+
+    with container.request_context():
+        with pytest.raises(LookupError) as exc_info:
+            container.resolve(str)
+
+    assert str(exc_info.value) == (
+        "You are attempting to get the parameter `req` with the annotation "
+        "`tests.test_container.test_resolve_request_scoped_unresolved_error.<locals>"
+        ".Request` as a dependency into `tests.test_container"
+        ".test_resolve_request_scoped_unresolved_error.<locals>.req_path` which is not "
+        "registered or set in the scoped context."
+    )
+
+
 def test_resolve_transient_scoped(container: Container) -> None:
     container.register(uuid.UUID, uuid.uuid4, scope="transient")
 
@@ -1023,7 +1059,7 @@ def test_get_provider_arguments(container: Container) -> None:
 
     scoped_context = container._get_scoped_context("singleton")
 
-    args, kwargs = scoped_context._get_provider_arguments(provider)
+    args, kwargs = scoped_context._get_provider_params(provider)
 
     assert args == [10]
     assert kwargs == {"b": 1.0, "c": "test"}
@@ -1049,7 +1085,7 @@ async def test_async_get_provider_arguments(container: Container) -> None:
 
     scoped_context = container._get_scoped_context("singleton")
 
-    args, kwargs = await scoped_context._aget_provider_arguments(provider)
+    args, kwargs = await scoped_context._aget_provider_params(provider)
 
     assert args == [10]
     assert kwargs == {"b": 1.0, "c": "test"}

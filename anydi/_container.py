@@ -8,7 +8,6 @@ import types
 from collections import defaultdict
 from collections.abc import AsyncIterator, Awaitable, Iterable, Iterator, Sequence
 from contextvars import ContextVar
-from functools import wraps
 from typing import Any, Callable, TypeVar, cast, overload
 
 from typing_extensions import ParamSpec, Self, final
@@ -20,11 +19,11 @@ from ._context import (
     SingletonContext,
     TransientContext,
 )
-from ._logger import logger
+from ._injector import Injector
 from ._module import Module, ModuleRegistry
 from ._provider import Provider
 from ._scanner import Scanner
-from ._types import AnyInterface, Interface, Scope, is_marker
+from ._types import AnyInterface, Interface, Scope
 from ._utils import get_full_qualname, get_typed_parameters, is_builtin_type
 
 T = TypeVar("T", bound=Any)
@@ -58,8 +57,10 @@ class Container:
         )
         self._override_instances: dict[type[Any], Any] = {}
         self._strict = strict
+        self._unresolved_interfaces: set[type[Any]] = set()
 
         # Components
+        self._injector = Injector(self)
         self._modules = ModuleRegistry(self)
         self._scanner = Scanner(self)
 
@@ -113,7 +114,7 @@ class Container:
                 "already registered."
             )
 
-        self._validate_provider_match_scopes(provider)
+        self._validate_sub_providers(provider)
         self._set_provider(provider)
         return provider
 
@@ -184,8 +185,8 @@ class Container:
         if provider.is_resource:
             self._resource_cache[provider.scope].remove(provider.interface)
 
-    def _validate_provider_match_scopes(self, provider: Provider) -> None:
-        """Validate that the provider and its dependencies have matching scopes."""
+    def _validate_sub_providers(self, provider: Provider) -> None:
+        """Validate the sub-providers of a provider."""
 
         for parameter in provider.parameters:
             annotation = parameter.annotation
@@ -201,10 +202,13 @@ class Container:
                     annotation, parent_scope=provider.scope
                 )
             except LookupError:
+                if provider.scope not in {"singleton", "transient"}:
+                    self._unresolved_interfaces.add(provider.interface)
+                    continue
                 raise ValueError(
                     f"The provider `{provider}` depends on `{parameter.name}` of type "
                     f"`{get_full_qualname(annotation)}`, which "
-                    "has not been registered. To resolve this, ensure that "
+                    "has not been registered or set. To resolve this, ensure that "
                     f"`{parameter.name}` is registered before attempting to use it."
                 ) from None
 
@@ -430,33 +434,7 @@ class Container:
         def decorator(
             inner: Callable[P, T | Awaitable[T]],
         ) -> Callable[P, T | Awaitable[T]]:
-            # Check if the inner callable has already been wrapped
-            if hasattr(inner, "__inject_wrapper__"):
-                return cast(Callable[P, T | Awaitable[T]], inner.__inject_wrapper__)
-
-            injected_params = self._get_injected_params(inner)
-
-            if inspect.iscoroutinefunction(inner):
-
-                @wraps(inner)
-                async def awrapper(*args: P.args, **kwargs: P.kwargs) -> T:
-                    for name, annotation in injected_params.items():
-                        kwargs[name] = await self.aresolve(annotation)
-                    return cast(T, await inner(*args, **kwargs))
-
-                inner.__inject_wrapper__ = awrapper  # type: ignore[attr-defined]
-
-                return awrapper
-
-            @wraps(inner)
-            def wrapper(*args: P.args, **kwargs: P.kwargs) -> T:
-                for name, annotation in injected_params.items():
-                    kwargs[name] = self.resolve(annotation)
-                return cast(T, inner(*args, **kwargs))
-
-            inner.__inject_wrapper__ = wrapper  # type: ignore[attr-defined]
-
-            return wrapper
+            return self._injector.inject(inner)
 
         if func is None:
             return decorator
@@ -464,7 +442,7 @@ class Container:
 
     def run(self, func: Callable[P, T], /, *args: P.args, **kwargs: P.kwargs) -> T:
         """Run the given function with injected dependencies."""
-        return self.inject(func)(*args, **kwargs)
+        return cast(T, self._injector.inject(func)(*args, **kwargs))
 
     def scan(
         self,
@@ -475,44 +453,6 @@ class Container:
     ) -> None:
         """Scan packages or modules for decorated members and inject dependencies."""
         self._scanner.scan(packages, tags=tags)
-
-    def _get_injected_params(self, call: Callable[..., Any]) -> dict[str, Any]:
-        """Get the injected parameters of a callable object."""
-        injected_params = {}
-        for parameter in get_typed_parameters(call):
-            if not is_marker(parameter.default):
-                continue
-            try:
-                self._validate_injected_parameter(call, parameter)
-            except LookupError as exc:
-                if not self.strict:
-                    logger.debug(
-                        f"Cannot validate the `{get_full_qualname(call)}` parameter "
-                        f"`{parameter.name}` with an annotation of "
-                        f"`{get_full_qualname(parameter.annotation)} due to being "
-                        "in non-strict mode. It will be validated at the first call."
-                    )
-                else:
-                    raise exc
-            injected_params[parameter.name] = parameter.annotation
-        return injected_params
-
-    def _validate_injected_parameter(
-        self, call: Callable[..., Any], parameter: inspect.Parameter
-    ) -> None:
-        """Validate an injected parameter."""
-        if parameter.annotation is inspect.Parameter.empty:
-            raise TypeError(
-                f"Missing `{get_full_qualname(call)}` parameter "
-                f"`{parameter.name}` annotation."
-            )
-
-        if not self.is_registered(parameter.annotation):
-            raise LookupError(
-                f"`{get_full_qualname(call)}` has an unknown dependency parameter "
-                f"`{parameter.name}` with an annotation of "
-                f"`{get_full_qualname(parameter.annotation)}`."
-            )
 
 
 def transient(target: T) -> T:

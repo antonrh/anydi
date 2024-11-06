@@ -2,14 +2,15 @@ from __future__ import annotations
 
 import abc
 import contextlib
+import inspect
 from types import TracebackType
-from typing import TYPE_CHECKING, Any, ClassVar
+from typing import TYPE_CHECKING, Any, Callable, ClassVar
 
 from typing_extensions import Self, final
 
 from ._provider import CallableKind, Provider
 from ._types import AnyInterface, Scope, is_event_type
-from ._utils import run_async
+from ._utils import get_full_qualname, run_async
 
 if TYPE_CHECKING:
     from ._container import Container
@@ -23,6 +24,10 @@ class ScopedContext(abc.ABC):
     def __init__(self, container: Container) -> None:
         self.container = container
         self._instances: dict[Any, Any] = {}
+
+    def set(self, interface: AnyInterface, instance: Any) -> None:
+        """Set an instance of a dependency in the scoped context."""
+        self._instances[interface] = instance
 
     @abc.abstractmethod
     def get(self, provider: Provider) -> Any:
@@ -39,17 +44,41 @@ class ScopedContext(abc.ABC):
                 f"The instance for the coroutine provider `{provider}` cannot be "
                 "created in synchronous mode."
             )
-        args, kwargs = self._get_provider_arguments(provider)
+        args, kwargs = self._get_provider_params(provider)
         return provider.call(*args, **kwargs)
 
     async def _acreate_instance(self, provider: Provider) -> Any:
         """Create an instance asynchronously using the provider."""
-        args, kwargs = await self._aget_provider_arguments(provider)
+        args, kwargs = await self._aget_provider_params(provider)
         if provider.kind == CallableKind.COROUTINE:
             return await provider.call(*args, **kwargs)
         return await run_async(provider.call, *args, **kwargs)
 
-    def _get_provider_arguments(
+    def _resolve_parameter(
+        self, provider: Provider, parameter: inspect.Parameter
+    ) -> Any:
+        self._validate_resolvable_parameter(parameter, call=provider.call)
+        return self.container.resolve(parameter.annotation)
+
+    async def _aresolve_parameter(
+        self, provider: Provider, parameter: inspect.Parameter
+    ) -> Any:
+        self._validate_resolvable_parameter(parameter, call=provider.call)
+        return await self.container.aresolve(parameter.annotation)
+
+    def _validate_resolvable_parameter(
+        self, parameter: inspect.Parameter, call: Callable[..., Any]
+    ) -> None:
+        """Ensure that the specified interface is resolved."""
+        if parameter.annotation in self.container._unresolved_interfaces:  # noqa
+            raise LookupError(
+                f"You are attempting to get the parameter `{parameter.name}` with the "
+                f"annotation `{get_full_qualname(parameter.annotation)}` as a "
+                f"dependency into `{get_full_qualname(call)}` which is not registered "
+                "or set in the scoped context."
+            )
+
+    def _get_provider_params(
         self, provider: Provider
     ) -> tuple[list[Any], dict[str, Any]]:
         """Retrieve the arguments for a provider."""
@@ -60,14 +89,14 @@ class ScopedContext(abc.ABC):
             if parameter.annotation in self._instances:
                 instance = self._instances[parameter.annotation]
             else:
-                instance = self.container.resolve(parameter.annotation)
+                instance = self._resolve_parameter(provider, parameter)
             if parameter.kind == parameter.POSITIONAL_ONLY:
                 args.append(instance)
             else:
                 kwargs[parameter.name] = instance
         return args, kwargs
 
-    async def _aget_provider_arguments(
+    async def _aget_provider_params(
         self, provider: Provider
     ) -> tuple[list[Any], dict[str, Any]]:
         """Asynchronously retrieve the arguments for a provider."""
@@ -78,7 +107,7 @@ class ScopedContext(abc.ABC):
             if parameter.annotation in self._instances:
                 instance = self._instances[parameter.annotation]
             else:
-                instance = await self.container.aresolve(parameter.annotation)
+                instance = await self._aresolve_parameter(provider, parameter)
             if parameter.kind == parameter.POSITIONAL_ONLY:
                 args.append(instance)
             else:
@@ -139,7 +168,7 @@ class ResourceScopedContext(ScopedContext):
 
     def _create_resource(self, provider: Provider) -> Any:
         """Create a resource using the provider."""
-        args, kwargs = self._get_provider_arguments(provider)
+        args, kwargs = self._get_provider_params(provider)
         cm = contextlib.contextmanager(provider.call)(*args, **kwargs)
         return self._stack.enter_context(cm)
 
@@ -153,7 +182,7 @@ class ResourceScopedContext(ScopedContext):
 
     async def _acreate_resource(self, provider: Provider) -> Any:
         """Create a resource asynchronously using the provider."""
-        args, kwargs = await self._aget_provider_arguments(provider)
+        args, kwargs = await self._aget_provider_params(provider)
         cm = contextlib.asynccontextmanager(provider.call)(*args, **kwargs)
         return await self._async_stack.enter_async_context(cm)
 

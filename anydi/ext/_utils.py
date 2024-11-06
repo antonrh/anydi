@@ -84,6 +84,6 @@ def patch_call_parameter(
             "first call because it is running in non-strict mode."
         )
     else:
-        container._validate_injected_parameter(call, parameter)  # noqa
+        container._injector._validate_injected_parameter(call, parameter)  # noqa
 
     parameter.default.interface = parameter.annotation
