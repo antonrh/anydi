@@ -33,5 +33,6 @@ class RequestScopedMiddleware(BaseHTTPMiddleware):
         Returns:
             The response to the request.
         """
-        async with self.container.arequest_context():
+        async with self.container.arequest_context() as ctx:
+            ctx.set(Request, instance=request)
             return await call_next(request)
