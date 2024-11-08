@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import logging
 from collections.abc import Iterator
 from typing import Any, cast
 
@@ -19,15 +18,9 @@ from .starlette.middleware import RequestScopedMiddleware
 
 __all__ = ["RequestScopedMiddleware", "install", "get_container", "Inject"]
 
-logger = logging.getLogger(__name__)
-
 
 def install(app: FastAPI, container: Container) -> None:
     """Install AnyDI into a FastAPI application.
-
-    Args:
-        app: The FastAPI application instance.
-        container: The container.
 
     This function installs the AnyDI container into a FastAPI application by attaching
     it to the application state. It also patches the route dependencies to inject the
@@ -52,14 +45,7 @@ def install(app: FastAPI, container: Container) -> None:
 
 
 def get_container(request: Request) -> Container:
-    """Get the AnyDI container from a FastAPI request.
-
-    Args:
-        request: The FastAPI request.
-
-    Returns:
-        The AnyDI container associated with the request.
-    """
+    """Get the AnyDI container from a FastAPI request."""
     return cast(Container, request.app.state.container)
 
 
@@ -74,14 +60,7 @@ class Resolver(HasInterface, params.Depends):
 
 
 def Inject() -> Any:  # noqa
-    """Decorator for marking a function parameter as requiring injection.
-
-    The `Inject` decorator is used to mark a function parameter as requiring injection
-    of a dependency resolved by AnyDI.
-
-    Returns:
-        The `Resolver` instance representing the parameter dependency.
-    """
+    """Decorator for marking a function parameter as requiring injection."""
     return Resolver()
 
 

@@ -73,7 +73,7 @@ def _anydi_injected_parameter_iterator(
         for parameter in get_typed_parameters(request.function):
             interface = parameter.annotation
             if (
-                interface is parameter.empty
+                interface is inspect.Parameter.empty
                 or interface in _anydi_unresolved
                 or parameter.name in registered_fixtures
             ):

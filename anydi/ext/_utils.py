@@ -32,7 +32,7 @@ def patch_annotated_parameter(parameter: inspect.Parameter) -> inspect.Parameter
     """Patch an annotated parameter to resolve the default value."""
     if not (
         get_origin(parameter.annotation) is Annotated
-        and parameter.default is parameter.empty
+        and parameter.default is inspect.Parameter.empty
     ):
         return parameter
 
@@ -63,13 +63,7 @@ def patch_annotated_parameter(parameter: inspect.Parameter) -> inspect.Parameter
 def patch_call_parameter(
     call: Callable[..., Any], parameter: inspect.Parameter, container: Container
 ) -> None:
-    """Patch a parameter to inject dependencies using AnyDI.
-
-    Args:
-        call:  The call function.
-        parameter: The parameter to patch.
-        container: The AnyDI container.
-    """
+    """Patch a parameter to inject dependencies using AnyDI."""
     parameter = patch_annotated_parameter(parameter)
 
     if not isinstance(parameter.default, HasInterface):
@@ -84,6 +78,6 @@ def patch_call_parameter(
             "first call because it is running in non-strict mode."
         )
     else:
-        container._validate_injected_parameter(call, parameter)  # noqa
+        container._injector._validate_injected_parameter(call, parameter)  # noqa
 
     parameter.default.interface = parameter.annotation

@@ -1,6 +1,6 @@
-from anydi import dep, injectable
+from anydi import auto, injectable
 
 
 @injectable(tags=["a", "a2", "a21"])
-def a21_handler(message: str = dep()) -> None:
+def a21_handler(message: str = auto) -> None:
     pass

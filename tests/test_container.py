@@ -1,4 +1,3 @@
-import logging
 import sys
 import uuid
 from collections.abc import AsyncIterator, Iterator, Sequence
@@ -8,7 +7,7 @@ from typing import Annotated, Any, Union
 import pytest
 from typing_extensions import Self
 
-from anydi import Container, Provider, Scope, auto, dep, request, singleton, transient
+from anydi import Container, Provider, Scope, auto, request, singleton, transient
 
 from tests.fixtures import Resource, Service
 
@@ -23,12 +22,12 @@ def test_default_strict_disabled(container: Container) -> None:
 
 
 def test_register_provider(container: Container) -> None:
-    def provider_obj() -> str:
+    def provider_call() -> str:
         return "test"
 
-    provider = container.register(str, provider_obj, scope="transient")
+    provider = container.register(str, provider_call, scope="transient")
 
-    assert provider.obj == provider_obj
+    assert provider.call == provider_call
     assert provider.scope == "transient"
 
 
@@ -44,14 +43,14 @@ def test_register_provider_already_registered(container: Container) -> None:
 def test_register_provider_override(container: Container) -> None:
     container.register(str, lambda: "old", scope="singleton")
 
-    def new_provider_obj() -> str:
+    def new_provider_call() -> str:
         return "new"
 
     provider = container.register(
-        str, new_provider_obj, scope="singleton", override=True
+        str, new_provider_call, scope="singleton", override=True
     )
 
-    assert provider.obj == new_provider_obj
+    assert provider.call == new_provider_call
 
 
 def test_register_provider_named(container: Container) -> None:
@@ -72,84 +71,67 @@ def test_register_provider_named(container: Container) -> None:
 
 def test_register_providers_via_constructor() -> None:
     container = Container(
-        providers={
-            str: Provider(obj=lambda: "test", scope="singleton"),
-            int: Provider(obj=lambda: 1, scope="singleton"),
-        }
+        providers=[
+            Provider(call=lambda: "test", scope="singleton", interface=str),
+            Provider(call=lambda: 1, scope="singleton", interface=int),
+        ]
     )
 
     assert container.is_registered(str)
     assert container.is_registered(int)
 
 
-def test_register_provider_with_invalid_scope(container: Container) -> None:
-    with pytest.raises(ValueError) as exc_info:
-        container.register(
-            str,
-            lambda: "test",
-            scope="invalid",  # type: ignore[arg-type]
-        )
-
-    assert str(exc_info.value) == (
-        "The scope provided is invalid. Only the following scopes are supported: "
-        "transient, singleton, request. Please use one of the supported scopes when "
-        "registering a provider."
-    )
-
-
 def test_register_provider_invalid_transient_resource(container: Container) -> None:
-    def provider_obj() -> Iterator[str]:
+    def provider_call() -> Iterator[str]:
         yield "test"
 
     with pytest.raises(TypeError) as exc_info:
-        container.register(str, provider_obj, scope="transient")
+        container.register(str, provider_call, scope="transient")
 
     assert str(exc_info.value) == (
         "The resource provider `tests.test_container"
-        ".test_register_provider_invalid_transient_resource.<locals>.provider_obj` is "
-        "attempting to register with a transient scope, which is not allowed. Please "
-        "update the provider's scope to an appropriate value before registering it."
+        ".test_register_provider_invalid_transient_resource.<locals>.provider_call` is "
+        "attempting to register with a transient scope, which is not allowed."
     )
 
 
 def test_register_provider_invalid_transient_async_resource(
     container: Container,
 ) -> None:
-    async def provider_obj() -> AsyncIterator[str]:
+    async def provider_call() -> AsyncIterator[str]:
         yield "test"
 
     with pytest.raises(TypeError) as exc_info:
-        container.register(str, provider_obj, scope="transient")
+        container.register(str, provider_call, scope="transient")
 
     assert str(exc_info.value) == (
         "The resource provider `tests.test_container"
         ".test_register_provider_invalid_transient_async_resource"
-        ".<locals>.provider_obj` is attempting to register with a transient scope, "
-        "which is not allowed. Please update the provider's scope to an "
-        "appropriate value before registering it."
+        ".<locals>.provider_call` is attempting to register with a transient scope, "
+        "which is not allowed."
     )
 
 
 def test_register_provider_valid_resource(container: Container) -> None:
-    def provider_obj1() -> Iterator[str]:
+    def provider_call1() -> Iterator[str]:
         yield "test"
 
-    def provider_obj2() -> Iterator[int]:
+    def provider_call2() -> Iterator[int]:
         yield 100
 
-    container.register(str, provider_obj1, scope="singleton")
-    container.register(int, provider_obj2, scope="request")
+    container.register(str, provider_call1, scope="singleton")
+    container.register(int, provider_call2, scope="request")
 
 
 def test_register_provider_valid_async_resource(container: Container) -> None:
-    async def provider_obj1() -> AsyncIterator[str]:
+    async def provider_call1() -> AsyncIterator[str]:
         yield "test"
 
-    async def provider_obj2() -> AsyncIterator[int]:
+    async def provider_call2() -> AsyncIterator[int]:
         yield 100
 
-    container.register(str, provider_obj1, scope="singleton")
-    container.register(int, provider_obj2, scope="request")
+    container.register(str, provider_call1, scope="singleton")
+    container.register(int, provider_call2, scope="request")
 
 
 def test_register_invalid_provider_type(container: Container) -> None:
@@ -158,18 +140,8 @@ def test_register_invalid_provider_type(container: Container) -> None:
 
     assert str(exc_info.value) == (
         "The provider `Test` is invalid because it is not a callable object. Only "
-        "callable providers are allowed. Please update the provider to a callable "
-        "object before attempting to register it."
+        "callable providers are allowed."
     )
-
-
-def test_register_valid_class_provider(container: Container) -> None:
-    class Klass:
-        pass
-
-    provider = container.register(str, Klass, scope="singleton")
-
-    assert provider.is_class
 
 
 @pytest.mark.parametrize(
@@ -241,11 +213,10 @@ def test_register_provider_match_scopes_error(container: Container) -> None:
         container.register(str, provider_str, scope="singleton")
 
     assert str(exc_info.value) == (
-        "The provider `tests.test_container.test_register_provider_match_scopes_error"
-        ".<locals>.provider_str` with a singleton scope was attempted to be registered "
-        "with the provider `tests.test_container"
-        ".test_register_provider_match_scopes_error.<locals>.provider_int` with a "
-        "`request` scope, which is not allowed. Please ensure that all providers are "
+        "The provider `tests.test_container.test_register_provider_match_scopes_error."
+        "<locals>.provider_str` with a `singleton` scope cannot depend on "
+        "`tests.test_container.test_register_provider_match_scopes_error.<locals>."
+        "provider_int` with a `request` scope. Please ensure all providers are "
         "registered with matching scopes."
     )
 
@@ -282,7 +253,7 @@ def test_register_provider_with_not_registered_sub_provider(
         "The provider "
         "`tests.test_container.test_register_provider_with_not_registered_sub_provider"
         ".<locals>.dep2` depends on `dep1` of type `int`, which has not been "
-        "registered. To resolve this, ensure that `dep1` is registered "
+        "registered or set. To resolve this, ensure that `dep1` is registered "
         "before attempting to use it."
     )
 
@@ -392,27 +363,6 @@ def test_unregister_not_registered_provider(container: Container) -> None:
         container.unregister(str)
 
     assert str(exc_info.value) == "The provider interface `str` not registered."
-
-
-def test_inject_auto_registered_log_message(
-    container: Container, caplog: pytest.LogCaptureFixture
-) -> None:
-    class Service:
-        pass
-
-    with caplog.at_level(logging.DEBUG, logger="anydi"):
-
-        @container.inject
-        def handler(service: Service = dep()) -> None:
-            pass
-
-        assert caplog.messages == [
-            "Cannot validate the `tests.test_container"
-            ".test_inject_auto_registered_log_message.<locals>.handler` parameter "
-            "`service` with an annotation of `tests.test_container"
-            ".test_inject_auto_registered_log_message.<locals>.Service due to being "
-            "in non-strict mode. It will be validated at the first call."
-        ]
 
 
 # Lifespan
@@ -698,6 +648,42 @@ async def test_resolve_request_scoped_annotated_async_resource(
     assert result == instance
 
 
+def test_resolve_request_scoped_unresolved_yet(container: Container) -> None:
+    class Request:
+        def __init__(self, path: str) -> None:
+            self.path = path
+
+    @container.provider(scope="request")
+    def req_path(req: Request) -> str:
+        return req.path
+
+    with container.request_context() as ctx:
+        ctx.set(Request, Request(path="test"))
+        assert container.resolve(str) == "test"
+
+
+def test_resolve_request_scoped_unresolved_error(container: Container) -> None:
+    class Request:
+        def __init__(self, path: str) -> None:
+            self.path = path
+
+    @container.provider(scope="request")
+    def req_path(req: Request) -> str:
+        return req.path
+
+    with container.request_context():
+        with pytest.raises(LookupError) as exc_info:
+            container.resolve(str)
+
+    assert str(exc_info.value) == (
+        "You are attempting to get the parameter `req` with the annotation "
+        "`tests.test_container.test_resolve_request_scoped_unresolved_error.<locals>"
+        ".Request` as a dependency into `tests.test_container"
+        ".test_resolve_request_scoped_unresolved_error.<locals>.req_path` which is not "
+        "registered or set in the scoped context."
+    )
+
+
 def test_resolve_transient_scoped(container: Container) -> None:
     container.register(uuid.UUID, uuid.uuid4, scope="transient")
 
@@ -751,7 +737,7 @@ def test_resolve_non_strict_provider_scope_defined(container: Container) -> None
 
     _ = container.resolve(Service)
 
-    assert container.providers == {Service: Provider(obj=Service, scope="singleton")}
+    assert container.providers == {Service: Provider(call=Service, scope="singleton")}
 
 
 def test_resolve_non_strict_provider_scope_from_sub_provider_request(
@@ -769,8 +755,8 @@ def test_resolve_non_strict_provider_scope_from_sub_provider_request(
         _ = container.resolve(Service)
 
     assert container.providers == {
-        str: Provider(obj=message, scope="request"),
-        Service: Provider(obj=Service, scope="request"),
+        str: Provider(call=message, scope="request"),
+        Service: Provider(call=Service, scope="request"),
     }
 
 
@@ -1031,58 +1017,6 @@ async def test_async_resource_delegated_exception(container: Container) -> None:
 # Inspections
 
 
-@pytest.mark.parametrize(
-    "annotation, expected",
-    [
-        (str, str),
-        (int, int),
-        (Service, Service),
-        (Iterator[Service], Service),
-        (AsyncIterator[Service], Service),
-        (dict[str, Any], dict[str, Any]),
-        (list[str], list[str]),
-        ("list[str]", list[str]),
-        (tuple[str, ...], tuple[str, ...]),
-        ("tuple[str, ...]", tuple[str, ...]),
-        ('Annotated[str, "name"]', Annotated[str, "name"]),
-    ],
-)
-def test_get_supported_provider_annotation(
-    container: Container, annotation: type[Any], expected: type[Any]
-) -> None:
-    def provider() -> annotation:  # type: ignore[valid-type]
-        return object()
-
-    assert container._get_provider_annotation(provider) == expected
-
-
-def test_get_provider_annotation_missing(container: Container) -> None:
-    def provider():  # type: ignore[no-untyped-def]
-        return object()
-
-    with pytest.raises(TypeError) as exc_info:
-        container._get_provider_annotation(provider)
-
-    assert str(exc_info.value) == (
-        "Missing `tests.test_container.test_get_provider_annotation_missing.<locals>"
-        ".provider` provider return annotation."
-    )
-
-
-def test_get_provider_annotation_resource_without_args(container: Container) -> None:
-    def provider() -> Iterator:  # type: ignore[type-arg]
-        yield
-
-    with pytest.raises(TypeError) as exc_info:
-        container._get_provider_annotation(provider)
-
-    assert str(exc_info.value) == (
-        "Cannot use `tests.test_container"
-        ".test_get_provider_annotation_resource_without_args.<locals>.provider` "
-        "resource type annotation without actual type."
-    )
-
-
 def test_get_provider_arguments(container: Container) -> None:
     @container.provider(scope="singleton")
     def a() -> int:
@@ -1103,7 +1037,7 @@ def test_get_provider_arguments(container: Container) -> None:
 
     scoped_context = container._get_scoped_context("singleton")
 
-    args, kwargs = scoped_context._get_provider_arguments(provider)
+    args, kwargs = scoped_context._get_provider_params(provider)
 
     assert args == [10]
     assert kwargs == {"b": 1.0, "c": "test"}
@@ -1129,156 +1063,10 @@ async def test_async_get_provider_arguments(container: Container) -> None:
 
     scoped_context = container._get_scoped_context("singleton")
 
-    args, kwargs = await scoped_context._aget_provider_arguments(provider)
+    args, kwargs = await scoped_context._aget_provider_params(provider)
 
     assert args == [10]
     assert kwargs == {"b": 1.0, "c": "test"}
-
-
-def test_inject_missing_annotation(container: Container) -> None:
-    def handler(name=dep()) -> str:  # type: ignore[no-untyped-def]
-        return name  # type: ignore[no-any-return]
-
-    with pytest.raises(TypeError) as exc_info:
-        container.inject(handler)
-
-    assert str(exc_info.value) == (
-        "Missing `tests.test_container.test_inject_missing_annotation"
-        ".<locals>.handler` parameter `name` annotation."
-    )
-
-
-def test_inject_unknown_dependency_using_strict_mode() -> None:
-    container = Container(strict=True)
-
-    def handler(message: str = dep()) -> None:
-        pass
-
-    with pytest.raises(LookupError) as exc_info:
-        container.inject(handler)
-
-    assert str(exc_info.value) == (
-        "`tests.test_container.test_inject_unknown_dependency_using_strict_mode"
-        ".<locals>.handler` has an unknown dependency parameter `message` with an "
-        "annotation of `str`."
-    )
-
-
-def test_inject(container: Container) -> None:
-    @container.provider(scope="singleton")
-    def ident_provider() -> str:
-        return "1000"
-
-    @container.provider(scope="singleton")
-    def service_provider(ident: str) -> Service:
-        return Service(ident=ident)
-
-    @container.inject
-    def func(name: str, service: Service = dep()) -> str:
-        return f"{name} = {service.ident}"
-
-    result = func(name="service ident")
-
-    assert result == "service ident = 1000"
-
-
-def test_inject_auto_marker(container: Container) -> None:
-    @container.provider(scope="singleton")
-    def message() -> str:
-        return "test"
-
-    @container.inject
-    def func(message: str = auto) -> str:
-        return message
-
-    result = func()
-
-    assert result == "test"
-
-
-def test_inject_auto_marker_call(container: Container) -> None:
-    @container.provider(scope="singleton")
-    def message() -> str:
-        return "test"
-
-    @container.inject
-    def func(message: str = auto()) -> str:
-        return message
-
-    result = func()
-
-    assert result == "test"
-
-
-def test_inject_class(container: Container) -> None:
-    @container.provider(scope="singleton")
-    def ident_provider() -> str:
-        return "1000"
-
-    @container.provider(scope="singleton")
-    def service_provider(ident: str) -> Service:
-        return Service(ident=ident)
-
-    @container.inject
-    class Handler:
-        def __init__(self, name: str, service: Service = dep()) -> None:
-            self.name = name
-            self.service = service
-
-        def handle(self) -> str:
-            return f"{self.name} = {self.service.ident}"
-
-    handler = Handler(name="service ident")
-
-    result = handler.handle()
-
-    assert result == "service ident = 1000"
-
-
-def test_inject_dataclass(container: Container) -> None:
-    @container.provider(scope="singleton")
-    def ident_provider() -> str:
-        return "1000"
-
-    @container.provider(scope="singleton")
-    def service_provider(ident: str) -> Service:
-        return Service(ident=ident)
-
-    @container.inject
-    @dataclass
-    class Handler:
-        name: str
-        service: Service = dep()
-
-        def handle(self) -> str:
-            return f"{self.name} = {self.service.ident}"
-
-    handler = Handler(name="service ident")
-
-    result = handler.handle()
-
-    assert result == "service ident = 1000"
-
-
-async def test_inject_with_sync_and_async_resources(container: Container) -> None:
-    def ident_provider() -> Iterator[str]:
-        yield "1000"
-
-    async def service_provider(ident: str) -> AsyncIterator[Service]:
-        yield Service(ident=ident)
-
-    container.register(str, ident_provider, scope="singleton")
-    container.register(Service, service_provider, scope="singleton")
-
-    await container.astart()
-
-    @container.inject
-    async def func(name: str, service: Service = dep()) -> str:
-        return f"{name} = {service.ident}"
-
-    result = await func(name="service ident")
-
-    assert result == "service ident = 1000"
 
 
 def test_run(container: Container) -> None:
@@ -1292,8 +1080,8 @@ def test_run(container: Container) -> None:
 
     def sum_handler(
         value1: int,
-        value2: Annotated[int, "value1"] = dep(),
-        value3: Annotated[int, "value2"] = dep(),
+        value2: Annotated[int, "value1"] = auto,
+        value3: Annotated[int, "value2"] = auto,
     ) -> int:
         return value1 + value2 + value3
 
@@ -1307,7 +1095,7 @@ def test_provider_decorator(container: Container) -> None:
     def ident() -> str:
         return "1000"
 
-    assert container.providers[str] == Provider(obj=ident, scope="singleton")
+    assert container.providers[str] == Provider(call=ident, scope="singleton")
 
 
 def test_request_decorator() -> None:

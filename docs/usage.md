@@ -339,6 +339,33 @@ async def main() -> None:
         assert (await container.aresolve(Request).path) == "/"
 ```
 
+#### `request` scoped instances
+
+In `AnyDI`, you can create `request-scoped` instances to manage dependencies that should be instantiated per request.
+This is particularly useful when handling dependencies with request-specific data that need to be isolated across different requests.
+
+To create a request context, you use the `request_context` (or `arequest_context` for async) method on the container.
+This context is then used to resolve dependencies scoped to the current request.
+
+```python
+from typing import Annotated
+
+from anydi import Container
+
+container = Container()
+
+
+@container.provider(scope="request")
+def request_param(request: Request) -> Annotated[str, "request.param"]:
+    return request.param
+
+
+with container.request_context() as ctx:
+    ctx.set(Request, Request(param="param1"))
+
+    assert container.resolve(Annotated[str, "request.param"]) == "param1"
+```
+
 ## Resource Providers
 
 Resource providers are special types of providers that need to be started and stopped. `AnyDI` supports synchronous and asynchronous resource providers.

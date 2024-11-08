@@ -5,33 +5,12 @@ from __future__ import annotations
 import contextlib
 import inspect
 import types
-import uuid
 from collections import defaultdict
-from collections.abc import (
-    AsyncIterator,
-    Awaitable,
-    Iterable,
-    Iterator,
-    Mapping,
-    Sequence,
-)
+from collections.abc import AsyncIterator, Awaitable, Iterable, Iterator, Sequence
 from contextvars import ContextVar
-from functools import wraps
-from typing import (
-    Any,
-    Callable,
-    TypeVar,
-    cast,
-    overload,
-)
+from typing import Any, Callable, TypeVar, cast, overload
 
-from typing_extensions import ParamSpec, Self, final, get_args, get_origin
-
-try:
-    from types import NoneType
-except ImportError:
-    NoneType = type(None)  # type: ignore[misc]
-
+from typing_extensions import ParamSpec, Self, final
 
 from ._context import (
     RequestContext,
@@ -40,16 +19,12 @@ from ._context import (
     SingletonContext,
     TransientContext,
 )
-from ._logger import logger
+from ._injector import Injector
 from ._module import Module, ModuleRegistry
+from ._provider import Provider
 from ._scanner import Scanner
-from ._types import AnyInterface, Event, Interface, Provider, Scope, is_marker
-from ._utils import (
-    get_full_qualname,
-    get_typed_parameters,
-    get_typed_return_annotation,
-    is_builtin_type,
-)
+from ._types import AnyInterface, Interface, Scope
+from ._utils import get_full_qualname, get_typed_parameters, is_builtin_type
 
 T = TypeVar("T", bound=Any)
 P = ParamSpec("P")
@@ -63,27 +38,16 @@ ALLOWED_SCOPES: dict[Scope, list[Scope]] = {
 
 @final
 class Container:
-    """AnyDI is a dependency injection container.
-
-    Args:
-        modules: Optional sequence of modules to register during initialization.
-    """
+    """AnyDI is a dependency injection container."""
 
     def __init__(
         self,
         *,
-        providers: Mapping[type[Any], Provider] | None = None,
+        providers: Sequence[Provider] | None = None,
         modules: Sequence[Module | type[Module] | Callable[[Container], None] | str]
         | None = None,
         strict: bool = False,
     ) -> None:
-        """Initialize the AnyDI instance.
-
-        Args:
-            providers: Optional mapping of providers to register during initialization.
-            modules: Optional sequence of modules to register during initialization.
-            strict: Whether to enable strict mode. Defaults to False.
-        """
         self._providers: dict[type[Any], Provider] = {}
         self._resource_cache: dict[Scope, list[type[Any]]] = defaultdict(list)
         self._singleton_context = SingletonContext(self)
@@ -93,15 +57,17 @@ class Container:
         )
         self._override_instances: dict[type[Any], Any] = {}
         self._strict = strict
+        self._unresolved_interfaces: set[type[Any]] = set()
 
         # Components
+        self._injector = Injector(self)
         self._modules = ModuleRegistry(self)
         self._scanner = Scanner(self)
 
         # Register providers
-        providers = providers or {}
-        for interface, provider in providers.items():
-            self.register(interface, provider.obj, scope=provider.scope)
+        providers = providers or []
+        for provider in providers:
+            self._register_provider(provider)
 
         # Register modules
         modules = modules or []
@@ -110,102 +76,50 @@ class Container:
 
     @property
     def strict(self) -> bool:
-        """Check if strict mode is enabled.
-
-        Returns:
-            True if strict mode is enabled, False otherwise.
-        """
+        """Check if strict mode is enabled."""
         return self._strict
 
     @property
     def providers(self) -> dict[type[Any], Provider]:
-        """Get the registered providers.
-
-        Returns:
-            A dictionary containing the registered providers.
-        """
+        """Get the registered providers."""
         return self._providers
 
     def is_registered(self, interface: AnyInterface) -> bool:
-        """Check if a provider is registered for the specified interface.
-
-        Args:
-            interface: The interface to check for a registered provider.
-
-        Returns:
-            True if a provider is registered for the interface, False otherwise.
-        """
+        """Check if a provider is registered for the specified interface."""
         return interface in self._providers
 
     def register(
         self,
         interface: AnyInterface,
-        obj: Callable[..., Any],
+        call: Callable[..., Any],
         *,
         scope: Scope,
         override: bool = False,
     ) -> Provider:
-        """Register a provider for the specified interface.
+        """Register a provider for the specified interface."""
+        provider = Provider(call=call, scope=scope, interface=interface)
+        return self._register_provider(provider, override=override)
 
-        Args:
-            interface: The interface for which the provider is being registered.
-            obj: The provider function or callable object.
-            scope: The scope of the provider.
-            override: If True, override an existing provider for the interface
-                if one is already registered. Defaults to False.
-
-        Returns:
-            The registered provider.
-
-        Raises:
-            LookupError: If a provider for the interface is already registered
-              and override is False.
-
-        Notes:
-            - If the provider is a resource or an asynchronous resource, and the
-              interface is None, an Event type will be automatically created and used
-              as the interface.
-            - The provider will be validated for its scope, type, and matching scopes.
-        """
-        provider = Provider(obj=obj, scope=scope)
-
-        # Create Event type
-        if provider.is_resource and (interface is NoneType or interface is None):
-            interface = type(f"Event_{uuid.uuid4().hex}", (Event,), {})
-
-        if interface in self._providers:
+    def _register_provider(
+        self, provider: Provider, *, override: bool = False
+    ) -> Provider:
+        """Register a provider."""
+        if provider.interface in self._providers:
             if override:
-                self._set_provider(interface, provider)
+                self._set_provider(provider)
                 return provider
 
             raise LookupError(
-                f"The provider interface `{get_full_qualname(interface)}` "
+                f"The provider interface `{get_full_qualname(provider.interface)}` "
                 "already registered."
             )
 
-        # Validate provider
-        self._validate_provider_scope(provider)
-        self._validate_provider_type(provider)
-        self._validate_provider_match_scopes(provider)
-
-        self._set_provider(interface, provider)
+        self._validate_sub_providers(provider)
+        self._set_provider(provider)
         return provider
 
     def unregister(self, interface: AnyInterface) -> None:
-        """Unregister a provider by interface.
-
-        Args:
-            interface: The interface of the provider to unregister.
-
-        Raises:
-            LookupError: If the provider interface is not registered.
-
-        Notes:
-            - The method cleans up any scoped context instance associated with
-              the provider's scope.
-            - The method removes the provider reference from the internal dictionary
-              of registered providers.
-        """
+        """Unregister a provider by interface."""
         if not self.is_registered(interface):
             raise LookupError(
                 "The provider interface "
@@ -224,20 +138,10 @@ class Container:
                 scoped_context.delete(interface)
 
         # Cleanup provider references
-        self._delete_provider(interface)
+        self._delete_provider(provider)
 
     def _get_provider(self, interface: AnyInterface) -> Provider:
-        """Get provider by interface.
-
-        Args:
-            interface: The interface for which to retrieve the provider.
-
-        Returns:
-            Provider: The provider object associated with the interface.
-
-        Raises:
-            LookupError: If the provider interface has not been registered.
-        """
+        """Get provider by interface."""
         try:
             return self._providers[interface]
         except KeyError as exc:
@@ -247,18 +151,10 @@ class Container:
                 "properly registered before attempting to use it."
             ) from exc
 
-    def _get_or_register_provider(self, interface: AnyInterface) -> Provider:
-        """Get or register a provider by interface.
-
-        Args:
-            interface: The interface for which to retrieve the provider.
-
-        Returns:
-            Provider: The provider object associated with the interface.
-
-        Raises:
-            LookupError: If the provider interface has not been registered.
-        """
+    def _get_or_register_provider(
+        self, interface: AnyInterface, parent_scope: Scope | None = None
+    ) -> Provider:
+        """Get or register a provider by interface."""
         try:
             return self._get_provider(interface)
         except LookupError:
@@ -269,151 +165,89 @@ class Container:
                 and interface is not inspect.Parameter.empty
             ):
                 # Try to get defined scope
-                scope = getattr(interface, "__scope__", None)
+                scope = getattr(interface, "__scope__", parent_scope)
                 # Try to detect scope
                 if scope is None:
                     scope = self._detect_scope(interface)
                 return self.register(interface, interface, scope=scope or "transient")
             raise
 
-    def _set_provider(self, interface: AnyInterface, provider: Provider) -> None:
-        """Set a provider by interface.
-
-        Args:
-            interface: The interface for which to set the provider.
-            provider: The provider object to set.
-        """
-        self._providers[interface] = provider
+    def _set_provider(self, provider: Provider) -> None:
+        """Set a provider by interface."""
+        self._providers[provider.interface] = provider
         if provider.is_resource:
-            self._resource_cache[provider.scope].append(interface)
+            self._resource_cache[provider.scope].append(provider.interface)
 
-    def _delete_provider(self, interface: AnyInterface) -> None:
-        """Delete a provider by interface.
-
-        Args:
-            interface: The interface for which to delete the provider.
-        """
-        provider = self._providers.pop(interface, None)
-        if provider is not None and provider.is_resource:
-            self._resource_cache[provider.scope].remove(interface)
-
-    def _validate_provider_scope(self, provider: Provider) -> None:
-        """Validate the scope of a provider.
-
-        Args:
-            provider: The provider to validate.
-
-        Raises:
-            ValueError: If the scope provided is invalid.
-        """
-        if provider.scope not in get_args(Scope):
-            raise ValueError(
-                "The scope provided is invalid. Only the following scopes are "
-                f"supported: {', '.join(get_args(Scope))}. Please use one of the "
-                "supported scopes when registering a provider."
-            )
-
-    def _validate_provider_type(self, provider: Provider) -> None:
-        """Validate the type of provider.
-
-        Args:
-            provider: The provider to validate.
-
-        Raises:
-            TypeError: If the provider has an invalid type.
-        """
-        if provider.is_function or provider.is_class:
-            return
-
+    def _delete_provider(self, provider: Provider) -> None:
+        """Delete a provider."""
+        if provider.interface in self._providers:
+            del self._providers[provider.interface]
         if provider.is_resource:
-            if provider.scope == "transient":
-                raise TypeError(
-                    f"The resource provider `{provider}` is attempting to register "
-                    "with a transient scope, which is not allowed. Please update the "
-                    "provider's scope to an appropriate value before registering it."
-                )
-            return
+            self._resource_cache[provider.scope].remove(provider.interface)
 
-        raise TypeError(
-            f"The provider `{provider.obj}` is invalid because it is not a callable "
-            "object. Only callable providers are allowed. Please update the provider "
-            "to a callable object before attempting to register it."
-        )
-
-    def _validate_provider_match_scopes(self, provider: Provider) -> None:
-        """Validate that the provider and its dependencies have matching scopes.
-
-        Args:
-            provider: The provider to validate.
-
-        Raises:
-            ValueError: If the provider and its dependencies have mismatched scopes.
-            TypeError: If a dependency is missing an annotation.
-        """
+    def _validate_sub_providers(self, provider: Provider) -> None:
+        """Validate the sub-providers of a provider."""
 
         for parameter in provider.parameters:
-            if parameter.annotation is inspect.Parameter.empty:
+            annotation = parameter.annotation
+
+            if annotation is inspect.Parameter.empty:
                 raise TypeError(
                     f"Missing provider `{provider}` "
                     f"dependency `{parameter.name}` annotation."
                 )
 
             try:
-                sub_provider = self._get_or_register_provider(parameter.annotation)
+                sub_provider = self._get_or_register_provider(
+                    annotation, parent_scope=provider.scope
+                )
             except LookupError:
+                if provider.scope not in {"singleton", "transient"}:
+                    self._unresolved_interfaces.add(provider.interface)
+                    continue
                 raise ValueError(
-                    f"The provider `{get_full_qualname(provider.obj)}` depends on "
-                    f"`{parameter.name}` of type "
-                    f"`{get_full_qualname(parameter.annotation)}`, which "
-                    "has not been registered. To resolve this, ensure that "
+                    f"The provider `{provider}` depends on `{parameter.name}` of type "
+                    f"`{get_full_qualname(annotation)}`, which "
+                    "has not been registered or set. To resolve this, ensure that "
                     f"`{parameter.name}` is registered before attempting to use it."
                 ) from None
 
-            left_scope, right_scope = sub_provider.scope, provider.scope
-            allowed_scopes = ALLOWED_SCOPES.get(right_scope) or []
-
-            if left_scope not in allowed_scopes:
+            # Check scope compatibility
+            if sub_provider.scope not in ALLOWED_SCOPES.get(provider.scope, []):
                 raise ValueError(
-                    f"The provider `{provider}` with a {provider.scope} scope was "
-                    "attempted to be registered with the provider "
-                    f"`{sub_provider}` with a `{sub_provider.scope}` scope, "
-                    "which is not allowed. Please ensure that all providers are "
-                    "registered with matching scopes."
+                    f"The provider `{provider}` with a `{provider.scope}` scope cannot "
+                    f"depend on `{sub_provider}` with a `{sub_provider.scope}` scope. "
+                    "Please ensure all providers are registered with matching scopes."
                 )
 
-    def _detect_scope(self, obj: Callable[..., Any]) -> Scope | None:
-        """Detect the scope for a provider.
+    def _detect_scope(self, call: Callable[..., Any]) -> Scope | None:
+        """Detect the scope for a callable."""
+        scopes = set()
 
-        Args:
-            obj: The provider to detect the auto scope for.
-        Returns:
-            The auto scope, or None if the auto scope cannot be detected.
-        """
-        has_transient, has_request, has_singleton = False, False, False
-        for parameter in get_typed_parameters(obj):
+        for parameter in get_typed_parameters(call):
             sub_provider = self._get_or_register_provider(parameter.annotation)
-            if not has_transient and sub_provider.scope == "transient":
-                has_transient = True
-            if not has_request and sub_provider.scope == "request":
-                has_request = True
-            if not has_singleton and sub_provider.scope == "singleton":
-                has_singleton = True
-        if has_transient:
-            return "transient"
-        if has_request:
+            scope = sub_provider.scope
+
+            if scope == "transient":
+                return "transient"
+            scopes.add(scope)
+
+            # If all scopes are found, we can return based on priority order
+            if {"transient", "request", "singleton"}.issubset(scopes):
+                break
+
+        # Determine scope based on priority
+        if "request" in scopes:
             return "request"
-        if has_singleton:
+        if "singleton" in scopes:
             return "singleton"
+
         return None
 
     def register_module(
         self, module: Module | type[Module] | Callable[[Container], None] | str
     ) -> None:
-        """Register a module as a callable, module type, or module instance.
-
-        Args:
-            module: The module to register.
-        """
+        """Register a module as a callable, module type, or module instance."""
         self._modules.register(module)
 
     def __enter__(self) -> Self:
@@ -440,11 +274,7 @@ class Container:
 
     @contextlib.contextmanager
     def request_context(self) -> Iterator[RequestContext]:
-        """Obtain a context manager for the request-scoped context.
-
-        Returns:
-            A context manager for the request-scoped context.
-        """
+        """Obtain a context manager for the request-scoped context."""
         context = RequestContext(self)
         token = self._request_context_var.set(context)
         with context:
@@ -475,11 +305,7 @@ class Container:
 
     @contextlib.asynccontextmanager
     async def arequest_context(self) -> AsyncIterator[RequestContext]:
-        """Obtain an async context manager for the request-scoped context.
-
-        Returns:
-            An async context manager for the request-scoped context.
-        """
+        """Obtain an async context manager for the request-scoped context."""
         context = RequestContext(self)
         token = self._request_context_var.set(context)
         async with context:
@@ -487,14 +313,7 @@ class Container:
             self._request_context_var.reset(token)
 
     def _get_request_context(self) -> RequestContext:
-        """Get the current request context.
-
-        Returns:
-            RequestContext: The current request context.
-
-        Raises:
-            LookupError: If the request context has not been started.
-        """
+        """Get the current request context."""
         request_context = self._request_context_var.get()
         if request_context is None:
             raise LookupError(
@@ -521,23 +340,13 @@ class Container:
     def resolve(self, interface: T) -> T: ...
 
     def resolve(self, interface: Interface[T]) -> T:
-        """Resolve an instance by interface.
-
-        Args:
-            interface: The interface type.
-
-        Returns:
-            The instance of the interface.
-
-        Raises:
-            LookupError: If the provider for the interface is not registered.
-        """
+        """Resolve an instance by interface."""
         if interface in self._override_instances:
             return cast(T, self._override_instances[interface])
 
         provider = self._get_or_register_provider(interface)
         scoped_context = self._get_scoped_context(provider.scope)
-        return scoped_context.get(interface, provider)
+        return cast(T, scoped_context.get(provider))
 
     @overload
     async def aresolve(self, interface: Interface[T]) -> T: ...
@@ -546,33 +355,16 @@ class Container:
     async def aresolve(self, interface: T) -> T: ...
 
     async def aresolve(self, interface: Interface[T]) -> T:
-        """Resolve an instance by interface asynchronously.
-
-        Args:
-            interface: The interface type.
-
-        Returns:
-            The instance of the interface.
-
-        Raises:
-            LookupError: If the provider for the interface is not registered.
-        """
+        """Resolve an instance by interface asynchronously."""
         if interface in self._override_instances:
             return cast(T, self._override_instances[interface])
 
         provider = self._get_or_register_provider(interface)
         scoped_context = self._get_scoped_context(provider.scope)
-        return await scoped_context.aget(interface, provider)
+        return cast(T, await scoped_context.aget(provider))
 
     def is_resolved(self, interface: AnyInterface) -> bool:
-        """Check if an instance by interface exists.
-
-        Args:
-            interface: The interface type.
-
-        Returns:
-            True if the instance exists, otherwise False.
-        """
+        """Check if an instance by interface exists."""
         try:
             provider = self._get_provider(interface)
         except LookupError:
@@ -584,28 +376,14 @@ class Container:
         return False
 
     def release(self, interface: AnyInterface) -> None:
-        """Release an instance by interface.
-
-        Args:
-            interface: The interface type.
-
-        Raises:
-            LookupError: If the provider for the interface is not registered.
-        """
+        """Release an instance by interface."""
         provider = self._get_provider(interface)
         scoped_context = self._get_scoped_context(provider.scope)
         if isinstance(scoped_context, ResourceScopedContext):
             scoped_context.delete(interface)
 
     def _get_scoped_context(self, scope: Scope) -> ScopedContext:
-        """Get the scoped context based on the specified scope.
-
-        Args:
-            scope: The scope of the provider.
-
-        Returns:
-            The scoped context, or None if the scope is not applicable.
-        """
+        """Get the scoped context based on the specified scope."""
         if scope == "singleton":
             return self._singleton_context
         elif scope == "request":
@@ -615,17 +393,8 @@ class Container:
 
     @contextlib.contextmanager
     def override(self, interface: AnyInterface, instance: Any) -> Iterator[None]:
-        """Override the provider for the specified interface with a specific instance.
-
-        Args:
-            interface: The interface type to override.
-            instance: The instance to use as the override.
-
-        Yields:
-            None
-
-        Raises:
-            LookupError: If the provider for the interface is not registered.
+        """
+        Override the provider for the specified interface with a specific instance.
         """
         if not self.is_registered(interface) and self.strict:
             raise LookupError(
@@ -639,85 +408,41 @@ class Container:
     def provider(
         self, *, scope: Scope, override: bool = False
     ) -> Callable[[Callable[P, T]], Callable[P, T]]:
-        """Decorator to register a provider function with the specified scope.
+        """Decorator to register a provider function with the specified scope."""
 
-        Args:
-            scope : The scope of the provider.
-            override: Whether the provider should override an existing provider
-                for the same interface. Defaults to False.
-
-        Returns:
-            The decorator function.
-        """
-
-        def decorator(func: Callable[P, T]) -> Callable[P, T]:
-            interface = self._get_provider_annotation(func)
-            self.register(interface, func, scope=scope, override=override)
-            return func
+        def decorator(call: Callable[P, T]) -> Callable[P, T]:
+            provider = Provider(call=call, scope=scope)
+            self._register_provider(provider, override=override)
+            return call
 
         return decorator
 
     @overload
-    def inject(self, obj: Callable[P, T]) -> Callable[P, T]: ...
+    def inject(self, func: Callable[P, T]) -> Callable[P, T]: ...
 
     @overload
     def inject(self) -> Callable[[Callable[P, T]], Callable[P, T]]: ...
 
     def inject(
-        self, obj: Callable[P, T | Awaitable[T]] | None = None
+        self, func: Callable[P, T | Awaitable[T]] | None = None
     ) -> (
         Callable[[Callable[P, T | Awaitable[T]]], Callable[P, T | Awaitable[T]]]
         | Callable[P, T | Awaitable[T]]
     ):
-        """Decorator to inject dependencies into a callable.
-
-        Args:
-            obj: The callable object to be decorated. If None, returns
-                the decorator itself.
-
-        Returns:
-            The decorated callable object or decorator function.
-        """
+        """Decorator to inject dependencies into a callable."""
 
         def decorator(
-            obj: Callable[P, T | Awaitable[T]],
+            inner: Callable[P, T | Awaitable[T]],
         ) -> Callable[P, T | Awaitable[T]]:
-            injected_params = self._get_injected_params(obj)
+            return self._injector.inject(inner)
 
-            if inspect.iscoroutinefunction(obj):
-
-                @wraps(obj)
-                async def awrapped(*args: P.args, **kwargs: P.kwargs) -> T:
-                    for name, annotation in injected_params.items():
-                        kwargs[name] = await self.aresolve(annotation)
-                    return cast(T, await obj(*args, **kwargs))
-
-                return awrapped
-
-            @wraps(obj)
-            def wrapped(*args: P.args, **kwargs: P.kwargs) -> T:
-                for name, annotation in injected_params.items():
-                    kwargs[name] = self.resolve(annotation)
-                return cast(T, obj(*args, **kwargs))
-
-            return wrapped
-
-        if obj is None:
+        if func is None:
             return decorator
-        return decorator(obj)
+        return decorator(func)
 
-    def run(self, obj: Callable[P, T], /, *args: P.args, **kwargs: P.kwargs) -> T:
-        """Run the given function with injected dependencies.
-
-        Args:
-            obj: The callable object.
-            args: The positional arguments to pass to the object.
-            kwargs: The keyword arguments to pass to the object.
-
-        Returns:
-            The result of the callable object.
-        """
-        return self.inject(obj)(*args, **kwargs)
+    def run(self, func: Callable[P, T], /, *args: P.args, **kwargs: P.kwargs) -> T:
+        """Run the given function with injected dependencies."""
+        return cast(T, self._injector.inject(func)(*args, **kwargs))
 
     def scan(
         self,
@@ -726,139 +451,23 @@ class Container:
         *,
         tags: Iterable[str] | None = None,
     ) -> None:
-        """Scan packages or modules for decorated members and inject dependencies.
-
-        Args:
-            packages: A single package or module to scan,
-                or an iterable of packages or modules to scan.
-            tags: Optional list of tags to filter the scanned members. Only members
-                with at least one matching tag will be scanned. Defaults to None.
-        """
+        """Scan packages or modules for decorated members and inject dependencies."""
         self._scanner.scan(packages, tags=tags)
-
-    def _get_provider_annotation(self, obj: Callable[..., Any]) -> Any:
-        """Retrieve the provider return annotation from a callable object.
-
-        Args:
-            obj: The callable object (provider).
-
-        Returns:
-            The provider return annotation.
-
-        Raises:
-            TypeError: If the provider return annotation is missing or invalid.
-        """
-        annotation = get_typed_return_annotation(obj)
-
-        if annotation is None:
-            raise TypeError(
-                f"Missing `{get_full_qualname(obj)}` provider return annotation."
-            )
-
-        iterator_types = {Iterator, AsyncIterator}
-        origin = get_origin(annotation)
-
-        if annotation in iterator_types or origin in iterator_types:
-            args = get_args(annotation)
-            if args:
-                return args[0]
-            else:
-                raise TypeError(
-                    f"Cannot use `{get_full_qualname(obj)}` resource type annotation "
-                    "without actual type."
-                )
-
-        return annotation
-
-    def _get_injected_params(self, obj: Callable[..., Any]) -> dict[str, Any]:
-        """Get the injected parameters of a callable object.
-
-        Args:
-            obj: The callable object.
-
-        Returns:
-            A dictionary containing the names and annotations
-                of the injected parameters.
-        """
-        injected_params = {}
-        for parameter in get_typed_parameters(obj):
-            if not is_marker(parameter.default):
-                continue
-            try:
-                self._validate_injected_parameter(obj, parameter)
-            except LookupError as exc:
-                if not self.strict:
-                    logger.debug(
-                        f"Cannot validate the `{get_full_qualname(obj)}` parameter "
-                        f"`{parameter.name}` with an annotation of "
-                        f"`{get_full_qualname(parameter.annotation)} due to being "
-                        "in non-strict mode. It will be validated at the first call."
-                    )
-                else:
-                    raise exc
-            injected_params[parameter.name] = parameter.annotation
-        return injected_params
-
-    def _validate_injected_parameter(
-        self, obj: Callable[..., Any], parameter: inspect.Parameter
-    ) -> None:
-        """Validate an injected parameter.
-
-        Args:
-            obj: The callable object.
-            parameter: The parameter to validate.
-
-        Raises:
-            TypeError: If the parameter annotation is missing or an unknown dependency.
-        """
-        if parameter.annotation is inspect.Parameter.empty:
-            raise TypeError(
-                f"Missing `{get_full_qualname(obj)}` parameter "
-                f"`{parameter.name}` annotation."
-            )
-
-        if not self.is_registered(parameter.annotation):
-            raise LookupError(
-                f"`{get_full_qualname(obj)}` has an unknown dependency parameter "
-                f"`{parameter.name}` with an annotation of "
-                f"`{get_full_qualname(parameter.annotation)}`."
-            )
 
 
 def transient(target: T) -> T:
-    """Decorator for marking a class as transient scope.
-
-    Args:
-        target: The target class to be decorated.
-
-    Returns:
-        The decorated target class.
-    """
+    """Decorator for marking a class as transient scope."""
     setattr(target, "__scope__", "transient")
     return target
 
 
 def request(target: T) -> T:
-    """Decorator for marking a class as request scope.
-
-    Args:
-        target: The target class to be decorated.
-
-    Returns:
-        The decorated target class.
-    """
+    """Decorator for marking a class as request scope."""
     setattr(target, "__scope__", "request")
     return target
 
 
 def singleton(target: T) -> T:
-    """Decorator for marking a class as singleton scope.
-
-    Args:
-        target: The target class to be decorated.
-
-    Returns:
-        The decorated target class.
-    """
+    """Decorator for marking a class as singleton scope."""
     setattr(target, "__scope__", "singleton")
     return target
