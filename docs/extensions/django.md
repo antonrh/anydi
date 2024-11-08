@@ -155,7 +155,8 @@ def get_container() -> Container:
 
 ## Request Scope
 
-To utilize `request` scoped dependencies in your Django application with `AnyDI`, you should use the `request_scoped_middleware`. This middleware facilitates the creation of request-specific dependency instances. These instances are instantiated at the beginning of each request and are available throughout the lifetime of that request.
+To use `request`-scoped dependencies in your Django application with `AnyDI`, include the `request_scoped_middleware`.
+This middleware creates request-specific dependency instances at the start of each request, which remain available for the request’s duration.
 
 Add the middleware to your `settings.py`:
 
@@ -166,4 +167,6 @@ MIDDLEWARE = [
 ]
 ```
 
-With this setup, you can now define and use request-scoped dependencies in your application.
+With this setup, you can define and utilize `request`-scoped dependencies throughout your application.
+Additionally, `HttpRequest` dependencies are automatically available in request-scoped providers,
+allowing convenient access to the request object and its data in these dependencies.
