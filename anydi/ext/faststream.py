@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import logging
 from typing import Any, cast
 
 from fast_depends.dependencies import Depends
@@ -14,15 +13,9 @@ from anydi._utils import get_typed_parameters
 
 from ._utils import HasInterface, patch_call_parameter
 
-logger = logging.getLogger(__name__)
-
 
 def install(broker: BrokerUsecase[Any, Any], container: Container) -> None:
     """Install AnyDI into a FastStream broker.
-
-    Args:
-        broker: The broker.
-        container: The container.
 
     This function installs the AnyDI container into a FastStream broker by attaching
     it to the broker. It also patches the broker handlers to inject the required
