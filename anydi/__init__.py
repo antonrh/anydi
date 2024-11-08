@@ -8,12 +8,6 @@ from ._provider import Provider
 from ._scanner import injectable
 from ._types import Marker, Scope
 
-
-def dep() -> Any:
-    """A marker for dependency injection."""
-    return Marker()
-
-
 # Alias for dependency auto marker
 auto = cast(Any, Marker())
 
@@ -24,7 +18,6 @@ __all__ = [
     "Provider",
     "Scope",
     "auto",
-    "dep",
     "injectable",
     "provider",
     "request",

@@ -7,7 +7,7 @@ from typing import Annotated, Any, Union
 import pytest
 from typing_extensions import Self
 
-from anydi import Container, Provider, Scope, dep, request, singleton, transient
+from anydi import Container, Provider, Scope, auto, request, singleton, transient
 
 from tests.fixtures import Resource, Service
 
@@ -1080,8 +1080,8 @@ def test_run(container: Container) -> None:
 
     def sum_handler(
         value1: int,
-        value2: Annotated[int, "value1"] = dep(),
-        value3: Annotated[int, "value2"] = dep(),
+        value2: Annotated[int, "value1"] = auto,
+        value3: Annotated[int, "value2"] = auto,
     ) -> int:
         return value1 + value2 + value3
 
