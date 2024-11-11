@@ -86,7 +86,9 @@ class ScopedContext(abc.ABC):
         kwargs: dict[str, Any] = {}
 
         for parameter in provider.parameters:
-            if parameter.annotation in self._instances:
+            if parameter.annotation in self.container._override_instances:  # noqa
+                instance = self.container._override_instances[parameter.annotation]  # noqa
+            elif parameter.annotation in self._instances:
                 instance = self._instances[parameter.annotation]
             else:
                 instance = self._resolve_parameter(provider, parameter)
@@ -104,7 +106,9 @@ class ScopedContext(abc.ABC):
         kwargs: dict[str, Any] = {}
 
         for parameter in provider.parameters:
-            if parameter.annotation in self._instances:
+            if parameter.annotation in self.container._override_instances:  # noqa
+                instance = self.container._override_instances[parameter.annotation]  # noqa
+            elif parameter.annotation in self._instances:
                 instance = self._instances[parameter.annotation]
             else:
                 instance = await self._aresolve_parameter(provider, parameter)

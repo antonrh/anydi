@@ -41,7 +41,7 @@ class Provider:
     )
 
     def __init__(
-        self, *, call: Callable[..., Any], scope: Scope, interface: Any = _sentinel
+        self, call: Callable[..., Any], *, scope: Scope, interface: Any = _sentinel
     ) -> None:
         self._call = call
         self._call_module = getattr(call, "__module__", None)
