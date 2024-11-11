@@ -106,6 +106,12 @@ class Provider:
 
     def _validate_scope(self) -> None:
         """Validate the scope of the provider."""
+        if self.scope not in get_args(Scope):
+            raise ValueError(
+                "The scope provided is invalid. Only the following scopes are "
+                f"supported: {', '.join(get_args(Scope))}. Please use one of the "
+                "supported scopes when registering a provider."
+            )
         if self.is_resource and self.scope == "transient":
             raise TypeError(
                 f"The resource provider `{self}` is attempting to register "
