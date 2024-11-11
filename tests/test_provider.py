@@ -132,6 +132,16 @@ class TestProvider:
             "without actual type argument."
         )
 
+    def test_construct_unsupported_scope(self) -> None:
+        with pytest.raises(ValueError) as exc_info:
+            Provider(call=generator, scope="other")  # type: ignore[arg-type]
+
+        assert str(exc_info.value) == (
+            "The scope provided is invalid. Only the following scopes are supported: "
+            "transient, singleton, request. Please use one of the supported scopes "
+            "when registering a provider."
+        )
+
     def test_construct_transient_resource_not_allowed(self) -> None:
         with pytest.raises(TypeError) as exc_info:
             Provider(call=generator, scope="transient")
