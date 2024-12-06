@@ -4,7 +4,7 @@ import inspect
 import uuid
 from collections.abc import AsyncIterator, Iterator
 from enum import IntEnum
-from typing import Any, Callable
+from typing import Any, Callable, Union
 
 from typing_extensions import get_args, get_origin
 
@@ -38,6 +38,7 @@ class Provider:
         "_kind",
         "_interface",
         "_parameters",
+        "_aliases",
     )
 
     def __init__(
@@ -48,6 +49,7 @@ class Provider:
         self._call_globals = getattr(call, "__globals__", {})
         self._scope = scope
         self._qualname = get_full_qualname(call)
+        self._aliases: list[Any] = []
 
         # Detect the kind of callable provider
         self._detect_kind()
@@ -91,6 +93,10 @@ class Provider:
     @property
     def interface(self) -> Any:
         return self._interface
+
+    @property
+    def aliases(self) -> list[Any]:
+        return self._aliases
 
     @property
     def parameters(self) -> list[inspect.Parameter]:
@@ -146,9 +152,13 @@ class Provider:
         if interface is _sentinel:
             interface = self._resolve_interface(interface, signature)
 
-        # If the callable is an iterator, return the actual type
         iterator_types = {Iterator, AsyncIterator}
-        if interface in iterator_types or get_origin(interface) in iterator_types:
+
+        if (origin := get_origin(interface)) is Union:
+            interface, *aliases = get_args(interface)
+            self._aliases = aliases
+        elif interface in iterator_types or origin in iterator_types:
+            # If the callable is an iterator, return the actual type
             if args := get_args(interface):
                 interface = args[0]
                 # If the callable is a generator, return the resource type
