@@ -1,3 +1,4 @@
+import abc
 import sys
 import uuid
 from collections.abc import AsyncIterator, Iterator, Sequence
@@ -1012,6 +1013,99 @@ async def test_async_resource_delegated_exception(container: Container) -> None:
     assert resource.called
     assert not resource.committed
     assert resource.rolled_back
+
+
+def test_alias_string(container: Container) -> None:
+    container.register(
+        Annotated[str, "message"],
+        lambda: "test",
+        scope="singleton",
+    )
+
+    container.alias(Annotated[str, "message"], Annotated[str, "alias"])
+
+    assert container.resolve(Annotated[str, "message"]) == container.resolve(
+        Annotated[str, "alias"]
+    )
+
+
+def test_alias_already_registered(container: Container) -> None:
+    container.register(
+        Annotated[str, "message"],
+        lambda: "test",
+        scope="singleton",
+    )
+
+    container.alias(Annotated[str, "message"], Annotated[str, "alias"])
+
+    with pytest.raises(LookupError) as exc_info:
+        container.alias(Annotated[str, "message"], Annotated[str, "alias"])
+
+    assert str(exc_info.value) == (
+        "The interface `Annotated[str, str]` is already aliased."
+    )
+
+
+def test_alias_multiple_aliases(container: Container) -> None:
+    container.register(
+        Annotated[str, "message"],
+        lambda: "test",
+        scope="singleton",
+    )
+
+    container.alias(
+        Annotated[str, "message"],
+        Annotated[str, "alias1"] | Annotated[str, "alias2"] | Annotated[str, "alias3"],
+    )
+
+    assert (
+        container.resolve(Annotated[str, "message"])
+        == container.resolve(Annotated[str, "alias1"])
+        == container.resolve(Annotated[str, "alias2"])
+        == container.resolve(Annotated[str, "alias3"])
+    )
+
+
+def test_aliased_object(container: Container) -> None:
+    class Greeting:
+        def __init__(self, message: str) -> None:
+            self.message = message
+
+    class IGreeter(abc.ABC):
+        @abc.abstractmethod
+        def greet(self) -> Greeting:
+            pass
+
+    class GreeterService(IGreeter):
+        def __init__(self, greeting: Greeting) -> None:
+            self.greeting = greeting
+
+        def greet(self) -> Greeting:
+            return self.greeting
+
+    container.register(
+        GreeterService,
+        lambda: GreeterService(Greeting("test")),
+        scope="singleton",
+    )
+
+    container.alias(GreeterService, IGreeter)
+
+    assert container.resolve(GreeterService) is container.resolve(IGreeter)
+
+
+def test_alias_with_register(container: Container) -> None:
+    container.register(
+        Annotated[str, "message"] | Annotated[str, "alias1"] | Annotated[str, "alias2"],
+        lambda: "test",
+        scope="singleton",
+    )
+
+    assert (
+        container.resolve(Annotated[str, "message"])
+        == container.resolve(Annotated[str, "alias1"])
+        == container.resolve(Annotated[str, "alias2"])
+    )
 
 
 # Inspections

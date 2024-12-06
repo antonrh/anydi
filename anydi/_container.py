@@ -8,9 +8,9 @@ import types
 from collections import defaultdict
 from collections.abc import AsyncIterator, Awaitable, Iterable, Iterator, Sequence
 from contextvars import ContextVar
-from typing import Any, Callable, TypeVar, cast, overload
+from typing import Any, Callable, TypeVar, Union, cast, get_args, overload
 
-from typing_extensions import ParamSpec, Self, final, is_protocol
+from typing_extensions import ParamSpec, Self, final, get_origin, is_protocol
 
 from ._context import (
     RequestContext,
@@ -99,7 +99,10 @@ class Container:
     ) -> Provider:
         """Register a provider for the specified interface."""
         provider = Provider(call=call, scope=scope, interface=interface)
-        return self._register_provider(provider, override=override)
+        self._register_provider(provider, override=override)
+        for alias in provider.aliases:
+            self._alias(provider.interface, alias)
+        return provider
 
     def _register_provider(
         self, provider: Provider, *, override: bool = False
@@ -143,8 +146,16 @@ class Container:
 
     def alias(self, interface: AnyInterface, alias: AnyInterface) -> None:
         """Add an alias for the specified interface."""
+        if get_origin(alias) is Union:
+            for sub_alias in get_args(alias):
+                self._alias(interface, sub_alias)
+            return None
+        self._alias(interface, alias)
+
+    def _alias(self, interface: AnyInterface, alias: AnyInterface) -> None:
+        """Add an alias for the specified interface."""
         if alias in self._aliases:
-            raise ValueError(
+            raise LookupError(
                 f"The interface `{get_full_qualname(alias)}` is already aliased."
             )
         provider = self._get_or_register_provider(interface)
@@ -428,6 +439,8 @@ class Container:
         def decorator(call: Callable[P, T]) -> Callable[P, T]:
             provider = Provider(call=call, scope=scope)
             self._register_provider(provider, override=override)
+            for alias in provider.aliases:
+                self._alias(provider.interface, alias)
             return call
 
         return decorator
