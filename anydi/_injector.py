@@ -51,7 +51,11 @@ class Injector:
                 kwargs[name] = self.container.resolve(annotation)
             return cast(T, call(*args, **kwargs))
 
-        call.__inject_wrapper__ = wrapper  # type: ignore[attr-defined]
+        # check if the call is a method
+        if inspect.ismethod(call):
+            wrapper = wraps(call)(wrapper)
+        else:
+            call.__inject_wrapper__ = wrapper  # type: ignore[attr-defined]
 
         return wrapper
 
