@@ -3,6 +3,7 @@ import uuid
 from collections.abc import AsyncIterator, Iterator, Sequence
 from dataclasses import dataclass
 from typing import Annotated, Any, Union
+from unittest import mock
 
 import pytest
 from typing_extensions import Self
@@ -965,6 +966,33 @@ async def test_override_instance_async_resource_provider(container: Container) -
 
     with container.override(str, overridden):
         assert container.resolve(str) == overridden
+
+
+def test_override_instance_testing() -> None:
+    container = Container(strict=False, testing=True)
+    container.register(Annotated[str, "param"], lambda: "param", scope="singleton")
+
+    class UserRepo:
+        def get_user(self) -> str:
+            return "user"
+
+    @dataclass
+    class UserService:
+        __scope__ = "singleton"
+
+        repo: UserRepo
+        param: Annotated[str, "param"]
+
+        def get_user(self) -> str:
+            return self.repo.get_user()
+
+    user_repo_mock = mock.MagicMock(spec=UserRepo)
+    user_repo_mock.get_user.return_value = "mocked_user"
+
+    user_service = container.resolve(UserService)
+
+    with container.override(UserRepo, user_repo_mock):
+        assert user_service.get_user() == "mocked_user"
 
 
 def test_resource_delegated_exception(container: Container) -> None:

@@ -5,6 +5,7 @@ from __future__ import annotations
 import contextlib
 import inspect
 import types
+import warnings
 from collections import defaultdict
 from collections.abc import AsyncIterator, Awaitable, Iterable, Iterator, Sequence
 from contextvars import ContextVar
@@ -47,6 +48,7 @@ class Container:
         modules: Sequence[Module | type[Module] | Callable[[Container], None] | str]
         | None = None,
         strict: bool = False,
+        testing: bool = False,
     ) -> None:
         self._providers: dict[type[Any], Provider] = {}
         self._resource_cache: dict[Scope, list[type[Any]]] = defaultdict(list)
@@ -57,6 +59,7 @@ class Container:
         )
         self._override_instances: dict[type[Any], Any] = {}
         self._strict = strict
+        self._testing = testing
         self._unresolved_interfaces: set[type[Any]] = set()
 
         # Components
@@ -346,7 +349,39 @@ class Container:
 
         provider = self._get_or_register_provider(interface)
         scoped_context = self._get_scoped_context(provider.scope)
-        return cast(T, scoped_context.get(provider))
+        instance, created = scoped_context.get_or_create(provider)
+        if self._testing and created:
+            self._patch_for_testing(instance)
+        return cast(T, instance)
+
+    def _patch_for_testing(self, instance: Any) -> None:
+        """Patch the instance class for testing."""
+
+        def _resolver(_self: Any, name: str) -> Any:
+            # Skip magic or built-in attributes
+            if not name.startswith("__"):
+                try:
+                    # Get annotations from the constructor only once
+                    _init = object.__getattribute__(_self, "__init__")
+                    _annotations = {
+                        parameter.name: parameter.annotation
+                        for parameter in get_typed_parameters(_init)
+                        if parameter.annotation is not inspect.Parameter.empty
+                    }
+
+                    # If the name is in annotations, resolve it
+                    if name in _annotations:
+                        return self.resolve(_annotations[name])
+                except AttributeError:
+                    pass
+
+            # Default behavior for attributes not in annotations
+            return object.__getattribute__(_self, name)
+
+        # Only apply patch if the instance belongs to a user-defined class
+        if hasattr(instance, "__class__") and not is_builtin_type(instance.__class__):
+            # Replace the class-level __getattribute__ with the resolver
+            instance.__class__.__getattribute__ = _resolver
 
     @overload
     async def aresolve(self, interface: Interface[T]) -> T: ...
@@ -361,7 +396,10 @@ class Container:
 
         provider = self._get_or_register_provider(interface)
         scoped_context = self._get_scoped_context(provider.scope)
-        return cast(T, await scoped_context.aget(provider))
+        instance, created = await scoped_context.aget_or_create(provider)
+        if self._testing and created:
+            self._patch_for_testing(instance)
+        return cast(T, instance)
 
     def is_resolved(self, interface: AnyInterface) -> bool:
         """Check if an instance by interface exists."""
@@ -396,6 +434,15 @@ class Container:
         """
         Override the provider for the specified interface with a specific instance.
         """
+        if not self._testing:
+            warnings.warn(
+                (
+                    "The `override` method is intended for testing purposes only. "
+                    "Please set `testing=True` when creating the container."
+                ),
+                DeprecationWarning,
+                stacklevel=2,
+            )
         if not self.is_registered(interface) and self.strict:
             raise LookupError(
                 f"The provider interface `{get_full_qualname(interface)}` "
