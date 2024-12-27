@@ -363,11 +363,13 @@ class Container:
                 try:
                     # Get annotations from the constructor only once
                     _init = object.__getattribute__(_self, "__init__")
-                    _annotations = {
-                        parameter.name: parameter.annotation
-                        for parameter in get_typed_parameters(_init)
-                        if parameter.annotation is not inspect.Parameter.empty
-                    }
+                    if not hasattr(_self, "__cached_annotations__"):
+                        _self.__cached_annotations__ = {
+                            parameter.name: parameter.annotation
+                            for parameter in get_typed_parameters(_init)
+                            if parameter.annotation is not inspect.Parameter.empty
+                        }
+                    _annotations = _self.__cached_annotations__
 
                     # If the name is in annotations, resolve it
                     if name in _annotations:
