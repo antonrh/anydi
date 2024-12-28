@@ -364,22 +364,19 @@ class Container:
         def _resolver(_self: Any, name: str) -> Any:
             # Skip magic or built-in attributes
             if not name.startswith("__"):
-                try:
-                    # Get annotations from the constructor only once
-                    _init = object.__getattribute__(_self, "__init__")
-                    if not hasattr(_self, "__cached_annotations__"):
-                        _self.__cached_annotations__ = {
-                            parameter.name: parameter.annotation
-                            for parameter in get_typed_parameters(_init)
-                            if parameter.annotation is not inspect.Parameter.empty
-                        }
-                    _annotations = _self.__cached_annotations__
+                # Get annotations from the constructor only once
+                if not hasattr(_self, "__cached_annotations__"):
+                    constructor = object.__getattribute__(_self, "__init__")
+                    _self.__cached_annotations__ = {
+                        parameter.name: parameter.annotation
+                        for parameter in get_typed_parameters(constructor)
+                        if parameter.annotation is not inspect.Parameter.empty
+                    }
+                _annotations = _self.__cached_annotations__
 
-                    # If the name is in annotations, resolve it
-                    if name in _annotations:
-                        return self.resolve(_annotations[name])
-                except AttributeError:
-                    pass
+                # If the name is in annotations, resolve it
+                if name in _annotations:
+                    return self.resolve(_annotations[name])
 
             # Default behavior for attributes not in annotations
             return object.__getattribute__(_self, name)
