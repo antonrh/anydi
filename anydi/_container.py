@@ -209,6 +209,10 @@ class Container:
                     annotation, parent_scope=provider.scope
                 )
             except LookupError:
+                # Skip unresolved interfaces in non-strict mode
+                if not self.strict and parameter.default is not inspect.Parameter.empty:
+                    continue
+
                 if provider.scope not in {"singleton", "transient"}:
                     self._unresolved_interfaces.add(provider.interface)
                     continue
@@ -232,7 +236,12 @@ class Container:
         scopes = set()
 
         for parameter in get_typed_parameters(call):
-            sub_provider = self._get_or_register_provider(parameter.annotation)
+            try:
+                sub_provider = self._get_or_register_provider(parameter.annotation)
+            except LookupError:
+                if not self.strict and parameter.default is not inspect.Parameter.empty:
+                    continue
+                raise
             scope = sub_provider.scope
 
             if scope == "transient":

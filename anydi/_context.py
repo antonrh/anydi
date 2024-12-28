@@ -91,7 +91,12 @@ class ScopedContext(abc.ABC):
             elif parameter.annotation in self._instances:
                 instance = self._instances[parameter.annotation]
             else:
-                instance = self._resolve_parameter(provider, parameter)
+                try:
+                    instance = self._resolve_parameter(provider, parameter)
+                except LookupError:
+                    if parameter.default is inspect.Parameter.empty:
+                        raise
+                    instance = parameter.default
             if parameter.kind == parameter.POSITIONAL_ONLY:
                 args.append(instance)
             else:
@@ -111,7 +116,12 @@ class ScopedContext(abc.ABC):
             elif parameter.annotation in self._instances:
                 instance = self._instances[parameter.annotation]
             else:
-                instance = await self._aresolve_parameter(provider, parameter)
+                try:
+                    instance = await self._aresolve_parameter(provider, parameter)
+                except LookupError:
+                    if parameter.default is inspect.Parameter.empty:
+                        raise
+                    instance = parameter.default
             if parameter.kind == parameter.POSITIONAL_ONLY:
                 args.append(instance)
             else:

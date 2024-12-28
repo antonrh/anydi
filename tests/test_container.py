@@ -890,6 +890,22 @@ async def test_resolve_non_strict_with_as_async_context_manager(
     assert service.exited
 
 
+def test_resolve_non_strict_with_defaults(container: Container) -> None:
+    @dataclass
+    class Repo:
+        name: str = "repo"
+
+    class Service:
+        def __init__(self, repo: Repo, name: str = "service") -> None:
+            self.repo = repo
+            self.name = name
+
+    service = container.resolve(Service)
+
+    assert service.name == "service"
+    assert service.repo.name == "repo"
+
+
 def test_is_resolved(container: Container) -> None:
     assert not container.is_resolved(str)
 
