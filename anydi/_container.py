@@ -5,7 +5,6 @@ from __future__ import annotations
 import contextlib
 import inspect
 import types
-import warnings
 from collections import defaultdict
 from collections.abc import AsyncIterator, Awaitable, Iterable, Iterator, Sequence
 from contextvars import ContextVar
@@ -81,6 +80,11 @@ class Container:
     def strict(self) -> bool:
         """Check if strict mode is enabled."""
         return self._strict
+
+    @property
+    def testing(self) -> bool:
+        """Check if testing mode is enabled."""
+        return self._testing
 
     @property
     def providers(self) -> dict[type[Any], Provider]:
@@ -350,7 +354,7 @@ class Container:
         provider = self._get_or_register_provider(interface)
         scoped_context = self._get_scoped_context(provider.scope)
         instance, created = scoped_context.get_or_create(provider)
-        if self._testing and created:
+        if self.testing and created:
             self._patch_for_testing(instance)
         return cast(T, instance)
 
@@ -399,7 +403,7 @@ class Container:
         provider = self._get_or_register_provider(interface)
         scoped_context = self._get_scoped_context(provider.scope)
         instance, created = await scoped_context.aget_or_create(provider)
-        if self._testing and created:
+        if self.testing and created:
             self._patch_for_testing(instance)
         return cast(T, instance)
 
@@ -436,15 +440,6 @@ class Container:
         """
         Override the provider for the specified interface with a specific instance.
         """
-        if not self._testing:
-            warnings.warn(
-                (
-                    "The `override` method is intended for testing purposes only. "
-                    "Please set `testing=True` when creating the container."
-                ),
-                DeprecationWarning,
-                stacklevel=2,
-            )
         if not self.is_registered(interface) and self.strict:
             raise LookupError(
                 f"The provider interface `{get_full_qualname(interface)}` "
