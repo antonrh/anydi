@@ -983,16 +983,25 @@ def test_override_instance_testing() -> None:
         repo: UserRepo
         param: Annotated[str, "param"]
 
-        def get_user(self) -> str:
-            return self.repo.get_user()
+        def process(self) -> dict[str, str]:
+            return {
+                "user": self.repo.get_user(),
+                "param": self.param,
+            }
 
     user_repo_mock = mock.MagicMock(spec=UserRepo)
     user_repo_mock.get_user.return_value = "mocked_user"
 
     user_service = container.resolve(UserService)
 
-    with container.override(UserRepo, user_repo_mock):
-        assert user_service.get_user() == "mocked_user"
+    with (
+        container.override(UserRepo, user_repo_mock),
+        container.override(Annotated[str, "param"], "mock"),
+    ):
+        assert user_service.process() == {
+            "user": "mocked_user",
+            "param": "mock",
+        }
 
 
 def test_resource_delegated_exception(container: Container) -> None:
