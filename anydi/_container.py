@@ -362,7 +362,6 @@ class Container:
         """Patch the instance class for testing."""
 
         def _resolver(_self: Any, name: str) -> Any:
-            # Skip magic or built-in attributes
             if not name.startswith("__"):
                 # Get annotations from the constructor only once
                 if not hasattr(_self, "__cached_annotations__"):
@@ -374,16 +373,12 @@ class Container:
                     }
                 _annotations = _self.__cached_annotations__
 
-                # If the name is in annotations, resolve it
                 if name in _annotations:
                     return self.resolve(_annotations[name])
 
-            # Default behavior for attributes not in annotations
             return object.__getattribute__(_self, name)
 
-        # Only apply patch if the instance belongs to a user-defined class
         if hasattr(instance, "__class__") and not is_builtin_type(instance.__class__):
-            # Replace the class-level __getattribute__ with the resolver
             instance.__class__.__getattribute__ = _resolver
 
     @overload
