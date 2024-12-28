@@ -35,12 +35,12 @@ class ScopedContext(abc.ABC):
             self._instances[alias] = self._instances[interface]
 
     @abc.abstractmethod
-    def get(self, provider: Provider) -> Any:
-        """Get an instance of a dependency from the scoped context."""
+    def get_or_create(self, provider: Provider) -> tuple[Any, bool]:
+        """Get or create an instance of a dependency from the scoped context."""
 
     @abc.abstractmethod
-    async def aget(self, provider: Provider) -> Any:
-        """Get an async instance of a dependency from the scoped context."""
+    async def aget_or_create(self, provider: Provider) -> tuple[Any, bool]:
+        """Get or create an async instance of a dependency from the scoped context."""
 
     def _create_instance(self, provider: Provider) -> Any:
         """Create an instance using the provider."""
@@ -133,7 +133,7 @@ class ResourceScopedContext(ScopedContext):
         self._stack = contextlib.ExitStack()
         self._async_stack = contextlib.AsyncExitStack()
 
-    def get(self, provider: Provider) -> Any:
+    def get_or_create(self, provider: Provider) -> tuple[Any, bool]:
         """Get an instance of a dependency from the scoped context."""
         instance = self._instances.get(provider.interface)
         if instance is None:
@@ -148,9 +148,10 @@ class ResourceScopedContext(ScopedContext):
             else:
                 instance = self._create_instance(provider)
             self._instances[provider.interface] = instance
-        return instance
+            return instance, True
+        return instance, False
 
-    async def aget(self, provider: Provider) -> Any:
+    async def aget_or_create(self, provider: Provider) -> tuple[Any, bool]:
         """Get an async instance of a dependency from the scoped context."""
         instance = self._instances.get(provider.interface)
         if instance is None:
@@ -161,7 +162,8 @@ class ResourceScopedContext(ScopedContext):
             else:
                 instance = await self._acreate_instance(provider)
             self._instances[provider.interface] = instance
-        return instance
+            return instance, True
+        return instance, False
 
     def has(self, interface: AnyInterface) -> bool:
         """Check if the scoped context has an instance of the dependency."""
@@ -292,10 +294,12 @@ class TransientContext(ScopedContext):
 
     scope = "transient"
 
-    def get(self, provider: Provider) -> Any:
-        """Get an instance of a dependency from the transient context."""
-        return self._create_instance(provider)
+    def get_or_create(self, provider: Provider) -> tuple[Any, bool]:
+        """Get or create an instance of a dependency from the transient context."""
+        return self._create_instance(provider), True
 
-    async def aget(self, provider: Provider) -> Any:
-        """Get an async instance of a dependency from the transient context."""
-        return await self._acreate_instance(provider)
+    async def aget_or_create(self, provider: Provider) -> tuple[Any, bool]:
+        """
+        Get or create an async instance of a dependency from the transient context.
+        """
+        return await self._acreate_instance(provider), True
