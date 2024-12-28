@@ -906,6 +906,24 @@ def test_resolve_non_strict_with_defaults(container: Container) -> None:
     assert service.repo.name == "repo"
 
 
+async def test_resolve_non_strict_with_defaults_async_resolver(
+    container: Container,
+) -> None:
+    @dataclass
+    class Repo:
+        name: str = "repo"
+
+    class Service:
+        def __init__(self, repo: Repo, name: str = "service") -> None:
+            self.repo = repo
+            self.name = name
+
+    service = await container.aresolve(Service)
+
+    assert service.name == "service"
+    assert service.repo.name == "repo"
+
+
 def test_is_resolved(container: Container) -> None:
     assert not container.is_resolved(str)
 
@@ -1016,6 +1034,29 @@ def test_override_instance_testing() -> None:
     ):
         assert user_service.process() == {
             "user": "mocked_user",
+            "param": "mock",
+        }
+
+
+async def test_override_instance_testing_async_resolved() -> None:
+    container = Container(strict=False, testing=True)
+    container.register(Annotated[str, "param"], lambda: "param", scope="singleton")
+
+    @dataclass
+    class UserService:
+        __scope__ = "singleton"
+
+        param: Annotated[str, "param"]
+
+        def process(self) -> dict[str, str]:
+            return {
+                "param": self.param,
+            }
+
+    user_service = await container.aresolve(UserService)
+
+    with container.override(Annotated[str, "param"], "mock"):
+        assert user_service.process() == {
             "param": "mock",
         }
 

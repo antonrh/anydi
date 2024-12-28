@@ -114,6 +114,18 @@ class TestProvider:
             "<locals>.<lambda>` provider return annotation."
         )
 
+    def test_construct_provider_without_return_annotation(self) -> None:
+        def provide_message():  # type: ignore[no-untyped-def]
+            return "hello"
+
+        with pytest.raises(TypeError) as exc_info:
+            Provider(call=provide_message, scope="singleton")
+
+        assert str(exc_info.value) == (
+            "Missing `tests.test_provider.TestProvider.test_construct_provider_without_"
+            "return_annotation.<locals>.provide_message` provider return annotation."
+        )
+
     def test_construct_not_callable(self) -> None:
         with pytest.raises(TypeError) as exc_info:
             Provider(call="Test", scope="singleton")  # type: ignore[arg-type]

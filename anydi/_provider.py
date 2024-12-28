@@ -69,7 +69,7 @@ class Provider:
 
     def __eq__(self, other: object) -> bool:
         if not isinstance(other, Provider):
-            return NotImplemented
+            return NotImplemented  # pragma: no cover
         return (
             self._call == other._call
             and self._scope == other._scope

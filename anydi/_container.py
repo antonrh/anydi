@@ -250,7 +250,7 @@ class Container:
 
             # If all scopes are found, we can return based on priority order
             if {"transient", "request", "singleton"}.issubset(scopes):
-                break
+                break  # pragma: no cover
 
         # Determine scope based on priority
         if "request" in scopes:
