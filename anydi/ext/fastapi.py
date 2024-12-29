@@ -41,7 +41,7 @@ def install(app: FastAPI, container: Container) -> None:
             if not call:
                 continue  # pragma: no cover
             for parameter in get_typed_parameters(call):
-                patch_call_parameter(call, parameter, container)
+                patch_call_parameter(container, call, parameter)
 
 
 def get_container(request: Request) -> Container:

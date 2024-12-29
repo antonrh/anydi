@@ -3,12 +3,14 @@
 from __future__ import annotations
 
 import contextlib
+import functools
 import inspect
 import types
 from collections import defaultdict
-from collections.abc import AsyncIterator, Awaitable, Iterable, Iterator, Sequence
+from collections.abc import AsyncIterator, Iterable, Iterator, Sequence
 from contextvars import ContextVar
 from typing import Any, Callable, TypeVar, cast, overload
+from weakref import WeakKeyDictionary
 
 from typing_extensions import ParamSpec, Self, final
 
@@ -19,11 +21,11 @@ from ._context import (
     SingletonContext,
     TransientContext,
 )
-from ._injector import Injector
+from ._logger import logger
 from ._module import Module, ModuleRegistry
 from ._provider import Provider
 from ._scanner import Scanner
-from ._types import AnyInterface, Interface, Scope
+from ._types import AnyInterface, Interface, Scope, is_marker
 from ._utils import get_full_qualname, get_typed_parameters, is_builtin_type
 
 T = TypeVar("T", bound=Any)
@@ -60,9 +62,11 @@ class Container:
         self._strict = strict
         self._testing = testing
         self._unresolved_interfaces: set[type[Any]] = set()
+        self._inject_cache: WeakKeyDictionary[
+            Callable[..., Any], Callable[..., Any]
+        ] = WeakKeyDictionary()
 
         # Components
-        self._injector = Injector(self)
         self._modules = ModuleRegistry(self)
         self._scanner = Scanner(self)
 
@@ -469,25 +473,92 @@ class Container:
     def inject(self) -> Callable[[Callable[P, T]], Callable[P, T]]: ...
 
     def inject(
-        self, func: Callable[P, T | Awaitable[T]] | None = None
-    ) -> (
-        Callable[[Callable[P, T | Awaitable[T]]], Callable[P, T | Awaitable[T]]]
-        | Callable[P, T | Awaitable[T]]
-    ):
+        self, func: Callable[P, T] | None = None
+    ) -> Callable[[Callable[P, T]], Callable[P, T]] | Callable[P, T]:
         """Decorator to inject dependencies into a callable."""
 
         def decorator(
-            inner: Callable[P, T | Awaitable[T]],
-        ) -> Callable[P, T | Awaitable[T]]:
-            return self._injector.inject(inner)
+            call: Callable[P, T],
+        ) -> Callable[P, T]:
+            return self._inject(call)
 
         if func is None:
             return decorator
         return decorator(func)
 
+    def _inject(
+        self,
+        call: Callable[P, T],
+    ) -> Callable[P, T]:
+        """Inject dependencies into a callable."""
+        if call in self._inject_cache:
+            return cast(Callable[P, T], self._inject_cache[call])
+
+        injected_params = self._get_injected_params(call)
+
+        if inspect.iscoroutinefunction(call):
+
+            @functools.wraps(call)
+            async def awrapper(*args: P.args, **kwargs: P.kwargs) -> T:
+                for name, annotation in injected_params.items():
+                    kwargs[name] = await self.aresolve(annotation)
+                return cast(T, await call(*args, **kwargs))
+
+            self._inject_cache[call] = awrapper
+
+            return awrapper  # type: ignore[return-value]
+
+        @functools.wraps(call)
+        def wrapper(*args: P.args, **kwargs: P.kwargs) -> T:
+            for name, annotation in injected_params.items():
+                kwargs[name] = self.resolve(annotation)
+            return call(*args, **kwargs)
+
+        self._inject_cache[call] = wrapper
+
+        return wrapper
+
+    def _get_injected_params(self, call: Callable[..., Any]) -> dict[str, Any]:
+        """Get the injected parameters of a callable object."""
+        injected_params = {}
+        for parameter in get_typed_parameters(call):
+            if not is_marker(parameter.default):
+                continue
+            try:
+                self._validate_injected_parameter(call, parameter)
+            except LookupError as exc:
+                if not self.strict:
+                    logger.debug(
+                        f"Cannot validate the `{get_full_qualname(call)}` parameter "
+                        f"`{parameter.name}` with an annotation of "
+                        f"`{get_full_qualname(parameter.annotation)} due to being "
+                        "in non-strict mode. It will be validated at the first call."
+                    )
+                else:
+                    raise exc
+            injected_params[parameter.name] = parameter.annotation
+        return injected_params
+
+    def _validate_injected_parameter(
+        self, call: Callable[..., Any], parameter: inspect.Parameter
+    ) -> None:
+        """Validate an injected parameter."""
+        if parameter.annotation is inspect.Parameter.empty:
+            raise TypeError(
+                f"Missing `{get_full_qualname(call)}` parameter "
+                f"`{parameter.name}` annotation."
+            )
+
+        if not self.is_registered(parameter.annotation):
+            raise LookupError(
+                f"`{get_full_qualname(call)}` has an unknown dependency parameter "
+                f"`{parameter.name}` with an annotation of "
+                f"`{get_full_qualname(parameter.annotation)}`."
+            )
+
     def run(self, func: Callable[P, T], /, *args: P.args, **kwargs: P.kwargs) -> T:
         """Run the given function with injected dependencies."""
-        return cast(T, self._injector.inject(func)(*args, **kwargs))
+        return self._inject(func)(*args, **kwargs)
 
     def scan(
         self,

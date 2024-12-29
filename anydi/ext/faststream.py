@@ -26,7 +26,7 @@ def install(broker: BrokerUsecase[Any, Any], container: Container) -> None:
     for handler in _get_broken_handlers(broker):
         call = handler._original_call  # noqa
         for parameter in get_typed_parameters(call):
-            patch_call_parameter(call, parameter, container)
+            patch_call_parameter(container, call, parameter)
 
 
 def _get_broken_handlers(broker: BrokerUsecase[Any, Any]) -> list[Any]:
