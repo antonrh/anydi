@@ -61,7 +61,7 @@ def patch_annotated_parameter(parameter: inspect.Parameter) -> inspect.Parameter
 
 
 def patch_call_parameter(
-    call: Callable[..., Any], parameter: inspect.Parameter, container: Container
+    container: Container, call: Callable[..., Any], parameter: inspect.Parameter
 ) -> None:
     """Patch a parameter to inject dependencies using AnyDI."""
     parameter = patch_annotated_parameter(parameter)
@@ -78,6 +78,6 @@ def patch_call_parameter(
             "first call because it is running in non-strict mode."
         )
     else:
-        container._injector._validate_injected_parameter(call, parameter)  # noqa
+        container._validate_injected_parameter(call, parameter)  # noqa
 
     parameter.default.interface = parameter.annotation
