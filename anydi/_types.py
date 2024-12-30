@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import inspect
+from dataclasses import dataclass
 from typing import Annotated, Any, TypeVar, Union
 
 from typing_extensions import Literal, Self, TypeAlias
@@ -35,3 +36,8 @@ class Event:
 def is_event_type(obj: Any) -> bool:
     """Checks if an object is an event type."""
     return inspect.isclass(obj) and issubclass(obj, Event)
+
+
+@dataclass(frozen=True)
+class TestInterface:
+    interface: type[Any]

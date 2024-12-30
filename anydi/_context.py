@@ -9,7 +9,7 @@ from typing import TYPE_CHECKING, Any, Callable, ClassVar
 from typing_extensions import Self, final
 
 from ._provider import CallableKind, Provider
-from ._types import AnyInterface, Scope, is_event_type
+from ._types import AnyInterface, Scope, TestInterface, is_event_type
 from ._utils import get_full_qualname, run_async
 
 if TYPE_CHECKING:
@@ -44,12 +44,12 @@ class ScopedContext(abc.ABC):
                 f"The instance for the coroutine provider `{provider}` cannot be "
                 "created in synchronous mode."
             )
-        args, kwargs = self._get_provider_params(provider)
+        args, kwargs = self._get_provided_args(provider)
         return provider.call(*args, **kwargs)
 
     async def _acreate_instance(self, provider: Provider) -> Any:
         """Create an instance asynchronously using the provider."""
-        args, kwargs = await self._aget_provider_params(provider)
+        args, kwargs = await self._aget_provided_args(provider)
         if provider.kind == CallableKind.COROUTINE:
             return await provider.call(*args, **kwargs)
         return await run_async(provider.call, *args, **kwargs)
@@ -78,7 +78,7 @@ class ScopedContext(abc.ABC):
                 "or set in the scoped context."
             )
 
-    def _get_provider_params(
+    def _get_provided_args(
         self, provider: Provider
     ) -> tuple[list[Any], dict[str, Any]]:
         """Retrieve the arguments for a provider."""
@@ -97,13 +97,16 @@ class ScopedContext(abc.ABC):
                     if parameter.default is inspect.Parameter.empty:
                         raise
                     instance = parameter.default
+                else:
+                    if self.container.testing:
+                        instance = TestInterface(interface=parameter.annotation)
             if parameter.kind == parameter.POSITIONAL_ONLY:
                 args.append(instance)
             else:
                 kwargs[parameter.name] = instance
         return args, kwargs
 
-    async def _aget_provider_params(
+    async def _aget_provided_args(
         self, provider: Provider
     ) -> tuple[list[Any], dict[str, Any]]:
         """Asynchronously retrieve the arguments for a provider."""
@@ -122,6 +125,9 @@ class ScopedContext(abc.ABC):
                     if parameter.default is inspect.Parameter.empty:
                         raise
                     instance = parameter.default
+                else:
+                    if self.container.testing:
+                        instance = TestInterface(interface=parameter.annotation)
             if parameter.kind == parameter.POSITIONAL_ONLY:
                 args.append(instance)
             else:
@@ -184,7 +190,7 @@ class ResourceScopedContext(ScopedContext):
 
     def _create_resource(self, provider: Provider) -> Any:
         """Create a resource using the provider."""
-        args, kwargs = self._get_provider_params(provider)
+        args, kwargs = self._get_provided_args(provider)
         cm = contextlib.contextmanager(provider.call)(*args, **kwargs)
         return self._stack.enter_context(cm)
 
@@ -198,7 +204,7 @@ class ResourceScopedContext(ScopedContext):
 
     async def _acreate_resource(self, provider: Provider) -> Any:
         """Create a resource asynchronously using the provider."""
-        args, kwargs = await self._aget_provider_params(provider)
+        args, kwargs = await self._aget_provided_args(provider)
         cm = contextlib.asynccontextmanager(provider.call)(*args, **kwargs)
         return await self._async_stack.enter_async_context(cm)
 

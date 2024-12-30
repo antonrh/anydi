@@ -25,7 +25,7 @@ from ._logger import logger
 from ._module import Module, ModuleRegistry
 from ._provider import Provider
 from ._scanner import Scanner
-from ._types import AnyInterface, Interface, Scope, is_marker
+from ._types import AnyInterface, Interface, Scope, TestInterface, is_marker
 from ._utils import get_full_qualname, get_typed_parameters, is_builtin_type
 
 T = TypeVar("T", bound=Any)
@@ -368,28 +368,27 @@ class Container:
         scoped_context = self._get_scoped_context(provider.scope)
         instance, created = scoped_context.get_or_create(provider)
         if self.testing and created:
-            self._patch_for_testing(instance)
+            self._patch_test_resolver(instance)
         return cast(T, instance)
 
-    def _patch_for_testing(self, instance: Any) -> None:
-        """Patch the instance class for testing."""
+    def _patch_test_resolver(self, instance: Any) -> None:
+        """Patch the test resolver for the instance."""
 
-        def _resolver(_self: Any, name: str) -> Any:
-            if not name.startswith("__"):
-                # Get annotations from the constructor only once
-                if not hasattr(_self, "__cached_annotations__"):
-                    constructor = object.__getattribute__(_self, "__init__")
-                    _self.__cached_annotations__ = {
-                        parameter.name: parameter.annotation
-                        for parameter in get_typed_parameters(constructor)
-                        if parameter.annotation is not inspect.Parameter.empty
-                    }
-                _annotations = _self.__cached_annotations__
-
-                if name in _annotations:
-                    return self.resolve(_annotations[name])
-
-            return object.__getattribute__(_self, name)
+        def _resolver(_self: Any, _name: str) -> Any:
+            try:
+                test_interfaces = object.__getattribute__(_self, "__test_interfaces__")
+            except AttributeError:
+                test_interfaces = {
+                    name: value.interface
+                    for name, value in object.__getattribute__(
+                        _self, "__dict__"
+                    ).items()
+                    if isinstance(value, TestInterface)
+                }
+                object.__setattr__(_self, "__test_interfaces__", test_interfaces)
+            if _name in test_interfaces:
+                return self.resolve(test_interfaces[_name])
+            return object.__getattribute__(_self, _name)
 
         if hasattr(instance, "__class__") and not is_builtin_type(instance.__class__):
             instance.__class__.__getattribute__ = _resolver
@@ -409,7 +408,7 @@ class Container:
         scoped_context = self._get_scoped_context(provider.scope)
         instance, created = await scoped_context.aget_or_create(provider)
         if self.testing and created:
-            self._patch_for_testing(instance)
+            self._patch_test_resolver(instance)
         return cast(T, instance)
 
     def is_resolved(self, interface: AnyInterface) -> bool:
