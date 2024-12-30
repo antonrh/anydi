@@ -4,12 +4,12 @@ import abc
 import contextlib
 import inspect
 from types import TracebackType
-from typing import TYPE_CHECKING, Any, Callable, ClassVar, NamedTuple
+from typing import TYPE_CHECKING, Any, Callable, ClassVar
 
 from typing_extensions import Self, final
 
 from ._provider import CallableKind, Provider
-from ._types import AnyInterface, Scope, is_event_type
+from ._types import AnyInterface, Scope, TestInterface, is_event_type
 from ._utils import get_full_qualname, run_async
 
 if TYPE_CHECKING:
@@ -314,7 +314,3 @@ class TransientContext(ScopedContext):
         Get or create an async instance of a dependency from the transient context.
         """
         return await self._acreate_instance(provider), True
-
-
-class TestInterface(NamedTuple):
-    interface: type[Any]
