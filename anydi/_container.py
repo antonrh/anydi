@@ -19,6 +19,7 @@ from ._context import (
     ResourceScopedContext,
     ScopedContext,
     SingletonContext,
+    TestInterface,
     TransientContext,
 )
 from ._logger import logger
@@ -374,22 +375,23 @@ class Container:
     def _patch_for_testing(self, instance: Any) -> None:
         """Patch the instance class for testing."""
 
-        def _resolver(_self: Any, name: str) -> Any:
-            if not name.startswith("__"):
-                # Get annotations from the constructor only once
-                if not hasattr(_self, "__cached_annotations__"):
-                    constructor = object.__getattribute__(_self, "__init__")
-                    _self.__cached_annotations__ = {
-                        parameter.name: parameter.annotation
-                        for parameter in get_typed_parameters(constructor)
-                        if parameter.annotation is not inspect.Parameter.empty
-                    }
-                _annotations = _self.__cached_annotations__
+        def _resolver(_self: Any, _name: str) -> Any:
+            try:
+                test_interfaces = object.__getattribute__(_self, "__test_interfaces__")
+            except AttributeError:
+                test_interfaces = {
+                    name: value.interface
+                    for name, value in object.__getattribute__(
+                        _self, "__dict__"
+                    ).items()
+                    if isinstance(value, TestInterface)
+                }
+                object.__setattr__(_self, "__test_interfaces__", test_interfaces)
 
-                if name in _annotations:
-                    return self.resolve(_annotations[name])
+            if _name in test_interfaces:
+                return self.resolve(test_interfaces[_name])
 
-            return object.__getattribute__(_self, name)
+            return object.__getattribute__(_self, _name)
 
         if hasattr(instance, "__class__") and not is_builtin_type(instance.__class__):
             instance.__class__.__getattribute__ = _resolver

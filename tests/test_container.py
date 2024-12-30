@@ -1132,7 +1132,7 @@ def test_get_provider_arguments(container: Container) -> None:
 
     scoped_context = container._get_scoped_context("singleton")
 
-    args, kwargs = scoped_context._get_provider_params(provider)
+    args, kwargs = scoped_context._get_provided_args(provider)
 
     assert args == [10]
     assert kwargs == {"b": 1.0, "c": "test"}
@@ -1158,7 +1158,7 @@ async def test_async_get_provider_arguments(container: Container) -> None:
 
     scoped_context = container._get_scoped_context("singleton")
 
-    args, kwargs = await scoped_context._aget_provider_params(provider)
+    args, kwargs = await scoped_context._aget_provided_args(provider)
 
     assert args == [10]
     assert kwargs == {"b": 1.0, "c": "test"}
