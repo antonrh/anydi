@@ -105,8 +105,10 @@ def _anydi_inject(
 
         try:
             request.node.funcargs[argname] = container.resolve(interface)
-        except Exception:  # noqa
-            logger.warning(f"Failed to resolve dependency for argument '{argname}'.")
+        except Exception as exc:
+            logger.warning(
+                f"Failed to resolve dependency for argument '{argname}'.", exc_info=exc
+            )
             _anydi_unresolved.append(interface)
 
 
@@ -131,6 +133,8 @@ async def _anydi_ainject(
 
         try:
             request.node.funcargs[argname] = await container.aresolve(interface)
-        except Exception:  # noqa
-            logger.warning(f"Failed to resolve dependency for argument '{argname}'.")
+        except Exception as exc:
+            logger.warning(
+                f"Failed to resolve dependency for argument '{argname}'.", exc_info=exc
+            )
             _anydi_unresolved.append(interface)

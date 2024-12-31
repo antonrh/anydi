@@ -39,5 +39,11 @@ def is_event_type(obj: Any) -> bool:
 
 
 @dataclass(frozen=True)
-class TestInterface:
+class DependencyWrapper:
     interface: type[Any]
+    instance: Any
+
+    def __getattribute__(self, name: str) -> Any:
+        if name in {"interface", "instance"}:
+            return object.__getattribute__(self, name)
+        return getattr(self.instance, name)
