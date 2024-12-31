@@ -1062,6 +1062,26 @@ async def test_override_instance_testing_async_resolved() -> None:
         }
 
 
+def test_override_instance_testing_in_strict_mode() -> None:
+    container = Container(strict=True, testing=True)
+
+    @dataclass
+    class Settings:
+        name: str
+
+    @container.provider(scope="singleton")
+    def provide_settings() -> Settings:
+        return Settings(name="test")
+
+    @container.provider(scope="singleton")
+    def provide_service(settings: Settings) -> Service:
+        return Service(ident=settings.name)
+
+    service = container.resolve(Service)
+
+    assert service.ident == "test"
+
+
 def test_resource_delegated_exception(container: Container) -> None:
     resource = Resource()
 

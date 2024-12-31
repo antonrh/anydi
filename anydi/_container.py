@@ -25,7 +25,7 @@ from ._logger import logger
 from ._module import Module, ModuleRegistry
 from ._provider import Provider
 from ._scanner import Scanner
-from ._types import AnyInterface, Interface, Scope, TestInterface, is_marker
+from ._types import AnyInterface, DependencyWrapper, Interface, Scope, is_marker
 from ._utils import get_full_qualname, get_typed_parameters, is_builtin_type
 
 T = TypeVar("T", bound=Any)
@@ -371,28 +371,6 @@ class Container:
             self._patch_test_resolver(instance)
         return cast(T, instance)
 
-    def _patch_test_resolver(self, instance: Any) -> None:
-        """Patch the test resolver for the instance."""
-
-        def _resolver(_self: Any, _name: str) -> Any:
-            try:
-                test_interfaces = object.__getattribute__(_self, "__test_interfaces__")
-            except AttributeError:
-                test_interfaces = {
-                    name: value.interface
-                    for name, value in object.__getattribute__(
-                        _self, "__dict__"
-                    ).items()
-                    if isinstance(value, TestInterface)
-                }
-                object.__setattr__(_self, "__test_interfaces__", test_interfaces)
-            if _name in test_interfaces:
-                return self.resolve(test_interfaces[_name])
-            return object.__getattribute__(_self, _name)
-
-        if hasattr(instance, "__class__") and not is_builtin_type(instance.__class__):
-            instance.__class__.__getattribute__ = _resolver
-
     @overload
     async def aresolve(self, interface: Interface[T]) -> T: ...
 
@@ -410,6 +388,29 @@ class Container:
         if self.testing and created:
             self._patch_test_resolver(instance)
         return cast(T, instance)
+
+    def _patch_test_resolver(self, instance: Any) -> None:
+        """Patch the test resolver for the instance."""
+        if not hasattr(instance, "__dict__"):
+            return
+
+        wrapped = {
+            name: value.interface
+            for name, value in instance.__dict__.items()
+            if isinstance(value, DependencyWrapper)
+        }
+
+        # Custom resolver function
+        def _resolver(_self: Any, _name: str) -> Any:
+            if _name in wrapped:
+                # Resolve the dependency if it's wrapped
+                return self.resolve(wrapped[_name])
+            # Fall back to default behavior
+            return object.__getattribute__(_self, _name)
+
+        # Apply the patched resolver if wrapped attributes exist
+        if wrapped:
+            instance.__class__.__getattribute__ = _resolver
 
     def is_resolved(self, interface: AnyInterface) -> bool:
         """Check if an instance by interface exists."""

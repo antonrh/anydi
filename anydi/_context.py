@@ -9,7 +9,7 @@ from typing import TYPE_CHECKING, Any, Callable, ClassVar
 from typing_extensions import Self, final
 
 from ._provider import CallableKind, Provider
-from ._types import AnyInterface, Scope, TestInterface, is_event_type
+from ._types import AnyInterface, DependencyWrapper, Scope, is_event_type
 from ._utils import get_full_qualname, run_async
 
 if TYPE_CHECKING:
@@ -99,7 +99,9 @@ class ScopedContext(abc.ABC):
                     instance = parameter.default
                 else:
                     if self.container.testing:
-                        instance = TestInterface(interface=parameter.annotation)
+                        instance = DependencyWrapper(
+                            interface=parameter.annotation, instance=instance
+                        )
             if parameter.kind == parameter.POSITIONAL_ONLY:
                 args.append(instance)
             else:
@@ -127,7 +129,9 @@ class ScopedContext(abc.ABC):
                     instance = parameter.default
                 else:
                     if self.container.testing:
-                        instance = TestInterface(interface=parameter.annotation)
+                        instance = DependencyWrapper(
+                            interface=parameter.annotation, instance=instance
+                        )
             if parameter.kind == parameter.POSITIONAL_ONLY:
                 args.append(instance)
             else:
