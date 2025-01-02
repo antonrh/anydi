@@ -1,16 +1,14 @@
 import contextlib
 from types import TracebackType
-from typing import Any, Callable
+from typing import Any
 
 from typing_extensions import Self
 
 from ._utils import run_async
 
 
-
-
-class ScopedContext:
-    """ScopedContext base class."""
+class InstanceContext:
+    """A context to store instances."""
 
     __slots__ = ("_instances", "_stack", "_async_stack")
 
@@ -82,30 +80,3 @@ class ScopedContext:
     async def aclose(self) -> None:
         """Close the scoped context asynchronously."""
         await self.__aexit__(None, None, None)
-
-
-class ScopedRegistry:
-    def __init__(self):
-        self._scope_funcs = {}
-        self._contexts = {}
-
-    def register(self, scope: str, scope_func: Callable[[], str]) -> None:
-        self._scope_funcs[scope] = scope_func
-
-    def _get_ident(self, scope: str) -> str:
-        scope_func = self._scope_funcs.get(scope)
-        if scope_func is None:
-            raise KeyError(f"Scope {scope} is not registered.")
-        return f"{scope}_{scope_func()}"
-
-    def get_context(self, scope: str) -> ScopedContext:
-        ident = self._get_ident(scope)
-        if ident not in self._contexts:
-            self._contexts[ident] = ScopedContext()
-        return self._contexts[ident]
-
-    def close(self, scope: str) -> None:
-        ident = self._get_ident(scope)
-        if ident in self._contexts:
-            self._contexts[ident].close()
-            del self._contexts[ident]
