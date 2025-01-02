@@ -24,6 +24,8 @@ class ScopedContext(abc.ABC):
     def __init__(self, container: Container) -> None:
         self.container = container
         self._instances: dict[Any, Any] = {}
+        self._stack = contextlib.ExitStack()
+        self._async_stack = contextlib.AsyncExitStack()
 
     def set(self, interface: AnyInterface, instance: Any) -> None:
         """Set an instance of a dependency in the scoped context."""
@@ -149,12 +151,6 @@ class ScopedContext(abc.ABC):
 
 class ResourceScopedContext(ScopedContext):
     """ScopedContext with closable resources support."""
-
-    def __init__(self, container: Container) -> None:
-        """Initialize the ScopedContext."""
-        super().__init__(container)
-        self._stack = contextlib.ExitStack()
-        self._async_stack = contextlib.AsyncExitStack()
 
     def get_or_create(self, provider: Provider) -> tuple[Any, bool]:
         """Get an instance of a dependency from the scoped context."""
