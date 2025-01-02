@@ -1148,7 +1148,7 @@ def test_get_provider_arguments(container: Container) -> None:
 
     provider = container.register(Service, service, scope="singleton")
 
-    context = container._get_scope_context("singleton")
+    context = container._get_scoped_context("singleton")
 
     args, kwargs = container._get_provided_args(provider, context=context)
 
@@ -1174,7 +1174,7 @@ async def test_async_get_provider_arguments(container: Container) -> None:
 
     provider = container.register(Service, service, scope="singleton")
 
-    context = container._get_scope_context("singleton")
+    context = container._get_scoped_context("singleton")
 
     args, kwargs = await container._aget_provided_args(provider, context=context)
 
