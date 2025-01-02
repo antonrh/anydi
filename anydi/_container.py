@@ -20,7 +20,13 @@ from ._module import Module, ModuleRegistry
 from ._provider import CallableKind, Provider
 from ._scanner import Scanner
 from ._types import AnyInterface, DependencyWrapper, Interface, Scope, is_marker
-from ._utils import get_full_qualname, get_typed_parameters, is_builtin_type, run_async
+from ._utils import (
+    get_full_qualname,
+    get_typed_parameters,
+    is_async_context_manager,
+    is_builtin_type,
+    run_async,
+)
 
 T = TypeVar("T", bound=Any)
 P = ParamSpec("P")
@@ -393,7 +399,7 @@ class Container:
         stack: contextlib.ExitStack | None = None,
     ) -> Any:
         """Create an instance using the provider."""
-        if provider.kind in {CallableKind.COROUTINE, CallableKind.ASYNC_GENERATOR}:
+        if provider.is_async:
             raise TypeError(
                 f"The instance for the provider `{provider}` cannot be created in "
                 "synchronous mode."
@@ -403,14 +409,14 @@ class Container:
 
         args, kwargs = self._get_provided_args(provider, instances=instances)
 
-        if provider.kind == CallableKind.GENERATOR:
+        if provider.is_generator:
             if stack is None:
                 raise ValueError("The stack is required for generator providers.")
             cm = contextlib.contextmanager(provider.call)(*args, **kwargs)
             return stack.enter_context(cm)
 
         instance = provider.call(*args, **kwargs)
-        if isinstance(instance, contextlib.AbstractContextManager):
+        if hasattr(instance, "__enter__") and hasattr(instance, "__exit__"):
             if stack is None:
                 raise ValueError("The stack is required for context manager providers.")
             stack.enter_context(instance)
@@ -430,7 +436,7 @@ class Container:
 
         if provider.kind == CallableKind.COROUTINE:
             instance = await provider.call(*args, **kwargs)
-            if isinstance(instance, contextlib.AbstractAsyncContextManager):
+            if is_async_context_manager(instance):
                 if async_stack is None:
                     raise ValueError(
                         "The async stack is required for "
@@ -458,7 +464,7 @@ class Container:
             return await run_async(_create)
 
         instance = await run_async(provider.call, *args, **kwargs)
-        if isinstance(instance, contextlib.AbstractAsyncContextManager):
+        if is_async_context_manager(instance):
             if async_stack is None:
                 raise ValueError(
                     "The async stack is required for async context manager providers."

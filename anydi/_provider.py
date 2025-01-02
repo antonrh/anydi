@@ -38,6 +38,9 @@ class Provider:
         "_kind",
         "_interface",
         "_parameters",
+        "_is_async",
+        "_is_generator",
+        "_is_resource",
     )
 
     def __init__(
@@ -51,6 +54,23 @@ class Provider:
 
         # Detect the kind of callable provider
         self._detect_kind()
+
+        # Check if the provider is async
+        self._is_async = self._kind in {
+            CallableKind.COROUTINE,
+            CallableKind.ASYNC_GENERATOR,
+        }
+
+        # Check if the provider is a generator
+        self._is_generator = self._kind in {
+            CallableKind.GENERATOR,
+        }
+
+        # Check if the provider is a resource
+        self._is_resource = self._kind in {
+            CallableKind.GENERATOR,
+            CallableKind.ASYNC_GENERATOR,
+        }
 
         # Validate the scope of the provider
         self._validate_scope()
@@ -97,12 +117,19 @@ class Provider:
         return self._parameters
 
     @property
+    def is_async(self) -> bool:
+        """Check if the provider is an async callable."""
+        return self._is_async
+
+    @property
+    def is_generator(self) -> bool:
+        """Check if the provider is a generator."""
+        return self._is_generator
+
+    @property
     def is_resource(self) -> bool:
         """Check if the provider is a resource."""
-        return self._kind in {
-            CallableKind.GENERATOR,
-            CallableKind.ASYNC_GENERATOR,
-        }
+        return self._is_resource
 
     def _validate_scope(self) -> None:
         """Validate the scope of the provider."""
