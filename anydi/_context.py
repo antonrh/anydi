@@ -4,13 +4,13 @@ import abc
 import contextlib
 import inspect
 from types import TracebackType
-from typing import TYPE_CHECKING, Any, Callable, ClassVar
+from typing import TYPE_CHECKING, Any, ClassVar
 
 from typing_extensions import Self, final
 
 from ._provider import CallableKind, Provider
 from ._types import AnyInterface, DependencyWrapper, Scope, is_event_type
-from ._utils import get_full_qualname, run_async
+from ._utils import run_async
 
 if TYPE_CHECKING:
     from ._container import Container
@@ -104,30 +104,6 @@ class ScopedContext(abc.ABC):
             await self._async_stack.enter_async_context(instance)
         return instance
 
-    def _resolve_parameter(
-        self, provider: Provider, parameter: inspect.Parameter
-    ) -> Any:
-        self._validate_resolvable_parameter(parameter, call=provider.call)
-        return self.container.resolve(parameter.annotation)
-
-    async def _aresolve_parameter(
-        self, provider: Provider, parameter: inspect.Parameter
-    ) -> Any:
-        self._validate_resolvable_parameter(parameter, call=provider.call)
-        return await self.container.aresolve(parameter.annotation)
-
-    def _validate_resolvable_parameter(
-        self, parameter: inspect.Parameter, call: Callable[..., Any]
-    ) -> None:
-        """Ensure that the specified interface is resolved."""
-        if parameter.annotation in self.container._unresolved_interfaces:  # noqa
-            raise LookupError(
-                f"You are attempting to get the parameter `{parameter.name}` with the "
-                f"annotation `{get_full_qualname(parameter.annotation)}` as a "
-                f"dependency into `{get_full_qualname(call)}` which is not registered "
-                "or set in the scoped context."
-            )
-
     def _get_provided_args(
         self, provider: Provider
     ) -> tuple[list[Any], dict[str, Any]]:
@@ -142,7 +118,7 @@ class ScopedContext(abc.ABC):
                 instance = self._instances[parameter.annotation]
             else:
                 try:
-                    instance = self._resolve_parameter(provider, parameter)
+                    instance = self.container._resolve_parameter(provider, parameter)
                 except LookupError:
                     if parameter.default is inspect.Parameter.empty:
                         raise
@@ -172,7 +148,9 @@ class ScopedContext(abc.ABC):
                 instance = self._instances[parameter.annotation]
             else:
                 try:
-                    instance = await self._aresolve_parameter(provider, parameter)
+                    instance = await self.container._aresolve_parameter(
+                        provider, parameter
+                    )
                 except LookupError:
                     if parameter.default is inspect.Parameter.empty:
                         raise

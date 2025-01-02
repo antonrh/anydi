@@ -31,7 +31,12 @@ class Service:
 
 @container.provider(scope="transient")
 def provide_repo() -> Iterator[Repo]:
-    yield Repo(items=[Item(name="item1"), Item(name="item2")])
+    return Repo(items=[
+        Item(name="item1"),
+        Item(name="item2"),
+        Item(name="item3"),
+        Item(name="item4"),
+    ])
 
 
 @container.inject
