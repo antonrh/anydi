@@ -146,7 +146,7 @@ class Container:
 
         # Cleanup instance context
         try:
-            context = self._get_instance_context(provider.scope)
+            context = self._get_scope_context(provider.scope)
         except LookupError:
             pass
         else:
@@ -369,7 +369,7 @@ class Container:
         """Reset resolved instances."""
         for interface, provider in self._providers.items():
             try:
-                context = self._get_instance_context(provider.scope)
+                context = self._get_scope_context(provider.scope)
             except LookupError:
                 continue
             del context[interface]
@@ -389,7 +389,7 @@ class Container:
         if provider.scope == "transient":
             instance, created = self._create_instance(provider), True
         else:
-            context = self._get_instance_context(provider.scope)
+            context = self._get_scope_context(provider.scope)
             instance, created = self._get_or_create_instance(provider, context=context)
         if self.testing and created:
             self._patch_test_resolver(instance)
@@ -410,7 +410,7 @@ class Container:
         if provider.scope == "transient":
             instance, created = await self._acreate_instance(provider), True
         else:
-            context = self._get_instance_context(provider.scope)
+            context = self._get_scope_context(provider.scope)
             instance, created = await self._aget_or_create_instance(
                 provider, context=context
             )
@@ -631,7 +631,7 @@ class Container:
         except LookupError:
             pass
         else:
-            context = self._get_instance_context(provider.scope)
+            context = self._get_scope_context(provider.scope)
             return interface in context
         return False
 
@@ -640,10 +640,10 @@ class Container:
         provider = self._get_provider(interface)
         if provider.scope == "transient":
             return None
-        context = self._get_instance_context(provider.scope)
+        context = self._get_scope_context(provider.scope)
         del context[interface]
 
-    def _get_instance_context(self, scope: Scope) -> InstanceContext:
+    def _get_scope_context(self, scope: Scope) -> InstanceContext:
         """Get the instance context for the specified scope."""
         if scope == "singleton":
             return self._singleton_context
