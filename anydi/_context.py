@@ -21,8 +21,9 @@ class ScopedContext(abc.ABC):
 
     scope: ClassVar[Scope]
 
-    def __init__(self, container: Container) -> None:
+    def __init__(self, container: Container, start_events_only: bool = False) -> None:
         self.container = container
+        self._start_events_only = start_events_only
         self._instances: dict[Any, Any] = {}
         self._stack = contextlib.ExitStack()
         self._async_stack = contextlib.AsyncExitStack()
@@ -39,13 +40,37 @@ class ScopedContext(abc.ABC):
         """Delete a dependency instance from the scoped context."""
         self._instances.pop(interface, None)
 
-    @abc.abstractmethod
     def get_or_create(self, provider: Provider) -> tuple[Any, bool]:
-        """Get or create an instance of a dependency from the scoped context."""
+        """Get an instance of a dependency from the scoped context."""
+        instance = self._instances.get(provider.interface)
+        if instance is None:
+            if provider.kind == CallableKind.GENERATOR:
+                instance = self._create_resource(provider)
+            elif provider.kind == CallableKind.ASYNC_GENERATOR:
+                raise TypeError(
+                    f"The provider `{provider}` cannot be started in synchronous mode "
+                    "because it is an asynchronous provider. Please start the provider "
+                    "in asynchronous mode before using it."
+                )
+            else:
+                instance = self._create_instance(provider)
+            self._instances[provider.interface] = instance
+            return instance, True
+        return instance, False
 
-    @abc.abstractmethod
     async def aget_or_create(self, provider: Provider) -> tuple[Any, bool]:
-        """Get or create an async instance of a dependency from the scoped context."""
+        """Get an async instance of a dependency from the scoped context."""
+        instance = self._instances.get(provider.interface)
+        if instance is None:
+            if provider.kind == CallableKind.GENERATOR:
+                instance = await run_async(self._create_resource, provider)
+            elif provider.kind == CallableKind.ASYNC_GENERATOR:
+                instance = await self._acreate_resource(provider)
+            else:
+                instance = await self._acreate_instance(provider)
+            self._instances[provider.interface] = instance
+            return instance, True
+        return instance, False
 
     def _create_instance(self, provider: Provider) -> Any:
         """Create an instance using the provider."""
@@ -55,14 +80,33 @@ class ScopedContext(abc.ABC):
                 "created in synchronous mode."
             )
         args, kwargs = self._get_provided_args(provider)
-        return provider.call(*args, **kwargs)
+
+        instance = provider.call(*args, **kwargs)
+        if isinstance(instance, contextlib.AbstractContextManager):
+            self._stack.enter_context(instance)
+        return instance
+
+    def _create_resource(self, provider: Provider) -> Any:
+        """Create a resource using the provider."""
+        args, kwargs = self._get_provided_args(provider)
+        cm = contextlib.contextmanager(provider.call)(*args, **kwargs)
+        return self._stack.enter_context(cm)
 
     async def _acreate_instance(self, provider: Provider) -> Any:
         """Create an instance asynchronously using the provider."""
         args, kwargs = await self._aget_provided_args(provider)
         if provider.kind == CallableKind.COROUTINE:
             return await provider.call(*args, **kwargs)
-        return await run_async(provider.call, *args, **kwargs)
+        instance = await run_async(provider.call, *args, **kwargs)
+        if isinstance(instance, contextlib.AbstractAsyncContextManager):
+            await self._async_stack.enter_async_context(instance)
+        return instance
+
+    async def _acreate_resource(self, provider: Provider) -> Any:
+        """Create a resource asynchronously using the provider."""
+        args, kwargs = await self._aget_provided_args(provider)
+        cm = contextlib.asynccontextmanager(provider.call)(*args, **kwargs)
+        return await self._async_stack.enter_async_context(cm)
 
     def _resolve_parameter(
         self, provider: Provider, parameter: inspect.Parameter
@@ -148,70 +192,6 @@ class ScopedContext(abc.ABC):
                 kwargs[parameter.name] = instance
         return args, kwargs
 
-
-class ResourceScopedContext(ScopedContext):
-    """ScopedContext with closable resources support."""
-
-    def get_or_create(self, provider: Provider) -> tuple[Any, bool]:
-        """Get an instance of a dependency from the scoped context."""
-        instance = self._instances.get(provider.interface)
-        if instance is None:
-            if provider.kind == CallableKind.GENERATOR:
-                instance = self._create_resource(provider)
-            elif provider.kind == CallableKind.ASYNC_GENERATOR:
-                raise TypeError(
-                    f"The provider `{provider}` cannot be started in synchronous mode "
-                    "because it is an asynchronous provider. Please start the provider "
-                    "in asynchronous mode before using it."
-                )
-            else:
-                instance = self._create_instance(provider)
-            self._instances[provider.interface] = instance
-            return instance, True
-        return instance, False
-
-    async def aget_or_create(self, provider: Provider) -> tuple[Any, bool]:
-        """Get an async instance of a dependency from the scoped context."""
-        instance = self._instances.get(provider.interface)
-        if instance is None:
-            if provider.kind == CallableKind.GENERATOR:
-                instance = await run_async(self._create_resource, provider)
-            elif provider.kind == CallableKind.ASYNC_GENERATOR:
-                instance = await self._acreate_resource(provider)
-            else:
-                instance = await self._acreate_instance(provider)
-            self._instances[provider.interface] = instance
-            return instance, True
-        return instance, False
-
-    def _create_instance(self, provider: Provider) -> Any:
-        """Create an instance using the provider."""
-        instance = super()._create_instance(provider)
-        # Enter the context manager if the instance is closable.
-        if isinstance(instance, contextlib.AbstractContextManager):
-            self._stack.enter_context(instance)
-        return instance
-
-    def _create_resource(self, provider: Provider) -> Any:
-        """Create a resource using the provider."""
-        args, kwargs = self._get_provided_args(provider)
-        cm = contextlib.contextmanager(provider.call)(*args, **kwargs)
-        return self._stack.enter_context(cm)
-
-    async def _acreate_instance(self, provider: Provider) -> Any:
-        """Create an instance asynchronously using the provider."""
-        instance = await super()._acreate_instance(provider)
-        # Enter the context manager if the instance is closable.
-        if isinstance(instance, contextlib.AbstractAsyncContextManager):
-            await self._async_stack.enter_async_context(instance)
-        return instance
-
-    async def _acreate_resource(self, provider: Provider) -> Any:
-        """Create a resource asynchronously using the provider."""
-        args, kwargs = await self._aget_provided_args(provider)
-        cm = contextlib.asynccontextmanager(provider.call)(*args, **kwargs)
-        return await self._async_stack.enter_async_context(cm)
-
     def __enter__(self) -> Self:
         """Enter the context."""
         self.start()
@@ -226,10 +206,11 @@ class ResourceScopedContext(ScopedContext):
         """Exit the context."""
         return self._stack.__exit__(exc_type, exc_val, exc_tb)  # type: ignore[return-value]
 
-    @abc.abstractmethod
     def start(self) -> None:
         """Start the scoped context."""
         for interface in self.container._resource_cache.get(self.scope, []):  # noqa
+            if self._start_events_only and not is_event_type(interface):
+                continue
             self.container.resolve(interface)
 
     def close(self) -> None:
@@ -252,9 +233,12 @@ class ResourceScopedContext(ScopedContext):
             self.__exit__, exc_type, exc_val, exc_tb
         ) or await self._async_stack.__aexit__(exc_type, exc_val, exc_tb)
 
-    @abc.abstractmethod
     async def astart(self) -> None:
         """Start the scoped context asynchronously."""
+        for interface in self.container._resource_cache.get(self.scope, []):  # noqa
+            if self._start_events_only and not is_event_type(interface):
+                continue
+            await self.container.aresolve(interface)
 
     async def aclose(self) -> None:
         """Close the scoped context asynchronously."""
@@ -262,41 +246,17 @@ class ResourceScopedContext(ScopedContext):
 
 
 @final
-class SingletonContext(ResourceScopedContext):
+class SingletonContext(ScopedContext):
     """A scoped context representing the "singleton" scope."""
 
     scope = "singleton"
 
-    def start(self) -> None:
-        """Start the scoped context."""
-        for interface in self.container._resource_cache.get(self.scope, []):  # noqa
-            self.container.resolve(interface)
-
-    async def astart(self) -> None:
-        """Start the scoped context asynchronously."""
-        for interface in self.container._resource_cache.get(self.scope, []):  # noqa
-            await self.container.aresolve(interface)
-
 
 @final
-class RequestContext(ResourceScopedContext):
+class RequestContext(ScopedContext):
     """A scoped context representing the "request" scope."""
 
     scope = "request"
-
-    def start(self) -> None:
-        """Start the scoped context."""
-        for interface in self.container._resource_cache.get(self.scope, []):  # noqa
-            if not is_event_type(interface):
-                continue
-            self.container.resolve(interface)
-
-    async def astart(self) -> None:
-        """Start the scoped context asynchronously."""
-        for interface in self.container._resource_cache.get(self.scope, []):  # noqa
-            if not is_event_type(interface):
-                continue
-            await self.container.aresolve(interface)
 
 
 @final

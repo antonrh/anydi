@@ -293,7 +293,7 @@ class Container:
     @contextlib.contextmanager
     def request_context(self) -> Iterator[RequestContext]:
         """Obtain a context manager for the request-scoped context."""
-        context = RequestContext(self)
+        context = RequestContext(self, start_events_only=True)
         token = self._request_context_var.set(context)
         with context:
             yield context
@@ -324,7 +324,7 @@ class Container:
     @contextlib.asynccontextmanager
     async def arequest_context(self) -> AsyncIterator[RequestContext]:
         """Obtain an async context manager for the request-scoped context."""
-        context = RequestContext(self)
+        context = RequestContext(self, start_events_only=True)
         token = self._request_context_var.set(context)
         async with context:
             yield context
