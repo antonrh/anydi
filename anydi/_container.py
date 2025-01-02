@@ -14,18 +14,13 @@ from weakref import WeakKeyDictionary
 
 from typing_extensions import ParamSpec, Self, final
 
-from ._context import (
-    RequestContext,
-    ScopedContext,
-    SingletonContext,
-    TransientContext,
-)
+from ._context import ScopedContext
 from ._logger import logger
 from ._module import Module, ModuleRegistry
-from ._provider import Provider
+from ._provider import CallableKind, Provider
 from ._scanner import Scanner
 from ._types import AnyInterface, DependencyWrapper, Interface, Scope, is_marker
-from ._utils import get_full_qualname, get_typed_parameters, is_builtin_type
+from ._utils import get_full_qualname, get_typed_parameters, is_builtin_type, run_async
 
 T = TypeVar("T", bound=Any)
 P = ParamSpec("P")
@@ -51,10 +46,9 @@ class Container:
         testing: bool = False,
     ) -> None:
         self._providers: dict[type[Any], Provider] = {}
-        self._resource_cache: dict[Scope, list[type[Any]]] = defaultdict(list)
-        self._singleton_context = SingletonContext(self)
-        self._transient_context = TransientContext(self)
-        self._request_context_var: ContextVar[RequestContext | None] = ContextVar(
+        self._resource_cache: dict[str, list[type[Any]]] = defaultdict(list)
+        self._singleton_context = ScopedContext(self, scope="singleton")
+        self._request_context_var: ContextVar[ScopedContext | None] = ContextVar(
             "request_context", default=None
         )
         self._override_instances: dict[type[Any], Any] = {}
@@ -291,9 +285,9 @@ class Container:
         self._singleton_context.close()
 
     @contextlib.contextmanager
-    def request_context(self) -> Iterator[RequestContext]:
+    def request_context(self) -> Iterator[ScopedContext]:
         """Obtain a context manager for the request-scoped context."""
-        context = RequestContext(self, start_events_only=True)
+        context = ScopedContext(self, scope="request", start_events_only=True)
         token = self._request_context_var.set(context)
         with context:
             yield context
@@ -322,15 +316,15 @@ class Container:
         await self._singleton_context.aclose()
 
     @contextlib.asynccontextmanager
-    async def arequest_context(self) -> AsyncIterator[RequestContext]:
+    async def arequest_context(self) -> AsyncIterator[ScopedContext]:
         """Obtain an async context manager for the request-scoped context."""
-        context = RequestContext(self, start_events_only=True)
+        context = ScopedContext(self, scope="request", start_events_only=True)
         token = self._request_context_var.set(context)
         async with context:
             yield context
             self._request_context_var.reset(token)
 
-    def _get_request_context(self) -> RequestContext:
+    def _get_request_context(self) -> ScopedContext:
         """Get the current request context."""
         request_context = self._request_context_var.get()
         if request_context is None:
@@ -362,8 +356,11 @@ class Container:
             return cast(T, self._override_instances[interface])
 
         provider = self._get_or_register_provider(interface)
-        scoped_context = self._get_scoped_context(provider.scope)
-        instance, created = scoped_context.get_or_create(provider)
+        if provider.scope == "transient":
+            instance, created = self._create_instance(provider), True
+        else:
+            scoped_context = self._get_scoped_context(provider.scope)
+            instance, created = scoped_context.get_or_create(provider)
         if self.testing and created:
             self._patch_test_resolver(instance)
         return cast(T, instance)
@@ -380,11 +377,156 @@ class Container:
             return cast(T, self._override_instances[interface])
 
         provider = self._get_or_register_provider(interface)
-        scoped_context = self._get_scoped_context(provider.scope)
-        instance, created = await scoped_context.aget_or_create(provider)
+        if provider.scope == "transient":
+            instance, created = await self._acreate_instance(provider), True
+        else:
+            scoped_context = self._get_scoped_context(provider.scope)
+            instance, created = await scoped_context.aget_or_create(provider)
         if self.testing and created:
             self._patch_test_resolver(instance)
         return cast(T, instance)
+
+    def _create_instance(
+        self,
+        provider: Provider,
+        instances: dict[type[Any], Any] | None = None,
+        stack: contextlib.ExitStack | None = None,
+    ) -> Any:
+        """Create an instance using the provider."""
+        if provider.kind in {CallableKind.COROUTINE, CallableKind.ASYNC_GENERATOR}:
+            raise TypeError(
+                f"The instance for the provider `{provider}` cannot be created in "
+                "synchronous mode."
+            )
+
+        instances = instances or {}
+
+        args, kwargs = self._get_provided_args(provider, instances=instances)
+
+        if provider.kind == CallableKind.GENERATOR:
+            if stack is None:
+                raise ValueError("The stack is required for generator providers.")
+            cm = contextlib.contextmanager(provider.call)(*args, **kwargs)
+            return stack.enter_context(cm)
+
+        instance = provider.call(*args, **kwargs)
+        if isinstance(instance, contextlib.AbstractContextManager):
+            if stack is None:
+                raise ValueError("The stack is required for context manager providers.")
+            stack.enter_context(instance)
+        return instance
+
+    async def _acreate_instance(  # noqa: C901
+        self,
+        provider: Provider,
+        instances: dict[type[Any], Any] | None = None,
+        stack: contextlib.ExitStack | None = None,
+        async_stack: contextlib.AsyncExitStack | None = None,
+    ) -> Any:
+        """Create an instance asynchronously using the provider."""
+        instances = instances or {}
+
+        args, kwargs = await self._aget_provided_args(provider, instances=instances)
+
+        if provider.kind == CallableKind.COROUTINE:
+            instance = await provider.call(*args, **kwargs)
+            if isinstance(instance, contextlib.AbstractAsyncContextManager):
+                if async_stack is None:
+                    raise ValueError(
+                        "The async stack is required for "
+                        "async context manager providers."
+                    )
+                await async_stack.enter_async_context(instance)
+            return instance
+
+        elif provider.kind == CallableKind.ASYNC_GENERATOR:
+            if async_stack is None:
+                raise ValueError(
+                    "The async stack is required for async generator providers."
+                )
+            cm = contextlib.asynccontextmanager(provider.call)(*args, **kwargs)
+            return await async_stack.enter_async_context(cm)
+
+        elif provider.kind == CallableKind.GENERATOR:
+
+            def _create() -> Any:
+                if stack is None:
+                    raise ValueError("The stack is required for generator providers.")
+                cm = contextlib.contextmanager(provider.call)(*args, **kwargs)
+                return stack.enter_context(cm)
+
+            return await run_async(_create)
+
+        instance = await run_async(provider.call, *args, **kwargs)
+        if isinstance(instance, contextlib.AbstractAsyncContextManager):
+            if async_stack is None:
+                raise ValueError(
+                    "The async stack is required for async context manager providers."
+                )
+            await async_stack.enter_async_context(instance)
+        return instance
+
+    def _get_provided_args(
+        self, provider: Provider, instances: dict[type[Any], Any]
+    ) -> tuple[list[Any], dict[str, Any]]:
+        """Retrieve the arguments for a provider."""
+        args: list[Any] = []
+        kwargs: dict[str, Any] = {}
+
+        for parameter in provider.parameters:
+            if parameter.annotation in self._override_instances:
+                instance = self._override_instances[parameter.annotation]
+            elif parameter.annotation in instances:
+                instance = instances[parameter.annotation]
+            else:
+                try:
+                    instance = self._resolve_parameter(provider, parameter)
+                except LookupError:
+                    if parameter.default is inspect.Parameter.empty:
+                        raise
+                    instance = parameter.default
+                else:
+                    if self.testing:
+                        instance = DependencyWrapper(
+                            interface=parameter.annotation, instance=instance
+                        )
+            if parameter.kind == parameter.POSITIONAL_ONLY:
+                args.append(instance)
+            else:
+                kwargs[parameter.name] = instance
+        return args, kwargs
+
+    async def _aget_provided_args(
+        self,
+        provider: Provider,
+        instances: dict[type[Any], Any],
+    ) -> tuple[list[Any], dict[str, Any]]:
+        """Asynchronously retrieve the arguments for a provider."""
+        args: list[Any] = []
+        kwargs: dict[str, Any] = {}
+
+        for parameter in provider.parameters:
+            if parameter.annotation in self._override_instances:
+                instance = self._override_instances[parameter.annotation]
+            elif parameter.annotation in instances:
+                instance = instances[parameter.annotation]
+            else:
+                try:
+                    instance = await self._aresolve_parameter(provider, parameter)
+                except LookupError:
+                    if parameter.default is inspect.Parameter.empty:
+                        raise
+                    instance = parameter.default
+                else:
+                    if self.testing:
+                        instance = DependencyWrapper(
+                            interface=parameter.annotation, instance=instance
+                        )
+            if parameter.kind == parameter.POSITIONAL_ONLY:
+                args.append(instance)
+            else:
+                kwargs[parameter.name] = instance
+        return args, kwargs
 
     def _resolve_parameter(
         self, provider: Provider, parameter: inspect.Parameter
@@ -447,6 +589,8 @@ class Container:
     def release(self, interface: AnyInterface) -> None:
         """Release an instance by interface."""
         provider = self._get_provider(interface)
+        if provider.scope == "transient":
+            return None
         scoped_context = self._get_scoped_context(provider.scope)
         scoped_context.delete(interface)
 
@@ -457,7 +601,7 @@ class Container:
         elif scope == "request":
             request_context = self._get_request_context()
             return request_context
-        return self._transient_context
+        raise LookupError(f"Unknown scope `{scope}`.")
 
     @contextlib.contextmanager
     def override(self, interface: AnyInterface, instance: Any) -> Iterator[None]:
