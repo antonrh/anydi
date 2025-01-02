@@ -44,69 +44,65 @@ class ScopedContext(abc.ABC):
         """Get an instance of a dependency from the scoped context."""
         instance = self._instances.get(provider.interface)
         if instance is None:
-            if provider.kind == CallableKind.GENERATOR:
-                instance = self._create_resource(provider)
-            elif provider.kind == CallableKind.ASYNC_GENERATOR:
-                raise TypeError(
-                    f"The provider `{provider}` cannot be started in synchronous mode "
-                    "because it is an asynchronous provider. Please start the provider "
-                    "in asynchronous mode before using it."
-                )
-            else:
-                instance = self._create_instance(provider)
-            self._instances[provider.interface] = instance
-            return instance, True
-        return instance, False
-
-    async def aget_or_create(self, provider: Provider) -> tuple[Any, bool]:
-        """Get an async instance of a dependency from the scoped context."""
-        instance = self._instances.get(provider.interface)
-        if instance is None:
-            if provider.kind == CallableKind.GENERATOR:
-                instance = await run_async(self._create_resource, provider)
-            elif provider.kind == CallableKind.ASYNC_GENERATOR:
-                instance = await self._acreate_resource(provider)
-            else:
-                instance = await self._acreate_instance(provider)
+            instance = self._create_instance(provider)
             self._instances[provider.interface] = instance
             return instance, True
         return instance, False
 
     def _create_instance(self, provider: Provider) -> Any:
         """Create an instance using the provider."""
-        if provider.kind == CallableKind.COROUTINE:
+        if provider.kind in {CallableKind.COROUTINE, CallableKind.ASYNC_GENERATOR}:
             raise TypeError(
-                f"The instance for the coroutine provider `{provider}` cannot be "
-                "created in synchronous mode."
+                f"The instance for the provider `{provider}` cannot be created in "
+                "synchronous mode."
             )
+
         args, kwargs = self._get_provided_args(provider)
+
+        if provider.kind == CallableKind.GENERATOR:
+            cm = contextlib.contextmanager(provider.call)(*args, **kwargs)
+            return self._stack.enter_context(cm)
 
         instance = provider.call(*args, **kwargs)
         if isinstance(instance, contextlib.AbstractContextManager):
             self._stack.enter_context(instance)
         return instance
 
-    def _create_resource(self, provider: Provider) -> Any:
-        """Create a resource using the provider."""
-        args, kwargs = self._get_provided_args(provider)
-        cm = contextlib.contextmanager(provider.call)(*args, **kwargs)
-        return self._stack.enter_context(cm)
+    async def aget_or_create(self, provider: Provider) -> tuple[Any, bool]:
+        """Get an async instance of a dependency from the scoped context."""
+        instance = self._instances.get(provider.interface)
+        if instance is None:
+            instance = await self._acreate_instance(provider)
+            self._instances[provider.interface] = instance
+            return instance, True
+        return instance, False
 
     async def _acreate_instance(self, provider: Provider) -> Any:
         """Create an instance asynchronously using the provider."""
         args, kwargs = await self._aget_provided_args(provider)
+
         if provider.kind == CallableKind.COROUTINE:
-            return await provider.call(*args, **kwargs)
+            instance = await provider.call(*args, **kwargs)
+            if isinstance(instance, contextlib.AbstractAsyncContextManager):
+                await self._async_stack.enter_async_context(instance)
+            return instance
+
+        elif provider.kind == CallableKind.ASYNC_GENERATOR:
+            cm = contextlib.asynccontextmanager(provider.call)(*args, **kwargs)
+            return await self._async_stack.enter_async_context(cm)
+
+        elif provider.kind == CallableKind.GENERATOR:
+
+            def _create() -> Any:
+                cm = contextlib.contextmanager(provider.call)(*args, **kwargs)
+                return self._stack.enter_context(cm)
+
+            return await run_async(_create)
+
         instance = await run_async(provider.call, *args, **kwargs)
         if isinstance(instance, contextlib.AbstractAsyncContextManager):
             await self._async_stack.enter_async_context(instance)
         return instance
-
-    async def _acreate_resource(self, provider: Provider) -> Any:
-        """Create a resource asynchronously using the provider."""
-        args, kwargs = await self._aget_provided_args(provider)
-        cm = contextlib.asynccontextmanager(provider.call)(*args, **kwargs)
-        return await self._async_stack.enter_async_context(cm)
 
     def _resolve_parameter(
         self, provider: Provider, parameter: inspect.Parameter

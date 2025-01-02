@@ -1,5 +1,6 @@
 import time
 from dataclasses import dataclass
+from typing import Iterator
 
 from anydi import Container, auto
 
@@ -29,8 +30,8 @@ class Service:
 
 
 @container.provider(scope="transient")
-def provide_repo() -> Repo:
-    return Repo(items=[Item(name="item1"), Item(name="item2")])
+def provide_repo() -> Iterator[Repo]:
+    yield Repo(items=[Item(name="item1"), Item(name="item2")])
 
 
 @container.inject
@@ -46,4 +47,5 @@ for _ in range(100000):
 print(time.time() - start)
 
 
-# Time is 0.3882 seconds
+# Iter #1: Time is 0.3882 seconds
+# Iter #2: Time is 0.4832 seconds

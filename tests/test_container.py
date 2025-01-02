@@ -504,10 +504,9 @@ def test_resolve_singleton_scoped_started_with_async_resource_provider(
         container.start()
 
     assert str(exc_info.value) == (
-        "The provider `tests.test_container.test_resolve_singleton_scoped_started_with_"
-        "async_resource_provider.<locals>.provide` cannot be started in synchronous "
-        "mode because it is an asynchronous provider. Please start the provider "
-        "in asynchronous mode before using it."
+        "The instance for the provider `tests.test_container.test_resolve_singleton_"
+        "scoped_started_with_async_resource_provider.<locals>.provide` "
+        "cannot be created in synchronous mode."
     )
 
 
@@ -568,10 +567,9 @@ async def test_resolved_singleton_async_resource_not_started(
         container.resolve(str)
 
     assert str(exc_info.value) == (
-        "The provider `tests.test_container"
+        "The instance for the provider `tests.test_container"
         ".test_resolved_singleton_async_resource_not_started.<locals>.provide` "
-        "cannot be started in synchronous mode because it is an asynchronous provider. "
-        "Please start the provider in asynchronous mode before using it."
+        "cannot be created in synchronous mode."
     )
 
 
@@ -701,7 +699,7 @@ def test_sync_resolve_transient_async_provider(container: Container) -> None:
         container.resolve(uuid.UUID)
 
     assert str(exc_info.value) == (
-        "The instance for the coroutine provider "
+        "The instance for the provider "
         "`tests.test_container.test_sync_resolve_transient_async_provider"
         ".<locals>.get_uuid` cannot be created in synchronous mode."
     )
