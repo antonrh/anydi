@@ -6,7 +6,6 @@ from typing import TYPE_CHECKING, Any
 
 from typing_extensions import Self
 
-from ._provider import Provider
 from ._types import AnyInterface, is_event_type
 from ._utils import run_async
 
@@ -38,31 +37,6 @@ class ScopedContext:
     def delete(self, interface: AnyInterface) -> None:
         """Delete a dependency instance from the scoped context."""
         self._instances.pop(interface, None)
-
-    def get_or_create(self, provider: Provider) -> tuple[Any, bool]:
-        """Get an instance of a dependency from the scoped context."""
-        instance = self._instances.get(provider.interface)
-        if instance is None:
-            instance = self.container._create_instance(
-                provider, instances=self._instances, stack=self._stack
-            )
-            self._instances[provider.interface] = instance
-            return instance, True
-        return instance, False
-
-    async def aget_or_create(self, provider: Provider) -> tuple[Any, bool]:
-        """Get an async instance of a dependency from the scoped context."""
-        instance = self._instances.get(provider.interface)
-        if instance is None:
-            instance = await self.container._acreate_instance(
-                provider,
-                instances=self._instances,
-                stack=self._stack,
-                async_stack=self._async_stack,
-            )
-            self._instances[provider.interface] = instance
-            return instance, True
-        return instance, False
 
     def __enter__(self) -> Self:
         """Enter the context."""

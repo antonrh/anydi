@@ -366,10 +366,29 @@ class Container:
             instance, created = self._create_instance(provider), True
         else:
             scoped_context = self._get_scoped_context(provider.scope)
-            instance, created = scoped_context.get_or_create(provider)
+            instance, created = self.get_or_create(
+                provider, scoped_context=scoped_context
+            )
         if self.testing and created:
             self._patch_test_resolver(instance)
         return cast(T, instance)
+
+    def get_or_create(
+        self,
+        provider: Provider,
+        scoped_context: ScopedContext,
+    ) -> tuple[Any, bool]:
+        """Get an instance of a dependency from the scoped context."""
+        instance = scoped_context._instances.get(provider.interface)
+        if instance is None:
+            instance = self._create_instance(
+                provider,
+                instances=scoped_context._instances,
+                stack=scoped_context._stack,
+            )
+            scoped_context._instances[provider.interface] = instance
+            return instance, True
+        return instance, False
 
     @overload
     async def aresolve(self, interface: Interface[T]) -> T: ...
@@ -387,10 +406,28 @@ class Container:
             instance, created = await self._acreate_instance(provider), True
         else:
             scoped_context = self._get_scoped_context(provider.scope)
-            instance, created = await scoped_context.aget_or_create(provider)
+            instance, created = await self.aget_or_create(
+                provider, scoped_context=scoped_context
+            )
         if self.testing and created:
             self._patch_test_resolver(instance)
         return cast(T, instance)
+
+    async def aget_or_create(
+        self, provider: Provider, scoped_context: ScopedContext
+    ) -> tuple[Any, bool]:
+        """Get an async instance of a dependency from the scoped context."""
+        instance = scoped_context._instances.get(provider.interface)
+        if instance is None:
+            instance = await self._acreate_instance(
+                provider,
+                instances=scoped_context._instances,
+                stack=scoped_context._stack,
+                async_stack=scoped_context._async_stack,
+            )
+            scoped_context._instances[provider.interface] = instance
+            return instance, True
+        return instance, False
 
     def _create_instance(
         self,
