@@ -22,7 +22,6 @@ from ._scanner import Scanner
 from ._types import (
     AnyInterface,
     DependencyWrapper,
-    Interface,
     Scope,
     is_event_type,
     is_marker,
@@ -376,12 +375,12 @@ class Container:
             del context[interface]
 
     @overload
-    def resolve(self, interface: Interface[T]) -> T: ...
+    def resolve(self, interface: type[T]) -> T: ...
 
     @overload
     def resolve(self, interface: T) -> T: ...
 
-    def resolve(self, interface: Interface[T]) -> T:
+    def resolve(self, interface: type[T]) -> T:
         """Resolve an instance by interface."""
         if interface in self._override_instances:
             return cast(T, self._override_instances[interface])
@@ -390,30 +389,19 @@ class Container:
         if provider.scope == "transient":
             instance, created = self._create_instance(provider), True
         else:
-            scoped_context = self._get_scoped_context(provider.scope)
-            instance, created = self.get_or_create(provider, context=scoped_context)
+            context = self._get_scoped_context(provider.scope)
+            instance, created = self._get_or_create_instance(provider, context=context)
         if self.testing and created:
             self._patch_test_resolver(instance)
         return cast(T, instance)
 
-    def get_or_create(
-        self, provider: Provider, context: ScopedContext
-    ) -> tuple[Any, bool]:
-        """Get an instance of a dependency from the scoped context."""
-        instance = context.get(provider.interface)
-        if instance is None:
-            instance = self._create_instance(provider, context=context)
-            context[provider.interface] = instance
-            return instance, True
-        return instance, False
-
     @overload
-    async def aresolve(self, interface: Interface[T]) -> T: ...
+    async def aresolve(self, interface: type[T]) -> T: ...
 
     @overload
     async def aresolve(self, interface: T) -> T: ...
 
-    async def aresolve(self, interface: Interface[T]) -> T:
+    async def aresolve(self, interface: type[T]) -> T:
         """Resolve an instance by interface asynchronously."""
         if interface in self._override_instances:
             return cast(T, self._override_instances[interface])
@@ -422,21 +410,21 @@ class Container:
         if provider.scope == "transient":
             instance, created = await self._acreate_instance(provider), True
         else:
-            scoped_context = self._get_scoped_context(provider.scope)
-            instance, created = await self.aget_or_create(
-                provider, context=scoped_context
+            context = self._get_scoped_context(provider.scope)
+            instance, created = await self._aget_or_create_instance(
+                provider, context=context
             )
         if self.testing and created:
             self._patch_test_resolver(instance)
         return cast(T, instance)
 
-    async def aget_or_create(
+    def _get_or_create_instance(
         self, provider: Provider, context: ScopedContext
     ) -> tuple[Any, bool]:
-        """Get an async instance of a dependency from the scoped context."""
+        """Get an instance of a dependency from the scoped context."""
         instance = context.get(provider.interface)
         if instance is None:
-            instance = await self._acreate_instance(provider, context=context)
+            instance = self._create_instance(provider, context=context)
             context[provider.interface] = instance
             return instance, True
         return instance, False
@@ -515,6 +503,17 @@ class Container:
                 )
             await context.aenter(instance)
         return instance
+
+    async def _aget_or_create_instance(
+        self, provider: Provider, context: ScopedContext
+    ) -> tuple[Any, bool]:
+        """Get an async instance of a dependency from the scoped context."""
+        instance = context.get(provider.interface)
+        if instance is None:
+            instance = await self._acreate_instance(provider, context=context)
+            context[provider.interface] = instance
+            return instance, True
+        return instance, False
 
     def _get_provided_args(
         self, provider: Provider, context: ScopedContext | None
@@ -632,8 +631,8 @@ class Container:
         except LookupError:
             pass
         else:
-            scoped_context = self._get_scoped_context(provider.scope)
-            return interface in scoped_context
+            context = self._get_scoped_context(provider.scope)
+            return interface in context
         return False
 
     def release(self, interface: AnyInterface) -> None:

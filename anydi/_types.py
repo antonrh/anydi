@@ -2,15 +2,13 @@ from __future__ import annotations
 
 import inspect
 from dataclasses import dataclass
-from typing import Annotated, Any, TypeVar, Union
+from typing import Annotated, Any
 
 from typing_extensions import Literal, Self, TypeAlias
 
 Scope = Literal["transient", "singleton", "request"]
 
-T = TypeVar("T")
-AnyInterface: TypeAlias = Union[type[Any], Annotated[Any, ...]]
-Interface: TypeAlias = type[T]
+AnyInterface: TypeAlias = type[Any] | Annotated[Any, ...]
 
 
 class Marker:
