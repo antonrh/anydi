@@ -58,7 +58,7 @@ class Container:
         testing: bool = False,
     ) -> None:
         self._providers: dict[type[Any], Provider] = {}
-        self._resource_cache: dict[str, list[type[Any]]] = defaultdict(list)
+        self._resources: dict[str, list[type[Any]]] = defaultdict(list)
         self._singleton_context = ScopedContext()
         self._request_context_var: ContextVar[ScopedContext | None] = ContextVar(
             "request_context", default=None
@@ -191,14 +191,14 @@ class Container:
         """Set a provider by interface."""
         self._providers[provider.interface] = provider
         if provider.is_resource:
-            self._resource_cache[provider.scope].append(provider.interface)
+            self._resources[provider.scope].append(provider.interface)
 
     def _delete_provider(self, provider: Provider) -> None:
         """Delete a provider."""
         if provider.interface in self._providers:
             del self._providers[provider.interface]
         if provider.is_resource:
-            self._resource_cache[provider.scope].remove(provider.interface)
+            self._resources[provider.scope].remove(provider.interface)
 
     def _validate_sub_providers(self, provider: Provider) -> None:
         """Validate the sub-providers of a provider."""
@@ -291,7 +291,7 @@ class Container:
     def start(self) -> None:
         """Start the singleton context."""
         # Resolve all singleton resources
-        for interface in self._resource_cache.get("singleton", []):
+        for interface in self._resources.get("singleton", []):
             self.resolve(interface)
 
     def close(self) -> None:
@@ -306,7 +306,7 @@ class Container:
         token = self._request_context_var.set(context)
 
         # Resolve all request resources
-        for interface in self._resource_cache.get("request", []):
+        for interface in self._resources.get("request", []):
             if not is_event_type(interface):
                 continue
             self.resolve(interface)
@@ -331,7 +331,7 @@ class Container:
 
     async def astart(self) -> None:
         """Start the singleton context asynchronously."""
-        for interface in self._resource_cache.get("singleton", []):
+        for interface in self._resources.get("singleton", []):
             await self.aresolve(interface)
 
     async def aclose(self) -> None:
@@ -345,7 +345,7 @@ class Container:
 
         token = self._request_context_var.set(context)
 
-        for interface in self._resource_cache.get("request", []):
+        for interface in self._resources.get("request", []):
             if not is_event_type(interface):
                 continue
             await self.aresolve(interface)
@@ -425,7 +425,7 @@ class Container:
         instance = context.get(provider.interface)
         if instance is None:
             instance = self._create_instance(provider, context=context)
-            context[provider.interface] = instance
+            context.set(provider.interface, instance)
             return instance, True
         return instance, False
 
@@ -511,7 +511,7 @@ class Container:
         instance = context.get(provider.interface)
         if instance is None:
             instance = await self._acreate_instance(provider, context=context)
-            context[provider.interface] = instance
+            context.set(provider.interface, instance)
             return instance, True
         return instance, False
 

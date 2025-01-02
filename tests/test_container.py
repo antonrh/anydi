@@ -658,7 +658,7 @@ def test_resolve_request_scoped_unresolved_yet(container: Container) -> None:
         return req.path
 
     with container.request_context() as context:
-        context[Request] = Request(path="test")
+        context.set(Request, Request(path="test"))
         assert container.resolve(str) == "test"
 
 

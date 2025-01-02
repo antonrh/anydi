@@ -19,5 +19,5 @@ class RequestScopedMiddleware(BaseHTTPMiddleware):
         self, request: Request, call_next: RequestResponseEndpoint
     ) -> Response:
         async with self.container.arequest_context() as context:
-            context[Request] = request
+            context.set(Request, request)
             return await call_next(request)
