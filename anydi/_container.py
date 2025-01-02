@@ -16,7 +16,6 @@ from typing_extensions import ParamSpec, Self, final
 
 from ._context import (
     RequestContext,
-    ResourceScopedContext,
     ScopedContext,
     SingletonContext,
     TransientContext,
@@ -145,8 +144,7 @@ class Container:
         except LookupError:
             pass
         else:
-            if isinstance(scoped_context, ResourceScopedContext):
-                scoped_context.delete(interface)
+            scoped_context.delete(interface)
 
         # Cleanup provider references
         self._delete_provider(provider)
@@ -350,8 +348,7 @@ class Container:
                 scoped_context = self._get_scoped_context(provider.scope)
             except LookupError:
                 continue
-            if isinstance(scoped_context, ResourceScopedContext):
-                scoped_context.delete(interface)
+            scoped_context.delete(interface)
 
     @overload
     def resolve(self, interface: Interface[T]) -> T: ...
@@ -420,16 +417,14 @@ class Container:
             pass
         else:
             scoped_context = self._get_scoped_context(provider.scope)
-            if isinstance(scoped_context, ResourceScopedContext):
-                return scoped_context.has(interface)
+            return scoped_context.has(interface)
         return False
 
     def release(self, interface: AnyInterface) -> None:
         """Release an instance by interface."""
         provider = self._get_provider(interface)
         scoped_context = self._get_scoped_context(provider.scope)
-        if isinstance(scoped_context, ResourceScopedContext):
-            scoped_context.delete(interface)
+        scoped_context.delete(interface)
 
     def _get_scoped_context(self, scope: Scope) -> ScopedContext:
         """Get the scoped context based on the specified scope."""

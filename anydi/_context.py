@@ -29,6 +29,14 @@ class ScopedContext(abc.ABC):
         """Set an instance of a dependency in the scoped context."""
         self._instances[interface] = instance
 
+    def has(self, interface: AnyInterface) -> bool:
+        """Check if the scoped context has an instance of the dependency."""
+        return interface in self._instances
+
+    def delete(self, interface: AnyInterface) -> None:
+        """Delete a dependency instance from the scoped context."""
+        self._instances.pop(interface, None)
+
     @abc.abstractmethod
     def get_or_create(self, provider: Provider) -> tuple[Any, bool]:
         """Get or create an instance of a dependency from the scoped context."""
@@ -180,10 +188,6 @@ class ResourceScopedContext(ScopedContext):
             return instance, True
         return instance, False
 
-    def has(self, interface: AnyInterface) -> bool:
-        """Check if the scoped context has an instance of the dependency."""
-        return interface in self._instances
-
     def _create_instance(self, provider: Provider) -> Any:
         """Create an instance using the provider."""
         instance = super()._create_instance(provider)
@@ -211,10 +215,6 @@ class ResourceScopedContext(ScopedContext):
         args, kwargs = await self._aget_provided_args(provider)
         cm = contextlib.asynccontextmanager(provider.call)(*args, **kwargs)
         return await self._async_stack.enter_async_context(cm)
-
-    def delete(self, interface: AnyInterface) -> None:
-        """Delete a dependency instance from the scoped context."""
-        self._instances.pop(interface, None)
 
     def __enter__(self) -> Self:
         """Enter the context."""
