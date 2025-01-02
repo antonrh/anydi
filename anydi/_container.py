@@ -19,7 +19,14 @@ from ._logger import logger
 from ._module import Module, ModuleRegistry
 from ._provider import CallableKind, Provider
 from ._scanner import Scanner
-from ._types import AnyInterface, DependencyWrapper, Interface, Scope, is_marker
+from ._types import (
+    AnyInterface,
+    DependencyWrapper,
+    Interface,
+    Scope,
+    is_event_type,
+    is_marker,
+)
 from ._utils import (
     get_full_qualname,
     get_typed_parameters,
@@ -53,7 +60,7 @@ class Container:
     ) -> None:
         self._providers: dict[type[Any], Provider] = {}
         self._resource_cache: dict[str, list[type[Any]]] = defaultdict(list)
-        self._singleton_context = ScopedContext(self, scope="singleton")
+        self._singleton_context = ScopedContext()
         self._request_context_var: ContextVar[ScopedContext | None] = ContextVar(
             "request_context", default=None
         )
@@ -140,11 +147,11 @@ class Container:
 
         # Cleanup scoped context instance
         try:
-            scoped_context = self._get_scoped_context(provider.scope)
+            context = self._get_scoped_context(provider.scope)
         except LookupError:
             pass
         else:
-            scoped_context.delete(interface)
+            del context[interface]
 
         # Cleanup provider references
         self._delete_provider(provider)
@@ -278,13 +285,15 @@ class Container:
         exc_type: type[BaseException] | None,
         exc_val: BaseException | None,
         exc_tb: types.TracebackType | None,
-    ) -> bool:
+    ) -> Any:
         """Exit the singleton context."""
         return self._singleton_context.__exit__(exc_type, exc_val, exc_tb)
 
     def start(self) -> None:
         """Start the singleton context."""
-        self._singleton_context.start()
+        # Resolve all singleton resources
+        for interface in self._resource_cache.get("singleton", []):
+            self.resolve(interface)
 
     def close(self) -> None:
         """Close the singleton context."""
@@ -293,8 +302,16 @@ class Container:
     @contextlib.contextmanager
     def request_context(self) -> Iterator[ScopedContext]:
         """Obtain a context manager for the request-scoped context."""
-        context = ScopedContext(self, scope="request", start_events_only=True)
+        context = ScopedContext()
+
         token = self._request_context_var.set(context)
+
+        # Resolve all request resources
+        for interface in self._resource_cache.get("request", []):
+            if not is_event_type(interface):
+                continue
+            self.resolve(interface)
+
         with context:
             yield context
             self._request_context_var.reset(token)
@@ -315,7 +332,8 @@ class Container:
 
     async def astart(self) -> None:
         """Start the singleton context asynchronously."""
-        await self._singleton_context.astart()
+        for interface in self._resource_cache.get("singleton", []):
+            await self.aresolve(interface)
 
     async def aclose(self) -> None:
         """Close the singleton context asynchronously."""
@@ -324,8 +342,15 @@ class Container:
     @contextlib.asynccontextmanager
     async def arequest_context(self) -> AsyncIterator[ScopedContext]:
         """Obtain an async context manager for the request-scoped context."""
-        context = ScopedContext(self, scope="request", start_events_only=True)
+        context = ScopedContext()
+
         token = self._request_context_var.set(context)
+
+        for interface in self._resource_cache.get("request", []):
+            if not is_event_type(interface):
+                continue
+            await self.aresolve(interface)
+
         async with context:
             yield context
             self._request_context_var.reset(token)
@@ -345,10 +370,10 @@ class Container:
         """Reset resolved instances."""
         for interface, provider in self._providers.items():
             try:
-                scoped_context = self._get_scoped_context(provider.scope)
+                context = self._get_scoped_context(provider.scope)
             except LookupError:
                 continue
-            scoped_context.delete(interface)
+            del context[interface]
 
     @overload
     def resolve(self, interface: Interface[T]) -> T: ...
@@ -366,27 +391,19 @@ class Container:
             instance, created = self._create_instance(provider), True
         else:
             scoped_context = self._get_scoped_context(provider.scope)
-            instance, created = self.get_or_create(
-                provider, scoped_context=scoped_context
-            )
+            instance, created = self.get_or_create(provider, context=scoped_context)
         if self.testing and created:
             self._patch_test_resolver(instance)
         return cast(T, instance)
 
     def get_or_create(
-        self,
-        provider: Provider,
-        scoped_context: ScopedContext,
+        self, provider: Provider, context: ScopedContext
     ) -> tuple[Any, bool]:
         """Get an instance of a dependency from the scoped context."""
-        instance = scoped_context._instances.get(provider.interface)
+        instance = context.get(provider.interface)
         if instance is None:
-            instance = self._create_instance(
-                provider,
-                instances=scoped_context._instances,
-                stack=scoped_context._stack,
-            )
-            scoped_context._instances[provider.interface] = instance
+            instance = self._create_instance(provider, context=context)
+            context[provider.interface] = instance
             return instance, True
         return instance, False
 
@@ -407,33 +424,27 @@ class Container:
         else:
             scoped_context = self._get_scoped_context(provider.scope)
             instance, created = await self.aget_or_create(
-                provider, scoped_context=scoped_context
+                provider, context=scoped_context
             )
         if self.testing and created:
             self._patch_test_resolver(instance)
         return cast(T, instance)
 
     async def aget_or_create(
-        self, provider: Provider, scoped_context: ScopedContext
+        self, provider: Provider, context: ScopedContext
     ) -> tuple[Any, bool]:
         """Get an async instance of a dependency from the scoped context."""
-        instance = scoped_context._instances.get(provider.interface)
+        instance = context.get(provider.interface)
         if instance is None:
-            instance = await self._acreate_instance(
-                provider,
-                instances=scoped_context._instances,
-                stack=scoped_context._stack,
-                async_stack=scoped_context._async_stack,
-            )
-            scoped_context._instances[provider.interface] = instance
+            instance = await self._acreate_instance(provider, context=context)
+            context[provider.interface] = instance
             return instance, True
         return instance, False
 
     def _create_instance(
         self,
         provider: Provider,
-        instances: dict[type[Any], Any] | None = None,
-        stack: contextlib.ExitStack | None = None,
+        context: ScopedContext | None = None,
     ) -> Any:
         """Create an instance using the provider."""
         if provider.is_async:
@@ -442,75 +453,71 @@ class Container:
                 "synchronous mode."
             )
 
-        instances = instances or {}
-
-        args, kwargs = self._get_provided_args(provider, instances=instances)
+        args, kwargs = self._get_provided_args(provider, context=context)
 
         if provider.is_generator:
-            if stack is None:
-                raise ValueError("The stack is required for generator providers.")
+            if context is None:
+                raise ValueError("The context is required for generator providers.")
             cm = contextlib.contextmanager(provider.call)(*args, **kwargs)
-            return stack.enter_context(cm)
+            return context.enter(cm)
 
         instance = provider.call(*args, **kwargs)
         if hasattr(instance, "__enter__") and hasattr(instance, "__exit__"):
-            if stack is None:
-                raise ValueError("The stack is required for context manager providers.")
-            stack.enter_context(instance)
+            if context is None:
+                raise ValueError(
+                    "The context is required for context manager providers."
+                )
+            context.enter(instance)
         return instance
 
     async def _acreate_instance(  # noqa: C901
         self,
         provider: Provider,
-        instances: dict[type[Any], Any] | None = None,
-        stack: contextlib.ExitStack | None = None,
-        async_stack: contextlib.AsyncExitStack | None = None,
+        context: ScopedContext | None = None,
     ) -> Any:
         """Create an instance asynchronously using the provider."""
-        instances = instances or {}
-
-        args, kwargs = await self._aget_provided_args(provider, instances=instances)
+        args, kwargs = await self._aget_provided_args(provider, context=context)
 
         if provider.kind == CallableKind.COROUTINE:
             instance = await provider.call(*args, **kwargs)
             if is_async_context_manager(instance):
-                if async_stack is None:
+                if context is None:
                     raise ValueError(
                         "The async stack is required for "
                         "async context manager providers."
                     )
-                await async_stack.enter_async_context(instance)
+                await context.aenter(instance)
             return instance
 
         elif provider.kind == CallableKind.ASYNC_GENERATOR:
-            if async_stack is None:
+            if context is None:
                 raise ValueError(
                     "The async stack is required for async generator providers."
                 )
             cm = contextlib.asynccontextmanager(provider.call)(*args, **kwargs)
-            return await async_stack.enter_async_context(cm)
+            return await context.aenter(cm)
 
         elif provider.kind == CallableKind.GENERATOR:
 
             def _create() -> Any:
-                if stack is None:
+                if context is None:
                     raise ValueError("The stack is required for generator providers.")
                 cm = contextlib.contextmanager(provider.call)(*args, **kwargs)
-                return stack.enter_context(cm)
+                return context.enter(cm)
 
             return await run_async(_create)
 
         instance = await run_async(provider.call, *args, **kwargs)
         if is_async_context_manager(instance):
-            if async_stack is None:
+            if context is None:
                 raise ValueError(
                     "The async stack is required for async context manager providers."
                 )
-            await async_stack.enter_async_context(instance)
+            await context.aenter(instance)
         return instance
 
     def _get_provided_args(
-        self, provider: Provider, instances: dict[type[Any], Any]
+        self, provider: Provider, context: ScopedContext | None
     ) -> tuple[list[Any], dict[str, Any]]:
         """Retrieve the arguments for a provider."""
         args: list[Any] = []
@@ -519,8 +526,8 @@ class Container:
         for parameter in provider.parameters:
             if parameter.annotation in self._override_instances:
                 instance = self._override_instances[parameter.annotation]
-            elif parameter.annotation in instances:
-                instance = instances[parameter.annotation]
+            elif context and parameter.annotation in context:
+                instance = context[parameter.annotation]
             else:
                 try:
                     instance = self._resolve_parameter(provider, parameter)
@@ -542,7 +549,7 @@ class Container:
     async def _aget_provided_args(
         self,
         provider: Provider,
-        instances: dict[type[Any], Any],
+        context: ScopedContext | None,
     ) -> tuple[list[Any], dict[str, Any]]:
         """Asynchronously retrieve the arguments for a provider."""
         args: list[Any] = []
@@ -551,8 +558,8 @@ class Container:
         for parameter in provider.parameters:
             if parameter.annotation in self._override_instances:
                 instance = self._override_instances[parameter.annotation]
-            elif parameter.annotation in instances:
-                instance = instances[parameter.annotation]
+            elif context and parameter.annotation in context:
+                instance = context[parameter.annotation]
             else:
                 try:
                     instance = await self._aresolve_parameter(provider, parameter)
@@ -626,7 +633,7 @@ class Container:
             pass
         else:
             scoped_context = self._get_scoped_context(provider.scope)
-            return scoped_context.has(interface)
+            return interface in scoped_context
         return False
 
     def release(self, interface: AnyInterface) -> None:
@@ -634,8 +641,8 @@ class Container:
         provider = self._get_provider(interface)
         if provider.scope == "transient":
             return None
-        scoped_context = self._get_scoped_context(provider.scope)
-        scoped_context.delete(interface)
+        context = self._get_scoped_context(provider.scope)
+        del context[interface]
 
     def _get_scoped_context(self, scope: Scope) -> ScopedContext:
         """Get the scoped context based on the specified scope."""
