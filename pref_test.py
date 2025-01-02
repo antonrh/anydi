@@ -34,8 +34,6 @@ def provide_repo() -> Iterator[Repo]:
     return Repo(items=[
         Item(name="item1"),
         Item(name="item2"),
-        Item(name="item3"),
-        Item(name="item4"),
     ])
 
 
