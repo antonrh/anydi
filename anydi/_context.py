@@ -188,7 +188,7 @@ class ResourceScopedContext(ScopedContext):
         """Create an instance using the provider."""
         instance = super()._create_instance(provider)
         # Enter the context manager if the instance is closable.
-        if hasattr(instance, "__enter__") and hasattr(instance, "__exit__"):
+        if isinstance(instance, contextlib.AbstractContextManager):
             self._stack.enter_context(instance)
         return instance
 
@@ -202,7 +202,7 @@ class ResourceScopedContext(ScopedContext):
         """Create an instance asynchronously using the provider."""
         instance = await super()._acreate_instance(provider)
         # Enter the context manager if the instance is closable.
-        if hasattr(instance, "__aenter__") and hasattr(instance, "__aexit__"):
+        if isinstance(instance, contextlib.AbstractAsyncContextManager):
             await self._async_stack.enter_async_context(instance)
         return instance
 
