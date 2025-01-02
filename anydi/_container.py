@@ -40,7 +40,7 @@ P = ParamSpec("P")
 ALLOWED_SCOPES: dict[Scope, list[Scope]] = {
     "singleton": ["singleton"],
     "request": ["request", "singleton"],
-    "transient": ["transient", "singleton", "request"],
+    "transient": ["transient", "request", "singleton"],
 }
 
 
