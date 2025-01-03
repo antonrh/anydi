@@ -4,39 +4,74 @@ from __future__ import annotations
 
 import contextlib
 import functools
+import importlib
 import inspect
+import pkgutil
 import threading
 import types
 from collections import defaultdict
 from collections.abc import AsyncIterator, Iterable, Iterator, Sequence
 from contextvars import ContextVar
-from typing import Any, Callable, TypeVar, cast, overload
+from types import ModuleType
+from typing import Any, Callable, TypeVar, Union, cast, overload
 from weakref import WeakKeyDictionary
 
-from typing_extensions import ParamSpec, Self, final
+from typing_extensions import Concatenate, ParamSpec, Self, final
 
-from ._context import (
-    RequestContext,
-    ResourceScopedContext,
-    ScopedContext,
-    SingletonContext,
-    TransientContext,
-)
+from ._context import InstanceContext
 from ._logger import logger
-from ._module import Module, ModuleRegistry
 from ._provider import Provider
-from ._scanner import Scanner
-from ._types import AnyInterface, DependencyWrapper, Interface, Scope, is_marker
-from ._utils import AsyncRLock, get_full_qualname, get_typed_parameters, is_builtin_type
+from ._types import (
+    AnyInterface,
+    Dependency,
+    DependencyWrapper,
+    InjectableDecoratorArgs,
+    ProviderDecoratorArgs,
+    Scope,
+    is_event_type,
+    is_marker,
+)
+from ._utils import (
+    AsyncRLock,
+    get_full_qualname,
+    get_typed_parameters,
+    import_string,
+    is_async_context_manager,
+    is_builtin_type,
+    is_context_manager,
+    run_async,
+)
 
 T = TypeVar("T", bound=Any)
+M = TypeVar("M", bound="Module")
 P = ParamSpec("P")
 
 ALLOWED_SCOPES: dict[Scope, list[Scope]] = {
     "singleton": ["singleton"],
     "request": ["request", "singleton"],
-    "transient": ["transient", "singleton", "request"],
+    "transient": ["transient", "request", "singleton"],
 }
+
+
+class ModuleMeta(type):
+    """A metaclass used for the Module base class."""
+
+    def __new__(cls, name: str, bases: tuple[type, ...], attrs: dict[str, Any]) -> Any:
+        attrs["providers"] = [
+            (name, getattr(value, "__provider__"))
+            for name, value in attrs.items()
+            if hasattr(value, "__provider__")
+        ]
+        return super().__new__(cls, name, bases, attrs)
+
+
+class Module(metaclass=ModuleMeta):
+    """A base class for defining AnyDI modules."""
+
+    providers: list[tuple[str, ProviderDecoratorArgs]]
+
+    def configure(self, container: Container) -> None:
+        """Configure the AnyDI container with providers and their dependencies."""
 
 
 @final
@@ -53,12 +88,11 @@ class Container:
         testing: bool = False,
     ) -> None:
         self._providers: dict[type[Any], Provider] = {}
-        self._resource_cache: dict[Scope, list[type[Any]]] = defaultdict(list)
-        self._singleton_context = SingletonContext(self)
+        self._resources: dict[str, list[type[Any]]] = defaultdict(list)
+        self._singleton_context = InstanceContext()
         self._singleton_lock = threading.RLock()
         self._singleton_async_lock = AsyncRLock()
-        self._transient_context = TransientContext(self)
-        self._request_context_var: ContextVar[RequestContext | None] = ContextVar(
+        self._request_context_var: ContextVar[InstanceContext | None] = ContextVar(
             "request_context", default=None
         )
         self._override_instances: dict[type[Any], Any] = {}
@@ -68,10 +102,6 @@ class Container:
         self._inject_cache: WeakKeyDictionary[
             Callable[..., Any], Callable[..., Any]
         ] = WeakKeyDictionary()
-
-        # Components
-        self._modules = ModuleRegistry(self)
-        self._scanner = Scanner(self)
 
         # Register providers
         providers = providers or []
@@ -142,14 +172,14 @@ class Container:
 
         provider = self._get_provider(interface)
 
-        # Cleanup scoped context instance
-        try:
-            scoped_context = self._get_scoped_context(provider.scope)
-        except LookupError:
-            pass
-        else:
-            if isinstance(scoped_context, ResourceScopedContext):
-                scoped_context.delete(interface)
+        # Cleanup instance context
+        if provider.scope != "transient":
+            try:
+                context = self._get_scoped_context(provider.scope)
+            except LookupError:
+                pass
+            else:
+                del context[interface]
 
         # Cleanup provider references
         self._delete_provider(provider)
@@ -190,14 +220,14 @@ class Container:
         """Set a provider by interface."""
         self._providers[provider.interface] = provider
         if provider.is_resource:
-            self._resource_cache[provider.scope].append(provider.interface)
+            self._resources[provider.scope].append(provider.interface)
 
     def _delete_provider(self, provider: Provider) -> None:
         """Delete a provider."""
         if provider.interface in self._providers:
             del self._providers[provider.interface]
         if provider.is_resource:
-            self._resource_cache[provider.scope].remove(provider.interface)
+            self._resources[provider.scope].remove(provider.interface)
 
     def _validate_sub_providers(self, provider: Provider) -> None:
         """Validate the sub-providers of a provider."""
@@ -271,7 +301,27 @@ class Container:
         self, module: Module | type[Module] | Callable[[Container], None] | str
     ) -> None:
         """Register a module as a callable, module type, or module instance."""
-        self._modules.register(module)
+        # Callable Module
+        if inspect.isfunction(module):
+            module(self)
+            return
+
+        # Module path
+        if isinstance(module, str):
+            module = import_string(module)
+
+        # Class based Module or Module type
+        if inspect.isclass(module) and issubclass(module, Module):
+            module = module()
+
+        if isinstance(module, Module):
+            module.configure(self)
+            for provider_name, decorator_args in module.providers:
+                obj = getattr(module, provider_name)
+                self.provider(
+                    scope=decorator_args.scope,
+                    override=decorator_args.override,
+                )(obj)
 
     def __enter__(self) -> Self:
         """Enter the singleton context."""
@@ -283,23 +333,33 @@ class Container:
         exc_type: type[BaseException] | None,
         exc_val: BaseException | None,
         exc_tb: types.TracebackType | None,
-    ) -> bool:
+    ) -> Any:
         """Exit the singleton context."""
         return self._singleton_context.__exit__(exc_type, exc_val, exc_tb)
 
     def start(self) -> None:
         """Start the singleton context."""
-        self._singleton_context.start()
+        # Resolve all singleton resources
+        for interface in self._resources.get("singleton", []):
+            self.resolve(interface)
 
     def close(self) -> None:
         """Close the singleton context."""
         self._singleton_context.close()
 
     @contextlib.contextmanager
-    def request_context(self) -> Iterator[RequestContext]:
+    def request_context(self) -> Iterator[InstanceContext]:
         """Obtain a context manager for the request-scoped context."""
-        context = RequestContext(self)
+        context = InstanceContext()
+
         token = self._request_context_var.set(context)
+
+        # Resolve all request resources
+        for interface in self._resources.get("request", []):
+            if not is_event_type(interface):
+                continue
+            self.resolve(interface)
+
         with context:
             yield context
             self._request_context_var.reset(token)
@@ -320,22 +380,30 @@ class Container:
 
     async def astart(self) -> None:
         """Start the singleton context asynchronously."""
-        await self._singleton_context.astart()
+        for interface in self._resources.get("singleton", []):
+            await self.aresolve(interface)
 
     async def aclose(self) -> None:
         """Close the singleton context asynchronously."""
         await self._singleton_context.aclose()
 
     @contextlib.asynccontextmanager
-    async def arequest_context(self) -> AsyncIterator[RequestContext]:
+    async def arequest_context(self) -> AsyncIterator[InstanceContext]:
         """Obtain an async context manager for the request-scoped context."""
-        context = RequestContext(self)
+        context = InstanceContext()
+
         token = self._request_context_var.set(context)
+
+        for interface in self._resources.get("request", []):
+            if not is_event_type(interface):
+                continue
+            await self.aresolve(interface)
+
         async with context:
             yield context
             self._request_context_var.reset(token)
 
-    def _get_request_context(self) -> RequestContext:
+    def _get_request_context(self) -> InstanceContext:
         """Get the current request context."""
         request_context = self._request_context_var.get()
         if request_context is None:
@@ -349,56 +417,247 @@ class Container:
     def reset(self) -> None:
         """Reset resolved instances."""
         for interface, provider in self._providers.items():
+            if provider.scope == "transient":
+                continue
             try:
-                scoped_context = self._get_scoped_context(provider.scope)
+                context = self._get_scoped_context(provider.scope)
             except LookupError:
                 continue
-            if isinstance(scoped_context, ResourceScopedContext):
-                scoped_context.delete(interface)
+            del context[interface]
 
     @overload
-    def resolve(self, interface: Interface[T]) -> T: ...
+    def resolve(self, interface: type[T]) -> T: ...
 
     @overload
     def resolve(self, interface: T) -> T: ...
 
-    def resolve(self, interface: Interface[T]) -> T:
+    def resolve(self, interface: type[T]) -> T:
         """Resolve an instance by interface."""
         if interface in self._override_instances:
             return cast(T, self._override_instances[interface])
 
         provider = self._get_or_register_provider(interface)
-        scoped_context = self._get_scoped_context(provider.scope)
-        if provider.scope == "singleton":
-            with self._singleton_lock:
-                instance, created = scoped_context.get_or_create(provider)
+        if provider.scope == "transient":
+            instance, created = self._create_instance(provider), True
         else:
-            instance, created = scoped_context.get_or_create(provider)
+            context = self._get_scoped_context(provider.scope)
+            if provider.scope == "singleton":
+                with self._singleton_lock:
+                    instance, created = self._get_or_create_instance(
+                        provider, context=context
+                    )
+            else:
+                instance, created = self._get_or_create_instance(
+                    provider, context=context
+                )
         if self.testing and created:
             self._patch_test_resolver(instance)
         return cast(T, instance)
 
     @overload
-    async def aresolve(self, interface: Interface[T]) -> T: ...
+    async def aresolve(self, interface: type[T]) -> T: ...
 
     @overload
     async def aresolve(self, interface: T) -> T: ...
 
-    async def aresolve(self, interface: Interface[T]) -> T:
+    async def aresolve(self, interface: type[T]) -> T:
         """Resolve an instance by interface asynchronously."""
         if interface in self._override_instances:
             return cast(T, self._override_instances[interface])
 
         provider = self._get_or_register_provider(interface)
-        scoped_context = self._get_scoped_context(provider.scope)
-        if provider.scope == "singleton":
-            async with self._singleton_async_lock:
-                instance, created = await scoped_context.aget_or_create(provider)
+        if provider.scope == "transient":
+            instance, created = await self._acreate_instance(provider), True
         else:
-            instance, created = await scoped_context.aget_or_create(provider)
+            context = self._get_scoped_context(provider.scope)
+            if provider.scope == "singleton":
+                async with self._singleton_async_lock:
+                    instance, created = await self._aget_or_create_instance(
+                        provider, context=context
+                    )
+            else:
+                instance, created = await self._aget_or_create_instance(
+                    provider, context=context
+                )
         if self.testing and created:
             self._patch_test_resolver(instance)
         return cast(T, instance)
+
+    def _get_or_create_instance(
+        self, provider: Provider, context: InstanceContext
+    ) -> tuple[Any, bool]:
+        """Get an instance of a dependency from the scoped context."""
+        instance = context.get(provider.interface)
+        if instance is None:
+            instance = self._create_instance(provider, context=context)
+            context.set(provider.interface, instance)
+            return instance, True
+        return instance, False
+
+    async def _aget_or_create_instance(
+        self, provider: Provider, context: InstanceContext
+    ) -> tuple[Any, bool]:
+        """Get an async instance of a dependency from the scoped context."""
+        instance = context.get(provider.interface)
+        if instance is None:
+            instance = await self._acreate_instance(provider, context=context)
+            context.set(provider.interface, instance)
+            return instance, True
+        return instance, False
+
+    def _create_instance(
+        self,
+        provider: Provider,
+        context: InstanceContext | None = None,
+    ) -> Any:
+        """Create an instance using the provider."""
+        if provider.is_async:
+            raise TypeError(
+                f"The instance for the provider `{provider}` cannot be created in "
+                "synchronous mode."
+            )
+
+        args, kwargs = self._get_provided_args(provider, context=context)
+
+        if provider.is_generator:
+            if context is None:
+                raise ValueError("The context is required for generator providers.")
+            cm = contextlib.contextmanager(provider.call)(*args, **kwargs)
+            return context.enter(cm)
+
+        instance = provider.call(*args, **kwargs)
+        if context is not None and is_context_manager(instance):
+            context.enter(instance)
+        return instance
+
+    async def _acreate_instance(
+        self,
+        provider: Provider,
+        context: InstanceContext | None = None,
+    ) -> Any:
+        """Create an instance asynchronously using the provider."""
+        args, kwargs = await self._aget_provided_args(provider, context=context)
+
+        if provider.is_coroutine:
+            instance = await provider.call(*args, **kwargs)
+            if context is not None and is_async_context_manager(instance):
+                await context.aenter(instance)
+            return instance
+
+        if provider.is_async_generator:
+            if context is None:
+                raise ValueError(
+                    "The async stack is required for async generator providers."
+                )
+            cm = contextlib.asynccontextmanager(provider.call)(*args, **kwargs)
+            return await context.aenter(cm)
+
+        if provider.is_generator:
+
+            def _create() -> Any:
+                if context is None:
+                    raise ValueError("The stack is required for generator providers.")
+                cm = contextlib.contextmanager(provider.call)(*args, **kwargs)
+                return context.enter(cm)
+
+            return await run_async(_create)
+
+        instance = await run_async(provider.call, *args, **kwargs)
+        if context is not None and is_async_context_manager(instance):
+            await context.aenter(instance)
+        return instance
+
+    def _get_provided_args(
+        self,
+        provider: Provider,
+        context: InstanceContext | None,
+        *args: Any,
+        **kwargs: Any,
+    ) -> tuple[list[Any], dict[str, Any]]:
+        """Retrieve the arguments for a provider."""
+        provided_args: list[Any] = []
+        provided_kwargs: dict[str, Any] = {}
+
+        for parameter in provider.parameters:
+            if parameter.annotation in self._override_instances:
+                instance = self._override_instances[parameter.annotation]
+            elif context and parameter.annotation in context:
+                instance = context[parameter.annotation]
+            else:
+                try:
+                    instance = self._resolve_parameter(provider, parameter)
+                except LookupError:
+                    if parameter.default is inspect.Parameter.empty:
+                        raise
+                    instance = parameter.default
+                else:
+                    if self.testing:
+                        instance = DependencyWrapper(
+                            interface=parameter.annotation, instance=instance
+                        )
+            if parameter.kind == parameter.POSITIONAL_ONLY:
+                provided_args.append(instance)
+            else:
+                provided_kwargs[parameter.name] = instance
+        return provided_args, provided_kwargs
+
+    async def _aget_provided_args(
+        self,
+        provider: Provider,
+        context: InstanceContext | None,
+        *args: Any,
+        **kwargs: Any,
+    ) -> tuple[list[Any], dict[str, Any]]:
+        """Asynchronously retrieve the arguments for a provider."""
+        provided_args: list[Any] = []
+        provided_kwargs: dict[str, Any] = {}
+
+        for parameter in provider.parameters:
+            if parameter.annotation in self._override_instances:
+                instance = self._override_instances[parameter.annotation]
+            elif context and parameter.annotation in context:
+                instance = context[parameter.annotation]
+            else:
+                try:
+                    instance = await self._aresolve_parameter(provider, parameter)
+                except LookupError:
+                    if parameter.default is inspect.Parameter.empty:
+                        raise
+                    instance = parameter.default
+                else:
+                    if self.testing:
+                        instance = DependencyWrapper(
+                            interface=parameter.annotation, instance=instance
+                        )
+            if parameter.kind == parameter.POSITIONAL_ONLY:
+                provided_args.append(instance)
+            else:
+                provided_kwargs[parameter.name] = instance
+        return provided_args, provided_kwargs
+
+    def _resolve_parameter(
+        self, provider: Provider, parameter: inspect.Parameter
+    ) -> Any:
+        self._validate_resolvable_parameter(parameter, call=provider.call)
+        return self.resolve(parameter.annotation)
+
+    async def _aresolve_parameter(
+        self, provider: Provider, parameter: inspect.Parameter
+    ) -> Any:
+        self._validate_resolvable_parameter(parameter, call=provider.call)
+        return await self.aresolve(parameter.annotation)
+
+    def _validate_resolvable_parameter(
+        self, parameter: inspect.Parameter, call: Callable[..., Any]
+    ) -> None:
+        """Ensure that the specified interface is resolved."""
+        if parameter.annotation in self._unresolved_interfaces:
+            raise LookupError(
+                f"You are attempting to get the parameter `{parameter.name}` with the "
+                f"annotation `{get_full_qualname(parameter.annotation)}` as a "
+                f"dependency into `{get_full_qualname(call)}` which is not registered "
+                "or set in the scoped context."
+            )
 
     def _patch_test_resolver(self, instance: Any) -> None:
         """Patch the test resolver for the instance."""
@@ -428,28 +687,25 @@ class Container:
         try:
             provider = self._get_provider(interface)
         except LookupError:
-            pass
-        else:
-            scoped_context = self._get_scoped_context(provider.scope)
-            if isinstance(scoped_context, ResourceScopedContext):
-                return scoped_context.has(interface)
-        return False
+            return False
+        if provider.scope == "transient":
+            return False
+        context = self._get_scoped_context(provider.scope)
+        return interface in context
 
     def release(self, interface: AnyInterface) -> None:
         """Release an instance by interface."""
         provider = self._get_provider(interface)
-        scoped_context = self._get_scoped_context(provider.scope)
-        if isinstance(scoped_context, ResourceScopedContext):
-            scoped_context.delete(interface)
+        if provider.scope == "transient":
+            return None
+        context = self._get_scoped_context(provider.scope)
+        del context[interface]
 
-    def _get_scoped_context(self, scope: Scope) -> ScopedContext:
-        """Get the scoped context based on the specified scope."""
+    def _get_scoped_context(self, scope: Scope) -> InstanceContext:
+        """Get the instance context for the specified scope."""
         if scope == "singleton":
             return self._singleton_context
-        elif scope == "request":
-            request_context = self._get_request_context()
-            return request_context
-        return self._transient_context
+        return self._get_request_context()
 
     @contextlib.contextmanager
     def override(self, interface: AnyInterface, instance: Any) -> Iterator[None]:
@@ -488,19 +744,14 @@ class Container:
     ) -> Callable[[Callable[P, T]], Callable[P, T]] | Callable[P, T]:
         """Decorator to inject dependencies into a callable."""
 
-        def decorator(
-            call: Callable[P, T],
-        ) -> Callable[P, T]:
+        def decorator(call: Callable[P, T]) -> Callable[P, T]:
             return self._inject(call)
 
         if func is None:
             return decorator
         return decorator(func)
 
-    def _inject(
-        self,
-        call: Callable[P, T],
-    ) -> Callable[P, T]:
+    def _inject(self, call: Callable[P, T]) -> Callable[P, T]:
         """Inject dependencies into a callable."""
         if call in self._inject_cache:
             return cast(Callable[P, T], self._inject_cache[call])
@@ -574,12 +825,97 @@ class Container:
     def scan(
         self,
         /,
-        packages: types.ModuleType | str | Iterable[types.ModuleType | str],
+        packages: ModuleType | str | Iterable[ModuleType | str],
         *,
         tags: Iterable[str] | None = None,
     ) -> None:
         """Scan packages or modules for decorated members and inject dependencies."""
-        self._scanner.scan(packages, tags=tags)
+        dependencies: list[Dependency] = []
+
+        if isinstance(packages, Iterable) and not isinstance(packages, str):
+            scan_packages: Iterable[ModuleType | str] = packages
+        else:
+            scan_packages = cast(Iterable[Union[ModuleType, str]], [packages])
+
+        for package in scan_packages:
+            dependencies.extend(self._scan_package(package, tags=tags))
+
+        for dependency in dependencies:
+            decorator = self.inject()(dependency.member)
+            setattr(dependency.module, dependency.member.__name__, decorator)
+
+    def _scan_package(
+        self,
+        package: ModuleType | str,
+        *,
+        tags: Iterable[str] | None = None,
+    ) -> list[Dependency]:
+        """Scan a package or module for decorated members."""
+        tags = tags or []
+        if isinstance(package, str):
+            package = importlib.import_module(package)
+
+        package_path = getattr(package, "__path__", None)
+
+        if not package_path:
+            return self._scan_module(package, tags=tags)
+
+        dependencies: list[Dependency] = []
+
+        for module_info in pkgutil.walk_packages(
+            path=package_path, prefix=package.__name__ + "."
+        ):
+            module = importlib.import_module(module_info.name)
+            dependencies.extend(self._scan_module(module, tags=tags))
+
+        return dependencies
+
+    def _scan_module(
+        self, module: ModuleType, *, tags: Iterable[str]
+    ) -> list[Dependency]:
+        """Scan a module for decorated members."""
+        dependencies: list[Dependency] = []
+
+        for _, member in inspect.getmembers(module):
+            if getattr(member, "__module__", None) != module.__name__ or not callable(
+                member
+            ):
+                continue
+
+            decorator_args: InjectableDecoratorArgs = getattr(
+                member,
+                "__injectable__",
+                InjectableDecoratorArgs(wrapped=False, tags=[]),
+            )
+
+            if tags and (
+                decorator_args.tags
+                and not set(decorator_args.tags).intersection(tags)
+                or not decorator_args.tags
+            ):
+                continue
+
+            if decorator_args.wrapped:
+                dependencies.append(
+                    self._create_dependency(member=member, module=module)
+                )
+                continue
+
+            # Get by Marker
+            for parameter in get_typed_parameters(member):
+                if is_marker(parameter.default):
+                    dependencies.append(
+                        self._create_dependency(member=member, module=module)
+                    )
+                    continue
+
+        return dependencies
+
+    def _create_dependency(self, member: Any, module: ModuleType) -> Dependency:
+        """Create a `Dependency` object from the scanned member and module."""
+        if hasattr(member, "__wrapped__"):
+            member = member.__wrapped__
+        return Dependency(member=member, module=module)
 
 
 def transient(target: T) -> T:
@@ -598,3 +934,51 @@ def singleton(target: T) -> T:
     """Decorator for marking a class as singleton scope."""
     setattr(target, "__scope__", "singleton")
     return target
+
+
+def provider(
+    *, scope: Scope, override: bool = False
+) -> Callable[[Callable[Concatenate[M, P], T]], Callable[Concatenate[M, P], T]]:
+    """Decorator for marking a function or method as a provider in a AnyDI module."""
+
+    def decorator(
+        target: Callable[Concatenate[M, P], T],
+    ) -> Callable[Concatenate[M, P], T]:
+        setattr(
+            target,
+            "__provider__",
+            ProviderDecoratorArgs(scope=scope, override=override),
+        )
+        return target
+
+    return decorator
+
+
+@overload
+def injectable(func: Callable[P, T]) -> Callable[P, T]: ...
+
+
+@overload
+def injectable(
+    *, tags: Iterable[str] | None = None
+) -> Callable[[Callable[P, T]], Callable[P, T]]: ...
+
+
+def injectable(
+    func: Callable[P, T] | None = None,
+    tags: Iterable[str] | None = None,
+) -> Callable[[Callable[P, T]], Callable[P, T]] | Callable[P, T]:
+    """Decorator for marking a function or method as requiring dependency injection."""
+
+    def decorator(inner: Callable[P, T]) -> Callable[P, T]:
+        setattr(
+            inner,
+            "__injectable__",
+            InjectableDecoratorArgs(wrapped=True, tags=tags),
+        )
+        return inner
+
+    if func is None:
+        return decorator
+
+    return decorator(func)

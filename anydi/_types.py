@@ -1,16 +1,16 @@
 from __future__ import annotations
 
 import inspect
+from collections.abc import Iterable
 from dataclasses import dataclass
-from typing import Annotated, Any, TypeVar, Union
+from types import ModuleType
+from typing import Annotated, Any, NamedTuple, Union
 
 from typing_extensions import Literal, Self, TypeAlias
 
 Scope = Literal["transient", "singleton", "request"]
 
-T = TypeVar("T")
 AnyInterface: TypeAlias = Union[type[Any], Annotated[Any, ...]]
-Interface: TypeAlias = type[T]
 
 
 class Marker:
@@ -47,3 +47,19 @@ class DependencyWrapper:
         if name in {"interface", "instance"}:
             return object.__getattribute__(self, name)
         return getattr(self.instance, name)
+
+
+class ProviderDecoratorArgs(NamedTuple):
+    scope: Scope
+    override: bool
+
+
+@dataclass(frozen=True)
+class Dependency:
+    member: Any
+    module: ModuleType
+
+
+class InjectableDecoratorArgs(NamedTuple):
+    wrapped: bool
+    tags: Iterable[str] | None
