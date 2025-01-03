@@ -8,15 +8,11 @@ import importlib
 import inspect
 import re
 import sys
+from types import TracebackType
 from typing import Any, Callable, ForwardRef, TypeVar
 
-from typing_extensions import ParamSpec, get_args, get_origin
-
-try:
-    import anyio  # noqa
-except ImportError:
-    anyio = None  # type: ignore[assignment]
-
+import anyio
+from typing_extensions import ParamSpec, Self, get_args, get_origin
 
 T = TypeVar("T")
 P = ParamSpec("P")
@@ -46,6 +42,16 @@ def get_full_qualname(obj: Any) -> str:
 def is_builtin_type(tp: type[Any]) -> bool:
     """Check if the given type is a built-in type."""
     return tp.__module__ == builtins.__name__
+
+
+def is_context_manager(obj: Any) -> bool:
+    """Check if the given object is a context manager."""
+    return hasattr(obj, "__enter__") and hasattr(obj, "__exit__")
+
+
+def is_async_context_manager(obj: Any) -> bool:
+    """Check if the given object is an async context manager."""
+    return hasattr(obj, "__aenter__") and hasattr(obj, "__aexit__")
 
 
 def get_typed_annotation(
@@ -82,11 +88,6 @@ async def run_async(
     **kwargs: P.kwargs,
 ) -> T:
     """Runs the given function asynchronously using the `anyio` library."""
-    if not anyio:
-        raise ImportError(
-            "`anyio` library is not currently installed. Please make sure to install "
-            "it first, or consider using `anydi[full]` instead."
-        )
     return await anyio.to_thread.run_sync(functools.partial(func, *args, **kwargs))
 
 
@@ -103,3 +104,39 @@ def import_string(dotted_path: str) -> Any:
             return importlib.import_module(attribute_name)
     except (ImportError, AttributeError) as exc:
         raise ImportError(f"Cannot import '{dotted_path}': {exc}") from exc
+
+
+class AsyncRLock:
+    def __init__(self) -> None:
+        self._lock = anyio.Lock()
+        self._owner: anyio.TaskInfo | None = None
+        self._count = 0
+
+    async def acquire(self) -> None:
+        current_task = anyio.get_current_task()
+        if self._owner == current_task:
+            self._count += 1
+        else:
+            await self._lock.acquire()
+            self._owner = current_task
+            self._count = 1
+
+    def release(self) -> None:
+        if self._owner != anyio.get_current_task():
+            raise RuntimeError("Lock can only be released by the owner")
+        self._count -= 1
+        if self._count == 0:
+            self._owner = None
+            self._lock.release()
+
+    async def __aenter__(self) -> Self:
+        await self.acquire()
+        return self
+
+    async def __aexit__(
+        self,
+        exc_type: type[BaseException] | None,
+        exc_val: BaseException | None,
+        exc_tb: TracebackType | None,
+    ) -> Any:
+        self.release()

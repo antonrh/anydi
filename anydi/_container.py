@@ -5,6 +5,7 @@ from __future__ import annotations
 import contextlib
 import functools
 import inspect
+import threading
 import types
 from collections import defaultdict
 from collections.abc import AsyncIterator, Iterable, Iterator, Sequence
@@ -26,7 +27,7 @@ from ._module import Module, ModuleRegistry
 from ._provider import Provider
 from ._scanner import Scanner
 from ._types import AnyInterface, DependencyWrapper, Interface, Scope, is_marker
-from ._utils import get_full_qualname, get_typed_parameters, is_builtin_type
+from ._utils import AsyncRLock, get_full_qualname, get_typed_parameters, is_builtin_type
 
 T = TypeVar("T", bound=Any)
 P = ParamSpec("P")
@@ -54,6 +55,8 @@ class Container:
         self._providers: dict[type[Any], Provider] = {}
         self._resource_cache: dict[Scope, list[type[Any]]] = defaultdict(list)
         self._singleton_context = SingletonContext(self)
+        self._singleton_lock = threading.RLock()
+        self._singleton_async_lock = AsyncRLock()
         self._transient_context = TransientContext(self)
         self._request_context_var: ContextVar[RequestContext | None] = ContextVar(
             "request_context", default=None
@@ -366,7 +369,11 @@ class Container:
 
         provider = self._get_or_register_provider(interface)
         scoped_context = self._get_scoped_context(provider.scope)
-        instance, created = scoped_context.get_or_create(provider)
+        if provider.scope == "singleton":
+            with self._singleton_lock:
+                instance, created = scoped_context.get_or_create(provider)
+        else:
+            instance, created = scoped_context.get_or_create(provider)
         if self.testing and created:
             self._patch_test_resolver(instance)
         return cast(T, instance)
@@ -384,7 +391,11 @@ class Container:
 
         provider = self._get_or_register_provider(interface)
         scoped_context = self._get_scoped_context(provider.scope)
-        instance, created = await scoped_context.aget_or_create(provider)
+        if provider.scope == "singleton":
+            async with self._singleton_async_lock:
+                instance, created = await scoped_context.aget_or_create(provider)
+        else:
+            instance, created = await scoped_context.aget_or_create(provider)
         if self.testing and created:
             self._patch_test_resolver(instance)
         return cast(T, instance)
