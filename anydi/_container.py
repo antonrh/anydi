@@ -451,6 +451,17 @@ class Container:
             return instance, True
         return instance, False
 
+    async def _aget_or_create_instance(
+        self, provider: Provider, context: InstanceContext
+    ) -> tuple[Any, bool]:
+        """Get an async instance of a dependency from the scoped context."""
+        instance = context.get(provider.interface)
+        if instance is None:
+            instance = await self._acreate_instance(provider, context=context)
+            context.set(provider.interface, instance)
+            return instance, True
+        return instance, False
+
     def _create_instance(
         self,
         provider: Provider,
@@ -512,17 +523,6 @@ class Container:
         if context is not None and is_async_context_manager(instance):
             await context.aenter(instance)
         return instance
-
-    async def _aget_or_create_instance(
-        self, provider: Provider, context: InstanceContext
-    ) -> tuple[Any, bool]:
-        """Get an async instance of a dependency from the scoped context."""
-        instance = context.get(provider.interface)
-        if instance is None:
-            instance = await self._acreate_instance(provider, context=context)
-            context.set(provider.interface, instance)
-            return instance, True
-        return instance, False
 
     def _get_provided_args(
         self,
