@@ -13,13 +13,12 @@ from contextvars import ContextVar
 from typing import Any, Callable, TypeVar, cast, overload
 from weakref import WeakKeyDictionary
 
-import anyio
 from typing_extensions import ParamSpec, Self, final
 
 from ._context import InstanceContext
 from ._logger import logger
 from ._module import Module, ModuleRegistry
-from ._provider import CallableKind, Provider
+from ._provider import Provider
 from ._scanner import Scanner
 from ._types import (
     AnyInterface,
@@ -29,10 +28,12 @@ from ._types import (
     is_marker,
 )
 from ._utils import (
+    AsyncRLock,
     get_full_qualname,
     get_typed_parameters,
     is_async_context_manager,
     is_builtin_type,
+    is_context_manager,
     run_async,
 )
 
@@ -63,7 +64,7 @@ class Container:
         self._resources: dict[str, list[type[Any]]] = defaultdict(list)
         self._singleton_context = InstanceContext()
         self._singleton_lock = threading.RLock()
-        self._singleton_async_lock = anyio.Lock()
+        self._singleton_async_lock = AsyncRLock()
         self._request_context_var: ContextVar[InstanceContext | None] = ContextVar(
             "request_context", default=None
         )
@@ -471,15 +472,11 @@ class Container:
             return context.enter(cm)
 
         instance = provider.call(*args, **kwargs)
-        if hasattr(instance, "__enter__") and hasattr(instance, "__exit__"):
-            if context is None:
-                raise ValueError(
-                    "The context is required for context manager providers."
-                )
+        if context is not None and is_context_manager(instance):
             context.enter(instance)
         return instance
 
-    async def _acreate_instance(  # noqa: C901
+    async def _acreate_instance(
         self,
         provider: Provider,
         context: InstanceContext | None = None,
@@ -487,18 +484,13 @@ class Container:
         """Create an instance asynchronously using the provider."""
         args, kwargs = await self._aget_provided_args(provider, context=context)
 
-        if provider.kind == CallableKind.COROUTINE:
+        if provider.is_coroutine:
             instance = await provider.call(*args, **kwargs)
-            if is_async_context_manager(instance):
-                if context is None:
-                    raise ValueError(
-                        "The async stack is required for "
-                        "async context manager providers."
-                    )
+            if context is not None and is_async_context_manager(instance):
                 await context.aenter(instance)
             return instance
 
-        elif provider.kind == CallableKind.ASYNC_GENERATOR:
+        if provider.is_async_generator:
             if context is None:
                 raise ValueError(
                     "The async stack is required for async generator providers."
@@ -506,7 +498,7 @@ class Container:
             cm = contextlib.asynccontextmanager(provider.call)(*args, **kwargs)
             return await context.aenter(cm)
 
-        elif provider.kind == CallableKind.GENERATOR:
+        if provider.is_generator:
 
             def _create() -> Any:
                 if context is None:
@@ -517,11 +509,7 @@ class Container:
             return await run_async(_create)
 
         instance = await run_async(provider.call, *args, **kwargs)
-        if is_async_context_manager(instance):
-            if context is None:
-                raise ValueError(
-                    "The async stack is required for async context manager providers."
-                )
+        if context is not None and is_async_context_manager(instance):
             await context.aenter(instance)
         return instance
 
