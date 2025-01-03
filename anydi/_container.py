@@ -525,11 +525,15 @@ class Container:
         return instance, False
 
     def _get_provided_args(
-        self, provider: Provider, context: InstanceContext | None
+        self,
+        provider: Provider,
+        context: InstanceContext | None,
+        *args: Any,
+        **kwargs: Any,
     ) -> tuple[list[Any], dict[str, Any]]:
         """Retrieve the arguments for a provider."""
-        args: list[Any] = []
-        kwargs: dict[str, Any] = {}
+        provided_args: list[Any] = []
+        provided_kwargs: dict[str, Any] = {}
 
         for parameter in provider.parameters:
             if parameter.annotation in self._override_instances:
@@ -549,19 +553,21 @@ class Container:
                             interface=parameter.annotation, instance=instance
                         )
             if parameter.kind == parameter.POSITIONAL_ONLY:
-                args.append(instance)
+                provided_args.append(instance)
             else:
-                kwargs[parameter.name] = instance
-        return args, kwargs
+                provided_kwargs[parameter.name] = instance
+        return provided_args, provided_kwargs
 
     async def _aget_provided_args(
         self,
         provider: Provider,
         context: InstanceContext | None,
+        *args: Any,
+        **kwargs: Any,
     ) -> tuple[list[Any], dict[str, Any]]:
         """Asynchronously retrieve the arguments for a provider."""
-        args: list[Any] = []
-        kwargs: dict[str, Any] = {}
+        provided_args: list[Any] = []
+        provided_kwargs: dict[str, Any] = {}
 
         for parameter in provider.parameters:
             if parameter.annotation in self._override_instances:
@@ -581,10 +587,10 @@ class Container:
                             interface=parameter.annotation, instance=instance
                         )
             if parameter.kind == parameter.POSITIONAL_ONLY:
-                args.append(instance)
+                provided_args.append(instance)
             else:
-                kwargs[parameter.name] = instance
-        return args, kwargs
+                provided_kwargs[parameter.name] = instance
+        return provided_args, provided_kwargs
 
     def _resolve_parameter(
         self, provider: Provider, parameter: inspect.Parameter
@@ -695,19 +701,14 @@ class Container:
     ) -> Callable[[Callable[P, T]], Callable[P, T]] | Callable[P, T]:
         """Decorator to inject dependencies into a callable."""
 
-        def decorator(
-            call: Callable[P, T],
-        ) -> Callable[P, T]:
+        def decorator(call: Callable[P, T]) -> Callable[P, T]:
             return self._inject(call)
 
         if func is None:
             return decorator
         return decorator(func)
 
-    def _inject(
-        self,
-        call: Callable[P, T],
-    ) -> Callable[P, T]:
+    def _inject(self, call: Callable[P, T]) -> Callable[P, T]:
         """Inject dependencies into a callable."""
         if call in self._inject_cache:
             return cast(Callable[P, T], self._inject_cache[call])
