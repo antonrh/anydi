@@ -1,5 +1,8 @@
+import asyncio
 import logging
 import sys
+import threading
+import time
 import uuid
 from collections.abc import AsyncIterator, Iterator, Sequence
 from dataclasses import dataclass
@@ -522,6 +525,31 @@ def test_resolve_singleton_resource(container: Container) -> None:
     container.resolve(str)
 
 
+def test_resolve_singleton_scoped_thread_safe() -> None:
+    container = Container()
+
+    @container.provider(scope="singleton")
+    def provide_service() -> Service:
+        time.sleep(0.1)
+        return Service(ident="test")
+
+    service_ids = set()
+
+    def use_service() -> None:
+        service = container.resolve(Service)
+        service_ids.add(id(service))
+
+    threads = [threading.Thread(target=use_service) for _ in range(5)]
+
+    for thread in threads:
+        thread.start()
+
+    for thread in threads:
+        thread.join()
+
+    assert len(service_ids) == 1
+
+
 async def test_resolve_singleton_async_resource(container: Container) -> None:
     instance = "test"
 
@@ -597,6 +625,27 @@ async def test_resolve_singleton_annotated_async_resource(container: Container) 
     result = await container.aresolve(Annotated[str, "message"])
 
     assert result == instance
+
+
+async def test_resolve_singleton_scoped_coro_safe() -> None:
+    container = Container()
+
+    @container.provider(scope="singleton")
+    async def provide_service() -> Service:
+        await asyncio.sleep(0.1)
+        return Service(ident="test")
+
+    service_ids = set()
+
+    async def use_service() -> None:
+        service = await container.aresolve(Service)
+        service_ids.add(id(service))
+
+    tasks = [use_service() for _ in range(5)]
+
+    await asyncio.gather(*tasks)
+
+    assert len(service_ids) == 1
 
 
 def test_resolve_request_scoped(container: Container) -> None:
