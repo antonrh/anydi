@@ -4,25 +4,29 @@ from __future__ import annotations
 
 import contextlib
 import functools
+import importlib
 import inspect
+import pkgutil
 import threading
 import types
 from collections import defaultdict
 from collections.abc import AsyncIterator, Iterable, Iterator, Sequence
 from contextvars import ContextVar
-from typing import Any, Callable, TypeVar, cast, overload
+from types import ModuleType
+from typing import Any, Callable, TypeVar, Union, cast, overload
 from weakref import WeakKeyDictionary
 
-from typing_extensions import ParamSpec, Self, final
+from typing_extensions import Concatenate, ParamSpec, Self, final
 
 from ._context import InstanceContext
 from ._logger import logger
-from ._module import Module, ModuleRegistry
 from ._provider import Provider
-from ._scanner import Scanner
 from ._types import (
     AnyInterface,
+    Dependency,
     DependencyWrapper,
+    InjectableDecoratorArgs,
+    ProviderDecoratorArgs,
     Scope,
     is_event_type,
     is_marker,
@@ -31,6 +35,7 @@ from ._utils import (
     AsyncRLock,
     get_full_qualname,
     get_typed_parameters,
+    import_string,
     is_async_context_manager,
     is_builtin_type,
     is_context_manager,
@@ -38,6 +43,7 @@ from ._utils import (
 )
 
 T = TypeVar("T", bound=Any)
+M = TypeVar("M", bound="Module")
 P = ParamSpec("P")
 
 ALLOWED_SCOPES: dict[Scope, list[Scope]] = {
@@ -45,6 +51,27 @@ ALLOWED_SCOPES: dict[Scope, list[Scope]] = {
     "request": ["request", "singleton"],
     "transient": ["transient", "request", "singleton"],
 }
+
+
+class ModuleMeta(type):
+    """A metaclass used for the Module base class."""
+
+    def __new__(cls, name: str, bases: tuple[type, ...], attrs: dict[str, Any]) -> Any:
+        attrs["providers"] = [
+            (name, getattr(value, "__provider__"))
+            for name, value in attrs.items()
+            if hasattr(value, "__provider__")
+        ]
+        return super().__new__(cls, name, bases, attrs)
+
+
+class Module(metaclass=ModuleMeta):
+    """A base class for defining AnyDI modules."""
+
+    providers: list[tuple[str, ProviderDecoratorArgs]]
+
+    def configure(self, container: Container) -> None:
+        """Configure the AnyDI container with providers and their dependencies."""
 
 
 @final
@@ -75,10 +102,6 @@ class Container:
         self._inject_cache: WeakKeyDictionary[
             Callable[..., Any], Callable[..., Any]
         ] = WeakKeyDictionary()
-
-        # Components
-        self._modules = ModuleRegistry(self)
-        self._scanner = Scanner(self)
 
         # Register providers
         providers = providers or []
@@ -278,7 +301,27 @@ class Container:
         self, module: Module | type[Module] | Callable[[Container], None] | str
     ) -> None:
         """Register a module as a callable, module type, or module instance."""
-        self._modules.register(module)
+        # Callable Module
+        if inspect.isfunction(module):
+            module(self)
+            return
+
+        # Module path
+        if isinstance(module, str):
+            module = import_string(module)
+
+        # Class based Module or Module type
+        if inspect.isclass(module) and issubclass(module, Module):
+            module = module()
+
+        if isinstance(module, Module):
+            module.configure(self)
+            for provider_name, decorator_args in module.providers:
+                obj = getattr(module, provider_name)
+                self.provider(
+                    scope=decorator_args.scope,
+                    override=decorator_args.override,
+                )(obj)
 
     def __enter__(self) -> Self:
         """Enter the singleton context."""
@@ -782,12 +825,97 @@ class Container:
     def scan(
         self,
         /,
-        packages: types.ModuleType | str | Iterable[types.ModuleType | str],
+        packages: ModuleType | str | Iterable[ModuleType | str],
         *,
         tags: Iterable[str] | None = None,
     ) -> None:
         """Scan packages or modules for decorated members and inject dependencies."""
-        self._scanner.scan(packages, tags=tags)
+        dependencies: list[Dependency] = []
+
+        if isinstance(packages, Iterable) and not isinstance(packages, str):
+            scan_packages: Iterable[ModuleType | str] = packages
+        else:
+            scan_packages = cast(Iterable[Union[ModuleType, str]], [packages])
+
+        for package in scan_packages:
+            dependencies.extend(self._scan_package(package, tags=tags))
+
+        for dependency in dependencies:
+            decorator = self.inject()(dependency.member)
+            setattr(dependency.module, dependency.member.__name__, decorator)
+
+    def _scan_package(
+        self,
+        package: ModuleType | str,
+        *,
+        tags: Iterable[str] | None = None,
+    ) -> list[Dependency]:
+        """Scan a package or module for decorated members."""
+        tags = tags or []
+        if isinstance(package, str):
+            package = importlib.import_module(package)
+
+        package_path = getattr(package, "__path__", None)
+
+        if not package_path:
+            return self._scan_module(package, tags=tags)
+
+        dependencies: list[Dependency] = []
+
+        for module_info in pkgutil.walk_packages(
+            path=package_path, prefix=package.__name__ + "."
+        ):
+            module = importlib.import_module(module_info.name)
+            dependencies.extend(self._scan_module(module, tags=tags))
+
+        return dependencies
+
+    def _scan_module(
+        self, module: ModuleType, *, tags: Iterable[str]
+    ) -> list[Dependency]:
+        """Scan a module for decorated members."""
+        dependencies: list[Dependency] = []
+
+        for _, member in inspect.getmembers(module):
+            if getattr(member, "__module__", None) != module.__name__ or not callable(
+                member
+            ):
+                continue
+
+            decorator_args: InjectableDecoratorArgs = getattr(
+                member,
+                "__injectable__",
+                InjectableDecoratorArgs(wrapped=False, tags=[]),
+            )
+
+            if tags and (
+                decorator_args.tags
+                and not set(decorator_args.tags).intersection(tags)
+                or not decorator_args.tags
+            ):
+                continue
+
+            if decorator_args.wrapped:
+                dependencies.append(
+                    self._create_dependency(member=member, module=module)
+                )
+                continue
+
+            # Get by Marker
+            for parameter in get_typed_parameters(member):
+                if is_marker(parameter.default):
+                    dependencies.append(
+                        self._create_dependency(member=member, module=module)
+                    )
+                    continue
+
+        return dependencies
+
+    def _create_dependency(self, member: Any, module: ModuleType) -> Dependency:
+        """Create a `Dependency` object from the scanned member and module."""
+        if hasattr(member, "__wrapped__"):
+            member = member.__wrapped__
+        return Dependency(member=member, module=module)
 
 
 def transient(target: T) -> T:
@@ -806,3 +934,51 @@ def singleton(target: T) -> T:
     """Decorator for marking a class as singleton scope."""
     setattr(target, "__scope__", "singleton")
     return target
+
+
+def provider(
+    *, scope: Scope, override: bool = False
+) -> Callable[[Callable[Concatenate[M, P], T]], Callable[Concatenate[M, P], T]]:
+    """Decorator for marking a function or method as a provider in a AnyDI module."""
+
+    def decorator(
+        target: Callable[Concatenate[M, P], T],
+    ) -> Callable[Concatenate[M, P], T]:
+        setattr(
+            target,
+            "__provider__",
+            ProviderDecoratorArgs(scope=scope, override=override),
+        )
+        return target
+
+    return decorator
+
+
+@overload
+def injectable(func: Callable[P, T]) -> Callable[P, T]: ...
+
+
+@overload
+def injectable(
+    *, tags: Iterable[str] | None = None
+) -> Callable[[Callable[P, T]], Callable[P, T]]: ...
+
+
+def injectable(
+    func: Callable[P, T] | None = None,
+    tags: Iterable[str] | None = None,
+) -> Callable[[Callable[P, T]], Callable[P, T]] | Callable[P, T]:
+    """Decorator for marking a function or method as requiring dependency injection."""
+
+    def decorator(inner: Callable[P, T]) -> Callable[P, T]:
+        setattr(
+            inner,
+            "__injectable__",
+            InjectableDecoratorArgs(wrapped=True, tags=tags),
+        )
+        return inner
+
+    if func is None:
+        return decorator
+
+    return decorator(func)
