@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import contextlib
 from types import TracebackType
 from typing import Any
