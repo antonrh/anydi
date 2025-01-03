@@ -10,7 +10,12 @@ from typing_extensions import Self, final
 
 from ._provider import CallableKind, Provider
 from ._types import AnyInterface, DependencyWrapper, Scope, is_event_type
-from ._utils import get_full_qualname, run_async
+from ._utils import (
+    get_full_qualname,
+    is_async_context_manager,
+    is_context_manager,
+    run_async,
+)
 
 if TYPE_CHECKING:
     from ._container import Container
@@ -188,7 +193,7 @@ class ResourceScopedContext(ScopedContext):
         """Create an instance using the provider."""
         instance = super()._create_instance(provider)
         # Enter the context manager if the instance is closable.
-        if hasattr(instance, "__enter__") and hasattr(instance, "__exit__"):
+        if is_context_manager(instance):
             self._stack.enter_context(instance)
         return instance
 
@@ -202,7 +207,7 @@ class ResourceScopedContext(ScopedContext):
         """Create an instance asynchronously using the provider."""
         instance = await super()._acreate_instance(provider)
         # Enter the context manager if the instance is closable.
-        if hasattr(instance, "__aenter__") and hasattr(instance, "__aexit__"):
+        if is_async_context_manager(instance):
             await self._async_stack.enter_async_context(instance)
         return instance
 
@@ -233,8 +238,6 @@ class ResourceScopedContext(ScopedContext):
     @abc.abstractmethod
     def start(self) -> None:
         """Start the scoped context."""
-        for interface in self.container._resource_cache.get(self.scope, []):  # noqa
-            self.container.resolve(interface)
 
     def close(self) -> None:
         """Close the scoped context."""
