@@ -10,13 +10,8 @@ import re
 import sys
 from typing import Any, Callable, ForwardRef, TypeVar
 
+import anyio
 from typing_extensions import ParamSpec, get_args, get_origin
-
-try:
-    import anyio  # noqa
-except ImportError:
-    anyio = None  # type: ignore[assignment]
-
 
 T = TypeVar("T")
 P = ParamSpec("P")
@@ -92,11 +87,6 @@ async def run_async(
     **kwargs: P.kwargs,
 ) -> T:
     """Runs the given function asynchronously using the `anyio` library."""
-    if not anyio:
-        raise ImportError(
-            "`anyio` library is not currently installed. Please make sure to install "
-            "it first, or consider using `anydi[full]` instead."
-        )
     return await anyio.to_thread.run_sync(functools.partial(func, *args, **kwargs))
 
 

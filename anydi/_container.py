@@ -5,6 +5,7 @@ from __future__ import annotations
 import contextlib
 import functools
 import inspect
+import threading
 import types
 from collections import defaultdict
 from collections.abc import AsyncIterator, Iterable, Iterator, Sequence
@@ -12,6 +13,7 @@ from contextvars import ContextVar
 from typing import Any, Callable, TypeVar, cast, overload
 from weakref import WeakKeyDictionary
 
+import anyio
 from typing_extensions import ParamSpec, Self, final
 
 from ._context import InstanceContext
@@ -60,6 +62,8 @@ class Container:
         self._providers: dict[type[Any], Provider] = {}
         self._resources: dict[str, list[type[Any]]] = defaultdict(list)
         self._singleton_context = InstanceContext()
+        self._singleton_lock = threading.RLock()
+        self._singleton_async_lock = anyio.Lock()
         self._request_context_var: ContextVar[InstanceContext | None] = ContextVar(
             "request_context", default=None
         )
@@ -393,7 +397,15 @@ class Container:
             instance, created = self._create_instance(provider), True
         else:
             context = self._get_scoped_context(provider.scope)
-            instance, created = self._get_or_create_instance(provider, context=context)
+            if provider.scope == "singleton":
+                with self._singleton_lock:
+                    instance, created = self._get_or_create_instance(
+                        provider, context=context
+                    )
+            else:
+                instance, created = self._get_or_create_instance(
+                    provider, context=context
+                )
         if self.testing and created:
             self._patch_test_resolver(instance)
         return cast(T, instance)
@@ -414,9 +426,15 @@ class Container:
             instance, created = await self._acreate_instance(provider), True
         else:
             context = self._get_scoped_context(provider.scope)
-            instance, created = await self._aget_or_create_instance(
-                provider, context=context
-            )
+            if provider.scope == "singleton":
+                async with self._singleton_async_lock:
+                    instance, created = await self._aget_or_create_instance(
+                        provider, context=context
+                    )
+            else:
+                instance, created = await self._aget_or_create_instance(
+                    provider, context=context
+                )
         if self.testing and created:
             self._patch_test_resolver(instance)
         return cast(T, instance)
