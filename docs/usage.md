@@ -437,7 +437,7 @@ container = Container()
 
 
 @container.provider(scope="singleton")
-async def resource_provider() -> t.AsyncIterator[Resource]:
+async def resource_provider() -> AsyncIterator[Resource]:
     resource = Resource(name="demo")
     await resource.start()
     yield resource
