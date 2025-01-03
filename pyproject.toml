@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "anydi"
-version = "0.34.1a0"
+version = "0.34.1a1"
 description = "Dependency Injection library"
 authors = ["Anton Ruhlov <antonruhlov@gmail.com>"]
 license = "MIT"
@@ -36,7 +36,7 @@ packages = [
 [tool.poetry.dependencies]
 python = "^3.9"
 typing-extensions = "^4.12.1"
-anyio = "^3.6.2"
+anyio = ">=3.7.1"
 mkdocs = { version = "^1.4.2", optional = true }
 mkdocs-material = { version = "^9.5.29", optional = true }
 
