@@ -6,6 +6,7 @@ import contextlib
 import functools
 import importlib
 import inspect
+import logging
 import pkgutil
 import threading
 import types
@@ -19,7 +20,6 @@ from weakref import WeakKeyDictionary
 from typing_extensions import Concatenate, ParamSpec, Self, final
 
 from ._context import InstanceContext
-from ._logger import logger
 from ._provider import Provider
 from ._types import (
     AnyInterface,
@@ -86,8 +86,12 @@ class Container:
         | None = None,
         strict: bool = False,
         testing: bool = False,
+        logger: logging.Logger | None = None,
     ) -> None:
         self._providers: dict[type[Any], Provider] = {}
+        self._strict = strict
+        self._testing = testing
+        self._logger = logger or logging.getLogger(__name__)
         self._resources: dict[str, list[type[Any]]] = defaultdict(list)
         self._singleton_context = InstanceContext()
         self._singleton_lock = threading.RLock()
@@ -96,8 +100,6 @@ class Container:
             "request_context", default=None
         )
         self._override_instances: dict[type[Any], Any] = {}
-        self._strict = strict
-        self._testing = testing
         self._unresolved_interfaces: set[type[Any]] = set()
         self._inject_cache: WeakKeyDictionary[
             Callable[..., Any], Callable[..., Any]
@@ -127,6 +129,11 @@ class Container:
     def providers(self) -> dict[type[Any], Provider]:
         """Get the registered providers."""
         return self._providers
+
+    @property
+    def logger(self) -> logging.Logger:
+        """Get the logger instance."""
+        return self._logger
 
     def is_registered(self, interface: AnyInterface) -> bool:
         """Check if a provider is registered for the specified interface."""
@@ -790,7 +797,7 @@ class Container:
                 self._validate_injected_parameter(call, parameter)
             except LookupError as exc:
                 if not self.strict:
-                    logger.debug(
+                    self.logger.debug(
                         f"Cannot validate the `{get_full_qualname(call)}` parameter "
                         f"`{parameter.name}` with an annotation of "
                         f"`{get_full_qualname(parameter.annotation)} due to being "
