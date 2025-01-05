@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import inspect
 from collections.abc import Iterable
-from dataclasses import dataclass
 from types import ModuleType
 from typing import Annotated, Any, NamedTuple, Union
 
@@ -38,13 +37,15 @@ def is_event_type(obj: Any) -> bool:
     return inspect.isclass(obj) and issubclass(obj, Event)
 
 
-@dataclass(frozen=True)
 class DependencyWrapper:
-    interface: type[Any]
-    instance: Any
+    __slots__ = ("interface", "instance")
+
+    def __init__(self, *, interface: type[Any], instance: Any):
+        self.interface = interface
+        self.instance = instance
 
     def __getattribute__(self, name: str) -> Any:
-        if name in {"interface", "instance"}:
+        if name in ("interface", "instance"):
             return object.__getattribute__(self, name)
         return getattr(self.instance, name)
 
@@ -54,8 +55,7 @@ class ProviderDecoratorArgs(NamedTuple):
     override: bool
 
 
-@dataclass(frozen=True)
-class Dependency:
+class Dependency(NamedTuple):
     member: Any
     module: ModuleType
 
