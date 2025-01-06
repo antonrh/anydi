@@ -203,7 +203,7 @@ class Container:
             ) from exc
 
     def _get_or_register_provider(
-        self, interface: type[T], parent_scope: Scope | None = None
+        self, interface: AnyInterface, parent_scope: Scope | None = None
     ) -> Provider:
         """Get or register a provider by interface."""
         try:
