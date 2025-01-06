@@ -784,7 +784,7 @@ from anydi import Container
 
 @pytest.fixture(scope="session")
 def container() -> Container:
-    container = Container()  # or pass your application container
+    container = Container(testing=True)  # or pass your application container
     container.register(
         Annotated[str, "message"],
         lambda: "Hello, world!",
