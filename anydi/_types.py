@@ -37,7 +37,7 @@ def is_event_type(obj: Any) -> bool:
     return inspect.isclass(obj) and issubclass(obj, Event)
 
 
-class DependencyWrapper:
+class InstanceProxy:
     __slots__ = ("interface", "instance")
 
     def __init__(self, *, interface: type[Any], instance: Any):
@@ -48,6 +48,9 @@ class DependencyWrapper:
         if name in ("interface", "instance"):
             return object.__getattribute__(self, name)
         return getattr(self.instance, name)
+
+    def __repr__(self) -> str:
+        return f"InstanceProxy({self.interface!r})"
 
 
 class ProviderDecoratorArgs(NamedTuple):

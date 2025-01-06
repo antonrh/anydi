@@ -24,8 +24,8 @@ from ._provider import Provider
 from ._types import (
     AnyInterface,
     Dependency,
-    DependencyWrapper,
     InjectableDecoratorArgs,
+    InstanceProxy,
     ProviderDecoratorArgs,
     Scope,
     is_event_type,
@@ -203,7 +203,7 @@ class Container:
             ) from exc
 
     def _get_or_register_provider(
-        self, interface: AnyInterface, parent_scope: Scope | None = None
+        self, interface: type[T], parent_scope: Scope | None = None
     ) -> Provider:
         """Get or register a provider by interface."""
         try:
@@ -445,7 +445,7 @@ class Container:
 
         provider = self._get_or_register_provider(interface)
         if provider.scope == "transient":
-            instance, created = self._create_instance(provider), True
+            instance, created = self._create_instance(provider, None), True
         else:
             context = self._get_scoped_context(provider.scope)
             if provider.scope == "singleton":
@@ -474,7 +474,7 @@ class Container:
 
         provider = self._get_or_register_provider(interface)
         if provider.scope == "transient":
-            instance, created = await self._acreate_instance(provider), True
+            instance, created = await self._acreate_instance(provider, None), True
         else:
             context = self._get_scoped_context(provider.scope)
             if provider.scope == "singleton":
@@ -488,6 +488,38 @@ class Container:
                 )
         if self.testing and created:
             self._patch_test_resolver(instance)
+        return cast(T, instance)
+
+    def create(self, interface: type[T], *args: Any, **kwargs: Any) -> T:
+        """Create an instance by interface."""
+        provider = self._get_or_register_provider(interface)
+        if provider.scope == "transient":
+            instance = self._create_instance(provider, None, *args, **kwargs)
+        else:
+            context = self._get_scoped_context(provider.scope)
+            if provider.scope == "singleton":
+                with self._singleton_lock:
+                    instance = self._create_instance(provider, context, *args, **kwargs)
+            else:
+                instance = self._create_instance(provider, context, *args, **kwargs)
+        return cast(T, instance)
+
+    async def acreate(self, interface: type[T], *args: Any, **kwargs: Any) -> T:
+        """Create an instance by interface."""
+        provider = self._get_or_register_provider(interface)
+        if provider.scope == "transient":
+            instance = await self._acreate_instance(provider, None, *args, **kwargs)
+        else:
+            context = self._get_scoped_context(provider.scope)
+            if provider.scope == "singleton":
+                async with self._singleton_async_lock:
+                    instance = await self._acreate_instance(
+                        provider, context, *args, **kwargs
+                    )
+            else:
+                instance = await self._acreate_instance(
+                    provider, context, *args, **kwargs
+                )
         return cast(T, instance)
 
     def _get_or_create_instance(
@@ -515,7 +547,9 @@ class Container:
     def _create_instance(
         self,
         provider: Provider,
-        context: InstanceContext | None = None,
+        context: InstanceContext | None,
+        *args: Any,
+        **kwargs: Any,
     ) -> Any:
         """Create an instance using the provider."""
         if provider.is_async:
@@ -524,15 +558,19 @@ class Container:
                 "synchronous mode."
             )
 
-        args, kwargs = self._get_provided_args(provider, context=context)
+        provider_args, provider_kwargs = self._get_provided_args(
+            provider, context, *args, **kwargs
+        )
 
         if provider.is_generator:
             if context is None:
                 raise ValueError("The context is required for generator providers.")
-            cm = contextlib.contextmanager(provider.call)(*args, **kwargs)
+            cm = contextlib.contextmanager(provider.call)(
+                *provider_args, **provider_kwargs
+            )
             return context.enter(cm)
 
-        instance = provider.call(*args, **kwargs)
+        instance = provider.call(*provider_args, **provider_kwargs)
         if context is not None and is_context_manager(instance):
             context.enter(instance)
         return instance
@@ -540,13 +578,17 @@ class Container:
     async def _acreate_instance(
         self,
         provider: Provider,
-        context: InstanceContext | None = None,
+        context: InstanceContext | None,
+        *args: Any,
+        **kwargs: Any,
     ) -> Any:
         """Create an instance asynchronously using the provider."""
-        args, kwargs = await self._aget_provided_args(provider, context=context)
+        provider_args, provider_kwargs = await self._aget_provided_args(
+            provider, context, *args, **kwargs
+        )
 
         if provider.is_coroutine:
-            instance = await provider.call(*args, **kwargs)
+            instance = await provider.call(*provider_args, **provider_kwargs)
             if context is not None and is_async_context_manager(instance):
                 await context.aenter(instance)
             return instance
@@ -556,7 +598,9 @@ class Container:
                 raise ValueError(
                     "The async stack is required for async generator providers."
                 )
-            cm = contextlib.asynccontextmanager(provider.call)(*args, **kwargs)
+            cm = contextlib.asynccontextmanager(provider.call)(
+                *provider_args, **provider_kwargs
+            )
             return await context.aenter(cm)
 
         if provider.is_generator:
@@ -564,12 +608,14 @@ class Container:
             def _create() -> Any:
                 if context is None:
                     raise ValueError("The stack is required for generator providers.")
-                cm = contextlib.contextmanager(provider.call)(*args, **kwargs)
+                cm = contextlib.contextmanager(provider.call)(
+                    *provider_args, **provider_kwargs
+                )
                 return context.enter(cm)
 
             return await run_async(_create)
 
-        instance = await run_async(provider.call, *args, **kwargs)
+        instance = await run_async(provider.call, *provider_args, **provider_kwargs)
         if context is not None and is_async_context_manager(instance):
             await context.aenter(instance)
         return instance
@@ -585,28 +631,48 @@ class Container:
         provided_args: list[Any] = []
         provided_kwargs: dict[str, Any] = {}
 
-        for parameter in provider.parameters:
-            if parameter.annotation in self._override_instances:
-                instance = self._override_instances[parameter.annotation]
-            elif context and parameter.annotation in context:
-                instance = context[parameter.annotation]
-            else:
-                try:
-                    instance = self._resolve_parameter(provider, parameter)
-                except LookupError:
-                    if parameter.default is inspect.Parameter.empty:
-                        raise
-                    instance = parameter.default
-                else:
-                    if self.testing:
-                        instance = DependencyWrapper(
-                            interface=parameter.annotation, instance=instance
-                        )
-            if parameter.kind == parameter.POSITIONAL_ONLY:
+        for index, parameter in enumerate(provider.parameters):
+            instance, is_positional_only = self._get_provider_instance(
+                provider, parameter, context, index, *args, **kwargs
+            )
+            if is_positional_only:
                 provided_args.append(instance)
             else:
                 provided_kwargs[parameter.name] = instance
         return provided_args, provided_kwargs
+
+    def _get_provider_instance(
+        self,
+        provider: Provider,
+        parameter: inspect.Parameter,
+        context: InstanceContext | None,
+        index: int,
+        *args: Any,
+        **kwargs: Any,
+    ) -> tuple[Any, bool]:
+        positional_only = parameter.kind == inspect.Parameter.POSITIONAL_ONLY
+        instance = None
+        if args or kwargs:
+            instance = self._get_instance_from_args(
+                parameter, index, positional_only, *args, **kwargs
+            )
+
+        if parameter.annotation in self._override_instances:
+            return self._override_instances[parameter.annotation], positional_only
+        elif context and parameter.annotation in context:
+            return context[parameter.annotation], positional_only
+
+        if instance is None:
+            try:
+                instance = self._resolve_parameter(provider, parameter)
+            except LookupError:
+                if parameter.default is inspect.Parameter.empty:
+                    raise
+                instance = parameter.default
+
+        if self.testing:
+            instance = InstanceProxy(interface=parameter.annotation, instance=instance)
+        return instance, positional_only
 
     async def _aget_provided_args(
         self,
@@ -619,28 +685,72 @@ class Container:
         provided_args: list[Any] = []
         provided_kwargs: dict[str, Any] = {}
 
-        for parameter in provider.parameters:
-            if parameter.annotation in self._override_instances:
-                instance = self._override_instances[parameter.annotation]
-            elif context and parameter.annotation in context:
-                instance = context[parameter.annotation]
-            else:
-                try:
-                    instance = await self._aresolve_parameter(provider, parameter)
-                except LookupError:
-                    if parameter.default is inspect.Parameter.empty:
-                        raise
-                    instance = parameter.default
-                else:
-                    if self.testing:
-                        instance = DependencyWrapper(
-                            interface=parameter.annotation, instance=instance
-                        )
-            if parameter.kind == parameter.POSITIONAL_ONLY:
+        for index, parameter in enumerate(provider.parameters):
+            instance, is_positional_only = await self._aget_provider_instance(
+                provider, parameter, context, index, *args, **kwargs
+            )
+            if is_positional_only:
                 provided_args.append(instance)
             else:
                 provided_kwargs[parameter.name] = instance
         return provided_args, provided_kwargs
+
+    async def _aget_provider_instance(
+        self,
+        provider: Provider,
+        parameter: inspect.Parameter,
+        context: InstanceContext | None,
+        index: int,
+        *args: Any,
+        **kwargs: Any,
+    ) -> tuple[Any, bool]:
+        positional_only = parameter.kind == inspect.Parameter.POSITIONAL_ONLY
+        instance = None
+        if args or kwargs:
+            instance = self._get_instance_from_args(
+                parameter, index, positional_only, *args, **kwargs
+            )
+
+        if parameter.annotation in self._override_instances:
+            return self._override_instances[parameter.annotation], positional_only
+        elif context and parameter.annotation in context:
+            return context[parameter.annotation], positional_only
+
+        if instance is None:
+            try:
+                instance = await self._aresolve_parameter(provider, parameter)
+            except LookupError:
+                if parameter.default is inspect.Parameter.empty:
+                    raise
+                instance = parameter.default
+
+        if self.testing:
+            instance = InstanceProxy(interface=parameter.annotation, instance=instance)
+        return instance, positional_only
+
+    def _get_instance_from_args(
+        self,
+        parameter: inspect.Parameter,
+        index: int,
+        positional_only: bool,
+        *args: Any,
+        **kwargs: Any,
+    ) -> Any:
+        if positional_only:
+            try:
+                return args[index]
+            except IndexError as exc:
+                raise LookupError(
+                    f"The provider `{provider}` requires a positional argument "
+                    f"at index `{index}` which is not provided."
+                ) from exc
+        try:
+            return kwargs[parameter.name]
+        except KeyError as exc:
+            raise LookupError(
+                f"The provider `{provider}` requires a keyword argument "
+                f"`{parameter.name}` which is not provided."
+            ) from exc
 
     def _resolve_parameter(
         self, provider: Provider, parameter: inspect.Parameter
@@ -674,7 +784,7 @@ class Container:
         wrapped = {
             name: value.interface
             for name, value in instance.__dict__.items()
-            if isinstance(value, DependencyWrapper)
+            if isinstance(value, InstanceProxy)
         }
 
         # Custom resolver function
