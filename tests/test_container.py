@@ -1390,6 +1390,22 @@ class TestContainer:
 
         assert result == 60
 
+    def test_run_cached(self, container: Container) -> None:
+        @container.provider(scope="singleton")
+        def message() -> str:
+            return "hello"
+
+        def handler(
+            message: str = auto
+        ) -> int:
+            return message
+
+        _ = container.run(handler)
+        _ = container.run(handler)
+
+        assert handler in container._inject_cache
+
+
     def test_register_modules(self) -> None:
         container = Container(modules=[TestModule])
 
@@ -1415,8 +1431,8 @@ class TestContainer:
         assert container.is_registered(Annotated[str, "msg2"])
 
     def test_register_module_function(self, container: Container) -> None:
-        def configure(container: Container) -> None:
-            container.register(str, lambda: "Message 1", scope="singleton")
+        def configure(_container: Container) -> None:
+            _container.register(str, lambda: "Message 1", scope="singleton")
 
         container.register_module(configure)
 
@@ -1473,6 +1489,158 @@ class TestContainer:
         from .scan_app.a.a3.handlers import a_a3_handler_1
 
         assert a_a3_handler_1() == "a.a1.str_provider"
+
+    def test_create_transient_non_strict(self) -> None:
+        @dataclass
+        class Component:
+            __scope__ = "transient"
+
+            name: str
+
+        container = Container(strict=False)
+
+        instance = container.create(Component, name="test")
+
+        assert instance.name == "test"
+
+    def test_create_singleton_non_strict(self) -> None:
+        @dataclass
+        class Component:
+            __scope__ = "singleton"
+
+            name: str
+
+        container = Container(strict=False)
+
+        instance = container.create(Component, name="test")
+
+        assert instance.name == "test"
+
+    def test_create_scoped_non_strict(self) -> None:
+        @dataclass
+        class Component:
+            __scope__ = "request"
+
+            name: str
+
+        container = Container(strict=False)
+
+        with container.request_context():
+            instance = container.create(Component, name="test")
+
+        assert instance.name == "test"
+
+    def test_create_non_existing_positional_arg(self) -> None:
+        class Component:
+            __scope__ = "singleton"
+
+        container = Container(strict=False)
+
+        with pytest.raises(
+            ValueError, match="Unexpected positional argument `test` for the provider"
+        ):
+            container.create(Component, "test")
+
+    def test_create_non_existing_keyword_arg(self) -> None:
+        class Component:
+            __scope__ = "singleton"
+
+        container = Container(strict=False)
+
+        with pytest.raises(
+            ValueError, match="Unexpected keyword argument `param` for the provider"
+        ):
+            container.create(Component, param="test")
+
+    def test_create_wrong_positional_arg(self) -> None:
+        @dataclass(kw_only=False)
+        class Component:
+            __scope__ = "singleton"
+
+            param: str
+
+        container = Container(strict=False)
+
+        with pytest.raises(
+            ValueError, match="Unexpected positional argument `test` for the provider"
+        ):
+            container.create(Component, "test")
+
+    def test_create_non_existing_keyword_arg(self) -> None:
+        class Component:
+            __scope__ = "singleton"
+
+        container = Container(strict=False)
+
+        with pytest.raises(
+            ValueError, match="Unexpected keyword argument `param` for the provider"
+        ):
+            container.create(Component, param="test")
+
+    async def test_create_async_transient_non_strict(self) -> None:
+        @dataclass
+        class Component:
+            __scope__ = "transient"
+
+            name: str
+
+        container = Container(strict=False)
+
+        instance = await container.acreate(Component, name="test")
+
+        assert instance.name == "test"
+
+    async def test_create_async_singleton_non_strict(self) -> None:
+        @dataclass
+        class Component:
+            __scope__ = "singleton"
+
+            name: str
+
+        container = Container(strict=False)
+
+        instance = await container.acreate(Component, name="test")
+
+        assert instance.name == "test"
+
+    async def test_create_async_scoped_non_strict(self) -> None:
+        @dataclass
+        class Component:
+            __scope__ = "request"
+
+            name: str
+
+        container = Container(strict=False)
+
+        with container.request_context():
+            instance = await container.acreate(Component, name="test")
+
+        assert instance.name == "test"
+
+    async def test_create_async_non_existing_positional_arg(self) -> None:
+        class Component:
+            __scope__ = "singleton"
+
+        container = Container(strict=False)
+
+        with pytest.raises(
+            ValueError, match="Unexpected positional argument `test` for the provider"
+        ):
+            await container.acreate(Component, "test")
+
+    async def test_create_async_non_existing_keyword_arg(self) -> None:
+        class Component:
+            __scope__ = "singleton"
+
+        container = Container(strict=False)
+
+        with pytest.raises(
+            ValueError, match="Unexpected keyword argument `param` for the provider"
+        ):
+            await container.acreate(Component, param="test")
+
+
+# Test decorators
 
 
 def test_provider_decorator() -> None:
