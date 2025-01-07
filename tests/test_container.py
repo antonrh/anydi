@@ -1177,17 +1177,16 @@ class TestContainer:
         def c() -> str:
             return "test"
 
-        def service(a: int, /, b: float, *, c: str) -> Service:
+        def service(a: int, b: float, *, c: str) -> Service:
             return Service(ident=f"{a}/{b}/{c}")
 
         provider = container.register(Service, service, scope="singleton")
 
         context = container._get_scoped_context("singleton")
 
-        args, kwargs = container._get_provided_args(provider, context=context)
+        kwargs = container._get_provided_kwargs(provider, context=context)
 
-        assert args == [10]
-        assert kwargs == {"b": 1.0, "c": "test"}
+        assert kwargs == {"a": 10, "b": 1.0, "c": "test"}
 
     async def test_async_get_provider_arguments(self, container: Container) -> None:
         @container.provider(scope="singleton")
@@ -1202,17 +1201,16 @@ class TestContainer:
         async def c() -> str:
             return "test"
 
-        async def service(a: int, /, b: float, *, c: str) -> Service:
+        async def service(a: int, b: float, *, c: str) -> Service:
             return Service(ident=f"{a}/{b}/{c}")
 
         provider = container.register(Service, service, scope="singleton")
 
         context = container._get_scoped_context("singleton")
 
-        args, kwargs = await container._aget_provided_args(provider, context=context)
+        kwargs = await container._aget_provided_kwargs(provider, context=context)
 
-        assert args == [10]
-        assert kwargs == {"b": 1.0, "c": "test"}
+        assert kwargs == {"a": 10, "b": 1.0, "c": "test"}
 
     def test_inject_auto_registered_log_message(
         self, container: Container, caplog: pytest.LogCaptureFixture
@@ -1395,16 +1393,13 @@ class TestContainer:
         def message() -> str:
             return "hello"
 
-        def handler(
-            message: str = auto
-        ) -> int:
+        def handler(message: str = auto) -> str:
             return message
 
         _ = container.run(handler)
         _ = container.run(handler)
 
         assert handler in container._inject_cache
-
 
     def test_register_modules(self) -> None:
         container = Container(modules=[TestModule])
@@ -1530,51 +1525,13 @@ class TestContainer:
 
         assert instance.name == "test"
 
-    def test_create_non_existing_positional_arg(self) -> None:
-        class Component:
-            __scope__ = "singleton"
-
-        container = Container(strict=False)
-
-        with pytest.raises(
-            ValueError, match="Unexpected positional argument `test` for the provider"
-        ):
-            container.create(Component, "test")
-
     def test_create_non_existing_keyword_arg(self) -> None:
         class Component:
             __scope__ = "singleton"
 
         container = Container(strict=False)
 
-        with pytest.raises(
-            ValueError, match="Unexpected keyword argument `param` for the provider"
-        ):
-            container.create(Component, param="test")
-
-    def test_create_wrong_positional_arg(self) -> None:
-        @dataclass(kw_only=False)
-        class Component:
-            __scope__ = "singleton"
-
-            param: str
-
-        container = Container(strict=False)
-
-        with pytest.raises(
-            ValueError, match="Unexpected positional argument `test` for the provider"
-        ):
-            container.create(Component, "test")
-
-    def test_create_non_existing_keyword_arg(self) -> None:
-        class Component:
-            __scope__ = "singleton"
-
-        container = Container(strict=False)
-
-        with pytest.raises(
-            ValueError, match="Unexpected keyword argument `param` for the provider"
-        ):
+        with pytest.raises(TypeError, match="takes no arguments"):
             container.create(Component, param="test")
 
     async def test_create_async_transient_non_strict(self) -> None:
@@ -1617,26 +1574,13 @@ class TestContainer:
 
         assert instance.name == "test"
 
-    async def test_create_async_non_existing_positional_arg(self) -> None:
-        class Component:
-            __scope__ = "singleton"
-
-        container = Container(strict=False)
-
-        with pytest.raises(
-            ValueError, match="Unexpected positional argument `test` for the provider"
-        ):
-            await container.acreate(Component, "test")
-
     async def test_create_async_non_existing_keyword_arg(self) -> None:
         class Component:
             __scope__ = "singleton"
 
         container = Container(strict=False)
 
-        with pytest.raises(
-            ValueError, match="Unexpected keyword argument `param` for the provider"
-        ):
+        with pytest.raises(TypeError, match="takes no arguments"):
             await container.acreate(Component, param="test")
 
 

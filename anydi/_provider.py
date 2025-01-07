@@ -209,13 +209,17 @@ class Provider:
 
     def _detect_parameters(self, signature: inspect.Signature) -> None:
         """Detect the parameters of the callable provider."""
-        self._parameters = [
-            parameter.replace(
-                annotation=get_typed_annotation(
-                    parameter.annotation,
-                    self._call_globals,
-                    module=self._call_module,
+        parameters = []
+        for parameter in signature.parameters.values():
+            if parameter.kind == inspect.Parameter.POSITIONAL_ONLY:
+                raise TypeError(
+                    f"Positional-only parameter `{parameter.name}` is not allowed "
+                    f"in the provider `{self}`."
                 )
+            annotation = get_typed_annotation(
+                parameter.annotation,
+                self._call_globals,
+                module=self._call_module,
             )
-            for parameter in signature.parameters.values()
-        ]
+            parameters.append(parameter.replace(annotation=annotation))
+        self._parameters = parameters
