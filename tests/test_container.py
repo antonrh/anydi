@@ -365,6 +365,19 @@ class TestContainer:
 
         assert not container.is_registered(str)
 
+    def test_unregister_provider_resource(self, container: Container) -> None:
+        @container.provider(scope="singleton")
+        def message() -> Iterator[str]:
+            yield "test"
+
+        assert container.is_registered(str)
+        assert str in container._resources["singleton"]
+
+        container.unregister(str)
+
+        assert not container.is_registered(str)
+        assert str not in container._resources["singleton"]
+
     def test_unregister_request_scoped_provider(self, container: Container) -> None:
         container.register(str, lambda: "test", scope="request")
 
@@ -466,6 +479,17 @@ class TestContainer:
 
         assert not container.is_resolved(str)
         assert not container.is_resolved(int)
+
+    def test_reset_transient(self, container: Container) -> None:
+        container.register(str, lambda: "test", scope="transient")
+
+        _ = container.resolve(str)
+
+        assert not container.is_resolved(str)
+
+        container.reset()
+
+        assert not container.is_resolved(str)
 
     # Instance
 
@@ -967,6 +991,24 @@ class TestContainer:
         assert service.repo.name == "repo"
 
     def test_is_resolved(self, container: Container) -> None:
+        @container.provider(scope="singleton")
+        def message() -> str:
+            return "test"
+
+        _ = container.resolve(str)
+
+        assert container.is_resolved(str)
+
+    def test_is_resolved_transient(self, container: Container) -> None:
+        @container.provider(scope="transient")
+        def message() -> str:
+            return "test"
+
+        _ = container.resolve(str)
+
+        assert not container.is_resolved(str)
+
+    def test_is_resolved_false(self, container: Container) -> None:
         assert not container.is_resolved(str)
 
     def test_release_instance(self, container: Container) -> None:
@@ -974,6 +1016,15 @@ class TestContainer:
         container.resolve(str)
 
         assert container.is_resolved(str)
+
+        container.release(str)
+
+        assert not container.is_resolved(str)
+
+    def test_release_transient_instance(self, container: Container) -> None:
+        container.register(str, lambda: "test", scope="transient")
+
+        assert not container.is_resolved(str)
 
         container.release(str)
 
@@ -1184,7 +1235,7 @@ class TestContainer:
 
         context = container._get_scoped_context("singleton")
 
-        kwargs = container._get_provided_kwargs(provider, context=context)
+        kwargs = container._get_provided_kwargs(provider, context)
 
         assert kwargs == {"a": 10, "b": 1.0, "c": "test"}
 
@@ -1208,7 +1259,7 @@ class TestContainer:
 
         context = container._get_scoped_context("singleton")
 
-        kwargs = await container._aget_provided_kwargs(provider, context=context)
+        kwargs = await container._aget_provided_kwargs(provider, context)
 
         assert kwargs == {"a": 10, "b": 1.0, "c": "test"}
 

@@ -734,38 +734,47 @@ The with `container.override()` context manager ensures that the overridden inst
 Once the block is exited, the original dependency is restored.
 
 ```python
+from dataclasses import dataclass, field
 from unittest import mock
 
-from anydi import auto, Container
+from anydi import Container, auto
 
 
+@dataclass(kw_only=True)
+class Item:
+    name: str
+
+
+@dataclass(kw_only=True)
+class Repository:
+    items: list[Item] = field(default_factory=list)
+
+    def all(self) -> list[Item]:
+        return self.items
+
+
+@dataclass(kw_only=True)
 class Service:
-    def __init__(self, name: str) -> None:
-        self.name = name
+    repo: Repository
 
-    def say_hello(self) -> str:
-        return f"Hello, from `{self.name}` service!"
+    def get_items(self) -> list[Item]:
+        return self.repo.all()
 
 
 container = Container(testing=True)
 
 
-@container.provider(scope="singleton")
-def service() -> Service:
-    return Service(name="demo")
-
-
 @container.inject
-def hello_handler(service: Service = auto) -> str:
-    return service.say_hello()
+def get_items(service: Service = auto) -> list[Item]:
+    return service.get_items()
 
 
-def test_hello_handler() -> None:
-    service_mock = mock.Mock(spec=Service)
-    service_mock.say_hello.return_value = "Hello, from service mock!"
+def test_handler() -> None:
+    repo_mock = mock.Mock(spec=Repository)
+    repo_mock.all.return_value = [Item(name="mock1"), Item(name="mock2")]
 
-    with container.override(Service, service_mock):
-        assert hello_handler() == "Hello, from service mock!"
+    with container.override(Repository, repo_mock):
+        assert get_items() == [Item(name="mock1"), Item(name="mock2")]
 ```
 
 ### Pytest Plugin
@@ -776,31 +785,40 @@ Additionally, you need to define a `container` fixture to provide a `Container` 
 
 
 ```python
-from typing import Annotated
 import pytest
-
-from anydi import Container
 
 
 @pytest.fixture(scope="session")
 def container() -> Container:
-    container = Container(testing=True)  # or pass your application container
-    container.register(
-        Annotated[str, "message"],
-        lambda: "Hello, world!",
-        scope="singleton",
-    )
-    return container
+    return Container(testing=True)
 
 
 @pytest.mark.inject
-def test_hello(message: Annotated[str, "message"]) -> None:
-    assert message == "Hello, world!"
+def test_service_get_items(service: Service) -> None:
+    repo_mock = mock.Mock(spec=Repository)
+    repo_mock.all.return_value = [Item(name="mock1"), Item(name="mock2")]
+
+    with container.override(Repository, repo_mock):
+        assert service.get_items() == [Item(name="mock1"), Item(name="mock2")]
 ```
 
 The message argument is injected into the test function thanks to the `@pytest.mark.inject` decorator.
 
-PS! `Pytest` fixtures will always have higher priority than the `@pytest.mark.inject` decorator. This means that if both a pytest fixture and the `@pytest.mark.inject` decorator attempt to provide a value for the same name, the value from the pytest fixture will be used.
+PS! `Pytest` fixtures will always have higher priority than the `@pytest.mark.inject` decorator. This means that if
+both a pytest fixture and the `@pytest.mark.inject` decorator attempt to provide a value for the same name, the value
+from the pytest fixture will be used.
+
+Using `.create` method you can create a new instance with overridden dependencies for testing:
+
+```python
+def test_handler() -> None:
+    repo_mock = mock.Mock(spec=Repository)
+    repo_mock.all.return_value = [Item(name="mock1"), Item(name="mock2")]
+
+    service = container.create(Service, repo=repo_mock)
+
+    assert service.get_items() == [Item(name="mock1"), Item(name="mock2")]
+```
 
 ## Conclusion
 

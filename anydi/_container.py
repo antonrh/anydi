@@ -109,7 +109,7 @@ class Container:
         # Register providers
         providers = providers or []
         for provider in providers:
-            self._register_provider(provider, override=False)
+            self._register_provider(provider, False)
 
         # Register modules
         modules = modules or []
@@ -153,7 +153,7 @@ class Container:
         return self._register_provider(provider, override)
 
     def _register_provider(
-        self, provider: Provider, override: bool, **defaults: Any
+        self, provider: Provider, override: bool, /, **defaults: Any
     ) -> Provider:
         """Register a provider."""
         if provider.interface in self._providers:
@@ -204,7 +204,7 @@ class Container:
             ) from exc
 
     def _get_or_register_provider(
-        self, interface: AnyInterface, parent_scope: Scope | None, **defaults: Any
+        self, interface: AnyInterface, parent_scope: Scope | None, /, **defaults: Any
     ) -> Provider:
         """Get or register a provider by interface."""
         try:
@@ -239,7 +239,7 @@ class Container:
         if provider.is_resource:
             self._resources[provider.scope].remove(provider.interface)
 
-    def _validate_sub_providers(self, provider: Provider, **defaults: Any) -> None:
+    def _validate_sub_providers(self, provider: Provider, /, **defaults: Any) -> None:
         """Validate the sub-providers of a provider."""
 
         for parameter in provider.parameters:
@@ -251,7 +251,7 @@ class Container:
 
             try:
                 sub_provider = self._get_or_register_provider(
-                    parameter.annotation, parent_scope=provider.scope
+                    parameter.annotation, provider.scope
                 )
             except LookupError:
                 if self._parameter_has_default(parameter, **defaults):
@@ -307,7 +307,7 @@ class Container:
         return None
 
     def _parameter_has_default(
-        self, parameter: inspect.Parameter, **defaults: Any
+        self, parameter: inspect.Parameter, /, **defaults: Any
     ) -> bool:
         return (defaults and parameter.name in defaults) or (
             not self.strict and parameter.default is not inspect.Parameter.empty
@@ -535,7 +535,7 @@ class Container:
         """Get an instance of a dependency from the scoped context."""
         instance = context.get(provider.interface)
         if instance is None:
-            instance = self._create_instance(provider, context=context)
+            instance = self._create_instance(provider, context)
             context.set(provider.interface, instance)
             return instance, True
         return instance, False
@@ -546,13 +546,13 @@ class Container:
         """Get an async instance of a dependency from the scoped context."""
         instance = context.get(provider.interface)
         if instance is None:
-            instance = await self._acreate_instance(provider, context=context)
+            instance = await self._acreate_instance(provider, context)
             context.set(provider.interface, instance)
             return instance, True
         return instance, False
 
     def _create_instance(
-        self, provider: Provider, context: InstanceContext | None, **defaults: Any
+        self, provider: Provider, context: InstanceContext | None, /, **defaults: Any
     ) -> Any:
         """Create an instance using the provider."""
         if provider.is_async:
@@ -575,7 +575,7 @@ class Container:
         return instance
 
     async def _acreate_instance(
-        self, provider: Provider, context: InstanceContext | None, **defaults: Any
+        self, provider: Provider, context: InstanceContext | None, /, **defaults: Any
     ) -> Any:
         """Create an instance asynchronously using the provider."""
         provider_kwargs = await self._aget_provided_kwargs(
@@ -612,10 +612,10 @@ class Container:
         return instance
 
     def _get_provided_kwargs(
-        self, provider: Provider, context: InstanceContext | None, **defaults: Any
+        self, provider: Provider, context: InstanceContext | None, /, **defaults: Any
     ) -> dict[str, Any]:
         """Retrieve the arguments for a provider."""
-        provided_kwargs: dict[str, Any] = {}
+        provided_kwargs = {}
         for parameter in provider.parameters:
             instance = self._get_provider_instance(
                 provider, parameter, context, **defaults
@@ -628,33 +628,38 @@ class Container:
         provider: Provider,
         parameter: inspect.Parameter,
         context: InstanceContext | None,
+        /,
         **defaults: Any,
     ) -> Any:
         """Retrieve an instance of a dependency from the scoped context."""
-        instance = self._get_instance_from_defaults(parameter, **defaults)
+        if parameter.name in defaults:
+            return defaults[parameter.name]
 
+        # Get instance from overrides or context cache
         if parameter.annotation in self._override_instances:
             return self._override_instances[parameter.annotation]
         elif context and parameter.annotation in context:
             return context[parameter.annotation]
 
-        if instance is None:
-            try:
-                instance = self._resolve_parameter(provider, parameter)
-            except LookupError:
-                if parameter.default is inspect.Parameter.empty:
-                    raise
-                instance = parameter.default
+        # Resolve the instance
+        try:
+            instance = self._resolve_parameter(provider, parameter)
+        except LookupError:
+            if parameter.default is inspect.Parameter.empty:
+                raise
+            instance = parameter.default
 
+        # Wrap the instance in a proxy for testing
         if self.testing:
-            instance = InstanceProxy(interface=parameter.annotation, instance=instance)
+            return InstanceProxy(interface=parameter.annotation, instance=instance)
+
         return instance
 
     async def _aget_provided_kwargs(
-        self, provider: Provider, context: InstanceContext | None, **defaults: Any
+        self, provider: Provider, context: InstanceContext | None, /, **defaults: Any
     ) -> dict[str, Any]:
         """Asynchronously retrieve the arguments for a provider."""
-        provided_kwargs: dict[str, Any] = {}
+        provided_kwargs = {}
         for parameter in provider.parameters:
             instance = await self._aget_provider_instance(
                 provider, parameter, context, **defaults
@@ -667,35 +672,31 @@ class Container:
         provider: Provider,
         parameter: inspect.Parameter,
         context: InstanceContext | None,
+        /,
         **defaults: Any,
     ) -> Any:
         """Asynchronously retrieve an instance of a dependency from the context."""
-        instance = self._get_instance_from_defaults(parameter, **defaults)
+        if parameter.name in defaults:
+            return defaults[parameter.name]
 
+        # Get instance from overrides or context cache
         if parameter.annotation in self._override_instances:
             return self._override_instances[parameter.annotation]
         elif context and parameter.annotation in context:
             return context[parameter.annotation]
 
-        if instance is None:
-            try:
-                instance = await self._aresolve_parameter(provider, parameter)
-            except LookupError:
-                if parameter.default is inspect.Parameter.empty:
-                    raise
-                instance = parameter.default
+        # Resolve the instance
+        try:
+            instance = await self._aresolve_parameter(provider, parameter)
+        except LookupError:
+            if parameter.default is inspect.Parameter.empty:
+                raise
+            instance = parameter.default
 
+        # Wrap the instance in a proxy for testing
         if self.testing:
-            instance = InstanceProxy(interface=parameter.annotation, instance=instance)
+            return InstanceProxy(interface=parameter.annotation, instance=instance)
         return instance
-
-    def _get_instance_from_defaults(
-        self, parameter: inspect.Parameter, **defaults: Any
-    ) -> Any | None:
-        """Get the instance from the defaults."""
-        if parameter.name in defaults:
-            return defaults[parameter.name]
-        return None
 
     def _resolve_parameter(
         self, provider: Provider, parameter: inspect.Parameter
@@ -790,7 +791,7 @@ class Container:
 
         def decorator(call: Callable[P, T]) -> Callable[P, T]:
             provider = Provider(call=call, scope=scope)
-            self._register_provider(provider, override=override)
+            self._register_provider(provider, override)
             return call
 
         return decorator
