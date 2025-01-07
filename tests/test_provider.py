@@ -162,3 +162,16 @@ class TestProvider:
             "The resource provider `tests.test_provider.generator` is attempting to "
             "register with a transient scope, which is not allowed."
         )
+
+    def test_construct_positional_only_parameter_not_allowed(self) -> None:
+        def provider_message(a: int, /, b: str) -> str:
+            return f"{a} {b}"
+
+        with pytest.raises(TypeError) as exc_info:
+            Provider(call=provider_message, scope="singleton")
+
+        assert str(exc_info.value) == (
+            "Positional-only parameter `a` is not allowed in the provider `tests.test_"
+            "provider.TestProvider.test_construct_positional_only_parameter_not_"
+            "allowed.<locals>.provider_message`."
+        )
