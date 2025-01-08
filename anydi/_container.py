@@ -622,7 +622,9 @@ class Container:
             return defaults[parameter.name]
 
         # Get instance from overrides or context cache
-        if context and parameter.annotation in context:
+        if parameter.annotation in self._override_instances:
+            return self._override_instances[parameter.annotation]
+        elif context and parameter.annotation in context:
             return context[parameter.annotation]
 
         # Resolve the instance
@@ -664,7 +666,9 @@ class Container:
             return defaults[parameter.name]
 
         # Get instance from overrides or context cache
-        if context and parameter.annotation in context:
+        if parameter.annotation in self._override_instances:
+            return self._override_instances[parameter.annotation]
+        elif context and parameter.annotation in context:
             return context[parameter.annotation]
 
         # Resolve the instance
