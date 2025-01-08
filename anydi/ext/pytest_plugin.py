@@ -6,6 +6,8 @@ from collections.abc import Iterator
 from typing import Any, Callable, cast
 
 import pytest
+from _pytest.python import async_warn_and_skip
+from anyio.pytest_plugin import extract_backend_and_options, get_runner
 
 from anydi import Container
 from anydi._utils import get_typed_parameters
@@ -113,28 +115,44 @@ def _anydi_inject(
 
 
 @pytest.fixture(autouse=True)
-async def _anydi_ainject(
+def _anydi_ainject(
     request: pytest.FixtureRequest,
     _anydi_should_inject: bool,
     _anydi_injected_parameter_iterator: Callable[[], Iterator[tuple[str, Any]]],
     _anydi_unresolved: list[str],
 ) -> None:
     """Inject dependencies into the test function."""
-    if not inspect.iscoroutinefunction(request.function) or not _anydi_should_inject:
+    if (
+        not inspect.iscoroutinefunction(request.function)
+        and not inspect.isasyncgenfunction(request.function)
+        or not _anydi_should_inject
+    ):
         return
 
-    # Setup the container
-    container = cast(Container, request.getfixturevalue("anydi_setup_container"))
+    # Skip if the anyio backend is not available
+    if "anyio_backend" not in request.fixturenames:
+        async_warn_and_skip(request.node.nodeid)
 
-    for argname, interface in _anydi_injected_parameter_iterator():
-        # Skip if the interface is not registered
-        if container.strict and not container.is_registered(interface):
-            continue
+    async def _awrapper() -> None:
+        # Setup the container
+        container = cast(Container, request.getfixturevalue("anydi_setup_container"))
 
-        try:
-            request.node.funcargs[argname] = await container.aresolve(interface)
-        except Exception as exc:
-            logger.warning(
-                f"Failed to resolve dependency for argument '{argname}'.", exc_info=exc
-            )
-            _anydi_unresolved.append(interface)
+        for argname, interface in _anydi_injected_parameter_iterator():
+            # Skip if the interface is not registered
+            if container.strict and not container.is_registered(interface):
+                continue
+
+            try:
+                request.node.funcargs[argname] = await container.aresolve(interface)
+            except Exception as exc:
+                logger.warning(
+                    f"Failed to resolve dependency for argument '{argname}'.",
+                    exc_info=exc,
+                )
+                _anydi_unresolved.append(interface)
+
+    anyio_backend = request.getfixturevalue("anyio_backend")
+    backend_name, backend_options = extract_backend_and_options(anyio_backend)
+
+    with get_runner(backend_name, backend_options) as runner:
+        runner.run_fixture(_awrapper, {})
