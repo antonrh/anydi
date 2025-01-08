@@ -1166,6 +1166,51 @@ class TestContainer:
 
         assert service.ident == "test"
 
+    def test_override_instance_first_testing(self) -> None:
+        container = Container(strict=True, testing=True)
+
+        @dataclass
+        class Item:
+            name: str
+
+        @dataclass
+        class ItemRepository:
+            items: list[Item]
+
+            def all(self) -> list[Item]:
+                return self.items
+
+        @dataclass
+        class ItemService:
+            repo: ItemRepository
+
+            def get_items(self) -> list[Item]:
+                return self.repo.all()
+
+        @container.provider(scope="singleton")
+        def provide_repo() -> ItemRepository:
+            return ItemRepository(items=[])
+
+        @container.provider(scope="singleton")
+        def provide_service(repo: ItemRepository) -> ItemService:
+            return ItemService(repo=repo)
+
+        @container.inject
+        def handler(service: ItemService = auto) -> list[Item]:
+            return service.get_items()
+
+        repo_mock = mock.MagicMock(spec=ItemRepository)
+        repo_mock.all.return_value = [Item(name="mocked")]
+
+        with container.override(ItemRepository, repo_mock):
+            items = handler()
+
+        assert items == [Item(name="mocked")]
+
+        service = container.resolve(ItemService)
+
+        assert service.get_items() == []
+
     def test_resource_delegated_exception(self, container: Container) -> None:
         resource = Resource()
 
