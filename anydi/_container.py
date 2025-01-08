@@ -536,8 +536,9 @@ class Container:
         instance = context.get(provider.interface)
         if instance is None:
             instance = self._create_instance(provider, context)
-            context.set(provider.interface, instance)
-            return instance, True
+            if not self._override_instances:
+                context.set(provider.interface, instance)
+                return instance, True
         return instance, False
 
     async def _aget_or_create_instance(
@@ -547,8 +548,9 @@ class Container:
         instance = context.get(provider.interface)
         if instance is None:
             instance = await self._acreate_instance(provider, context)
-            context.set(provider.interface, instance)
-            return instance, True
+            if not self._override_instances:
+                context.set(provider.interface, instance)
+                return instance, True
         return instance, False
 
     def _create_instance(
