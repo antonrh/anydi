@@ -6,11 +6,10 @@ import time
 import uuid
 from collections.abc import AsyncIterator, Iterator, Sequence
 from dataclasses import dataclass
-from typing import Annotated, Any, Union
+from typing import Annotated, Union
 from unittest import mock
 
 import pytest
-from typing_extensions import Self
 
 from anydi import (
     Container,
@@ -904,59 +903,6 @@ class TestContainer:
             "registered before attempting to use it."
         )
 
-    def test_resolve_non_strict_with_as_context_manager(
-        self, container: Container
-    ) -> None:
-        class Resource:
-            __scope__ = "singleton"
-
-            def __init__(self) -> None:
-                self.entered = False
-                self.exited = False
-
-            def __enter__(self) -> Self:
-                self.entered = True
-                return self
-
-            def __exit__(self, exc_type: Any, exc_value: Any, traceback: Any) -> None:
-                self.exited = True
-
-        resource = container.resolve(Resource)
-
-        assert resource.entered
-
-        container.close()
-
-        assert resource.exited
-
-    async def test_resolve_non_strict_with_as_async_context_manager(
-        self,
-        container: Container,
-    ) -> None:
-        class Service:
-            __scope__ = "singleton"
-
-            def __init__(self) -> None:
-                self.entered = False
-                self.exited = False
-
-            async def __aenter__(self) -> Self:
-                self.entered = True
-                return self
-
-            async def __aexit__(
-                self, exc_type: Any, exc_value: Any, traceback: Any
-            ) -> None:
-                self.exited = True
-
-        service = await container.aresolve(Service)
-
-        assert service.entered
-
-        await container.aclose()
-
-        assert service.exited
-
     def test_resolve_non_strict_with_defaults(self, container: Container) -> None:
         @dataclass
         class Repo:
@@ -1030,9 +976,11 @@ class TestContainer:
 
         assert not container.is_resolved(str)
 
-    def test_override_instance(self, container: Container) -> None:
+    def test_override_instance(self) -> None:
         origin_name = "origin"
         overridden_name = "overridden"
+
+        container = Container(testing=True)
 
         @container.provider(scope="singleton")
         def name() -> str:
@@ -1044,7 +992,7 @@ class TestContainer:
         assert container.resolve(str) == origin_name
 
     def test_override_instance_provider_not_registered_using_strict_mode(self) -> None:
-        container = Container(strict=True)
+        container = Container(strict=True, testing=True)
 
         with pytest.raises(LookupError) as exc_info:
             with container.override(str, "test"):
@@ -1052,8 +1000,10 @@ class TestContainer:
 
         assert str(exc_info.value) == "The provider interface `str` not registered."
 
-    def test_override_instance_transient_provider(self, container: Container) -> None:
+    def test_override_instance_transient_provider(self) -> None:
         overridden_uuid = uuid.uuid4()
+
+        container = Container(testing=True)
 
         @container.provider(scope="transient")
         def uuid_provider() -> uuid.UUID:
@@ -1064,9 +1014,11 @@ class TestContainer:
 
         assert container.resolve(uuid.UUID) != overridden_uuid
 
-    def test_override_instance_resource_provider(self, container: Container) -> None:
+    def test_override_instance_resource_provider(self) -> None:
         origin = "origin"
         overridden = "overridden"
+
+        container = Container(testing=True)
 
         @container.provider(scope="singleton")
         def message() -> Iterator[str]:
@@ -1077,18 +1029,18 @@ class TestContainer:
 
         assert container.resolve(str) == origin
 
-    async def test_override_instance_async_resource_provider(
-        self, container: Container
-    ) -> None:
+    async def test_override_instance_async_resource_provider(self) -> None:
         origin = "origin"
         overridden = "overridden"
+
+        container = Container(testing=True)
 
         @container.provider(scope="singleton")
         async def message() -> AsyncIterator[str]:
             yield origin
 
         with container.override(str, overridden):
-            assert container.resolve(str) == overridden
+            assert (await container.aresolve(str)) == overridden
 
     def test_override_instance_testing(self) -> None:
         container = Container(strict=False, testing=True)
@@ -1205,7 +1157,7 @@ class TestContainer:
         with container.override(ItemRepository, repo_mock):
             items = handler()
 
-        assert items == [Item(name="mocked")]
+            assert items == [Item(name="mocked")]
 
         service = container.resolve(ItemService)
 

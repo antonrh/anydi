@@ -36,9 +36,7 @@ from ._utils import (
     get_full_qualname,
     get_typed_parameters,
     import_string,
-    is_async_context_manager,
     is_builtin_type,
-    is_context_manager,
     run_async,
 )
 
@@ -449,25 +447,18 @@ class Container:
 
     def resolve(self, interface: type[T]) -> T:
         """Resolve an instance by interface."""
-        if interface in self._override_instances:
-            return cast(T, self._override_instances[interface])
-
         provider = self._get_or_register_provider(interface, None)
         if provider.scope == "transient":
-            instance, created = self._create_instance(provider, None), True
+            instance = self._create_instance(provider, None)
         else:
             context = self._get_scoped_context(provider.scope)
             if provider.scope == "singleton":
                 with self._singleton_lock:
-                    instance, created = self._get_or_create_instance(
-                        provider, context=context
-                    )
+                    instance = self._get_or_create_instance(provider, context)
             else:
-                instance, created = self._get_or_create_instance(
-                    provider, context=context
-                )
-        if self.testing and created:
-            self._patch_test_resolver(instance)
+                instance = self._get_or_create_instance(provider, context)
+        if self.testing:
+            instance = self._patch_test_resolver(provider.interface, instance)
         return cast(T, instance)
 
     @overload
@@ -478,25 +469,18 @@ class Container:
 
     async def aresolve(self, interface: type[T]) -> T:
         """Resolve an instance by interface asynchronously."""
-        if interface in self._override_instances:
-            return cast(T, self._override_instances[interface])
-
         provider = self._get_or_register_provider(interface, None)
         if provider.scope == "transient":
-            instance, created = await self._acreate_instance(provider, None), True
+            instance = await self._acreate_instance(provider, None)
         else:
             context = self._get_scoped_context(provider.scope)
             if provider.scope == "singleton":
                 async with self._singleton_async_lock:
-                    instance, created = await self._aget_or_create_instance(
-                        provider, context=context
-                    )
+                    instance = await self._aget_or_create_instance(provider, context)
             else:
-                instance, created = await self._aget_or_create_instance(
-                    provider, context=context
-                )
-        if self.testing and created:
-            self._patch_test_resolver(instance)
+                instance = await self._aget_or_create_instance(provider, context)
+        if self.testing:
+            instance = self._patch_test_resolver(interface, instance)
         return cast(T, instance)
 
     def create(self, interface: type[T], **defaults: Any) -> T:
@@ -531,27 +515,25 @@ class Container:
 
     def _get_or_create_instance(
         self, provider: Provider, context: InstanceContext
-    ) -> tuple[Any, bool]:
+    ) -> Any:
         """Get an instance of a dependency from the scoped context."""
         instance = context.get(provider.interface)
         if instance is None:
             instance = self._create_instance(provider, context)
-            if not self._override_instances:
-                context.set(provider.interface, instance)
-                return instance, True
-        return instance, False
+            context.set(provider.interface, instance)
+            return instance
+        return instance
 
     async def _aget_or_create_instance(
         self, provider: Provider, context: InstanceContext
-    ) -> tuple[Any, bool]:
+    ) -> Any:
         """Get an async instance of a dependency from the scoped context."""
         instance = context.get(provider.interface)
         if instance is None:
             instance = await self._acreate_instance(provider, context)
-            if not self._override_instances:
-                context.set(provider.interface, instance)
-                return instance, True
-        return instance, False
+            context.set(provider.interface, instance)
+            return instance
+        return instance
 
     def _create_instance(
         self, provider: Provider, context: InstanceContext | None, /, **defaults: Any
@@ -571,10 +553,7 @@ class Container:
             cm = contextlib.contextmanager(provider.call)(**provider_kwargs)
             return context.enter(cm)
 
-        instance = provider.call(**provider_kwargs)
-        if context is not None and is_context_manager(instance):
-            context.enter(instance)
-        return instance
+        return provider.call(**provider_kwargs)
 
     async def _acreate_instance(
         self, provider: Provider, context: InstanceContext | None, /, **defaults: Any
@@ -585,10 +564,7 @@ class Container:
         )
 
         if provider.is_coroutine:
-            instance = await provider.call(**provider_kwargs)
-            if context is not None and is_async_context_manager(instance):
-                await context.aenter(instance)
-            return instance
+            return await provider.call(**provider_kwargs)
 
         if provider.is_async_generator:
             if context is None:
@@ -608,10 +584,7 @@ class Container:
 
             return await run_async(_create)
 
-        instance = await run_async(provider.call, **provider_kwargs)
-        if context is not None and is_async_context_manager(instance):
-            await context.aenter(instance)
-        return instance
+        return await run_async(provider.call, **provider_kwargs)
 
     def _get_provided_kwargs(
         self, provider: Provider, context: InstanceContext | None, /, **defaults: Any
@@ -634,27 +607,27 @@ class Container:
         **defaults: Any,
     ) -> Any:
         """Retrieve an instance of a dependency from the scoped context."""
+
+        # Try to get instance from defaults
         if parameter.name in defaults:
-            return defaults[parameter.name]
+            instance = defaults[parameter.name]
 
-        # Get instance from overrides or context cache
-        if parameter.annotation in self._override_instances:
-            return self._override_instances[parameter.annotation]
+        # Try to get instance from context
         elif context and parameter.annotation in context:
-            return context[parameter.annotation]
+            instance = context[parameter.annotation]
 
-        # Resolve the instance
-        try:
-            instance = self._resolve_parameter(provider, parameter)
-        except LookupError:
-            if parameter.default is inspect.Parameter.empty:
-                raise
-            instance = parameter.default
+        # Resolve new instance
+        else:
+            try:
+                instance = self._resolve_parameter(provider, parameter)
+            except LookupError:
+                if parameter.default is inspect.Parameter.empty:
+                    raise
+                instance = parameter.default
 
         # Wrap the instance in a proxy for testing
         if self.testing:
             return InstanceProxy(interface=parameter.annotation, instance=instance)
-
         return instance
 
     async def _aget_provided_kwargs(
@@ -678,22 +651,23 @@ class Container:
         **defaults: Any,
     ) -> Any:
         """Asynchronously retrieve an instance of a dependency from the context."""
+
+        # Try to get instance from defaults
         if parameter.name in defaults:
-            return defaults[parameter.name]
+            instance = defaults[parameter.name]
 
-        # Get instance from overrides or context cache
-        if parameter.annotation in self._override_instances:
-            return self._override_instances[parameter.annotation]
+        # Try to get instance from context
         elif context and parameter.annotation in context:
-            return context[parameter.annotation]
+            instance = context[parameter.annotation]
 
-        # Resolve the instance
-        try:
-            instance = await self._aresolve_parameter(provider, parameter)
-        except LookupError:
-            if parameter.default is inspect.Parameter.empty:
-                raise
-            instance = parameter.default
+        # Resolve new instance
+        else:
+            try:
+                instance = await self._aresolve_parameter(provider, parameter)
+            except LookupError:
+                if parameter.default is inspect.Parameter.empty:
+                    raise
+                instance = parameter.default
 
         # Wrap the instance in a proxy for testing
         if self.testing:
@@ -724,10 +698,15 @@ class Container:
                 "or set in the scoped context."
             )
 
-    def _patch_test_resolver(self, instance: Any) -> None:
+    def _patch_test_resolver(self, interface: type[Any], instance: Any) -> Any:
         """Patch the test resolver for the instance."""
-        if not hasattr(instance, "__dict__"):
-            return
+        if interface in self._override_instances:
+            return self._override_instances[interface]
+
+        if not hasattr(instance, "__dict__") or hasattr(
+            instance, "__resolver_getter__"
+        ):
+            return instance
 
         wrapped = {
             name: value.interface
@@ -735,17 +714,37 @@ class Container:
             if isinstance(value, InstanceProxy)
         }
 
-        # Custom resolver function
-        def _resolver(_self: Any, _name: str) -> Any:
-            if _name in wrapped:
+        def __resolver_getter__(name: str) -> Any:
+            if name in wrapped:
+                _interface = wrapped[name]
                 # Resolve the dependency if it's wrapped
-                return self.resolve(wrapped[_name])
-            # Fall back to default behavior
-            return object.__getattribute__(_self, _name)
+                return self.resolve(_interface)
+            raise LookupError
 
-        # Apply the patched resolver if wrapped attributes exist
-        if wrapped:
-            instance.__class__.__getattribute__ = _resolver
+        # Attach the resolver getter to the instance
+        instance.__resolver_getter__ = __resolver_getter__
+
+        if not hasattr(instance.__class__, "__getattribute_patched__"):
+
+            def __getattribute__(_self: Any, name: str) -> Any:
+                # Skip the resolver getter
+                if name in {"__resolver_getter__"}:
+                    return object.__getattribute__(_self, name)
+
+                if hasattr(_self, "__resolver_getter__"):
+                    try:
+                        return _self.__resolver_getter__(name)
+                    except LookupError:
+                        pass
+
+                # Fall back to default behavior
+                return object.__getattribute__(_self, name)
+
+            # Apply the patched resolver if wrapped attributes exist
+            instance.__class__.__getattribute__ = __getattribute__
+            instance.__class__.__getattribute_patched__ = True
+
+        return instance
 
     def is_resolved(self, interface: AnyInterface) -> bool:
         """Check if an instance by interface exists."""
@@ -777,6 +776,10 @@ class Container:
         """
         Override the provider for the specified interface with a specific instance.
         """
+        if not self.testing:
+            raise RuntimeError(
+                "The `override` method can only be used in testing mode."
+            )
         if not self.is_registered(interface) and self.strict:
             raise LookupError(
                 f"The provider interface `{get_full_qualname(interface)}` "

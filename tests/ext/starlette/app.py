@@ -11,7 +11,7 @@ from anydi.ext.starlette.middleware import RequestScopedMiddleware
 
 from tests.ext.fixtures import MailService, UserService
 
-container = Container()
+container = Container(testing=True)
 
 
 @container.provider(scope="singleton")
