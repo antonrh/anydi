@@ -38,6 +38,7 @@ class Provider:
         "_kind",
         "_interface",
         "_parameters",
+        "_is_class",
         "_is_coroutine",
         "_is_generator",
         "_is_async_generator",
@@ -57,6 +58,7 @@ class Provider:
         # Detect the kind of callable provider
         self._detect_kind()
 
+        self._is_class = self._kind == CallableKind.CLASS
         self._is_coroutine = self._kind == CallableKind.COROUTINE
         self._is_generator = self._kind == CallableKind.GENERATOR
         self._is_async_generator = self._kind == CallableKind.ASYNC_GENERATOR
@@ -106,6 +108,11 @@ class Provider:
     @property
     def parameters(self) -> list[inspect.Parameter]:
         return self._parameters
+
+    @property
+    def is_class(self) -> bool:
+        """Check if the provider is a class."""
+        return self._is_class
 
     @property
     def is_coroutine(self) -> bool:
