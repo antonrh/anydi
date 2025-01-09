@@ -6,11 +6,10 @@ import time
 import uuid
 from collections.abc import AsyncIterator, Iterator, Sequence
 from dataclasses import dataclass
-from typing import Annotated, Any, Union
+from typing import Annotated, Union
 from unittest import mock
 
 import pytest
-from typing_extensions import Self
 
 from anydi import (
     Container,
@@ -903,59 +902,6 @@ class TestContainer:
             "been registered. Please ensure that the provider interface is properly "
             "registered before attempting to use it."
         )
-
-    def test_resolve_non_strict_with_as_context_manager(
-        self, container: Container
-    ) -> None:
-        class Resource:
-            __scope__ = "singleton"
-
-            def __init__(self) -> None:
-                self.entered = False
-                self.exited = False
-
-            def __enter__(self) -> Self:
-                self.entered = True
-                return self
-
-            def __exit__(self, exc_type: Any, exc_value: Any, traceback: Any) -> None:
-                self.exited = True
-
-        resource = container.resolve(Resource)
-
-        assert resource.entered
-
-        container.close()
-
-        assert resource.exited
-
-    async def test_resolve_non_strict_with_as_async_context_manager(
-        self,
-        container: Container,
-    ) -> None:
-        class Service:
-            __scope__ = "singleton"
-
-            def __init__(self) -> None:
-                self.entered = False
-                self.exited = False
-
-            async def __aenter__(self) -> Self:
-                self.entered = True
-                return self
-
-            async def __aexit__(
-                self, exc_type: Any, exc_value: Any, traceback: Any
-            ) -> None:
-                self.exited = True
-
-        service = await container.aresolve(Service)
-
-        assert service.entered
-
-        await container.aclose()
-
-        assert service.exited
 
     def test_resolve_non_strict_with_defaults(self, container: Container) -> None:
         @dataclass
