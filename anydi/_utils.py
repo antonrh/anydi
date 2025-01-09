@@ -44,6 +44,16 @@ def is_builtin_type(tp: type[Any]) -> bool:
     return tp.__module__ == builtins.__name__
 
 
+def is_context_manager(obj: Any) -> bool:
+    """Check if the given object is a context manager."""
+    return hasattr(obj, "__enter__") and hasattr(obj, "__exit__")
+
+
+def is_async_context_manager(obj: Any) -> bool:
+    """Check if the given object is an async context manager."""
+    return hasattr(obj, "__aenter__") and hasattr(obj, "__aexit__")
+
+
 def get_typed_annotation(
     annotation: Any, globalns: dict[str, Any], module: Any = None
 ) -> Any:

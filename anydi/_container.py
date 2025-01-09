@@ -36,7 +36,9 @@ from ._utils import (
     get_full_qualname,
     get_typed_parameters,
     import_string,
+    is_async_context_manager,
     is_builtin_type,
+    is_context_manager,
     run_async,
 )
 
@@ -553,7 +555,10 @@ class Container:
             cm = contextlib.contextmanager(provider.call)(**provider_kwargs)
             return context.enter(cm)
 
-        return provider.call(**provider_kwargs)
+        instance = provider.call(**provider_kwargs)
+        if context is not None and provider.is_class and is_context_manager(instance):
+            context.enter(instance)
+        return instance
 
     async def _acreate_instance(
         self, provider: Provider, context: InstanceContext | None, /, **defaults: Any
@@ -584,7 +589,14 @@ class Container:
 
             return await run_async(_create)
 
-        return await run_async(provider.call, **provider_kwargs)
+        instance = await run_async(provider.call, **provider_kwargs)
+        if (
+            context is not None
+            and provider.is_class
+            and is_async_context_manager(instance)
+        ):
+            await context.aenter(instance)
+        return instance
 
     def _get_provided_kwargs(
         self, provider: Provider, context: InstanceContext | None, /, **defaults: Any
