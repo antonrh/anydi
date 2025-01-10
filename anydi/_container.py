@@ -622,7 +622,7 @@ class Container:
 
         # Try to get instance from defaults
         if parameter.name in defaults:
-            instance = defaults[parameter.name]
+            return defaults[parameter.name]
 
         # Try to get instance from context
         elif context and parameter.annotation in context:
@@ -635,7 +635,7 @@ class Container:
             except LookupError:
                 if parameter.default is inspect.Parameter.empty:
                     raise
-                instance = parameter.default
+                return parameter.default
 
         # Wrap the instance in a proxy for testing
         if self.testing:
@@ -666,7 +666,7 @@ class Container:
 
         # Try to get instance from defaults
         if parameter.name in defaults:
-            instance = defaults[parameter.name]
+            return defaults[parameter.name]
 
         # Try to get instance from context
         elif context and parameter.annotation in context:
@@ -679,7 +679,7 @@ class Container:
             except LookupError:
                 if parameter.default is inspect.Parameter.empty:
                     raise
-                instance = parameter.default
+                return parameter.default
 
         # Wrap the instance in a proxy for testing
         if self.testing:

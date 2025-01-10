@@ -5,7 +5,7 @@ import threading
 import time
 import uuid
 from collections.abc import AsyncIterator, Iterator, Sequence
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Annotated, Any, Union
 from unittest import mock
 
@@ -1221,12 +1221,14 @@ class TestContainer:
         @dataclass
         class ServiceWithProp:
             name: str = "origin"
+            items: list[str] = field(default_factory=list)
 
         container = Container(testing=True)
 
         service = container.resolve(ServiceWithProp)
 
         assert service.name == "origin"
+        assert service.items == []
 
     def test_resource_delegated_exception(self, container: Container) -> None:
         resource = Resource()
