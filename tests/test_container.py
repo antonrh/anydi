@@ -1217,6 +1217,17 @@ class TestContainer:
 
         assert service.get_items() == []
 
+    def test_override_prop(self) -> None:
+        @dataclass
+        class ServiceWithProp:
+            name: str = "origin"
+
+        container = Container(testing=True)
+
+        service = container.resolve(ServiceWithProp)
+
+        assert service.name == "origin"
+
     def test_resource_delegated_exception(self, container: Container) -> None:
         resource = Resource()
 

@@ -639,7 +639,7 @@ class Container:
 
         # Wrap the instance in a proxy for testing
         if self.testing:
-            return InstanceProxy(interface=parameter.annotation, instance=instance)
+            return InstanceProxy(instance, interface=parameter.annotation)
         return instance
 
     async def _aget_provided_kwargs(
@@ -683,7 +683,7 @@ class Container:
 
         # Wrap the instance in a proxy for testing
         if self.testing:
-            return InstanceProxy(interface=parameter.annotation, instance=instance)
+            return InstanceProxy(instance, interface=parameter.annotation)
         return instance
 
     def _resolve_parameter(

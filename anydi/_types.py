@@ -5,6 +5,7 @@ from collections.abc import Iterable
 from types import ModuleType
 from typing import Annotated, Any, NamedTuple, Union
 
+import wrapt
 from typing_extensions import Literal, Self, TypeAlias
 
 Scope = Literal["transient", "singleton", "request"]
@@ -37,20 +38,19 @@ def is_event_type(obj: Any) -> bool:
     return inspect.isclass(obj) and issubclass(obj, Event)
 
 
-class InstanceProxy:
-    __slots__ = ("interface", "instance")
+class InstanceProxy(wrapt.ObjectProxy):  # type: ignore[misc]
+    def __init__(self, wrapped: Any, *, interface: type[Any]) -> None:
+        super().__init__(wrapped)
+        self._self_interface = interface
 
-    def __init__(self, *, interface: type[Any], instance: Any):
-        self.interface = interface
-        self.instance = instance
+    @property
+    def interface(self) -> type[Any]:
+        return self._self_interface
 
-    def __getattribute__(self, name: str) -> Any:
-        if name in ("interface", "instance"):
-            return object.__getattribute__(self, name)
-        return getattr(self.instance, name)
-
-    def __repr__(self) -> str:
-        return f"InstanceProxy({self.interface!r})"
+    def __getattribute__(self, item: str) -> Any:
+        if item in "interface":
+            return object.__getattribute__(self, item)
+        return object.__getattribute__(self, item)
 
 
 class ProviderDecoratorArgs(NamedTuple):
