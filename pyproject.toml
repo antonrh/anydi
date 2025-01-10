@@ -37,6 +37,7 @@ packages = [
 python = "^3.9"
 typing-extensions = "^4.12.1"
 anyio = ">=3.7.1"
+wrapt = "^1.17.0"
 mkdocs = { version = "^1.4.2", optional = true }
 mkdocs-material = { version = "^9.5.29", optional = true }
 
@@ -82,6 +83,7 @@ strict = true
 [[tool.mypy.overrides]]
 module = [
     "django.*",
+    "wrapt.*",
 ]
 ignore_missing_imports = true
 
