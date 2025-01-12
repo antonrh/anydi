@@ -86,11 +86,13 @@ class Container:
         modules: Sequence[Module | type[Module] | Callable[[Container], None] | str]
         | None = None,
         strict: bool = False,
+        default_scope: Scope = "transient",
         testing: bool = False,
         logger: logging.Logger | None = None,
     ) -> None:
         self._providers: dict[type[Any], Provider] = {}
         self._strict = strict
+        self._default_scope = default_scope
         self._testing = testing
         self._logger = logger or logging.getLogger(__name__)
         self._resources: dict[str, list[type[Any]]] = defaultdict(list)
@@ -120,6 +122,11 @@ class Container:
     def strict(self) -> bool:
         """Check if strict mode is enabled."""
         return self._strict
+
+    @property
+    def default_scope(self) -> Scope:
+        """Get the default scope."""
+        return self._default_scope
 
     @property
     def testing(self) -> bool:
@@ -221,7 +228,7 @@ class Container:
                 # Try to detect scope
                 if scope is None:
                     scope = self._detect_scope(interface, **defaults)
-                scope = scope or "transient"
+                scope = scope or self.default_scope
                 provider = Provider(call=interface, scope=scope, interface=interface)
                 return self._register_provider(provider, False, **defaults)
             raise

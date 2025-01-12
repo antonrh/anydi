@@ -38,6 +38,12 @@ class TestContainer:
     def test_default_strict_disabled(self, container: Container) -> None:
         assert not container.strict
 
+    def test_default_scope(self, container: Container) -> None:
+        assert container.default_scope == "transient"
+
+    def test_default_testing(self, container: Container) -> None:
+        assert not container.testing
+
     def test_register_provider(self, container: Container) -> None:
         def provider_call() -> str:
             return "test"
