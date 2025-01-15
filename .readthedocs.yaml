@@ -1,9 +1,9 @@
 version: 2
 
 build:
-  os: ubuntu-20.04
+  os: ubuntu-24.04
   tools:
-    python: "3.10"
+    python: "3.13"
   jobs:
     create_environment:
       - asdf plugin add uv
@@ -14,7 +14,7 @@ build:
       - uv sync --frozen --extra docs
     build:
        html:
-          - uv run sphinx-build -T -b html docs $READTHEDOCS_OUTPUT/html
+          - NO_COLOR=1 uv run mkdocs build --strict --site-dir $READTHEDOCS_OUTPUT/html
 
 mkdocs:
   configuration: mkdocs.yml
