@@ -26,7 +26,7 @@ jobs:
       - name: Static type checking
         run: uv run mypy anydi tests
       - name: Code formatting
-        run: uv run ruff check anydi tests && poetry run ruff format anydi tests --check
+        run: uv run ruff check anydi tests && uv run ruff format anydi tests --check
 
   tests:
     name: Run unit tests ${{ matrix.name }}
