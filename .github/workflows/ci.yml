@@ -13,24 +13,20 @@ jobs:
     name: Code quality
     runs-on: ubuntu-latest
     steps:
-      - name: Install poetry
-        run: |
-          curl -sSL https://install.python-poetry.org | python3 - --version 1.8.3
-          echo "PATH=${HOME}/.poetry/bin:${PATH}" >> $GITHUB_ENV
       - name: Checkout
         uses: actions/checkout@v4
-      - name: Set up Python 3.10
-        uses: actions/setup-python@v5
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
         with:
-          python-version: "3.10"
-          cache: "poetry"
+          enable-cache: true
+      - name: Set up Python
+        run: uv python install
       - name: Install dependencies
-        run: poetry install
+        run: uv sync --all-extras --dev
       - name: Static type checking
-        run: poetry run mypy anydi tests
+        run: uv run mypy anydi tests
       - name: Code formatting
-        run: poetry run ruff check anydi tests && poetry run ruff format anydi tests --check
-
+        run: uv run ruff check anydi tests && poetry run ruff format anydi tests --check
 
   tests:
     name: Run unit tests ${{ matrix.name }}
@@ -48,21 +44,17 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-      - name: Install poetry
-        run: |
-          curl -sSL https://install.python-poetry.org | python3 - --version 1.8.3
-          echo "PATH=${HOME}/.poetry/bin:${PATH}" >> $GITHUB_ENV
-      - name: Set up Python ${{ matrix.python }}
-        uses: actions/setup-python@v5
+      - name: Install uv and set the python version
+        uses: astral-sh/setup-uv@v5
         with:
-          python-version: ${{ matrix.python }}
-          cache: "poetry"
+          python-version: ${{ matrix.python-version }}
+          enable-cache: true
       - name: Install dependencies
-        run: poetry install
+        run: uv sync --all-extras --dev
       - name: Run tests
         run: |
-          poetry run pytest -vv tests --ignore=tests/ext/test_pytest_plugin.py --cov=anydi -p no:anydi
-          poetry run pytest -vv tests/ext/test_pytest_plugin.py --cov=anydi --cov-append --cov-report=xml
+          uv run pytest -vv tests --ignore=tests/ext/test_pytest_plugin.py --cov=anydi -p no:anydi
+          uv run pytest -vv tests/ext/test_pytest_plugin.py --cov=anydi --cov-append --cov-report=xml
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v3
         if: matrix.python == '3.9'
