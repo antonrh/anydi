@@ -74,7 +74,6 @@ class Module(metaclass=ModuleMeta):
         """Configure the AnyDI container with providers and their dependencies."""
 
 
-# noinspection PyShadowingNames
 @final
 class Container:
     """AnyDI is a dependency injection container."""
