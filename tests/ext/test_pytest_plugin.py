@@ -1,5 +1,3 @@
-from typing import Any
-
 import pytest
 
 from anydi import Container
@@ -37,11 +35,6 @@ def test_no_container_setup(
         "`container` fixture is not found. Make sure to define it in your test module "
         "or override `anydi_setup_container` fixture."
     )
-
-
-@pytest.fixture(autouse=True)
-def _clean_unresolved(_anydi_unresolved: list[Any]) -> None:
-    _anydi_unresolved.clear()
 
 
 @pytest.mark.inject
