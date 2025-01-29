@@ -460,18 +460,6 @@ class Container:
 
     def create(self, interface: type[T], **defaults: Any) -> T:
         """Create an instance by interface."""
-        provider = self._get_or_register_provider(interface, None, **defaults)
-        if provider.scope == "transient":
-            instance = self._create_instance(provider, None, **defaults)
-        else:
-            context = self._get_scoped_context(provider.scope)
-            if provider.scope == "singleton":
-                with self._singleton_lock:
-                    instance = self._create_instance(provider, context, **defaults)
-            else:
-                instance = self._create_instance(provider, context, **defaults)
-        if self.testing:
-            instance = self._patch_test_resolver(provider.interface, instance)
         return self._resolve_or_create(interface, create=True, **defaults)
 
     @overload
