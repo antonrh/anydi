@@ -456,41 +456,7 @@ class Container:
 
     def resolve(self, interface: type[T]) -> T:
         """Resolve an instance by interface."""
-        provider = self._get_or_register_provider(interface, None)
-        if provider.scope == "transient":
-            instance = self._create_instance(provider, None)
-        else:
-            context = self._get_scoped_context(provider.scope)
-            if provider.scope == "singleton":
-                with self._singleton_lock:
-                    instance = self._get_or_create_instance(provider, context)
-            else:
-                instance = self._get_or_create_instance(provider, context)
-        if self.testing:
-            instance = self._patch_test_resolver(provider.interface, instance)
-        return cast(T, instance)
-
-    @overload
-    async def aresolve(self, interface: type[T]) -> T: ...
-
-    @overload
-    async def aresolve(self, interface: T) -> T: ...
-
-    async def aresolve(self, interface: type[T]) -> T:
-        """Resolve an instance by interface asynchronously."""
-        provider = self._get_or_register_provider(interface, None)
-        if provider.scope == "transient":
-            instance = await self._acreate_instance(provider, None)
-        else:
-            context = self._get_scoped_context(provider.scope)
-            if provider.scope == "singleton":
-                async with self._singleton_async_lock:
-                    instance = await self._aget_or_create_instance(provider, context)
-            else:
-                instance = await self._aget_or_create_instance(provider, context)
-        if self.testing:
-            instance = self._patch_test_resolver(interface, instance)
-        return cast(T, instance)
+        return self._resolve_or_create(interface, create=False)
 
     def create(self, interface: type[T], **defaults: Any) -> T:
         """Create an instance by interface."""
@@ -506,10 +472,54 @@ class Container:
                 instance = self._create_instance(provider, context, **defaults)
         if self.testing:
             instance = self._patch_test_resolver(provider.interface, instance)
-        return cast(T, instance)
+        return self._resolve_or_create(interface, create=True, **defaults)
+
+    @overload
+    async def aresolve(self, interface: type[T]) -> T: ...
+
+    @overload
+    async def aresolve(self, interface: T) -> T: ...
+
+    async def aresolve(self, interface: type[T]) -> T:
+        """Resolve an instance by interface asynchronously."""
+        return await self._aresolve_or_acreate(interface, create=False)
 
     async def acreate(self, interface: type[T], **defaults: Any) -> T:
-        """Create an instance by interface."""
+        """Create an instance by interface asynchronously."""
+        return await self._aresolve_or_acreate(interface, create=True, **defaults)
+
+    def _resolve_or_create(
+        self, interface: type[T], create: bool, **defaults: Any
+    ) -> T:
+        """Internal method to handle instance resolution and creation."""
+        provider = self._get_or_register_provider(interface, None, **defaults)
+        if provider.scope == "transient":
+            instance = self._create_instance(provider, None, **defaults)
+        else:
+            context = self._get_scoped_context(provider.scope)
+            if provider.scope == "singleton":
+                with self._singleton_lock:
+                    instance = (
+                        self._get_or_create_instance(provider, context)
+                        if not create
+                        else self._create_instance(provider, context, **defaults)
+                    )
+            else:
+                instance = (
+                    self._get_or_create_instance(provider, context)
+                    if not create
+                    else self._create_instance(provider, context, **defaults)
+                )
+
+        if self.testing:
+            instance = self._patch_test_resolver(provider.interface, instance)
+
+        return cast(T, instance)
+
+    async def _aresolve_or_acreate(
+        self, interface: type[T], create: bool, **defaults: Any
+    ) -> T:
+        """Internal method to handle instance resolution and creation asynchronously."""
         provider = self._get_or_register_provider(interface, None, **defaults)
         if provider.scope == "transient":
             instance = await self._acreate_instance(provider, None, **defaults)
@@ -517,13 +527,21 @@ class Container:
             context = self._get_scoped_context(provider.scope)
             if provider.scope == "singleton":
                 async with self._singleton_async_lock:
-                    instance = await self._acreate_instance(
-                        provider, context, **defaults
+                    instance = (
+                        await self._aget_or_create_instance(provider, context)
+                        if not create
+                        else await self._acreate_instance(provider, context, **defaults)
                     )
             else:
-                instance = await self._acreate_instance(provider, context, **defaults)
+                instance = (
+                    await self._aget_or_create_instance(provider, context)
+                    if not create
+                    else await self._acreate_instance(provider, context, **defaults)
+                )
+
         if self.testing:
             instance = self._patch_test_resolver(provider.interface, instance)
+
         return cast(T, instance)
 
     def _get_or_create_instance(
