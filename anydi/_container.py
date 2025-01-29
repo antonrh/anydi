@@ -504,6 +504,8 @@ class Container:
                     instance = self._create_instance(provider, context, **defaults)
             else:
                 instance = self._create_instance(provider, context, **defaults)
+        if self.testing:
+            instance = self._patch_test_resolver(provider.interface, instance)
         return cast(T, instance)
 
     async def acreate(self, interface: type[T], **defaults: Any) -> T:
@@ -520,6 +522,8 @@ class Container:
                     )
             else:
                 instance = await self._acreate_instance(provider, context, **defaults)
+        if self.testing:
+            instance = self._patch_test_resolver(provider.interface, instance)
         return cast(T, instance)
 
     def _get_or_create_instance(
