@@ -57,27 +57,20 @@ def _anydi_should_inject(request: pytest.FixtureRequest) -> bool:
     return marker is not None or inject_all
 
 
-@pytest.fixture(scope="session")
-def _anydi_unresolved() -> Iterator[list[Any]]:
-    unresolved: list[Any] = []
-    yield unresolved
-    unresolved.clear()
-
-
 @pytest.fixture
 def _anydi_injected_parameter_iterator(
     request: pytest.FixtureRequest,
-    _anydi_unresolved: list[str],
 ) -> Callable[[], Iterator[tuple[str, Any]]]:
-    registered_fixtures = request.session._fixturemanager._arg2fixturedefs  # noqa
+    fixturenames = set(request.node._fixtureinfo.initialnames) - set(
+        request.node._fixtureinfo.name2fixturedefs.keys()
+    )
 
     def _iterator() -> Iterator[tuple[str, inspect.Parameter]]:
         for parameter in get_typed_parameters(request.function):
             interface = parameter.annotation
             if (
                 interface is inspect.Parameter.empty
-                or interface in _anydi_unresolved
-                or parameter.name in registered_fixtures
+                or parameter.name not in fixturenames
             ):
                 continue
             yield parameter.name, interface
@@ -90,7 +83,6 @@ def _anydi_inject(
     request: pytest.FixtureRequest,
     _anydi_should_inject: bool,
     _anydi_injected_parameter_iterator: Callable[[], Iterator[tuple[str, Any]]],
-    _anydi_unresolved: list[str],
 ) -> None:
     """Inject dependencies into the test function."""
 
@@ -111,7 +103,6 @@ def _anydi_inject(
             logger.warning(
                 f"Failed to resolve dependency for argument '{argname}'.", exc_info=exc
             )
-            _anydi_unresolved.append(interface)
 
 
 @pytest.fixture(autouse=True)
@@ -119,7 +110,6 @@ def _anydi_ainject(
     request: pytest.FixtureRequest,
     _anydi_should_inject: bool,
     _anydi_injected_parameter_iterator: Callable[[], Iterator[tuple[str, Any]]],
-    _anydi_unresolved: list[str],
 ) -> None:
     """Inject dependencies into the test function."""
     if (
@@ -149,7 +139,6 @@ def _anydi_ainject(
                     f"Failed to resolve dependency for argument '{argname}'.",
                     exc_info=exc,
                 )
-                _anydi_unresolved.append(interface)
 
     anyio_backend = request.getfixturevalue("anyio_backend")
     backend_name, backend_options = extract_backend_and_options(anyio_backend)
