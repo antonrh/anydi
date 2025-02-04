@@ -19,7 +19,7 @@ from typing import Any, Callable, TypeVar, Union, cast, overload
 from typing_extensions import Concatenate, ParamSpec, Self, final
 
 from ._context import InstanceContext
-from ._provider import Provider
+from ._provider import Provider, create_provider
 from ._types import (
     AnyInterface,
     Dependency,
@@ -108,7 +108,7 @@ class Container:
         # Register providers
         providers = providers or []
         for provider in providers:
-            _provider = Provider(
+            _provider = create_provider(
                 call=provider.call,
                 scope=provider.scope,
                 interface=provider.interface,
@@ -158,7 +158,7 @@ class Container:
         override: bool = False,
     ) -> Provider:
         """Register a provider for the specified interface."""
-        provider = Provider(call=call, scope=scope, interface=interface)
+        provider = create_provider(call=call, scope=scope, interface=interface)
         return self._register_provider(provider, override)
 
     def _register_provider(
@@ -231,7 +231,9 @@ class Container:
                 if scope is None:
                     scope = self._detect_scope(interface, **defaults)
                 scope = scope or self.default_scope
-                provider = Provider(call=interface, scope=scope, interface=interface)
+                provider = create_provider(
+                    call=interface, scope=scope, interface=interface
+                )
                 return self._register_provider(provider, False, **defaults)
             raise
 
@@ -820,7 +822,7 @@ class Container:
         """Decorator to register a provider function with the specified scope."""
 
         def decorator(call: Callable[P, T]) -> Callable[P, T]:
-            provider = Provider(call=call, scope=scope)
+            provider = create_provider(call=call, scope=scope)
             self._register_provider(provider, override)
             return call
 
