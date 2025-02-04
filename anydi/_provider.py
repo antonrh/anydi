@@ -220,6 +220,11 @@ class Provider:
         """Detect the parameters of the callable provider."""
         parameters = []
         for parameter in signature.parameters.values():
+            if parameter.annotation is inspect.Parameter.empty:
+                raise TypeError(
+                    f"Missing provider `{self}` "
+                    f"dependency `{parameter.name}` annotation."
+                )
             if parameter.kind == inspect.Parameter.POSITIONAL_ONLY:
                 raise TypeError(
                     f"Positional-only parameter `{parameter.name}` is not allowed "

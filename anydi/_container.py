@@ -249,12 +249,6 @@ class Container:
         """Validate the sub-providers of a provider."""
 
         for parameter in provider.parameters:
-            if parameter.annotation is inspect.Parameter.empty:
-                raise TypeError(
-                    f"Missing provider `{provider}` "
-                    f"dependency `{parameter.name}` annotation."
-                )
-
             try:
                 sub_provider = self._get_or_register_provider(
                     parameter.annotation, provider.scope

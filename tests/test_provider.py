@@ -163,6 +163,22 @@ class TestProvider:
             "register with a transient scope, which is not allowed."
         )
 
+    def test_construct_without_annotation(self) -> None:
+        def service_ident() -> str:
+            return "10000"
+
+        def service(ident) -> Service:  # type: ignore[no-untyped-def]
+            return Service(ident=ident)
+
+        with pytest.raises(TypeError) as exc_info:
+            Provider(call=service, scope="singleton")
+
+        assert str(exc_info.value) == (
+            "Missing provider "
+            "`tests.test_provider.TestProvider.test_construct_without_annotation"
+            ".<locals>.service` dependency `ident` annotation."
+        )
+
     def test_construct_positional_only_parameter_not_allowed(self) -> None:
         def provider_message(a: int, /, b: str) -> str:
             return f"{a} {b}"

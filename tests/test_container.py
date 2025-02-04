@@ -248,24 +248,6 @@ class TestContainer:
             "Please ensure all providers are registered with matching scopes."
         )
 
-    def test_register_provider_without_annotation(self, container: Container) -> None:
-        def service_ident() -> str:
-            return "10000"
-
-        def service(ident) -> Service:  # type: ignore[no-untyped-def]
-            return Service(ident=ident)
-
-        container.register(str, service_ident, scope="singleton")
-
-        with pytest.raises(TypeError) as exc_info:
-            container.register(Service, service, scope="singleton")
-
-        assert str(exc_info.value) == (
-            "Missing provider "
-            "`tests.test_container.TestContainer.test_register_provider_without_annotation"
-            ".<locals>.service` dependency `ident` annotation."
-        )
-
     def test_register_provider_with_not_registered_sub_provider(
         self,
         container: Container,
