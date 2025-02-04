@@ -3,7 +3,7 @@ from __future__ import annotations
 import inspect
 from collections.abc import Iterable
 from types import ModuleType
-from typing import Annotated, Any, NamedTuple, Union
+from typing import Annotated, Any, Callable, NamedTuple, Union
 
 import wrapt
 from typing_extensions import Literal, Self, TypeAlias
@@ -51,6 +51,12 @@ class InstanceProxy(wrapt.ObjectProxy):  # type: ignore[misc]
         if item in "interface":
             return object.__getattribute__(self, item)
         return object.__getattribute__(self, item)
+
+
+class ProviderArgs(NamedTuple):
+    call: Callable[..., Any]
+    scope: Scope
+    interface: Any | None = None
 
 
 class ProviderDecoratorArgs(NamedTuple):

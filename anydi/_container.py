@@ -25,6 +25,7 @@ from ._types import (
     Dependency,
     InjectableDecoratorArgs,
     InstanceProxy,
+    ProviderArgs,
     ProviderDecoratorArgs,
     Scope,
     is_event_type,
@@ -80,7 +81,7 @@ class Container:
     def __init__(
         self,
         *,
-        providers: Sequence[Provider] | None = None,
+        providers: Sequence[ProviderArgs] | None = None,
         modules: Sequence[Module | type[Module] | Callable[[Container], None] | str]
         | None = None,
         strict: bool = False,
@@ -107,7 +108,12 @@ class Container:
         # Register providers
         providers = providers or []
         for provider in providers:
-            self._register_provider(provider, False)
+            _provider = Provider(
+                call=provider.call,
+                scope=provider.scope,
+                interface=provider.interface,
+            )
+            self._register_provider(_provider, False)
 
         # Register modules
         modules = modules or []

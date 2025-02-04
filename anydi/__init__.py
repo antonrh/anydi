@@ -11,8 +11,7 @@ from ._container import (
     singleton,
     transient,
 )
-from ._provider import Provider
-from ._types import Marker, Scope
+from ._types import Marker, ProviderArgs as Provider, Scope
 
 # Alias for dependency auto marker
 auto = cast(Any, Marker())

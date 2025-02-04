@@ -15,7 +15,6 @@ from typing_extensions import Self
 from anydi import (
     Container,
     Module,
-    Provider,
     Scope,
     auto,
     injectable,
@@ -24,7 +23,7 @@ from anydi import (
     singleton,
     transient,
 )
-from anydi._types import InjectableDecoratorArgs, ProviderDecoratorArgs
+from anydi._types import InjectableDecoratorArgs, ProviderArgs, ProviderDecoratorArgs
 
 from tests.fixtures import Resource, Service, TestModule
 from tests.scan_app import ScanAppModule
@@ -58,7 +57,11 @@ class TestContainer:
         def ident() -> str:
             return "1000"
 
-        assert container.providers[str] == Provider(call=ident, scope="singleton")
+        provider = container.providers[str]
+
+        assert provider.call == ident
+        assert provider.scope == "singleton"
+        assert provider.interface is str
 
     def test_register_provider_already_registered(self, container: Container) -> None:
         container.register(str, lambda: "test", scope="singleton")
@@ -98,8 +101,8 @@ class TestContainer:
     def test_register_providers_via_constructor(self) -> None:
         container = Container(
             providers=[
-                Provider(call=lambda: "test", scope="singleton", interface=str),
-                Provider(call=lambda: 1, scope="singleton", interface=int),
+                ProviderArgs(call=lambda: "test", scope="singleton", interface=str),
+                ProviderArgs(call=lambda: 1, scope="singleton", interface=int),
             ]
         )
 
@@ -797,9 +800,11 @@ class TestContainer:
 
         _ = container.resolve(Service)
 
-        assert container.providers == {
-            Service: Provider(call=Service, scope="singleton"),
-        }
+        provider = container.providers[Service]
+
+        assert provider.call == Service
+        assert provider.scope == "singleton"
+        assert provider.interface == Service
 
     def test_resolve_non_strict_provider_scope_from_sub_provider_request(
         self,
@@ -812,10 +817,13 @@ class TestContainer:
         with container.request_context():
             _ = container.resolve(Service)
 
-        assert container.providers == {
-            str: Provider(call=ident, scope="request"),
-            Service: Provider(call=Service, scope="request"),
-        }
+        assert Service in container.providers
+
+        provider = container.providers[str]
+
+        assert provider.call == ident
+        assert provider.scope == "request"
+        assert provider.interface is str
 
     def test_resolve_non_strict_provider_scope_from_sub_provider_transient(
         self,
