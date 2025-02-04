@@ -15,7 +15,6 @@ from collections.abc import AsyncIterator, Iterable, Iterator, Sequence
 from contextvars import ContextVar
 from types import ModuleType
 from typing import Any, Callable, TypeVar, Union, cast, overload
-from weakref import WeakKeyDictionary
 
 from typing_extensions import Concatenate, ParamSpec, Self, final
 
@@ -103,9 +102,7 @@ class Container:
         )
         self._override_instances: dict[type[Any], Any] = {}
         self._unresolved_interfaces: set[type[Any]] = set()
-        self._inject_cache: WeakKeyDictionary[
-            Callable[..., Any], Callable[..., Any]
-        ] = WeakKeyDictionary()
+        self._inject_cache: dict[Callable[..., Any], Callable[..., Any]] = {}
 
         # Register providers
         providers = providers or []
