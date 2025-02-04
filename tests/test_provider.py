@@ -3,7 +3,7 @@ from typing import Annotated, Any, Callable
 
 import pytest
 
-from anydi._provider import CallableKind, Provider
+from anydi._provider import Provider, ProviderKind
 from anydi._types import Event
 
 from tests.fixtures import Service
@@ -45,15 +45,15 @@ class TestProvider:
     @pytest.mark.parametrize(
         "call, kind, interface",
         [
-            (func, CallableKind.FUNCTION, str),
-            (Class, CallableKind.CLASS, Class),
-            (generator, CallableKind.GENERATOR, str),
-            (async_generator, CallableKind.ASYNC_GENERATOR, str),
-            (coro, CallableKind.COROUTINE, str),
+            (func, ProviderKind.FUNCTION, str),
+            (Class, ProviderKind.CLASS, Class),
+            (generator, ProviderKind.GENERATOR, str),
+            (async_generator, ProviderKind.ASYNC_GENERATOR, str),
+            (coro, ProviderKind.COROUTINE, str),
         ],
     )
     def test_construct(
-        self, call: Callable[..., Any], kind: CallableKind, interface: Any
+        self, call: Callable[..., Any], kind: ProviderKind, interface: Any
     ) -> None:
         provider = Provider(call=call, scope="singleton")
 
@@ -88,12 +88,12 @@ class TestProvider:
 
     @pytest.mark.parametrize(
         "call, kind",
-        [(event, CallableKind.GENERATOR), (async_event, CallableKind.ASYNC_GENERATOR)],
+        [(event, ProviderKind.GENERATOR), (async_event, ProviderKind.ASYNC_GENERATOR)],
     )
     def test_construct_event(
         self,
         call: Callable[..., Any],
-        kind: CallableKind,
+        kind: ProviderKind,
     ) -> None:
         provider = Provider(call=call, scope="singleton")
 

@@ -20,7 +20,7 @@ from ._utils import get_full_qualname, get_typed_annotation
 _sentinel = object()
 
 
-class CallableKind(IntEnum):
+class ProviderKind(IntEnum):
     CLASS = 1
     FUNCTION = 2
     COROUTINE = 3
@@ -54,10 +54,10 @@ class Provider:
         # Detect the kind of callable provider
         self._detect_kind()
 
-        self._is_class = self._kind == CallableKind.CLASS
-        self._is_coroutine = self._kind == CallableKind.COROUTINE
-        self._is_generator = self._kind == CallableKind.GENERATOR
-        self._is_async_generator = self._kind == CallableKind.ASYNC_GENERATOR
+        self._is_class = self._kind == ProviderKind.CLASS
+        self._is_coroutine = self._kind == ProviderKind.COROUTINE
+        self._is_generator = self._kind == ProviderKind.GENERATOR
+        self._is_async_generator = self._kind == ProviderKind.ASYNC_GENERATOR
         self._is_async = self._is_coroutine or self._is_async_generator
         self._is_resource = self._is_generator or self._is_async_generator
 
@@ -91,7 +91,7 @@ class Provider:
         return self._call
 
     @property
-    def kind(self) -> CallableKind:
+    def kind(self) -> ProviderKind:
         return self._kind
 
     @property
@@ -153,15 +153,15 @@ class Provider:
     def _detect_kind(self) -> None:
         """Detect the kind of callable provider."""
         if inspect.isclass(self.call):
-            self._kind = CallableKind.CLASS
+            self._kind = ProviderKind.CLASS
         elif inspect.iscoroutinefunction(self.call):
-            self._kind = CallableKind.COROUTINE
+            self._kind = ProviderKind.COROUTINE
         elif inspect.isasyncgenfunction(self.call):
-            self._kind = CallableKind.ASYNC_GENERATOR
+            self._kind = ProviderKind.ASYNC_GENERATOR
         elif inspect.isgeneratorfunction(self.call):
-            self._kind = CallableKind.GENERATOR
+            self._kind = ProviderKind.GENERATOR
         elif inspect.isfunction(self.call) or inspect.ismethod(self.call):
-            self._kind = CallableKind.FUNCTION
+            self._kind = ProviderKind.FUNCTION
         else:
             raise TypeError(
                 f"The provider `{self.call}` is invalid because it is not a callable "
@@ -176,7 +176,7 @@ class Provider:
     ) -> None:
         """Detect the interface of callable provider."""
         # If the callable is a class, return the class itself
-        if self._kind == CallableKind.CLASS:
+        if self._kind == ProviderKind.CLASS:
             self._interface = self._call
             return
 
