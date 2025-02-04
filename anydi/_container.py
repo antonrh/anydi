@@ -699,25 +699,25 @@ class Container:
     def _resolve_parameter(
         self, provider: Provider, parameter: inspect.Parameter
     ) -> Any:
-        self._validate_resolvable_parameter(parameter, call=provider.call)
+        self._validate_resolvable_parameter(provider, parameter)
         return self.resolve(parameter.annotation)
 
     async def _aresolve_parameter(
         self, provider: Provider, parameter: inspect.Parameter
     ) -> Any:
-        self._validate_resolvable_parameter(parameter, call=provider.call)
+        self._validate_resolvable_parameter(provider, parameter)
         return await self.aresolve(parameter.annotation)
 
     def _validate_resolvable_parameter(
-        self, parameter: inspect.Parameter, call: Callable[..., Any]
+        self, provider: Provider, parameter: inspect.Parameter
     ) -> None:
         """Ensure that the specified interface is resolved."""
         if parameter.annotation in self._unresolved_interfaces:
             raise LookupError(
                 f"You are attempting to get the parameter `{parameter.name}` with the "
                 f"annotation `{get_full_qualname(parameter.annotation)}` as a "
-                f"dependency into `{get_full_qualname(call)}` which is not registered "
-                "or set in the scoped context."
+                f"dependency into `{get_full_qualname(provider.call)}` which is "
+                "not registered or set in the scoped context."
             )
 
     def _patch_test_resolver(self, interface: type[Any], instance: Any) -> Any:
