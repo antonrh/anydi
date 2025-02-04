@@ -85,7 +85,7 @@ def create_provider(
     signature = inspect.signature(call, globals=globalns)
 
     # Detect the interface
-    interface = _detect_interface(
+    interface = _detect_provider_interface(
         name, kind, call, interface, signature, globalns=globalns
     )
 
@@ -135,7 +135,7 @@ def _detect_provider_kind(call: Callable[..., Any]) -> ProviderKind:
     )
 
 
-def _detect_interface(
+def _detect_provider_interface(
     name: str,
     kind: ProviderKind,
     call: Callable[..., Any],

@@ -149,6 +149,10 @@ class Container:
         """Check if a provider is registered for the specified interface."""
         return interface in self._providers
 
+    #############################
+    # Provider methods
+    #############################
+
     def register(
         self,
         interface: AnyInterface,
