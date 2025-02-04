@@ -31,8 +31,6 @@ class CallableKind(IntEnum):
 class Provider:
     __slots__ = (
         "_call",
-        "_call_module",
-        "_call_globals",
         "_scope",
         "_qualname",
         "_kind",
@@ -50,8 +48,6 @@ class Provider:
         self, call: Callable[..., Any], *, scope: Scope, interface: Any = _sentinel
     ) -> None:
         self._call = call
-        self._call_module = getattr(call, "__module__", None)
-        self._call_globals = getattr(call, "__globals__", {})
         self._scope = scope
         self._qualname = get_full_qualname(call)
 
@@ -69,13 +65,14 @@ class Provider:
         self._validate_scope()
 
         # Get the signature
-        signature = inspect.signature(call)
+        globalns = getattr(call, "__globals__", {})
+        signature = inspect.signature(call, globals=globalns)
 
         # Detect the interface
-        self._detect_interface(interface, signature)
+        self._detect_interface(interface, signature, globalns=globalns)
 
         # Detect the parameters
-        self._detect_parameters(signature)
+        self._detect_parameters(signature, globalns=globalns)
 
     def __str__(self) -> str:
         return self._qualname
@@ -171,7 +168,12 @@ class Provider:
                 "object. Only callable providers are allowed."
             )
 
-    def _detect_interface(self, interface: Any, signature: inspect.Signature) -> None:
+    def _detect_interface(
+        self,
+        interface: Any,
+        signature: inspect.Signature,
+        globalns: dict[str, Any],
+    ) -> None:
         """Detect the interface of callable provider."""
         # If the callable is a class, return the class itself
         if self._kind == CallableKind.CLASS:
@@ -179,7 +181,7 @@ class Provider:
             return
 
         if interface is _sentinel:
-            interface = self._resolve_interface(interface, signature)
+            interface = self._resolve_interface(interface, signature, globalns=globalns)
 
         # If the callable is an iterator, return the actual type
         iterator_types = {Iterator, AsyncIterator}
@@ -203,18 +205,18 @@ class Provider:
         # Set the interface
         self._interface = interface
 
-    def _resolve_interface(self, interface: Any, signature: inspect.Signature) -> Any:
+    def _resolve_interface(
+        self, interface: Any, signature: inspect.Signature, globalns: dict[str, Any]
+    ) -> Any:
         """Resolve the interface of the callable provider."""
         interface = signature.return_annotation
         if interface is inspect.Signature.empty:
             return None
-        return get_typed_annotation(
-            interface,
-            self._call_globals,
-            module=self._call_module,
-        )
+        return get_typed_annotation(interface, globalns)
 
-    def _detect_parameters(self, signature: inspect.Signature) -> None:
+    def _detect_parameters(
+        self, signature: inspect.Signature, globalns: dict[str, Any]
+    ) -> None:
         """Detect the parameters of the callable provider."""
         parameters = []
         for parameter in signature.parameters.values():
@@ -223,10 +225,6 @@ class Provider:
                     f"Positional-only parameter `{parameter.name}` is not allowed "
                     f"in the provider `{self}`."
                 )
-            annotation = get_typed_annotation(
-                parameter.annotation,
-                self._call_globals,
-                module=self._call_module,
-            )
+            annotation = get_typed_annotation(parameter.annotation, globalns)
             parameters.append(parameter.replace(annotation=annotation))
         self._parameters = parameters
