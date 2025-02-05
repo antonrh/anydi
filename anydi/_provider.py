@@ -29,6 +29,23 @@ class ProviderKind(IntEnum):
     GENERATOR = 4
     ASYNC_GENERATOR = 5
 
+    @classmethod
+    def from_call(cls, call: Callable[..., Any]) -> ProviderKind:
+        if inspect.isclass(call):
+            return cls.CLASS
+        elif inspect.iscoroutinefunction(call):
+            return cls.COROUTINE
+        elif inspect.isasyncgenfunction(call):
+            return cls.ASYNC_GENERATOR
+        elif inspect.isgeneratorfunction(call):
+            return cls.GENERATOR
+        elif inspect.isfunction(call) or inspect.ismethod(call):
+            return cls.FUNCTION
+        raise TypeError(
+            f"The provider `{call}` is invalid because it is not a callable "
+            "object. Only callable providers are allowed."
+        )
+
 
 @dataclass(kw_only=True, frozen=True)
 class ProviderParameter:
@@ -78,7 +95,7 @@ def create_provider(
     name = get_full_qualname(call)
 
     # Detect the kind of callable provider
-    kind = _detect_provider_kind(call)
+    kind = ProviderKind.from_call(call)
 
     # Validate the scope of the provider
     _validate_scope(
@@ -123,24 +140,6 @@ def _validate_scope(name: str, scope: Scope, is_resource: bool) -> None:
             f"The resource provider `{name}` is attempting to register "
             "with a transient scope, which is not allowed."
         )
-
-
-def _detect_provider_kind(call: Callable[..., Any]) -> ProviderKind:
-    """Detect the kind of callable provider."""
-    if inspect.isclass(call):
-        return ProviderKind.CLASS
-    elif inspect.iscoroutinefunction(call):
-        return ProviderKind.COROUTINE
-    elif inspect.isasyncgenfunction(call):
-        return ProviderKind.ASYNC_GENERATOR
-    elif inspect.isgeneratorfunction(call):
-        return ProviderKind.GENERATOR
-    elif inspect.isfunction(call) or inspect.ismethod(call):
-        return ProviderKind.FUNCTION
-    raise TypeError(
-        f"The provider `{call}` is invalid because it is not a callable "
-        "object. Only callable providers are allowed."
-    )
 
 
 def _detect_provider_interface(
