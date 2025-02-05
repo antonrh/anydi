@@ -136,7 +136,7 @@ omit = [
 ]
 
 [tool.bumpversion]
-current_version = "0.38.1"
+current_version = "0.38.2-dev0"
 parse = """(?x)
     (?P<major>0|[1-9]\\d*)\\.
     (?P<minor>0|[1-9]\\d*)\\.
@@ -163,6 +163,11 @@ tag_message = "Bump version: {current_version} → {new_version}"
 allow_dirty = false
 commit = false
 message = "Bump version: {current_version} → {new_version}"
+
+[[tool.bumpversion.files]]
+filename = "pyproject.toml"
+search = "version = {current_version}"
+replace = "version = {new_version}"
 
 [tool.bumpversion.parts.pre_l]
 values = ["dev", "rc", "final"]
