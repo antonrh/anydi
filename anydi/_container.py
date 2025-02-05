@@ -395,6 +395,31 @@ class Container:
                     f"are not allowed in the provider `{name}`."
                 )
             annotation = get_typed_annotation(parameter.annotation, globalns)
+
+            try:
+                sub_provider = self._get_or_register_provider(annotation, scope)
+            except LookupError:
+                if self._parameter_has_default(parameter, **defaults):
+                    continue
+
+                if scope not in {"singleton", "transient"}:
+                    self._unresolved_interfaces.add(interface)
+                    continue
+                raise ValueError(
+                    f"The provider `{name}` depends on `{parameter.name}` of type "
+                    f"`{get_full_qualname(parameter.annotation)}`, which "
+                    "has not been registered or set. To resolve this, ensure that "
+                    f"`{parameter.name}` is registered before attempting to use it."
+                ) from None
+
+            # Check scope compatibility
+            if sub_provider.scope not in ALLOWED_SCOPES.get(scope, []):
+                raise ValueError(
+                    f"The provider `{name}` with a `{scope}` scope cannot "
+                    f"depend on `{sub_provider}` with a `{sub_provider.scope}` scope. "
+                    "Please ensure all providers are registered with matching scopes."
+                )
+
             parameters.append(parameter.replace(annotation=annotation))
 
         provider = Provider(
@@ -405,8 +430,6 @@ class Container:
             kind=kind,
             parameters=parameters,
         )
-
-        self._validate_sub_providers(provider, **defaults)
 
         self._set_provider(provider)
 
@@ -457,36 +480,6 @@ class Container:
             del self._providers[provider.interface]
         if provider.is_resource:
             self._resources[provider.scope].remove(provider.interface)
-
-    def _validate_sub_providers(self, provider: Provider, /, **defaults: Any) -> None:
-        """Validate the sub-providers of a provider."""
-
-        for parameter in provider.parameters:
-            try:
-                sub_provider = self._get_or_register_provider(
-                    parameter.annotation, provider.scope
-                )
-            except LookupError:
-                if self._parameter_has_default(parameter, **defaults):
-                    continue
-
-                if provider.scope not in {"singleton", "transient"}:
-                    self._unresolved_interfaces.add(provider.interface)
-                    continue
-                raise ValueError(
-                    f"The provider `{provider}` depends on `{parameter.name}` of type "
-                    f"`{get_full_qualname(parameter.annotation)}`, which "
-                    "has not been registered or set. To resolve this, ensure that "
-                    f"`{parameter.name}` is registered before attempting to use it."
-                ) from None
-
-            # Check scope compatibility
-            if sub_provider.scope not in ALLOWED_SCOPES.get(provider.scope, []):
-                raise ValueError(
-                    f"The provider `{provider}` with a `{provider.scope}` scope cannot "
-                    f"depend on `{sub_provider}` with a `{sub_provider.scope}` scope. "
-                    "Please ensure all providers are registered with matching scopes."
-                )
 
     def _detect_provider_scope(
         self, call: Callable[..., Any], /, **defaults: Any
