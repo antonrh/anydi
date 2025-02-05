@@ -1,6 +1,39 @@
+from collections.abc import AsyncIterator, Iterator
 from typing import Annotated
 
 from anydi import Container, Module, provider
+
+
+def func() -> str:
+    return "func"
+
+
+class Class:
+    pass
+
+
+def generator() -> Iterator[str]:
+    yield "generator"
+
+
+async def async_generator() -> AsyncIterator[str]:
+    yield "async_generator"
+
+
+async def coro() -> str:
+    return "coro"
+
+
+def event() -> Iterator[None]:
+    yield
+
+
+async def async_event() -> AsyncIterator[None]:
+    yield
+
+
+def iterator() -> Iterator:  # type: ignore[type-arg]
+    yield
 
 
 class Service:

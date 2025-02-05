@@ -10,7 +10,7 @@ from tests.fixtures import Service
 
 
 @pytest.mark.parametrize(
-    "tp, expected",
+    ("tp", "expected"),
     [
         (bool, True),
         (str, True),
@@ -24,7 +24,7 @@ def test_is_builtin_type(tp: type[Any], expected: bool) -> None:
 
 
 @pytest.mark.parametrize(
-    "obj, expected_qualname",
+    ("obj", "expected_qualname"),
     [
         (int, "int"),
         (Service, "tests.fixtures.Service"),
