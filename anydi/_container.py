@@ -20,17 +20,18 @@ from typing import Any, Callable, TypeVar, Union, cast, get_origin, overload
 from typing_extensions import Concatenate, ParamSpec, Self, final, get_args
 
 from ._context import InstanceContext
-from ._provider import Provider, ProviderKind
 from ._types import (
+    NOT_SET,
     AnyInterface,
     Event,
     InjectableDecoratorArgs,
     InstanceProxy,
+    Provider,
     ProviderArgs,
     ProviderDecoratorArgs,
+    ProviderKind,
     ScannedDependency,
     Scope,
-    _sentinel,
     is_event_type,
     is_marker,
 )
@@ -315,7 +316,7 @@ class Container:
         return decorator
 
     def _create_provider(  # noqa: C901
-        self, call: Callable[..., Any], *, scope: Scope, interface: Any = _sentinel
+        self, call: Callable[..., Any], *, scope: Scope, interface: Any = NOT_SET
     ) -> Provider:
         name = get_full_qualname(call)
 
@@ -348,7 +349,7 @@ class Container:
         if kind == ProviderKind.CLASS:
             interface = call
         else:
-            if interface is _sentinel:
+            if interface is NOT_SET:
                 interface = signature.return_annotation
                 if interface is inspect.Signature.empty:
                     interface = None
