@@ -119,12 +119,11 @@ class Container:
         # Register providers
         providers = providers or []
         for provider in providers:
-            _provider = self._create_provider(
-                call=provider.call,
-                scope=provider.scope,
-                interface=provider.interface,
+            self._register_provider(
+                provider.call,
+                provider.scope,
+                provider.interface,
             )
-            self._register_provider(_provider, False)
 
         # Register modules
         modules = modules or []
@@ -274,8 +273,7 @@ class Container:
         override: bool = False,
     ) -> Provider:
         """Register a provider for the specified interface."""
-        provider = self._create_provider(call=call, scope=scope, interface=interface)
-        return self._register_provider(provider, override)
+        return self._register_provider(call, scope, interface, override)
 
     def is_registered(self, interface: AnyInterface) -> bool:
         """Check if a provider is registered for the specified interface."""
@@ -309,18 +307,21 @@ class Container:
         """Decorator to register a provider function with the specified scope."""
 
         def decorator(call: Callable[P, T]) -> Callable[P, T]:
-            provider = self._create_provider(call=call, scope=scope)
-            self._register_provider(provider, override)
+            self._register_provider(call, scope, NOT_SET, override)
             return call
 
         return decorator
 
-    def _create_provider(  # noqa: C901
-        self, call: Callable[..., Any], *, scope: Scope, interface: Any = NOT_SET
+    def _register_provider(  # noqa: C901
+        self,
+        call: Callable[..., Any],
+        scope: Scope,
+        interface: Any = NOT_SET,
+        override: bool = False,
+        /,
+        **defaults: Any,
     ) -> Provider:
         name = get_full_qualname(call)
-
-        # Detect the kind of callable provider
         kind = ProviderKind.from_call(call)
 
         # Validate the scope of the provider
@@ -374,6 +375,12 @@ class Container:
             if interface in {None, NoneType}:
                 raise TypeError(f"Missing `{name}` provider return annotation.")
 
+        if interface in self._providers and not override:
+            raise LookupError(
+                f"The provider interface `{get_full_qualname(interface)}` "
+                "already registered."
+            )
+
         # Detect the parameters
         parameters = []
         for parameter in signature.parameters.values():
@@ -390,7 +397,7 @@ class Container:
             annotation = get_typed_annotation(parameter.annotation, globalns)
             parameters.append(parameter.replace(annotation=annotation))
 
-        return Provider(
+        provider = Provider(
             call=call,
             scope=scope,
             interface=interface,
@@ -399,22 +406,10 @@ class Container:
             parameters=parameters,
         )
 
-    def _register_provider(
-        self, provider: Provider, override: bool, /, **defaults: Any
-    ) -> Provider:
-        """Register a provider."""
-        if provider.interface in self._providers:
-            if override:
-                self._set_provider(provider)
-                return provider
-
-            raise LookupError(
-                f"The provider interface `{get_full_qualname(provider.interface)}` "
-                "already registered."
-            )
-
         self._validate_sub_providers(provider, **defaults)
+
         self._set_provider(provider)
+
         return provider
 
     def _get_provider(self, interface: AnyInterface) -> Provider:
@@ -447,10 +442,7 @@ class Container:
                 if scope is None:
                     scope = self._detect_provider_scope(interface, **defaults)
                 scope = scope or self.default_scope
-                provider = self._create_provider(
-                    call=interface, scope=scope, interface=interface
-                )
-                return self._register_provider(provider, False, **defaults)
+                return self._register_provider(interface, scope, **defaults)
             raise
 
     def _set_provider(self, provider: Provider) -> None:

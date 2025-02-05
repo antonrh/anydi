@@ -98,7 +98,7 @@ class TestContainer:
         kind: ProviderKind,
         interface: Any,
     ) -> None:
-        provider = container._create_provider(call=call, scope="singleton")
+        provider = container._register_provider(call, "singleton")
 
         assert provider.kind == kind
         assert provider.interface is interface
@@ -125,7 +125,7 @@ class TestContainer:
         def call() -> annotation:  # type: ignore[valid-type]
             return object()
 
-        provider = container._create_provider(call=call, scope="singleton")
+        provider = container._register_provider(call, "singleton")
 
         assert provider.interface == expected
 
@@ -142,15 +142,13 @@ class TestContainer:
         call: Callable[..., Any],
         kind: ProviderKind,
     ) -> None:
-        provider = container._create_provider(call=call, scope="singleton")
+        provider = container._register_provider(call, "singleton")
 
         assert provider.kind == kind
         assert issubclass(provider.interface, Event)
 
     def test_create_provider_with_interface(self, container: Container) -> None:
-        provider = container._create_provider(
-            call=lambda: "hello", scope="singleton", interface=str
-        )
+        provider = container._register_provider(lambda: "hello", "singleton", str)
 
         assert provider.interface is str
 
@@ -158,9 +156,7 @@ class TestContainer:
         with pytest.raises(
             TypeError, match="Missing `(.*?)` provider return annotation."
         ):
-            container._create_provider(
-                call=lambda: "hello", scope="singleton", interface=None
-            )
+            container._register_provider(lambda: "hello", "singleton", None)
 
     def test_create_provider_provider_without_return_annotation(
         self, container: Container
@@ -171,7 +167,7 @@ class TestContainer:
         with pytest.raises(
             TypeError, match="Missing `(.*?)` provider return annotation."
         ):
-            container._create_provider(call=provide_message, scope="singleton")
+            container._register_provider(provide_message, "singleton")
 
     def test_create_provider_not_callable(self, container: Container) -> None:
         with pytest.raises(
@@ -181,7 +177,7 @@ class TestContainer:
                 "Only callable providers are allowed."
             ),
         ):
-            container._create_provider(call="Test", scope="singleton")  # type: ignore[arg-type]
+            container._register_provider("Test", "singleton")  # type: ignore[arg-type]
 
     def test_create_provider_iterator_no_arg_not_allowed(
         self, container: Container
@@ -193,7 +189,7 @@ class TestContainer:
                 "without actual type argument."
             ),
         ):
-            container._create_provider(call=iterator, scope="singleton")
+            container._register_provider(iterator, "singleton")
 
     def test_create_provider_unsupported_scope(self, container: Container) -> None:
         with pytest.raises(
@@ -204,7 +200,7 @@ class TestContainer:
                 "Please use one of the supported scopes when registering a provider."
             ),
         ):
-            container._create_provider(call=generator, scope="other")  # type: ignore[arg-type]
+            container._register_provider(generator, "other")  # type: ignore[arg-type]
 
     def test_create_provider_transient_resource_not_allowed(
         self, container: Container
@@ -216,7 +212,7 @@ class TestContainer:
                 "register with a transient scope, which is not allowed."
             ),
         ):
-            container._create_provider(call=generator, scope="transient")
+            container._register_provider(generator, "transient")
 
     def test_create_provider_without_annotation(self, container: Container) -> None:
         def service_ident() -> str:
@@ -228,7 +224,7 @@ class TestContainer:
         with pytest.raises(
             TypeError, match="Missing provider `(.*?)` dependency `ident` annotation."
         ):
-            container._create_provider(call=service, scope="singleton")
+            container._register_provider(service, "singleton")
 
     def test_create_provider_positional_only_parameter_not_allowed(
         self, container: Container
@@ -240,7 +236,7 @@ class TestContainer:
             TypeError,
             match="Positional-only parameters are not allowed in the provider `(.*?)`.",
         ):
-            container._create_provider(call=provider_message, scope="singleton")
+            container._register_provider(provider_message, "singleton")
 
     def test_register_provider_already_registered(self, container: Container) -> None:
         container.register(str, lambda: "test", scope="singleton")
