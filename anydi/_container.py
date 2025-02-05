@@ -10,30 +10,34 @@ import logging
 import pkgutil
 import threading
 import types
+import uuid
 from collections import defaultdict
 from collections.abc import AsyncIterator, Iterable, Iterator, Sequence
 from contextvars import ContextVar
 from types import ModuleType
-from typing import Any, Callable, TypeVar, Union, cast, overload
+from typing import Any, Callable, TypeVar, Union, cast, get_origin, overload
 
-from typing_extensions import Concatenate, ParamSpec, Self, final
+from typing_extensions import Concatenate, ParamSpec, Self, final, get_args
 
 from ._context import InstanceContext
-from ._provider import Provider, create_provider
+from ._provider import Provider, ProviderKind
 from ._types import (
     AnyInterface,
+    Event,
     InjectableDecoratorArgs,
     InstanceProxy,
     ProviderArgs,
     ProviderDecoratorArgs,
     ScannedDependency,
     Scope,
+    _sentinel,
     is_event_type,
     is_marker,
 )
 from ._utils import (
     AsyncRLock,
     get_full_qualname,
+    get_typed_annotation,
     get_typed_parameters,
     import_string,
     is_async_context_manager,
@@ -41,6 +45,12 @@ from ._utils import (
     is_context_manager,
     run_async,
 )
+
+try:
+    from types import NoneType
+except ImportError:
+    NoneType = type(None)  # type: ignore[misc]
+
 
 T = TypeVar("T", bound=Any)
 M = TypeVar("M", bound="Module")
@@ -108,7 +118,7 @@ class Container:
         # Register providers
         providers = providers or []
         for provider in providers:
-            _provider = create_provider(
+            _provider = self._create_provider(
                 call=provider.call,
                 scope=provider.scope,
                 interface=provider.interface,
@@ -263,7 +273,7 @@ class Container:
         override: bool = False,
     ) -> Provider:
         """Register a provider for the specified interface."""
-        provider = create_provider(call=call, scope=scope, interface=interface)
+        provider = self._create_provider(call=call, scope=scope, interface=interface)
         return self._register_provider(provider, override)
 
     def is_registered(self, interface: AnyInterface) -> bool:
@@ -298,11 +308,95 @@ class Container:
         """Decorator to register a provider function with the specified scope."""
 
         def decorator(call: Callable[P, T]) -> Callable[P, T]:
-            provider = create_provider(call=call, scope=scope)
+            provider = self._create_provider(call=call, scope=scope)
             self._register_provider(provider, override)
             return call
 
         return decorator
+
+    def _create_provider(  # noqa: C901
+        self, call: Callable[..., Any], *, scope: Scope, interface: Any = _sentinel
+    ) -> Provider:
+        name = get_full_qualname(call)
+
+        # Detect the kind of callable provider
+        kind = ProviderKind.from_call(call)
+
+        # Validate the scope of the provider
+        if scope not in get_args(Scope):
+            raise ValueError(
+                f"The provider `{name}` scope is invalid. Only the following "
+                f"scopes are supported: {', '.join(get_args(Scope))}. "
+                "Please use one of the supported scopes when registering a provider."
+            )
+
+        # Validate the scope of the provider
+        if (
+            kind in {ProviderKind.GENERATOR, ProviderKind.ASYNC_GENERATOR}
+            and scope == "transient"
+        ):
+            raise TypeError(
+                f"The resource provider `{name}` is attempting to register "
+                "with a transient scope, which is not allowed."
+            )
+
+        # Get the signature
+        globalns = getattr(call, "__globals__", {})
+        signature = inspect.signature(call, globals=globalns)
+
+        # Detect the interface
+        if kind == ProviderKind.CLASS:
+            interface = call
+        else:
+            if interface is _sentinel:
+                interface = signature.return_annotation
+                if interface is inspect.Signature.empty:
+                    interface = None
+                else:
+                    interface = get_typed_annotation(interface, globalns)
+
+            # If the callable is an iterator, return the actual type
+            iterator_types = {Iterator, AsyncIterator}
+            if interface in iterator_types or get_origin(interface) in iterator_types:
+                if args := get_args(interface):
+                    interface = args[0]
+                    # If the callable is a generator, return the resource type
+                    if interface in {None, NoneType}:
+                        interface = type(f"Event_{uuid.uuid4().hex}", (Event,), {})
+                else:
+                    raise TypeError(
+                        f"Cannot use `{name}` resource type annotation "
+                        "without actual type argument."
+                    )
+
+            # None interface is not allowed
+            if interface in {None, NoneType}:
+                raise TypeError(f"Missing `{name}` provider return annotation.")
+
+        # Detect the parameters
+        parameters = []
+        for parameter in signature.parameters.values():
+            if parameter.annotation is inspect.Parameter.empty:
+                raise TypeError(
+                    f"Missing provider `{name}` "
+                    f"dependency `{parameter.name}` annotation."
+                )
+            if parameter.kind == inspect.Parameter.POSITIONAL_ONLY:
+                raise TypeError(
+                    "Positional-only parameters "
+                    f"are not allowed in the provider `{name}`."
+                )
+            annotation = get_typed_annotation(parameter.annotation, globalns)
+            parameters.append(parameter.replace(annotation=annotation))
+
+        return Provider(
+            call=call,
+            scope=scope,
+            interface=interface,
+            name=name,
+            kind=kind,
+            parameters=parameters,
+        )
 
     def _register_provider(
         self, provider: Provider, override: bool, /, **defaults: Any
@@ -352,7 +446,7 @@ class Container:
                 if scope is None:
                     scope = self._detect_provider_scope(interface, **defaults)
                 scope = scope or self.default_scope
-                provider = create_provider(
+                provider = self._create_provider(
                     call=interface, scope=scope, interface=interface
                 )
                 return self._register_provider(provider, False, **defaults)

@@ -1,25 +1,12 @@
 from __future__ import annotations
 
 import inspect
-import uuid
-from collections.abc import AsyncIterator, Iterator
 from dataclasses import dataclass
 from enum import IntEnum
 from functools import cached_property
 from typing import Any, Callable
 
-from typing_extensions import get_args, get_origin
-
-try:
-    from types import NoneType
-except ImportError:
-    NoneType = type(None)  # type: ignore[misc]
-
-
-from ._types import Event, Scope
-from ._utils import get_full_qualname, get_typed_annotation
-
-_sentinel = object()
+from ._types import Scope
 
 
 class ProviderKind(IntEnum):
@@ -87,113 +74,3 @@ class Provider:
     @cached_property
     def is_resource(self) -> bool:
         return self.is_generator or self.is_async_generator
-
-
-def create_provider(
-    call: Callable[..., Any], *, scope: Scope, interface: Any = _sentinel
-) -> Provider:
-    name = get_full_qualname(call)
-
-    # Detect the kind of callable provider
-    kind = ProviderKind.from_call(call)
-
-    # Validate the scope of the provider
-    _validate_scope(
-        name, scope, kind in {ProviderKind.GENERATOR, ProviderKind.ASYNC_GENERATOR}
-    )
-
-    # Get the signature
-    globalns = getattr(call, "__globals__", {})
-    signature = inspect.signature(call, globals=globalns)
-
-    # Detect the interface
-    if kind == ProviderKind.CLASS:
-        interface = call
-    else:
-        interface = _detect_provider_interface(
-            name, call, interface, signature, globalns=globalns
-        )
-
-    # Detect the parameters
-    parameters = _detect_provider_parameters(name, signature, globalns=globalns)
-
-    return Provider(
-        call=call,
-        scope=scope,
-        interface=interface,
-        name=name,
-        kind=kind,
-        parameters=parameters,
-    )
-
-
-def _validate_scope(name: str, scope: Scope, is_resource: bool) -> None:
-    """Validate the scope of the provider."""
-    if scope not in get_args(Scope):
-        raise ValueError(
-            f"The provider `{name}` scope is invalid. Only the following "
-            f"scopes are supported: {', '.join(get_args(Scope))}. "
-            "Please use one of the supported scopes when registering a provider."
-        )
-    if is_resource and scope == "transient":
-        raise TypeError(
-            f"The resource provider `{name}` is attempting to register "
-            "with a transient scope, which is not allowed."
-        )
-
-
-def _detect_provider_interface(
-    name: str,
-    call: Callable[..., Any],
-    interface: Any,
-    signature: inspect.Signature,
-    globalns: dict[str, Any],
-) -> Any:
-    """Detect the interface of callable provider."""
-    if interface is _sentinel:
-        interface = signature.return_annotation
-        if interface is inspect.Signature.empty:
-            interface = None
-        else:
-            interface = get_typed_annotation(interface, globalns)
-
-    # If the callable is an iterator, return the actual type
-    iterator_types = {Iterator, AsyncIterator}
-    if interface in iterator_types or get_origin(interface) in iterator_types:
-        if args := get_args(interface):
-            interface = args[0]
-            # If the callable is a generator, return the resource type
-            if interface is NoneType or interface is None:
-                return type(f"Event_{uuid.uuid4().hex}", (Event,), {})
-        else:
-            raise TypeError(
-                f"Cannot use `{name}` resource type annotation "
-                "without actual type argument."
-            )
-
-    # None interface is not allowed
-    if interface in {None, NoneType}:
-        raise TypeError(f"Missing `{name}` provider return annotation.")
-
-    # Set the interface
-    return interface
-
-
-def _detect_provider_parameters(
-    name: str, signature: inspect.Signature, globalns: dict[str, Any]
-) -> list[inspect.Parameter]:
-    """Detect the parameters of the callable provider."""
-    parameters = []
-    for parameter in signature.parameters.values():
-        if parameter.annotation is inspect.Parameter.empty:
-            raise TypeError(
-                f"Missing provider `{name}` "
-                f"dependency `{parameter.name}` annotation."
-            )
-        if parameter.kind == inspect.Parameter.POSITIONAL_ONLY:
-            raise TypeError(
-                f"Positional-only parameters are not allowed in the provider `{name}`."
-            )
-        annotation = get_typed_annotation(parameter.annotation, globalns)
-        parameters.append(parameter.replace(annotation=annotation))
-    return parameters

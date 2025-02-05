@@ -13,6 +13,9 @@ Scope = Literal["transient", "singleton", "request"]
 AnyInterface: TypeAlias = Union[type[Any], Annotated[Any, ...]]
 
 
+_sentinel = object()
+
+
 class Marker:
     """A marker class for marking dependencies."""
 
