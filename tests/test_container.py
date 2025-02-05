@@ -1,5 +1,6 @@
 import asyncio
 import logging
+import re
 import sys
 import threading
 import time
@@ -23,12 +24,12 @@ from anydi import (
     singleton,
     transient,
 )
-from anydi._provider import ProviderKind
 from anydi._types import (
     Event,
     InjectableDecoratorArgs,
     ProviderArgs,
     ProviderDecoratorArgs,
+    ProviderKind,
 )
 
 from tests.fixtures import (
@@ -47,18 +48,17 @@ from tests.fixtures import (
 from tests.scan_app import ScanAppModule
 
 
+@pytest.fixture
+def container() -> Container:
+    return Container()
+
+
 class TestContainer:
-    @pytest.fixture
-    def container(self) -> Container:
-        return Container()
+    def test_default_properties(self) -> None:
+        container = Container()
 
-    def test_default_strict_disabled(self, container: Container) -> None:
         assert not container.strict
-
-    def test_default_scope(self, container: Container) -> None:
         assert container.default_scope == "transient"
-
-    def test_default_testing(self, container: Container) -> None:
         assert not container.testing
 
     def test_register_provider(self, container: Container) -> None:
@@ -696,14 +696,14 @@ class TestContainer:
 
         container.register(str, provide, scope="singleton")
 
-        with pytest.raises(TypeError) as exc_info:
+        with pytest.raises(
+            TypeError,
+            match=(
+                "The instance for the provider `(.*?).provide` cannot be created "
+                "in synchronous mode."
+            ),
+        ):
             container.start()
-
-        assert str(exc_info.value) == (
-            "The instance for the provider `tests.test_container.TestContainer.test_"
-            "resolve_singleton_scoped_started_with_async_resource_provider.<locals>."
-            "provide` cannot be created in synchronous mode."
-        )
 
     def test_resolve_singleton_resource(self, container: Container) -> None:
         instance = "test"
@@ -715,9 +715,7 @@ class TestContainer:
 
         container.resolve(str)
 
-    def test_resolve_singleton_scoped_thread_safe(self) -> None:
-        container = Container()
-
+    def test_resolve_singleton_scoped_thread_safe(self, container: Container) -> None:
         @container.provider(scope="singleton")
         def provide_service() -> Service:
             time.sleep(0.1)
@@ -782,14 +780,14 @@ class TestContainer:
 
         container.register(str, provide, scope="singleton")
 
-        with pytest.raises(TypeError) as exc_info:
+        with pytest.raises(
+            TypeError,
+            match=(
+                "The instance for the provider `(.*?).provide` cannot be created "
+                "in synchronous mode."
+            ),
+        ):
             container.resolve(str)
-
-        assert str(exc_info.value) == (
-            "The instance for the provider `tests.test_container.TestContainer"
-            ".test_resolved_singleton_async_resource_not_started.<locals>.provide` "
-            "cannot be created in synchronous mode."
-        )
 
     def test_resolve_singleton_annotated_resource(self, container: Container) -> None:
         instance = "test"
@@ -815,9 +813,9 @@ class TestContainer:
 
         assert result == instance
 
-    async def test_resolve_singleton_scoped_coro_safe(self) -> None:
-        container = Container()
-
+    async def test_resolve_singleton_scoped_coro_safe(
+        self, container: Container
+    ) -> None:
         @container.provider(scope="singleton")
         async def provide_service() -> Service:
             await asyncio.sleep(0.1)
@@ -848,13 +846,14 @@ class TestContainer:
 
         container.register(str, lambda: instance, scope="request")
 
-        with pytest.raises(LookupError) as exc_info:
-            assert container.resolve(str)
-
-        assert str(exc_info.value) == (
-            "The request context has not been started. Please ensure that the request "
-            "context is properly initialized before attempting to use it."
-        )
+        with pytest.raises(
+            LookupError,
+            match=(
+                "The request context has not been started. Please ensure that the "
+                "request context is properly initialized before attempting to use it."
+            ),
+        ):
+            container.resolve(str)
 
     def test_resolve_request_scoped_annotated_resource(
         self, container: Container
@@ -909,17 +908,18 @@ class TestContainer:
         def req_path(req: Request) -> str:
             return req.path
 
-        with container.request_context():
-            with pytest.raises(LookupError) as exc_info:
-                container.resolve(str)
-
-        assert str(exc_info.value) == (
-            "You are attempting to get the parameter `req` with the annotation "
-            "`tests.test_container.TestContainer.test_resolve_request_scoped_"
-            "unresolved_error.<locals>.Request` as a dependency into `tests."
-            "test_container.TestContainer.test_resolve_request_scoped_unresolved_error."
-            "<locals>.req_path` which is not registered or set in the scoped context."
-        )
+        with (
+            pytest.raises(
+                LookupError,
+                match=(
+                    "You are attempting to get the parameter `req` with the annotation "
+                    "`(.*?).Request` as a dependency into `(.*?).req_path` which is "
+                    "not registered or set in the scoped context."
+                ),
+            ),
+            container.request_context(),
+        ):
+            container.resolve(str)
 
     def test_resolve_transient_scoped(self, container: Container) -> None:
         container.register(uuid.UUID, uuid.uuid4, scope="transient")
@@ -931,14 +931,14 @@ class TestContainer:
         async def get_uuid() -> uuid.UUID:
             return uuid.uuid4()
 
-        with pytest.raises(TypeError) as exc_info:
+        with pytest.raises(
+            TypeError,
+            match=(
+                "The instance for the provider `(.*?).get_uuid` cannot "
+                "be created in synchronous mode."
+            ),
+        ):
             container.resolve(uuid.UUID)
-
-        assert str(exc_info.value) == (
-            "The instance for the provider "
-            "`tests.test_container.TestContainer.test_sync_resolve_transient_async_provider"
-            ".<locals>.get_uuid` cannot be created in synchronous mode."
-        )
 
     async def test_async_resolve_transient_provider(self, container: Container) -> None:
         @container.provider(scope="transient")
@@ -1050,14 +1050,15 @@ class TestContainer:
     def test_resolve_non_strict_with_primitive_class(
         self, container: Container
     ) -> None:
-        with pytest.raises(LookupError) as exc_info:
+        with pytest.raises(
+            LookupError,
+            match=(
+                "The provider interface for `str` has not been registered. "
+                "Please ensure that the provider interface is properly registered "
+                "before attempting to use it."
+            ),
+        ):
             _ = container.resolve(Service).ident
-
-        assert str(exc_info.value) == (
-            "The provider interface for `str` has not been registered. "
-            "Please ensure that the provider interface is properly registered "
-            "before attempting to use it."
-        )
 
     @pytest.mark.skipif(sys.version_info < (3, 10), reason="Requires Python 3.10")
     def test_resolve_non_strict_with_custom_type(self, container: Container) -> None:
@@ -1067,15 +1068,15 @@ class TestContainer:
             ) -> None:
                 self.value = value
 
-        with pytest.raises(LookupError) as exc_info:
+        with pytest.raises(
+            LookupError,
+            match=re.escape(
+                "The provider interface for `Union[str, Sequence[str], int, list[str]]`"
+                " has not been registered. Please ensure that the provider interface "
+                "is properly registered before attempting to use it."
+            ),
+        ):
             _ = container.resolve(Klass)
-
-        assert str(exc_info.value) == (
-            "The provider interface for "
-            "`Union[str, Sequence[str], int, list[str]]` has not "
-            "been registered. Please ensure that the provider interface is properly "
-            "registered before attempting to use it."
-        )
 
     def test_resolve_non_strict_with_as_context_manager(
         self, container: Container
@@ -1221,11 +1222,11 @@ class TestContainer:
     def test_override_instance_provider_not_registered_using_strict_mode(self) -> None:
         container = Container(strict=True, testing=True)
 
-        with pytest.raises(LookupError) as exc_info:
+        with pytest.raises(
+            LookupError, match="The provider interface `str` not registered."
+        ):
             with container.override(str, "test"):
-                pass
-
-        assert str(exc_info.value) == "The provider interface `str` not registered."
+                ...
 
     def test_override_instance_transient_provider(self) -> None:
         overridden_uuid = uuid.uuid4()
@@ -1526,13 +1527,10 @@ class TestContainer:
         def handler(name=auto) -> str:  # type: ignore[no-untyped-def]
             return name  # type: ignore[no-any-return]
 
-        with pytest.raises(TypeError) as exc_info:
+        with pytest.raises(
+            TypeError, match="Missing `(.*?).handler` parameter `name` annotation."
+        ):
             container.inject(handler)
-
-        assert str(exc_info.value) == (
-            "Missing `tests.test_container.TestContainer.test_inject_missing_annotation"
-            ".<locals>.handler` parameter `name` annotation."
-        )
 
     def test_inject_unknown_dependency_using_strict_mode(self) -> None:
         container = Container(strict=True)
@@ -1540,14 +1538,14 @@ class TestContainer:
         def handler(message: str = auto) -> None:
             pass
 
-        with pytest.raises(LookupError) as exc_info:
+        with pytest.raises(
+            LookupError,
+            match=(
+                "`(.*?).handler` has an unknown dependency parameter `message` "
+                "with an annotation of `str`."
+            ),
+        ):
             container.inject(handler)
-
-        assert str(exc_info.value) == (
-            "`tests.test_container.TestContainer.test_inject_unknown_dependency_using_strict_mode"
-            ".<locals>.handler` has an unknown dependency parameter `message` with an "
-            "annotation of `str`."
-        )
 
     def test_inject(self, container: Container) -> None:
         @container.provider(scope="singleton")
@@ -1878,7 +1876,9 @@ class TestContainer:
             await container.acreate(Component, param="test")
 
 
+############################
 # Test decorators
+############################
 
 
 def test_provider_decorator() -> None:
