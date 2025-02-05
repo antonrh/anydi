@@ -170,5 +170,5 @@ search = "version = \"{current_version}\""
 replace = "version = \"{new_version}\""
 
 [tool.bumpversion.parts.pre_l]
-values = ["dev", "rc", "final"]
+values = ["rc", "final"]
 optional_value = "final"
