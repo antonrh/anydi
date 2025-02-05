@@ -1,6 +1,6 @@
 [project]
 name = "anydi"
-version = "0.38.1"
+version = "0.38.2-rc0"
 description = "Dependency Injection library"
 authors = [{ name = "Anton Ruhlov", email = "antonruhlov@gmail.com" }]
 requires-python = "~=3.9"
@@ -50,8 +50,8 @@ anydi = "anydi.ext.pytest_plugin"
 
 [dependency-groups]
 dev = [
-    "mypy[faster-cache]>=1.14.1,<2",
-    "ruff>=0.8.5,<0.9",
+    "mypy[faster-cache]>=1.15.0,<2",
+    "ruff>=0.9.4,<1.0",
     "pytest>=8.3.1,<9",
     "pytest-cov>=6.0.0,<7",
     "fastapi>=0.100.0,<0.101",
@@ -63,6 +63,7 @@ dev = [
     "faststream>=0.5.10,<0.6",
     "redis>=5.0.4,<6",
     "pydantic-settings>=2.4.0,<3",
+    "bump-my-version>=0.31.1",
 ]
 docs = [
     "mkdocs>=1.4.2,<2",
@@ -133,3 +134,32 @@ omit = [
     "anydi/ext/django/ninja/_operation.py",
     "anydi/ext/django/ninja/_signature.py",
 ]
+
+[tool.bumpversion]
+current_version = "0.38.2-rc0"
+parse = """(?x)
+    (?P<major>0|[1-9]\\d*)\\.
+    (?P<minor>0|[1-9]\\d*)\\.
+    (?P<patch>0|[1-9]\\d*)
+    (?:
+        -                             # dash separator for pre-release section
+        (?P<pre_l>[a-zA-Z-]+)         # pre-release label
+        (?P<pre_n>0|[1-9]\\d*)        # pre-release version number
+    )?                                # pre-release section is optional
+"""
+serialize = [
+    "{major}.{minor}.{patch}-{pre_l}{pre_n}",
+    "{major}.{minor}.{patch}",
+]
+search = "{current_version}"
+replace = "{new_version}"
+message = "Bump version: {current_version} → {new_version}"
+
+[[tool.bumpversion.files]]
+filename = "pyproject.toml"
+search = "version = \"{current_version}\""
+replace = "version = \"{new_version}\""
+
+[tool.bumpversion.parts.pre_l]
+values = ["rc", "final"]
+optional_value = "final"
