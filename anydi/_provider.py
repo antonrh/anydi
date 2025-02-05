@@ -31,6 +31,11 @@ class ProviderKind(IntEnum):
 
 
 @dataclass(kw_only=True, frozen=True)
+class ProviderParameter:
+    pass
+
+
+@dataclass(kw_only=True, frozen=True)
 class Provider:
     call: Callable[..., Any]
     scope: Scope
@@ -85,9 +90,12 @@ def create_provider(
     signature = inspect.signature(call, globals=globalns)
 
     # Detect the interface
-    interface = _detect_provider_interface(
-        name, kind, call, interface, signature, globalns=globalns
-    )
+    if kind == ProviderKind.CLASS:
+        interface = call
+    else:
+        interface = _detect_provider_interface(
+            name, call, interface, signature, globalns=globalns
+        )
 
     # Detect the parameters
     parameters = _detect_provider_parameters(name, signature, globalns=globalns)
@@ -106,9 +114,9 @@ def _validate_scope(name: str, scope: Scope, is_resource: bool) -> None:
     """Validate the scope of the provider."""
     if scope not in get_args(Scope):
         raise ValueError(
-            "The scope provided is invalid. Only the following scopes are "
-            f"supported: {', '.join(get_args(Scope))}. Please use one of the "
-            "supported scopes when registering a provider."
+            f"The provider `{name}` scope provided is invalid. Only the following "
+            f"scopes are supported: {', '.join(get_args(Scope))}. "
+            "Please use one of the supported scopes when registering a provider."
         )
     if is_resource and scope == "transient":
         raise TypeError(
@@ -137,17 +145,12 @@ def _detect_provider_kind(call: Callable[..., Any]) -> ProviderKind:
 
 def _detect_provider_interface(
     name: str,
-    kind: ProviderKind,
     call: Callable[..., Any],
     interface: Any,
     signature: inspect.Signature,
     globalns: dict[str, Any],
 ) -> Any:
     """Detect the interface of callable provider."""
-    # If the callable is a class, return the class itself
-    if kind == ProviderKind.CLASS:
-        return call
-
     if interface is _sentinel:
         interface = signature.return_annotation
         if interface is inspect.Signature.empty:
