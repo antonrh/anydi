@@ -64,7 +64,7 @@ class ProviderDecoratorArgs(NamedTuple):
     override: bool
 
 
-class Dependency(NamedTuple):
+class ScannedDependency(NamedTuple):
     member: Any
     module: ModuleType
 
