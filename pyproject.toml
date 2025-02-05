@@ -153,15 +153,6 @@ serialize = [
 ]
 search = "{current_version}"
 replace = "{new_version}"
-regex = false
-ignore_missing_version = false
-ignore_missing_files = false
-tag = false
-sign_tags = false
-tag_name = "v{new_version}"
-tag_message = "Bump version: {current_version} → {new_version}"
-allow_dirty = false
-commit = false
 message = "Bump version: {current_version} → {new_version}"
 
 [[tool.bumpversion.files]]
