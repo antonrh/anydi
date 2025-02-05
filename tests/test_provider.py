@@ -153,9 +153,9 @@ def test_create_provider_unsupported_scope() -> None:
         create_provider(call=generator, scope="other")  # type: ignore[arg-type]
 
     assert str(exc_info.value) == (
-        "The scope provided is invalid. Only the following scopes are supported: "
-        "transient, singleton, request. Please use one of the supported scopes "
-        "when registering a provider."
+        "The provider `tests.test_provider.generator` scope is invalid. Only the "
+        "following scopes are supported: transient, singleton, request. Please use "
+        "one of the supported scopes when registering a provider."
     )
 
 

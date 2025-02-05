@@ -114,7 +114,7 @@ def _validate_scope(name: str, scope: Scope, is_resource: bool) -> None:
     """Validate the scope of the provider."""
     if scope not in get_args(Scope):
         raise ValueError(
-            f"The provider `{name}` scope provided is invalid. Only the following "
+            f"The provider `{name}` scope is invalid. Only the following "
             f"scopes are supported: {', '.join(get_args(Scope))}. "
             "Please use one of the supported scopes when registering a provider."
         )

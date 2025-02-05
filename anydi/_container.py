@@ -284,7 +284,9 @@ class Container:
                     "Please ensure all providers are registered with matching scopes."
                 )
 
-    def _detect_scope(self, call: Callable[..., Any], **defaults: Any) -> Scope | None:
+    def _detect_scope(
+        self, call: Callable[..., Any], /, **defaults: Any
+    ) -> Scope | None:
         """Detect the scope for a callable."""
         scopes = set()
 
@@ -458,11 +460,11 @@ class Container:
 
     def resolve(self, interface: type[T]) -> T:
         """Resolve an instance by interface."""
-        return self._resolve_or_create(interface, create=False)
+        return self._resolve_or_create(interface, False)
 
-    def create(self, interface: type[T], **defaults: Any) -> T:
+    def create(self, interface: type[T], /, **defaults: Any) -> T:
         """Create an instance by interface."""
-        return self._resolve_or_create(interface, create=True, **defaults)
+        return self._resolve_or_create(interface, True, **defaults)
 
     @overload
     async def aresolve(self, interface: type[T]) -> T: ...
@@ -472,14 +474,14 @@ class Container:
 
     async def aresolve(self, interface: type[T]) -> T:
         """Resolve an instance by interface asynchronously."""
-        return await self._aresolve_or_acreate(interface, create=False)
+        return await self._aresolve_or_acreate(interface, False)
 
-    async def acreate(self, interface: type[T], **defaults: Any) -> T:
+    async def acreate(self, interface: type[T], /, **defaults: Any) -> T:
         """Create an instance by interface asynchronously."""
-        return await self._aresolve_or_acreate(interface, create=True, **defaults)
+        return await self._aresolve_or_acreate(interface, True, **defaults)
 
     def _resolve_or_create(
-        self, interface: type[T], create: bool, **defaults: Any
+        self, interface: type[T], create: bool, /, **defaults: Any
     ) -> T:
         """Internal method to handle instance resolution and creation."""
         provider = self._get_or_register_provider(interface, None, **defaults)
@@ -507,7 +509,7 @@ class Container:
         return cast(T, instance)
 
     async def _aresolve_or_acreate(
-        self, interface: type[T], create: bool, **defaults: Any
+        self, interface: type[T], create: bool, /, **defaults: Any
     ) -> T:
         """Internal method to handle instance resolution and creation asynchronously."""
         provider = self._get_or_register_provider(interface, None, **defaults)
