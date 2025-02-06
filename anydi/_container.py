@@ -324,13 +324,11 @@ class Container:
         """Register a provider with the specified scope."""
         name = get_full_qualname(call)
         kind = ProviderKind.from_call(call)
+        detected_scope = scope
 
         # Validate scope if it provided
         if scope:
             self._validate_provider_scope(scope, name, kind)
-            detected_scope = scope
-        else:
-            detected_scope = None
 
         # Get the signature
         globalns = getattr(call, "__globals__", {})
