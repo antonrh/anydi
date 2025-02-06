@@ -461,12 +461,10 @@ class Container:
         except LookupError:
             if self.strict or interface is inspect.Parameter.empty:
                 raise
-
             if get_origin(interface) is Annotated and (args := get_args(interface)):
                 call = args[0]
             else:
                 call = interface
-
             if inspect.isclass(call) and not is_builtin_type(call):
                 # Try to get defined scope
                 scope = getattr(interface, "__scope__", parent_scope)
