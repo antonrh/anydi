@@ -321,6 +321,7 @@ class Container:
         /,
         **defaults: Any,
     ) -> Provider:
+        """Register a provider with the specified scope."""
         name = get_full_qualname(call)
         kind = ProviderKind.from_call(call)
 
