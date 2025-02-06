@@ -473,7 +473,6 @@ class Container:
                 # Try to detect scope
                 if scope is None:
                     scope = self._detect_provider_scope(call, **defaults)
-                scope = scope or self.default_scope
                 return self._register_provider(call, scope, interface, **defaults)
             raise
 
@@ -492,7 +491,7 @@ class Container:
 
     def _detect_provider_scope(
         self, call: Callable[..., Any], /, **defaults: Any
-    ) -> Scope | None:
+    ) -> Scope:
         """Detect the scope for a callable."""
         scopes = set()
 
@@ -521,7 +520,7 @@ class Container:
         if "singleton" in scopes:
             return "singleton"
 
-        return None
+        return self.default_scope
 
     def _parameter_has_default(
         self, parameter: inspect.Parameter, /, **defaults: Any
