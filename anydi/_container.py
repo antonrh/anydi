@@ -547,7 +547,7 @@ class Container:
 
     async def aresolve(self, interface: type[T]) -> T:
         """Resolve an instance by interface asynchronously."""
-        return await self._aresolve_or_acreate(interface, False)
+        return await self._aresolve_or_create(interface, False)
 
     def create(self, interface: type[T], /, **defaults: Any) -> T:
         """Create an instance by interface."""
@@ -555,7 +555,7 @@ class Container:
 
     async def acreate(self, interface: type[T], /, **defaults: Any) -> T:
         """Create an instance by interface asynchronously."""
-        return await self._aresolve_or_acreate(interface, True, **defaults)
+        return await self._aresolve_or_create(interface, True, **defaults)
 
     def is_resolved(self, interface: AnyInterface) -> bool:
         """Check if an instance by interface exists."""
@@ -615,7 +615,7 @@ class Container:
 
         return cast(T, instance)
 
-    async def _aresolve_or_acreate(
+    async def _aresolve_or_create(
         self, interface: type[T], create: bool, /, **defaults: Any
     ) -> T:
         """Internal method to handle instance resolution and creation asynchronously."""
