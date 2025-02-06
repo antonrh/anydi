@@ -20,6 +20,9 @@ P = ParamSpec("P")
 
 def get_full_qualname(obj: Any) -> str:
     """Get the fully qualified name of an object."""
+    if isinstance(obj, str):
+        return obj
+
     # Get module and qualname with defaults to handle non-types directly
     module = getattr(obj, "__module__", type(obj).__module__)
     qualname = getattr(obj, "__qualname__", type(obj).__qualname__)

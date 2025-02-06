@@ -1,6 +1,5 @@
 import asyncio
 import logging
-import re
 import sys
 import threading
 import time
@@ -98,7 +97,7 @@ class TestContainer:
         kind: ProviderKind,
         interface: Any,
     ) -> None:
-        provider = container._create_provider(call=call, scope="singleton")
+        provider = container._register_provider(call, "singleton")
 
         assert provider.kind == kind
         assert provider.interface is interface
@@ -125,7 +124,7 @@ class TestContainer:
         def call() -> annotation:  # type: ignore[valid-type]
             return object()
 
-        provider = container._create_provider(call=call, scope="singleton")
+        provider = container._register_provider(call, "singleton")
 
         assert provider.interface == expected
 
@@ -142,15 +141,13 @@ class TestContainer:
         call: Callable[..., Any],
         kind: ProviderKind,
     ) -> None:
-        provider = container._create_provider(call=call, scope="singleton")
+        provider = container._register_provider(call, "singleton")
 
         assert provider.kind == kind
         assert issubclass(provider.interface, Event)
 
     def test_create_provider_with_interface(self, container: Container) -> None:
-        provider = container._create_provider(
-            call=lambda: "hello", scope="singleton", interface=str
-        )
+        provider = container._register_provider(lambda: "hello", "singleton", str)
 
         assert provider.interface is str
 
@@ -158,9 +155,7 @@ class TestContainer:
         with pytest.raises(
             TypeError, match="Missing `(.*?)` provider return annotation."
         ):
-            container._create_provider(
-                call=lambda: "hello", scope="singleton", interface=None
-            )
+            container._register_provider(lambda: "hello", "singleton", None)
 
     def test_create_provider_provider_without_return_annotation(
         self, container: Container
@@ -171,7 +166,7 @@ class TestContainer:
         with pytest.raises(
             TypeError, match="Missing `(.*?)` provider return annotation."
         ):
-            container._create_provider(call=provide_message, scope="singleton")
+            container._register_provider(provide_message, "singleton")
 
     def test_create_provider_not_callable(self, container: Container) -> None:
         with pytest.raises(
@@ -181,7 +176,7 @@ class TestContainer:
                 "Only callable providers are allowed."
             ),
         ):
-            container._create_provider(call="Test", scope="singleton")  # type: ignore[arg-type]
+            container._register_provider("Test", "singleton")  # type: ignore[arg-type]
 
     def test_create_provider_iterator_no_arg_not_allowed(
         self, container: Container
@@ -193,7 +188,7 @@ class TestContainer:
                 "without actual type argument."
             ),
         ):
-            container._create_provider(call=iterator, scope="singleton")
+            container._register_provider(iterator, "singleton")
 
     def test_create_provider_unsupported_scope(self, container: Container) -> None:
         with pytest.raises(
@@ -204,7 +199,7 @@ class TestContainer:
                 "Please use one of the supported scopes when registering a provider."
             ),
         ):
-            container._create_provider(call=generator, scope="other")  # type: ignore[arg-type]
+            container._register_provider(generator, "other")  # type: ignore[arg-type]
 
     def test_create_provider_transient_resource_not_allowed(
         self, container: Container
@@ -216,7 +211,7 @@ class TestContainer:
                 "register with a transient scope, which is not allowed."
             ),
         ):
-            container._create_provider(call=generator, scope="transient")
+            container._register_provider(generator, "transient")
 
     def test_create_provider_without_annotation(self, container: Container) -> None:
         def service_ident() -> str:
@@ -228,7 +223,7 @@ class TestContainer:
         with pytest.raises(
             TypeError, match="Missing provider `(.*?)` dependency `ident` annotation."
         ):
-            container._create_provider(call=service, scope="singleton")
+            container._register_provider(service, "singleton")
 
     def test_create_provider_positional_only_parameter_not_allowed(
         self, container: Container
@@ -240,7 +235,7 @@ class TestContainer:
             TypeError,
             match="Positional-only parameters are not allowed in the provider `(.*?)`.",
         ):
-            container._create_provider(call=provider_message, scope="singleton")
+            container._register_provider(provider_message, "singleton")
 
     def test_register_provider_already_registered(self, container: Container) -> None:
         container.register(str, lambda: "test", scope="singleton")
@@ -436,7 +431,7 @@ class TestContainer:
             return str(dep1)
 
         with pytest.raises(
-            ValueError,
+            LookupError,
             match=(
                 "The provider `(.*?).dep2` depends on `dep1` of type `int`, "
                 "which has not been registered or set. To resolve this, "
@@ -983,6 +978,17 @@ class TestContainer:
         assert provider.scope == "singleton"
         assert provider.interface == Service
 
+    def test_resolve_non_strict_annotated(self, container: Container) -> None:
+        class Service:
+            pass
+
+        service_1 = container.resolve(Annotated[Service, "service_1"])
+        service_2 = container.resolve(Annotated[Service, "service_2"])
+
+        assert service_1 != service_2
+        assert container.is_registered(Annotated[Service, "service_1"])
+        assert container.is_registered(Annotated[Service, "service_2"])
+
     def test_resolve_non_strict_provider_scope_from_sub_provider_request(
         self,
         container: Container,
@@ -1053,9 +1059,9 @@ class TestContainer:
         with pytest.raises(
             LookupError,
             match=(
-                "The provider interface for `str` has not been registered. "
-                "Please ensure that the provider interface is properly registered "
-                "before attempting to use it."
+                "The provider `tests.fixtures.Service` depends on `ident` of type "
+                "`str`, which has not been registered or set. To resolve this, "
+                "ensure that `ident` is registered before attempting to use it."
             ),
         ):
             _ = container.resolve(Service).ident
@@ -1070,10 +1076,10 @@ class TestContainer:
 
         with pytest.raises(
             LookupError,
-            match=re.escape(
-                "The provider interface for `Union[str, Sequence[str], int, list[str]]`"
-                " has not been registered. Please ensure that the provider interface "
-                "is properly registered before attempting to use it."
+            match=(
+                "The provider `(.*?)` depends on `value` of type `(.*?)`, "
+                "which has not been registered or set. To resolve this, "
+                "ensure that `value` is registered before attempting to use it."
             ),
         ):
             _ = container.resolve(Klass)
@@ -1507,6 +1513,123 @@ class TestContainer:
 
         assert kwargs == {"a": 10, "b": 1.0, "c": "test"}
 
+    def test_create_transient_non_strict(self) -> None:
+        @dataclass
+        class Component:
+            __scope__ = "transient"
+
+            name: str
+
+        container = Container(strict=False)
+
+        instance = container.create(Component, name="test")
+
+        assert instance.name == "test"
+
+    def test_create_singleton_non_strict(self) -> None:
+        @dataclass
+        class Component:
+            __scope__ = "singleton"
+
+            name: str
+
+        container = Container(strict=False)
+
+        instance = container.create(Component, name="test")
+
+        assert instance.name == "test"
+
+    def test_create_scoped_non_strict(self) -> None:
+        @dataclass
+        class Component:
+            __scope__ = "request"
+
+            name: str
+
+        container = Container(strict=False)
+
+        with container.request_context():
+            instance = container.create(Component, name="test")
+
+        assert instance.name == "test"
+
+    def test_create_non_existing_keyword_arg(self) -> None:
+        class Component:
+            __scope__ = "singleton"
+
+        container = Container(strict=False)
+
+        with pytest.raises(TypeError, match="takes no arguments"):
+            container.create(Component, param="test")
+
+    async def test_create_async_transient_non_strict(self) -> None:
+        @dataclass
+        class Component:
+            __scope__ = "transient"
+
+            name: str
+
+        container = Container(strict=False)
+
+        instance = await container.acreate(Component, name="test")
+
+        assert instance.name == "test"
+
+    async def test_create_async_singleton_non_strict(self) -> None:
+        @dataclass
+        class Component:
+            __scope__ = "singleton"
+
+            name: str
+
+        container = Container(strict=False)
+
+        instance = await container.acreate(Component, name="test")
+
+        assert instance.name == "test"
+
+    async def test_create_async_scoped_non_strict(self) -> None:
+        @dataclass
+        class Component:
+            __scope__ = "request"
+
+            name: str
+
+        container = Container(strict=False)
+
+        with container.request_context():
+            instance = await container.acreate(Component, name="test")
+
+        assert instance.name == "test"
+
+    async def test_create_async_non_existing_keyword_arg(self) -> None:
+        class Component:
+            __scope__ = "singleton"
+
+        container = Container(strict=False)
+
+        with pytest.raises(TypeError, match="takes no arguments"):
+            await container.acreate(Component, param="test")
+
+
+class TestContainerInjector:
+    def test_inject(self, container: Container) -> None:
+        @container.provider(scope="singleton")
+        def ident_provider() -> str:
+            return "1000"
+
+        @container.provider(scope="singleton")
+        def service_provider(ident: str) -> Service:
+            return Service(ident=ident)
+
+        @container.inject
+        def func(name: str, service: Service = auto) -> str:
+            return f"{name} = {service.ident}"
+
+        result = func(name="service ident")
+
+        assert result == "service ident = 1000"
+
     def test_inject_auto_registered_log_message(
         self, container: Container, caplog: pytest.LogCaptureFixture
     ) -> None:
@@ -1517,7 +1640,7 @@ class TestContainer:
                 pass
 
             assert caplog.messages == [
-                "Cannot validate the `tests.test_container.TestContainer"
+                "Cannot validate the `tests.test_container.TestContainerInjector"
                 ".test_inject_auto_registered_log_message.<locals>.handler` parameter "
                 "`service` with an annotation of `tests.fixtures.Service due to "
                 "being in non-strict mode. It will be validated at the first call."
@@ -1546,23 +1669,6 @@ class TestContainer:
             ),
         ):
             container.inject(handler)
-
-    def test_inject(self, container: Container) -> None:
-        @container.provider(scope="singleton")
-        def ident_provider() -> str:
-            return "1000"
-
-        @container.provider(scope="singleton")
-        def service_provider(ident: str) -> Service:
-            return Service(ident=ident)
-
-        @container.inject
-        def func(name: str, service: Service = auto) -> str:
-            return f"{name} = {service.ident}"
-
-        result = func(name="service ident")
-
-        assert result == "service ident = 1000"
 
     def test_inject_auto_marker(self, container: Container) -> None:
         @container.provider(scope="singleton")
@@ -1693,6 +1799,8 @@ class TestContainer:
 
         assert handler in container._inject_cache
 
+
+class TestContainerModule:
     def test_register_modules(self) -> None:
         container = Container(modules=[TestModule])
 
@@ -1747,6 +1855,8 @@ class TestContainer:
             Annotated[str, "dep2"],
         ]
 
+
+class TestContainerScanning:
     def test_scan(self, container: Container) -> None:
         container.register_module(ScanAppModule)
         container.scan(["tests.scan_app"])
@@ -1777,168 +1887,60 @@ class TestContainer:
 
         assert a_a3_handler_1() == "a.a1.str_provider"
 
-    def test_create_transient_non_strict(self) -> None:
-        @dataclass
-        class Component:
-            __scope__ = "transient"
 
-            name: str
+class TestDecorators:
+    def test_provider_decorator(self) -> None:
+        class TestModule(Module):
+            @provider(scope="singleton", override=True)
+            def provider(self) -> str:
+                return "test"
 
-        container = Container(strict=False)
+        assert getattr(TestModule.provider, "__provider__") == ProviderDecoratorArgs(
+            scope="singleton",
+            override=True,
+        )
 
-        instance = container.create(Component, name="test")
+    def test_request_decorator(self) -> None:
+        request(Service)
 
-        assert instance.name == "test"
+        assert getattr(Service, "__scope__") == "request"
 
-    def test_create_singleton_non_strict(self) -> None:
-        @dataclass
-        class Component:
-            __scope__ = "singleton"
+    def test_transient_decorator(self) -> None:
+        transient(Service)
 
-            name: str
+        assert getattr(Service, "__scope__") == "transient"
 
-        container = Container(strict=False)
+    def test_singleton_decorator(self) -> None:
+        singleton(Service)
 
-        instance = container.create(Component, name="test")
+        assert getattr(Service, "__scope__") == "singleton"
 
-        assert instance.name == "test"
+    def test_injectable_decorator_no_args(self) -> None:
+        @injectable
+        def my_func() -> None:
+            pass
 
-    def test_create_scoped_non_strict(self) -> None:
-        @dataclass
-        class Component:
-            __scope__ = "request"
+        assert getattr(my_func, "__injectable__") == InjectableDecoratorArgs(
+            wrapped=True,
+            tags=None,
+        )
 
-            name: str
+    def test_injectable_decorator_no_args_provided(self) -> None:
+        @injectable()
+        def my_func() -> None:
+            pass
 
-        container = Container(strict=False)
+        assert getattr(my_func, "__injectable__") == InjectableDecoratorArgs(
+            wrapped=True,
+            tags=None,
+        )
 
-        with container.request_context():
-            instance = container.create(Component, name="test")
+    def test_injectable_decorator(self) -> None:
+        @injectable(tags=["tag1", "tag2"])
+        def my_func() -> None:
+            pass
 
-        assert instance.name == "test"
-
-    def test_create_non_existing_keyword_arg(self) -> None:
-        class Component:
-            __scope__ = "singleton"
-
-        container = Container(strict=False)
-
-        with pytest.raises(TypeError, match="takes no arguments"):
-            container.create(Component, param="test")
-
-    async def test_create_async_transient_non_strict(self) -> None:
-        @dataclass
-        class Component:
-            __scope__ = "transient"
-
-            name: str
-
-        container = Container(strict=False)
-
-        instance = await container.acreate(Component, name="test")
-
-        assert instance.name == "test"
-
-    async def test_create_async_singleton_non_strict(self) -> None:
-        @dataclass
-        class Component:
-            __scope__ = "singleton"
-
-            name: str
-
-        container = Container(strict=False)
-
-        instance = await container.acreate(Component, name="test")
-
-        assert instance.name == "test"
-
-    async def test_create_async_scoped_non_strict(self) -> None:
-        @dataclass
-        class Component:
-            __scope__ = "request"
-
-            name: str
-
-        container = Container(strict=False)
-
-        with container.request_context():
-            instance = await container.acreate(Component, name="test")
-
-        assert instance.name == "test"
-
-    async def test_create_async_non_existing_keyword_arg(self) -> None:
-        class Component:
-            __scope__ = "singleton"
-
-        container = Container(strict=False)
-
-        with pytest.raises(TypeError, match="takes no arguments"):
-            await container.acreate(Component, param="test")
-
-
-############################
-# Test decorators
-############################
-
-
-def test_provider_decorator() -> None:
-    class TestModule(Module):
-        @provider(scope="singleton", override=True)
-        def provider(self) -> str:
-            return "test"
-
-    assert getattr(TestModule.provider, "__provider__") == ProviderDecoratorArgs(
-        scope="singleton",
-        override=True,
-    )
-
-
-def test_request_decorator() -> None:
-    request(Service)
-
-    assert getattr(Service, "__scope__") == "request"
-
-
-def test_transient_decorator() -> None:
-    transient(Service)
-
-    assert getattr(Service, "__scope__") == "transient"
-
-
-def test_singleton_decorator() -> None:
-    singleton(Service)
-
-    assert getattr(Service, "__scope__") == "singleton"
-
-
-def test_inject_decorator_no_args() -> None:
-    @injectable
-    def my_func() -> None:
-        pass
-
-    assert getattr(my_func, "__injectable__") == InjectableDecoratorArgs(
-        wrapped=True,
-        tags=None,
-    )
-
-
-def test_inject_decorator_no_args_provided() -> None:
-    @injectable()
-    def my_func() -> None:
-        pass
-
-    assert getattr(my_func, "__injectable__") == InjectableDecoratorArgs(
-        wrapped=True,
-        tags=None,
-    )
-
-
-def test_inject_decorator() -> None:
-    @injectable(tags=["tag1", "tag2"])
-    def my_func() -> None:
-        pass
-
-    assert getattr(my_func, "__injectable__") == InjectableDecoratorArgs(
-        wrapped=True,
-        tags=["tag1", "tag2"],
-    )
+        assert getattr(my_func, "__injectable__") == InjectableDecoratorArgs(
+            wrapped=True,
+            tags=["tag1", "tag2"],
+        )
