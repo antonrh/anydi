@@ -70,6 +70,8 @@ if __name__ == "__main__":
 *app.py*
 
 ```python
+from typing import Annotated
+
 from fastapi import FastAPI
 
 import anydi.ext.fastapi
@@ -88,7 +90,7 @@ app = FastAPI()
 
 
 @app.get("/hello")
-def say_hello(message: str = Inject()) -> dict[str, str]:
+def say_hello(message: Annotated[str, Inject()]) -> dict[str, str]:
     return {"message": message}
 
 

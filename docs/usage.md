@@ -570,7 +570,7 @@ def service() -> Service:
     return Service(name="demo")
 
 
-@container.injectable
+@container.inject
 def handler(service: Service = auto) -> None:
     print(f"Hello, from service `{service.name}`")
 ```
