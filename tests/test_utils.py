@@ -38,7 +38,7 @@ def test_is_builtin_type(tp: type[Any], expected: bool) -> None:
         ),
         (lambda x: x, "tests.test_utils.<lambda>"),
         (123, "int"),
-        ("hello", "str"),
+        ("hello", "hello"),
         (list[str], "list[str]"),
         pytest.param(
             Union[str, int],

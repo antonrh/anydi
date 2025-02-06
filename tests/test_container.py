@@ -1,6 +1,5 @@
 import asyncio
 import logging
-import re
 import sys
 import threading
 import time
@@ -432,7 +431,7 @@ class TestContainer:
             return str(dep1)
 
         with pytest.raises(
-            ValueError,
+            LookupError,
             match=(
                 "The provider `(.*?).dep2` depends on `dep1` of type `int`, "
                 "which has not been registered or set. To resolve this, "
@@ -1060,9 +1059,9 @@ class TestContainer:
         with pytest.raises(
             LookupError,
             match=(
-                "The provider interface for `str` has not been registered. "
-                "Please ensure that the provider interface is properly registered "
-                "before attempting to use it."
+                "The provider `tests.fixtures.Service` depends on `ident` of type "
+                "`str`, which has not been registered or set. To resolve this, "
+                "ensure that `ident` is registered before attempting to use it."
             ),
         ):
             _ = container.resolve(Service).ident
@@ -1077,10 +1076,10 @@ class TestContainer:
 
         with pytest.raises(
             LookupError,
-            match=re.escape(
-                "The provider interface for `Union[str, Sequence[str], int, list[str]]`"
-                " has not been registered. Please ensure that the provider interface "
-                "is properly registered before attempting to use it."
+            match=(
+                "The provider `(.*?)` depends on `value` of type `(.*?)`, "
+                "which has not been registered or set. To resolve this, "
+                "ensure that `value` is registered before attempting to use it."
             ),
         ):
             _ = container.resolve(Klass)
