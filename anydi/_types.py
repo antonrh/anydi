@@ -84,11 +84,6 @@ class ProviderKind(enum.IntEnum):
 
 
 @dataclass(kw_only=True, frozen=True)
-class ProviderParameter:
-    pass
-
-
-@dataclass(kw_only=True, frozen=True)
 class Provider:
     call: Callable[..., Any]
     scope: Scope
