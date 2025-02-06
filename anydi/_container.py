@@ -462,10 +462,10 @@ class Container:
         self, scope: Scope, name: str, kind: ProviderKind
     ) -> None:
         """Validate the provider scope."""
-        if scope not in get_args(Scope):
+        if scope not in (allowed_scopes := get_args(Scope)):
             raise ValueError(
                 f"The provider `{name}` scope is invalid. Only the following "
-                f"scopes are supported: {', '.join(get_args(Scope))}. "
+                f"scopes are supported: {', '.join(allowed_scopes)}. "
                 "Please use one of the supported scopes when registering a provider."
             )
         if (
