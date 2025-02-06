@@ -15,9 +15,9 @@ from collections import defaultdict
 from collections.abc import AsyncIterator, Iterable, Iterator, Sequence
 from contextvars import ContextVar
 from types import ModuleType
-from typing import Any, Callable, TypeVar, Union, cast, get_origin, overload
+from typing import Annotated, Any, Callable, TypeVar, Union, cast, overload
 
-from typing_extensions import Concatenate, ParamSpec, Self, final, get_args
+from typing_extensions import Concatenate, ParamSpec, Self, final, get_args, get_origin
 
 from ._context import InstanceContext
 from ._types import (
@@ -347,33 +347,33 @@ class Container:
         signature = inspect.signature(call, globals=globalns)
 
         # Detect the interface
-        if kind == ProviderKind.CLASS:
-            interface = call
-        else:
-            if interface is NOT_SET:
+        if interface is NOT_SET:
+            if kind == ProviderKind.CLASS:
+                interface = call
+            else:
                 interface = signature.return_annotation
                 if interface is inspect.Signature.empty:
                     interface = None
                 else:
                     interface = get_typed_annotation(interface, globalns)
 
-            # If the callable is an iterator, return the actual type
-            iterator_types = {Iterator, AsyncIterator}
-            if interface in iterator_types or get_origin(interface) in iterator_types:
-                if args := get_args(interface):
-                    interface = args[0]
-                    # If the callable is a generator, return the resource type
-                    if interface in {None, NoneType}:
-                        interface = type(f"Event_{uuid.uuid4().hex}", (Event,), {})
-                else:
-                    raise TypeError(
-                        f"Cannot use `{name}` resource type annotation "
-                        "without actual type argument."
-                    )
+        # If the callable is an iterator, return the actual type
+        iterator_types = {Iterator, AsyncIterator}
+        if interface in iterator_types or get_origin(interface) in iterator_types:
+            if args := get_args(interface):
+                interface = args[0]
+                # If the callable is a generator, return the resource type
+                if interface in {None, NoneType}:
+                    interface = type(f"Event_{uuid.uuid4().hex}", (Event,), {})
+            else:
+                raise TypeError(
+                    f"Cannot use `{name}` resource type annotation "
+                    "without actual type argument."
+                )
 
-            # None interface is not allowed
-            if interface in {None, NoneType}:
-                raise TypeError(f"Missing `{name}` provider return annotation.")
+        # None interface is not allowed
+        if interface in {None, NoneType}:
+            raise TypeError(f"Missing `{name}` provider return annotation.")
 
         if interface in self._providers and not override:
             raise LookupError(
@@ -381,8 +381,9 @@ class Container:
                 "already registered."
             )
 
-        # Detect the parameters
         parameters = []
+        scopes = {}
+
         for parameter in signature.parameters.values():
             if parameter.annotation is inspect.Parameter.empty:
                 raise TypeError(
@@ -412,15 +413,20 @@ class Container:
                     f"`{parameter.name}` is registered before attempting to use it."
                 ) from None
 
-            # Check scope compatibility
+            # Store first provider for each scope
+            if sub_provider.scope not in scopes:
+                scopes[sub_provider.scope] = sub_provider
+
+            parameters.append(parameter.replace(annotation=annotation))
+
+        # Check scope compatibility
+        for sub_provider in scopes.values():
             if sub_provider.scope not in ALLOWED_SCOPES.get(scope, []):
                 raise ValueError(
                     f"The provider `{name}` with a `{scope}` scope cannot "
                     f"depend on `{sub_provider}` with a `{sub_provider.scope}` scope. "
                     "Please ensure all providers are registered with matching scopes."
                 )
-
-            parameters.append(parameter.replace(annotation=annotation))
 
         provider = Provider(
             call=call,
@@ -432,7 +438,6 @@ class Container:
         )
 
         self._set_provider(provider)
-
         return provider
 
     def _get_provider(self, interface: AnyInterface) -> Provider:
@@ -453,19 +458,22 @@ class Container:
         try:
             return self._get_provider(interface)
         except LookupError:
-            if (
-                not self.strict
-                and inspect.isclass(interface)
-                and not is_builtin_type(interface)
-                and interface is not inspect.Parameter.empty
-            ):
+            if self.strict or interface is inspect.Parameter.empty:
+                raise
+
+            if get_origin(interface) is Annotated and (args := get_args(interface)):
+                call = args[0]
+            else:
+                call = interface
+
+            if inspect.isclass(call) and not is_builtin_type(call):
                 # Try to get defined scope
                 scope = getattr(interface, "__scope__", parent_scope)
                 # Try to detect scope
                 if scope is None:
-                    scope = self._detect_provider_scope(interface, **defaults)
+                    scope = self._detect_provider_scope(call, **defaults)
                 scope = scope or self.default_scope
-                return self._register_provider(interface, scope, **defaults)
+                return self._register_provider(call, scope, interface, **defaults)
             raise
 
     def _set_provider(self, provider: Provider) -> None:

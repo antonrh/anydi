@@ -128,7 +128,7 @@ class Provider:
 class ProviderArgs(NamedTuple):
     call: Callable[..., Any]
     scope: Scope
-    interface: Any | None = None
+    interface: Any = NOT_SET
 
 
 class ProviderDecoratorArgs(NamedTuple):
