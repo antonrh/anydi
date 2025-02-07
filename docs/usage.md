@@ -8,7 +8,7 @@ Once a provider is registered with `Container`, it can be used to resolve depend
 ### Registering Providers
 
 To register a provider, you can use the `register` method of the `Container` instance. The method takes
-three arguments: the type of the object to be provided, the provider function or class, and an scope.
+three arguments: the type of the object to be provided, the provider function or class, and a scope.
 
 ```python
 from anydi import Container
@@ -17,12 +17,12 @@ container = Container()
 
 
 def message() -> str:
-    return "Hello, message!"
+    return "Hello, World!"
 
 
 container.register(str, message, scope="singleton")
 
-assert container.resolve(str) == "Hello, world!"
+assert container.resolve(str) == "Hello, World!"
 ```
 
 Alternatively, you can use the `@provider` decorator to register a provider function. The decorator takes care of registering the provider with `Container`.
@@ -35,10 +35,10 @@ container = Container()
 
 @container.provider(scope="singleton")
 def message() -> str:
-    return "Hello, message!"
+    return "Hello, World!"
 
 
-assert container.resolve(str) == "Hello, world!"
+assert container.resolve(str) == "Hello, World!"
 ```
 
 ### Annotated Providers
@@ -82,7 +82,7 @@ container = Container()
 
 @container.provider(scope="singleton")
 def message() -> str:
-    return "Hello, message!"
+    return "Hello, World!"
 
 
 assert container.is_registered(str)
@@ -105,13 +105,13 @@ container = Container()
 
 @container.provider(scope="singleton")
 def message() -> str:
-    return "Hello, message!"
+    return "Hello, World!"
 
 
 # Check if an instance is resolved
 assert not container.is_resolved(str)
 
-assert container.resolve(str) == "Hello, world!"
+assert container.resolve(str) == "Hello, World!"
 
 assert container.is_resolved(str)
 
@@ -126,7 +126,7 @@ To release a provider instance, you can use the `release` method of the `Contain
 from anydi import Container
 
 container = Container()
-container.register(str, lambda: "Hello, world!", scope="singleton")
+container.register(str, lambda: "Hello, World!", scope="singleton")
 container.register(int, lambda: 100, scope="singleton")
 
 container.resolve(str)
@@ -164,6 +164,7 @@ class Database:
 @dataclass
 class Repository:
     db: Database
+
 
 @dataclass
 class Service:
@@ -445,7 +446,7 @@ async def resource_provider() -> AsyncIterator[Resource]:
 async def main() -> None:
     await container.astart()  # start resources
 
-    assert (await container.resolve(Resource)).name == "demo"
+    assert (await container.aresolve(Resource)).name == "demo"
 
     await container.aclose()  # close resources
 

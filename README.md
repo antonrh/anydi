@@ -56,7 +56,7 @@ container = Container()
 
 @container.provider(scope="singleton")
 def message() -> str:
-    return "Hello, world!"
+    return "Hello, World!"
 
 
 @container.inject
