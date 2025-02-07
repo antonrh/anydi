@@ -419,7 +419,7 @@ class Container:
 
         # Check for unresolved parameters
         if unresolved_parameter:
-            if detected_scope not in {"singleton", "transient"}:
+            if detected_scope not in ("singleton", "transient"):
                 self._unresolved_interfaces.add(interface)
             else:
                 raise LookupError(
@@ -461,10 +461,7 @@ class Container:
                 f"scopes are supported: {', '.join(allowed_scopes)}. "
                 "Please use one of the supported scopes when registering a provider."
             )
-        if (
-            kind in {ProviderKind.GENERATOR, ProviderKind.ASYNC_GENERATOR}
-            and scope == "transient"
-        ):
+        if scope == "transient" and ProviderKind.is_resource(kind):
             raise TypeError(
                 f"The resource provider `{name}` is attempting to register "
                 "with a transient scope, which is not allowed."

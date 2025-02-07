@@ -82,6 +82,10 @@ class ProviderKind(enum.IntEnum):
             "object. Only callable providers are allowed."
         )
 
+    @classmethod
+    def is_resource(cls, kind: ProviderKind) -> bool:
+        return kind in (cls.GENERATOR, cls.ASYNC_GENERATOR)
+
 
 @dataclass(kw_only=True, frozen=True)
 class Provider:
@@ -117,7 +121,7 @@ class Provider:
 
     @cached_property
     def is_resource(self) -> bool:
-        return self.is_generator or self.is_async_generator
+        return ProviderKind.is_resource(self.kind)
 
 
 class ProviderArgs(NamedTuple):
