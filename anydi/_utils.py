@@ -70,7 +70,7 @@ def is_none_type(tp: Any) -> bool:
 
 def is_iterator_type(tp: Any) -> bool:
     """Check if the given object is an iterator type."""
-    return tp in {Iterator, AsyncIterator}
+    return tp in (Iterator, AsyncIterator)
 
 
 def get_typed_annotation(
