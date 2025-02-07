@@ -44,14 +44,10 @@ from ._utils import (
     is_async_context_manager,
     is_builtin_type,
     is_context_manager,
+    is_iterator_type,
+    is_none_type,
     run_async,
 )
-
-try:
-    from types import NoneType
-except ImportError:
-    NoneType = type(None)  # type: ignore[misc]
-
 
 T = TypeVar("T", bound=Any)
 M = TypeVar("M", bound="Module")
@@ -347,12 +343,11 @@ class Container:
                     interface = get_typed_annotation(interface, globalns, module)
 
         # If the callable is an iterator, return the actual type
-        iterator_types = {Iterator, AsyncIterator}
-        if interface in iterator_types or get_origin(interface) in iterator_types:
+        if is_iterator_type(interface) or is_iterator_type(get_origin(interface)):
             if args := get_args(interface):
                 interface = args[0]
                 # If the callable is a generator, return the resource type
-                if interface in {None, NoneType}:
+                if is_none_type(interface):
                     interface = type(f"Event_{uuid.uuid4().hex}", (Event,), {})
             else:
                 raise TypeError(
@@ -361,7 +356,7 @@ class Container:
                 )
 
         # None interface is not allowed
-        if interface in {None, NoneType}:
+        if is_none_type(interface):
             raise TypeError(f"Missing `{name}` provider return annotation.")
 
         # Check for existing provider
@@ -424,7 +419,7 @@ class Container:
 
         # Check for unresolved parameters
         if unresolved_parameter:
-            if detected_scope not in {"singleton", "transient"}:
+            if detected_scope not in ("singleton", "transient"):
                 self._unresolved_interfaces.add(interface)
             else:
                 raise LookupError(
@@ -466,10 +461,7 @@ class Container:
                 f"scopes are supported: {', '.join(allowed_scopes)}. "
                 "Please use one of the supported scopes when registering a provider."
             )
-        if (
-            kind in {ProviderKind.GENERATOR, ProviderKind.ASYNC_GENERATOR}
-            and scope == "transient"
-        ):
+        if scope == "transient" and ProviderKind.is_resource(kind):
             raise TypeError(
                 f"The resource provider `{name}` is attempting to register "
                 "with a transient scope, which is not allowed."
