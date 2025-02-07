@@ -1483,7 +1483,7 @@ class TestContainer:
 
         provider = container.register(Service, service, scope="singleton")
 
-        context = container._get_scoped_context("singleton")
+        context = container._get_instance_context("singleton")
 
         kwargs = container._get_provided_kwargs(provider, context)
 
@@ -1507,7 +1507,7 @@ class TestContainer:
 
         provider = container.register(Service, service, scope="singleton")
 
-        context = container._get_scoped_context("singleton")
+        context = container._get_instance_context("singleton")
 
         kwargs = await container._aget_provided_kwargs(provider, context)
 

@@ -109,9 +109,7 @@ class Container:
         self._singleton_context = InstanceContext()
         self._singleton_lock = threading.RLock()
         self._singleton_async_lock = AsyncRLock()
-        self._request_context_var: ContextVar[InstanceContext | None] = ContextVar(
-            "request_context", default=None
-        )
+        self._scoped_context: dict[str, ContextVar[InstanceContext]] = {}
         self._override_instances: dict[type[Any], Any] = {}
         self._unresolved_interfaces: set[type[Any]] = set()
         self._inject_cache: dict[Callable[..., Any], Callable[..., Any]] = {}
@@ -211,50 +209,74 @@ class Container:
         await self._singleton_context.aclose()
 
     @contextlib.contextmanager
-    def request_context(self) -> Iterator[InstanceContext]:
-        """Obtain a context manager for the request-scoped context."""
+    def scoped_context(self, scope: str) -> Iterator[InstanceContext]:
+        """Obtain a context manager for the specified scoped context."""
         context = InstanceContext()
-
-        token = self._request_context_var.set(context)
+        scoped_context_var = self._get_scoped_context_var(scope)
+        token = scoped_context_var.set(context)
 
         # Resolve all request resources
-        for interface in self._resources.get("request", []):
+        for interface in self._resources.get(scope, []):
             if not is_event_type(interface):
                 continue
             self.resolve(interface)
 
         with context:
             yield context
-            self._request_context_var.reset(token)
+            scoped_context_var.reset(token)
 
     @contextlib.asynccontextmanager
-    async def arequest_context(self) -> AsyncIterator[InstanceContext]:
-        """Obtain an async context manager for the request-scoped context."""
+    async def ascoped_context(self, scope: str) -> AsyncIterator[InstanceContext]:
+        """Obtain a context manager for the specified scoped context."""
         context = InstanceContext()
+        scoped_context_var = self._get_scoped_context_var(scope)
+        token = scoped_context_var.set(context)
 
-        token = self._request_context_var.set(context)
-
-        for interface in self._resources.get("request", []):
+        # Resolve all request resources
+        for interface in self._resources.get(scope, []):
             if not is_event_type(interface):
                 continue
             await self.aresolve(interface)
 
         async with context:
             yield context
-            self._request_context_var.reset(token)
+            scoped_context_var.reset(token)
+
+    @contextlib.contextmanager
+    def request_context(self) -> Iterator[InstanceContext]:
+        """Obtain a context manager for the request-scoped context."""
+        with self.scoped_context("request") as context:
+            yield context
+
+    @contextlib.asynccontextmanager
+    async def arequest_context(self) -> AsyncIterator[InstanceContext]:
+        """Obtain an async context manager for the request-scoped context."""
+        async with self.ascoped_context("request") as context:
+            yield context
+
+    def _get_scoped_context(self, scope: str) -> InstanceContext:
+        scoped_context_var = self._get_scoped_context_var(scope)
+        try:
+            scoped_context = scoped_context_var.get()
+        except LookupError as exc:
+            raise LookupError(
+                f"The {scope} context has not been started. Please ensure that "
+                f"the {scope} context is properly initialized before attempting "
+                "to use it."
+            ) from exc
+        return scoped_context
+
+    def _get_scoped_context_var(self, scope: str) -> ContextVar[InstanceContext]:
+        """Get the context variable for the specified scope."""
+        if scope not in self._scoped_context:
+            self._scoped_context[scope] = ContextVar(f"{scope}_context")
+        return self._scoped_context[scope]
 
     def _get_request_context(self) -> InstanceContext:
         """Get the current request context."""
-        request_context = self._request_context_var.get()
-        if request_context is None:
-            raise LookupError(
-                "The request context has not been started. Please ensure that "
-                "the request context is properly initialized before attempting "
-                "to use it."
-            )
-        return request_context
+        return self._get_scoped_context("request")
 
-    def _get_scoped_context(self, scope: Scope) -> InstanceContext:
+    def _get_instance_context(self, scope: Scope) -> InstanceContext:
         """Get the instance context for the specified scope."""
         if scope == "singleton":
             return self._singleton_context
@@ -292,7 +314,7 @@ class Container:
         # Cleanup instance context
         if provider.scope != "transient":
             try:
-                context = self._get_scoped_context(provider.scope)
+                context = self._get_instance_context(provider.scope)
             except LookupError:
                 pass
             else:
@@ -565,7 +587,7 @@ class Container:
             return False
         if provider.scope == "transient":
             return False
-        context = self._get_scoped_context(provider.scope)
+        context = self._get_instance_context(provider.scope)
         return interface in context
 
     def release(self, interface: AnyInterface) -> None:
@@ -573,7 +595,7 @@ class Container:
         provider = self._get_provider(interface)
         if provider.scope == "transient":
             return None
-        context = self._get_scoped_context(provider.scope)
+        context = self._get_instance_context(provider.scope)
         del context[interface]
 
     def reset(self) -> None:
@@ -582,7 +604,7 @@ class Container:
             if provider.scope == "transient":
                 continue
             try:
-                context = self._get_scoped_context(provider.scope)
+                context = self._get_instance_context(provider.scope)
             except LookupError:
                 continue
             del context[interface]
@@ -595,7 +617,7 @@ class Container:
         if provider.scope == "transient":
             instance = self._create_instance(provider, None, **defaults)
         else:
-            context = self._get_scoped_context(provider.scope)
+            context = self._get_instance_context(provider.scope)
             if provider.scope == "singleton":
                 with self._singleton_lock:
                     instance = (
@@ -623,7 +645,7 @@ class Container:
         if provider.scope == "transient":
             instance = await self._acreate_instance(provider, None, **defaults)
         else:
-            context = self._get_scoped_context(provider.scope)
+            context = self._get_instance_context(provider.scope)
             if provider.scope == "singleton":
                 async with self._singleton_async_lock:
                     instance = (
