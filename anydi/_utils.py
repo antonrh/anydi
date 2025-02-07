@@ -8,11 +8,17 @@ import importlib
 import inspect
 import re
 import sys
+from collections.abc import AsyncIterator, Iterator
 from types import TracebackType
 from typing import Any, Callable, ForwardRef, TypeVar
 
 import anyio
 from typing_extensions import ParamSpec, Self, get_args, get_origin
+
+try:
+    from types import NoneType
+except ImportError:
+    NoneType = type(None)  # type: ignore[misc]
 
 T = TypeVar("T")
 P = ParamSpec("P")
@@ -55,6 +61,16 @@ def is_context_manager(obj: Any) -> bool:
 def is_async_context_manager(obj: Any) -> bool:
     """Check if the given object is an async context manager."""
     return hasattr(obj, "__aenter__") and hasattr(obj, "__aexit__")
+
+
+def is_none_type(tp: Any) -> bool:
+    """Check if the given object is a None type."""
+    return tp in (None, NoneType)
+
+
+def is_iterator_type(tp: Any) -> bool:
+    """Check if the given object is an iterator type."""
+    return tp in (Iterator, AsyncIterator)
 
 
 def get_typed_annotation(
