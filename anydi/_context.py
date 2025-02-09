@@ -1,23 +1,26 @@
 from __future__ import annotations
 
 import contextlib
+import threading
 from types import TracebackType
 from typing import Any
 
 from typing_extensions import Self
 
-from ._utils import run_async
+from ._utils import AsyncRLock, run_async
 
 
 class InstanceContext:
     """A context to store instances."""
 
-    __slots__ = ("_instances", "_stack", "_async_stack")
+    __slots__ = ("_instances", "_stack", "_async_stack", "_lock", "_async_lock")
 
     def __init__(self) -> None:
         self._instances: dict[type[Any], Any] = {}
         self._stack = contextlib.ExitStack()
         self._async_stack = contextlib.AsyncExitStack()
+        self._lock = threading.RLock()
+        self._async_lock = AsyncRLock()
 
     def get(self, interface: type[Any]) -> Any | None:
         """Get an instance from the context."""
@@ -82,3 +85,11 @@ class InstanceContext:
     async def aclose(self) -> None:
         """Close the scoped context asynchronously."""
         await self.__aexit__(None, None, None)
+
+    def lock(self) -> threading.RLock:
+        """Acquire the context lock."""
+        return self._lock
+
+    def alock(self) -> AsyncRLock:
+        """Acquire the context lock asynchronously."""
+        return self._async_lock
