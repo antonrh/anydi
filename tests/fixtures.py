@@ -1,4 +1,6 @@
+import uuid
 from collections.abc import AsyncIterator, Iterator
+from dataclasses import dataclass, field
 from typing import Annotated
 
 from anydi import Container, Module, provider
@@ -34,6 +36,11 @@ async def async_event() -> AsyncIterator[None]:
 
 def iterator() -> Iterator:  # type: ignore[type-arg]
     yield
+
+
+@dataclass(frozen=True)
+class UniqueId:
+    id: uuid.UUID = field(default_factory=uuid.uuid4)
 
 
 class Service:

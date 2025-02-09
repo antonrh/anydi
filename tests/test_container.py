@@ -2,7 +2,6 @@ import asyncio
 import logging
 import sys
 import threading
-import time
 import uuid
 from collections.abc import AsyncIterator, Iterator, Sequence
 from dataclasses import dataclass, field
@@ -36,6 +35,7 @@ from tests.fixtures import (
     Resource,
     Service,
     TestModule,
+    UniqueId,
     async_event,
     async_generator,
     coro,
@@ -90,7 +90,7 @@ class TestContainer:
             (coro, ProviderKind.COROUTINE, str),
         ],
     )
-    def test_create_provider(
+    def test_register_provider_different_kind(
         self,
         container: Container,
         call: Callable[..., Any],
@@ -118,7 +118,7 @@ class TestContainer:
             ('Annotated[str, "name"]', Annotated[str, "name"]),
         ],
     )
-    def test_create_provider_interface(
+    def test_register_provider_interface(
         self, container: Container, annotation: type[Any], expected: type[Any]
     ) -> None:
         def call() -> annotation:  # type: ignore[valid-type]
@@ -135,7 +135,7 @@ class TestContainer:
             (async_event, ProviderKind.ASYNC_GENERATOR),
         ],
     )
-    def test_create_provider_event(
+    def test_register_provider_event(
         self,
         container: Container,
         call: Callable[..., Any],
@@ -146,18 +146,18 @@ class TestContainer:
         assert provider.kind == kind
         assert issubclass(provider.interface, Event)
 
-    def test_create_provider_with_interface(self, container: Container) -> None:
+    def test_register_provider_with_interface(self, container: Container) -> None:
         provider = container._register_provider(lambda: "hello", "singleton", str)
 
         assert provider.interface is str
 
-    def test_create_provider_with_none(self, container: Container) -> None:
+    def test_register_provider_with_none(self, container: Container) -> None:
         with pytest.raises(
             TypeError, match="Missing `(.*?)` provider return annotation."
         ):
             container._register_provider(lambda: "hello", "singleton", None)
 
-    def test_create_provider_provider_without_return_annotation(
+    def test_register_provider_provider_without_return_annotation(
         self, container: Container
     ) -> None:
         def provide_message():  # type: ignore[no-untyped-def]
@@ -168,7 +168,7 @@ class TestContainer:
         ):
             container._register_provider(provide_message, "singleton")
 
-    def test_create_provider_not_callable(self, container: Container) -> None:
+    def test_register_provider_not_callable(self, container: Container) -> None:
         with pytest.raises(
             TypeError,
             match=(
@@ -178,7 +178,7 @@ class TestContainer:
         ):
             container._register_provider("Test", "singleton")  # type: ignore[arg-type]
 
-    def test_create_provider_iterator_no_arg_not_allowed(
+    def test_register_provider_iterator_no_arg_not_allowed(
         self, container: Container
     ) -> None:
         with pytest.raises(
@@ -190,7 +190,7 @@ class TestContainer:
         ):
             container._register_provider(iterator, "singleton")
 
-    def test_create_provider_unsupported_scope(self, container: Container) -> None:
+    def test_register_provider_unsupported_scope(self, container: Container) -> None:
         with pytest.raises(
             ValueError,
             match=(
@@ -201,7 +201,7 @@ class TestContainer:
         ):
             container._register_provider(generator, "other")  # type: ignore[arg-type]
 
-    def test_create_provider_transient_resource_not_allowed(
+    def test_register_provider_transient_resource_not_allowed(
         self, container: Container
     ) -> None:
         with pytest.raises(
@@ -213,7 +213,7 @@ class TestContainer:
         ):
             container._register_provider(generator, "transient")
 
-    def test_create_provider_without_annotation(self, container: Container) -> None:
+    def test_register_provider_without_annotation(self, container: Container) -> None:
         def service_ident() -> str:
             return "10000"
 
@@ -225,7 +225,7 @@ class TestContainer:
         ):
             container._register_provider(service, "singleton")
 
-    def test_create_provider_positional_only_parameter_not_allowed(
+    def test_register_provider_positional_only_parameter_not_allowed(
         self, container: Container
     ) -> None:
         def provider_message(a: int, /, b: str) -> str:
@@ -712,17 +712,16 @@ class TestContainer:
 
     def test_resolve_singleton_scoped_thread_safe(self, container: Container) -> None:
         @container.provider(scope="singleton")
-        def provide_service() -> Service:
-            time.sleep(0.1)
-            return Service(ident="test")
+        def provide_unique_id() -> UniqueId:
+            return UniqueId()
 
-        service_ids = set()
+        unique_ids = set()
 
-        def use_service() -> None:
-            service = container.resolve(Service)
-            service_ids.add(id(service))
+        def use_unique_id() -> None:
+            unique_id = container.resolve(UniqueId)
+            unique_ids.add(unique_id)
 
-        threads = [threading.Thread(target=use_service) for _ in range(5)]
+        threads = [threading.Thread(target=use_unique_id) for _ in range(10)]
 
         for thread in threads:
             thread.start()
@@ -730,7 +729,7 @@ class TestContainer:
         for thread in threads:
             thread.join()
 
-        assert len(service_ids) == 1
+        assert len(unique_ids) == 1
 
     async def test_resolve_singleton_async_resource(self, container: Container) -> None:
         instance = "test"
@@ -812,21 +811,37 @@ class TestContainer:
         self, container: Container
     ) -> None:
         @container.provider(scope="singleton")
-        async def provide_service() -> Service:
-            await asyncio.sleep(0.1)
-            return Service(ident="test")
+        async def provide_unique_id() -> UniqueId:
+            return UniqueId()
 
-        service_ids = set()
+        unique_ids = set()
 
         async def use_service() -> None:
-            service = await container.aresolve(Service)
-            service_ids.add(id(service))
+            unique_id = await container.aresolve(UniqueId)
+            unique_ids.add(unique_id)
 
-        tasks = [use_service() for _ in range(5)]
+        tasks = [use_service() for _ in range(10)]
 
         await asyncio.gather(*tasks)
 
-        assert len(service_ids) == 1
+        assert len(unique_ids) == 1
+
+    async def test_resolve_scoped_coro_safe(self, container: Container) -> None:
+        @container.provider(scope="request")
+        async def provide_unique_id() -> UniqueId:
+            return UniqueId()
+
+        unique_ids = set()
+
+        async def use_unique_id() -> None:
+            async with container.arequest_context():
+                unique_id = await container.aresolve(UniqueId)
+                unique_ids.add(unique_id)
+
+        tasks = [use_unique_id() for _ in range(10)]
+        await asyncio.gather(*tasks)
+
+        assert len(unique_ids) == 10
 
     def test_resolve_request_scoped(self, container: Container) -> None:
         instance = "test"
@@ -915,6 +930,28 @@ class TestContainer:
             container.request_context(),
         ):
             container.resolve(str)
+
+    def test_resolve_scoped_thread_safe(self, container: Container) -> None:
+        @container.provider(scope="request")
+        def provide_unique_id() -> UniqueId:
+            return UniqueId()
+
+        unique_ids = set()
+
+        def use_unique_id() -> None:
+            with container.request_context():
+                unique_id = container.resolve(UniqueId)
+                unique_ids.add(unique_id)
+
+        threads = [threading.Thread(target=use_unique_id) for n in range(10)]
+
+        for thread in threads:
+            thread.start()
+
+        for thread in threads:
+            thread.join()
+
+        assert len(unique_ids) == 10
 
     def test_resolve_transient_scoped(self, container: Container) -> None:
         container.register(uuid.UUID, uuid.uuid4, scope="transient")
@@ -1483,7 +1520,7 @@ class TestContainer:
 
         provider = container.register(Service, service, scope="singleton")
 
-        context = container._get_scoped_context("singleton")
+        context = container._get_instance_context("singleton")
 
         kwargs = container._get_provided_kwargs(provider, context)
 
@@ -1507,7 +1544,7 @@ class TestContainer:
 
         provider = container.register(Service, service, scope="singleton")
 
-        context = container._get_scoped_context("singleton")
+        context = container._get_instance_context("singleton")
 
         kwargs = await container._aget_provided_kwargs(provider, context)
 
