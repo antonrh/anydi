@@ -8,7 +8,6 @@ import importlib
 import inspect
 import logging
 import pkgutil
-import threading
 import types
 import uuid
 from collections import defaultdict
@@ -36,7 +35,6 @@ from ._types import (
     is_marker,
 )
 from ._utils import (
-    AsyncRLock,
     get_full_qualname,
     get_typed_annotation,
     get_typed_parameters,
@@ -103,8 +101,6 @@ class Container:
         self._logger = logger or logging.getLogger(__name__)
         self._resources: dict[str, list[type[Any]]] = defaultdict(list)
         self._singleton_context = InstanceContext()
-        self._singleton_lock = threading.RLock()
-        self._singleton_async_lock = AsyncRLock()
         self._scoped_context: dict[str, ContextVar[InstanceContext]] = {}
         self._override_instances: dict[type[Any], Any] = {}
         self._unresolved_interfaces: set[type[Any]] = set()
@@ -361,8 +357,9 @@ class Container:
                 interface = signature.return_annotation
                 if interface is inspect.Signature.empty:
                     interface = None
-                else:
-                    interface = get_typed_annotation(interface, globalns, module)
+
+        if isinstance(interface, str):
+            interface = get_typed_annotation(interface, globalns, module)
 
         # If the callable is an iterator, return the actual type
         if is_iterator_type(interface) or is_iterator_type(get_origin(interface)):
@@ -610,14 +607,7 @@ class Container:
             instance = self._create_instance(provider, None, **defaults)
         else:
             context = self._get_instance_context(provider.scope)
-            if provider.scope == "singleton":
-                with self._singleton_lock:
-                    instance = (
-                        self._get_or_create_instance(provider, context)
-                        if not create
-                        else self._create_instance(provider, context, **defaults)
-                    )
-            else:
+            with context.lock():
                 instance = (
                     self._get_or_create_instance(provider, context)
                     if not create
@@ -638,14 +628,7 @@ class Container:
             instance = await self._acreate_instance(provider, None, **defaults)
         else:
             context = self._get_instance_context(provider.scope)
-            if provider.scope == "singleton":
-                async with self._singleton_async_lock:
-                    instance = (
-                        await self._aget_or_create_instance(provider, context)
-                        if not create
-                        else await self._acreate_instance(provider, context, **defaults)
-                    )
-            else:
+            async with context.alock():
                 instance = (
                     await self._aget_or_create_instance(provider, context)
                     if not create

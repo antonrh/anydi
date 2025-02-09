@@ -2,7 +2,6 @@ import asyncio
 import logging
 import sys
 import threading
-import time
 import uuid
 from collections.abc import AsyncIterator, Iterator, Sequence
 from dataclasses import dataclass, field
@@ -36,6 +35,7 @@ from tests.fixtures import (
     Resource,
     Service,
     TestModule,
+    UniqueId,
     async_event,
     async_generator,
     coro,
@@ -90,7 +90,7 @@ class TestContainer:
             (coro, ProviderKind.COROUTINE, str),
         ],
     )
-    def test_create_provider(
+    def test_register_provider_different_kind(
         self,
         container: Container,
         call: Callable[..., Any],
@@ -118,7 +118,7 @@ class TestContainer:
             ('Annotated[str, "name"]', Annotated[str, "name"]),
         ],
     )
-    def test_create_provider_interface(
+    def test_register_provider_interface(
         self, container: Container, annotation: type[Any], expected: type[Any]
     ) -> None:
         def call() -> annotation:  # type: ignore[valid-type]
@@ -135,7 +135,7 @@ class TestContainer:
             (async_event, ProviderKind.ASYNC_GENERATOR),
         ],
     )
-    def test_create_provider_event(
+    def test_register_provider_event(
         self,
         container: Container,
         call: Callable[..., Any],
@@ -146,18 +146,18 @@ class TestContainer:
         assert provider.kind == kind
         assert issubclass(provider.interface, Event)
 
-    def test_create_provider_with_interface(self, container: Container) -> None:
+    def test_register_provider_with_interface(self, container: Container) -> None:
         provider = container._register_provider(lambda: "hello", "singleton", str)
 
         assert provider.interface is str
 
-    def test_create_provider_with_none(self, container: Container) -> None:
+    def test_register_provider_with_none(self, container: Container) -> None:
         with pytest.raises(
             TypeError, match="Missing `(.*?)` provider return annotation."
         ):
             container._register_provider(lambda: "hello", "singleton", None)
 
-    def test_create_provider_provider_without_return_annotation(
+    def test_register_provider_provider_without_return_annotation(
         self, container: Container
     ) -> None:
         def provide_message():  # type: ignore[no-untyped-def]
@@ -168,7 +168,7 @@ class TestContainer:
         ):
             container._register_provider(provide_message, "singleton")
 
-    def test_create_provider_not_callable(self, container: Container) -> None:
+    def test_register_provider_not_callable(self, container: Container) -> None:
         with pytest.raises(
             TypeError,
             match=(
@@ -178,7 +178,7 @@ class TestContainer:
         ):
             container._register_provider("Test", "singleton")  # type: ignore[arg-type]
 
-    def test_create_provider_iterator_no_arg_not_allowed(
+    def test_register_provider_iterator_no_arg_not_allowed(
         self, container: Container
     ) -> None:
         with pytest.raises(
@@ -190,7 +190,7 @@ class TestContainer:
         ):
             container._register_provider(iterator, "singleton")
 
-    def test_create_provider_unsupported_scope(self, container: Container) -> None:
+    def test_register_provider_unsupported_scope(self, container: Container) -> None:
         with pytest.raises(
             ValueError,
             match=(
@@ -201,7 +201,7 @@ class TestContainer:
         ):
             container._register_provider(generator, "other")  # type: ignore[arg-type]
 
-    def test_create_provider_transient_resource_not_allowed(
+    def test_register_provider_transient_resource_not_allowed(
         self, container: Container
     ) -> None:
         with pytest.raises(
@@ -213,7 +213,7 @@ class TestContainer:
         ):
             container._register_provider(generator, "transient")
 
-    def test_create_provider_without_annotation(self, container: Container) -> None:
+    def test_register_provider_without_annotation(self, container: Container) -> None:
         def service_ident() -> str:
             return "10000"
 
@@ -225,7 +225,7 @@ class TestContainer:
         ):
             container._register_provider(service, "singleton")
 
-    def test_create_provider_positional_only_parameter_not_allowed(
+    def test_register_provider_positional_only_parameter_not_allowed(
         self, container: Container
     ) -> None:
         def provider_message(a: int, /, b: str) -> str:
@@ -712,17 +712,16 @@ class TestContainer:
 
     def test_resolve_singleton_scoped_thread_safe(self, container: Container) -> None:
         @container.provider(scope="singleton")
-        def provide_service() -> Service:
-            time.sleep(0.1)
-            return Service(ident="test")
+        def provide_unique_id() -> UniqueId:
+            return UniqueId()
 
-        service_ids = set()
+        unique_ids = set()
 
-        def use_service() -> None:
-            service = container.resolve(Service)
-            service_ids.add(id(service))
+        def use_unique_id() -> None:
+            unique_id = container.resolve(UniqueId)
+            unique_ids.add(unique_id)
 
-        threads = [threading.Thread(target=use_service) for _ in range(5)]
+        threads = [threading.Thread(target=use_unique_id) for _ in range(10)]
 
         for thread in threads:
             thread.start()
@@ -730,7 +729,7 @@ class TestContainer:
         for thread in threads:
             thread.join()
 
-        assert len(service_ids) == 1
+        assert len(unique_ids) == 1
 
     async def test_resolve_singleton_async_resource(self, container: Container) -> None:
         instance = "test"
@@ -812,21 +811,37 @@ class TestContainer:
         self, container: Container
     ) -> None:
         @container.provider(scope="singleton")
-        async def provide_service() -> Service:
-            await asyncio.sleep(0.1)
-            return Service(ident="test")
+        async def provide_unique_id() -> UniqueId:
+            return UniqueId()
 
-        service_ids = set()
+        unique_ids = set()
 
         async def use_service() -> None:
-            service = await container.aresolve(Service)
-            service_ids.add(id(service))
+            unique_id = await container.aresolve(UniqueId)
+            unique_ids.add(unique_id)
 
-        tasks = [use_service() for _ in range(5)]
+        tasks = [use_service() for _ in range(10)]
 
         await asyncio.gather(*tasks)
 
-        assert len(service_ids) == 1
+        assert len(unique_ids) == 1
+
+    async def test_resolve_scoped_coro_safe(self, container: Container) -> None:
+        @container.provider(scope="request")
+        async def provide_unique_id() -> UniqueId:
+            return UniqueId()
+
+        unique_ids = set()
+
+        async def use_unique_id() -> None:
+            async with container.arequest_context():
+                unique_id = await container.aresolve(UniqueId)
+                unique_ids.add(unique_id)
+
+        tasks = [use_unique_id() for _ in range(10)]
+        await asyncio.gather(*tasks)
+
+        assert len(unique_ids) == 10
 
     def test_resolve_request_scoped(self, container: Container) -> None:
         instance = "test"
@@ -915,6 +930,28 @@ class TestContainer:
             container.request_context(),
         ):
             container.resolve(str)
+
+    def test_resolve_scoped_thread_safe(self, container: Container) -> None:
+        @container.provider(scope="request")
+        def provide_unique_id() -> UniqueId:
+            return UniqueId()
+
+        unique_ids = set()
+
+        def use_unique_id() -> None:
+            with container.request_context():
+                unique_id = container.resolve(UniqueId)
+                unique_ids.add(unique_id)
+
+        threads = [threading.Thread(target=use_unique_id) for n in range(10)]
+
+        for thread in threads:
+            thread.start()
+
+        for thread in threads:
+            thread.join()
+
+        assert len(unique_ids) == 10
 
     def test_resolve_transient_scoped(self, container: Container) -> None:
         container.register(uuid.UUID, uuid.uuid4, scope="transient")
@@ -1209,206 +1246,6 @@ class TestContainer:
         container.release(str)
 
         assert not container.is_resolved(str)
-
-    def test_override_instance(self) -> None:
-        origin_name = "origin"
-        overridden_name = "overridden"
-
-        container = Container(testing=True)
-
-        @container.provider(scope="singleton")
-        def name() -> str:
-            return origin_name
-
-        with container.override(str, overridden_name):
-            assert container.resolve(str) == overridden_name
-
-        assert container.resolve(str) == origin_name
-
-    def test_override_instance_provider_not_registered_using_strict_mode(self) -> None:
-        container = Container(strict=True, testing=True)
-
-        with pytest.raises(
-            LookupError, match="The provider interface `str` not registered."
-        ):
-            with container.override(str, "test"):
-                ...
-
-    def test_override_instance_transient_provider(self) -> None:
-        overridden_uuid = uuid.uuid4()
-
-        container = Container(testing=True)
-
-        @container.provider(scope="transient")
-        def uuid_provider() -> uuid.UUID:
-            return uuid.uuid4()
-
-        with container.override(uuid.UUID, overridden_uuid):
-            assert container.resolve(uuid.UUID) == overridden_uuid
-
-        assert container.resolve(uuid.UUID) != overridden_uuid
-
-    def test_override_instance_resource_provider(self) -> None:
-        origin = "origin"
-        overridden = "overridden"
-
-        container = Container(testing=True)
-
-        @container.provider(scope="singleton")
-        def message() -> Iterator[str]:
-            yield origin
-
-        with container.override(str, overridden):
-            assert container.resolve(str) == overridden
-
-        assert container.resolve(str) == origin
-
-    async def test_override_instance_async_resource_provider(self) -> None:
-        origin = "origin"
-        overridden = "overridden"
-
-        container = Container(testing=True)
-
-        @container.provider(scope="singleton")
-        async def message() -> AsyncIterator[str]:
-            yield origin
-
-        with container.override(str, overridden):
-            assert (await container.aresolve(str)) == overridden
-
-    def test_override_instance_testing(self) -> None:
-        container = Container(strict=False, testing=True)
-        container.register(Annotated[str, "param"], lambda: "param", scope="singleton")
-
-        class UserRepo:
-            def get_user(self) -> str:
-                return "user"
-
-        @dataclass
-        class UserService:
-            __scope__ = "singleton"
-
-            repo: UserRepo
-            param: Annotated[str, "param"]
-
-            def process(self) -> dict[str, str]:
-                return {
-                    "user": self.repo.get_user(),
-                    "param": self.param,
-                }
-
-        user_repo_mock = mock.MagicMock(spec=UserRepo)
-        user_repo_mock.get_user.return_value = "mocked_user"
-
-        user_service = container.resolve(UserService)
-
-        with (
-            container.override(UserRepo, user_repo_mock),
-            container.override(Annotated[str, "param"], "mock"),
-        ):
-            assert user_service.process() == {
-                "user": "mocked_user",
-                "param": "mock",
-            }
-
-    async def test_override_instance_testing_async_resolved(self) -> None:
-        container = Container(strict=False, testing=True)
-        container.register(Annotated[str, "param"], lambda: "param", scope="singleton")
-
-        @dataclass
-        class UserService:
-            __scope__ = "singleton"
-
-            param: Annotated[str, "param"]
-
-            def process(self) -> dict[str, str]:
-                return {
-                    "param": self.param,
-                }
-
-        user_service = await container.aresolve(UserService)
-
-        with container.override(Annotated[str, "param"], "mock"):
-            assert user_service.process() == {
-                "param": "mock",
-            }
-
-    def test_override_instance_testing_in_strict_mode(self) -> None:
-        container = Container(strict=True, testing=True)
-
-        @dataclass
-        class Settings:
-            name: str
-
-        @container.provider(scope="singleton")
-        def provide_settings() -> Settings:
-            return Settings(name="test")
-
-        @container.provider(scope="singleton")
-        def provide_service(settings: Settings) -> Service:
-            return Service(ident=settings.name)
-
-        service = container.resolve(Service)
-
-        assert service.ident == "test"
-
-    def test_override_instance_first_testing(self) -> None:
-        container = Container(strict=True, testing=True)
-
-        @dataclass
-        class Item:
-            name: str
-
-        @dataclass
-        class ItemRepository:
-            items: list[Item]
-
-            def all(self) -> list[Item]:
-                return self.items
-
-        @dataclass
-        class ItemService:
-            repo: ItemRepository
-
-            def get_items(self) -> list[Item]:
-                return self.repo.all()
-
-        @container.provider(scope="singleton")
-        def provide_repo() -> ItemRepository:
-            return ItemRepository(items=[])
-
-        @container.provider(scope="singleton")
-        def provide_service(repo: ItemRepository) -> ItemService:
-            return ItemService(repo=repo)
-
-        @container.inject
-        def handler(service: ItemService = auto) -> list[Item]:
-            return service.get_items()
-
-        repo_mock = mock.MagicMock(spec=ItemRepository)
-        repo_mock.all.return_value = [Item(name="mocked")]
-
-        with container.override(ItemRepository, repo_mock):
-            items = handler()
-
-            assert items == [Item(name="mocked")]
-
-        service = container.resolve(ItemService)
-
-        assert service.get_items() == []
-
-    def test_override_prop(self) -> None:
-        @dataclass
-        class ServiceWithProp:
-            name: str = "origin"
-            items: list[str] = field(default_factory=list)
-
-        container = Container(testing=True)
-
-        service = container.resolve(ServiceWithProp)
-
-        assert service.name == "origin"
-        assert service.items == []
 
     def test_resource_delegated_exception(self, container: Container) -> None:
         resource = Resource()
@@ -1798,6 +1635,208 @@ class TestContainerInjector:
         _ = container.run(handler)
 
         assert handler in container._inject_cache
+
+
+class TestContainerTestingMode:
+    def test_override_instance(self) -> None:
+        origin_name = "origin"
+        overridden_name = "overridden"
+
+        container = Container(testing=True)
+
+        @container.provider(scope="singleton")
+        def name() -> str:
+            return origin_name
+
+        with container.override(str, overridden_name):
+            assert container.resolve(str) == overridden_name
+
+        assert container.resolve(str) == origin_name
+
+    def test_override_instance_provider_not_registered_using_strict_mode(self) -> None:
+        container = Container(strict=True, testing=True)
+
+        with pytest.raises(
+            LookupError, match="The provider interface `str` not registered."
+        ):
+            with container.override(str, "test"):
+                pass
+
+    def test_override_instance_transient_provider(self) -> None:
+        overridden_uuid = uuid.uuid4()
+
+        container = Container(testing=True)
+
+        @container.provider(scope="transient")
+        def uuid_provider() -> uuid.UUID:
+            return uuid.uuid4()
+
+        with container.override(uuid.UUID, overridden_uuid):
+            assert container.resolve(uuid.UUID) == overridden_uuid
+
+        assert container.resolve(uuid.UUID) != overridden_uuid
+
+    def test_override_instance_resource_provider(self) -> None:
+        origin = "origin"
+        overridden = "overridden"
+
+        container = Container(testing=True)
+
+        @container.provider(scope="singleton")
+        def message() -> Iterator[str]:
+            yield origin
+
+        with container.override(str, overridden):
+            assert container.resolve(str) == overridden
+
+        assert container.resolve(str) == origin
+
+    async def test_override_instance_async_resource_provider(self) -> None:
+        origin = "origin"
+        overridden = "overridden"
+
+        container = Container(testing=True)
+
+        @container.provider(scope="singleton")
+        async def message() -> AsyncIterator[str]:
+            yield origin
+
+        with container.override(str, overridden):
+            assert (await container.aresolve(str)) == overridden
+
+    def test_override_instance_testing(self) -> None:
+        container = Container(strict=False, testing=True)
+        container.register(Annotated[str, "param"], lambda: "param", scope="singleton")
+
+        class UserRepo:
+            def get_user(self) -> str:
+                return "user"
+
+        @dataclass
+        class UserService:
+            __scope__ = "singleton"
+
+            repo: UserRepo
+            param: Annotated[str, "param"]
+
+            def process(self) -> dict[str, str]:
+                return {
+                    "user": self.repo.get_user(),
+                    "param": self.param,
+                }
+
+        user_repo_mock = mock.MagicMock(spec=UserRepo)
+        user_repo_mock.get_user.return_value = "mocked_user"
+
+        user_service = container.resolve(UserService)
+
+        with (
+            container.override(UserRepo, user_repo_mock),
+            container.override(Annotated[str, "param"], "mock"),
+        ):
+            assert user_service.process() == {
+                "user": "mocked_user",
+                "param": "mock",
+            }
+
+    async def test_override_instance_testing_async_resolved(self) -> None:
+        container = Container(strict=False, testing=True)
+        container.register(Annotated[str, "param"], lambda: "param", scope="singleton")
+
+        @dataclass
+        class UserService:
+            __scope__ = "singleton"
+
+            param: Annotated[str, "param"]
+
+            def process(self) -> dict[str, str]:
+                return {
+                    "param": self.param,
+                }
+
+        user_service = await container.aresolve(UserService)
+
+        with container.override(Annotated[str, "param"], "mock"):
+            assert user_service.process() == {
+                "param": "mock",
+            }
+
+    def test_override_instance_testing_in_strict_mode(self) -> None:
+        container = Container(strict=True, testing=True)
+
+        @dataclass
+        class Settings:
+            name: str
+
+        @container.provider(scope="singleton")
+        def provide_settings() -> Settings:
+            return Settings(name="test")
+
+        @container.provider(scope="singleton")
+        def provide_service(settings: Settings) -> Service:
+            return Service(ident=settings.name)
+
+        service = container.resolve(Service)
+
+        assert service.ident == "test"
+
+    def test_override_instance_first_testing(self) -> None:
+        container = Container(strict=True, testing=True)
+
+        @dataclass
+        class Item:
+            name: str
+
+        @dataclass
+        class ItemRepository:
+            items: list[Item]
+
+            def all(self) -> list[Item]:
+                return self.items
+
+        @dataclass
+        class ItemService:
+            repo: ItemRepository
+
+            def get_items(self) -> list[Item]:
+                return self.repo.all()
+
+        @container.provider(scope="singleton")
+        def provide_repo() -> ItemRepository:
+            return ItemRepository(items=[])
+
+        @container.provider(scope="singleton")
+        def provide_service(repo: ItemRepository) -> ItemService:
+            return ItemService(repo=repo)
+
+        @container.inject
+        def handler(service: ItemService = auto) -> list[Item]:
+            return service.get_items()
+
+        repo_mock = mock.MagicMock(spec=ItemRepository)
+        repo_mock.all.return_value = [Item(name="mocked")]
+
+        with container.override(ItemRepository, repo_mock):
+            items = handler()
+
+            assert items == [Item(name="mocked")]
+
+        service = container.resolve(ItemService)
+
+        assert service.get_items() == []
+
+    def test_override_prop(self) -> None:
+        @dataclass
+        class ServiceWithProp:
+            name: str = "origin"
+            items: list[str] = field(default_factory=list)
+
+        container = Container(testing=True)
+
+        service = container.resolve(ServiceWithProp)
+
+        assert service.name == "origin"
+        assert service.items == []
 
 
 class TestContainerModule:
