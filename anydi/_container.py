@@ -828,8 +828,10 @@ class Container:
                 "not registered."
             )
         self._override_instances[interface] = instance
-        yield
-        del self._override_instances[interface]
+        try:
+            yield
+        finally:
+            self._override_instances.pop(interface, None)
 
     ############################
     # Testing Methods
