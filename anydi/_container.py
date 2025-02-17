@@ -867,7 +867,7 @@ class Container:
 
             def __getattribute__(_self: Any, name: str) -> Any:
                 # Skip the resolver getter
-                if name in {"__resolver_getter__"}:
+                if name in {"__resolver_getter__", "__class__"}:
                     return object.__getattribute__(_self, name)
 
                 if hasattr(_self, "__resolver_getter__"):
