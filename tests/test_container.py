@@ -199,7 +199,7 @@ class TestContainer:
                 "Please use one of the supported scopes when registering a provider."
             ),
         ):
-            container._register_provider(generator, "other")  # type: ignore[arg-type]
+            container._register_provider(generator, "other")
 
     def test_register_provider_transient_resource_not_allowed(
         self, container: Container

@@ -30,7 +30,7 @@ from ._types import (
     ProviderDecoratorArgs,
     ProviderKind,
     ScannedDependency,
-    Scope,
+    ScopeOrStr,
     is_event_type,
     is_marker,
 )
@@ -50,12 +50,6 @@ from ._utils import (
 T = TypeVar("T", bound=Any)
 M = TypeVar("M", bound="Module")
 P = ParamSpec("P")
-
-ALLOWED_SCOPES: dict[Scope, list[Scope]] = {
-    "singleton": ["singleton"],
-    "request": ["request", "singleton"],
-    "transient": ["transient", "request", "singleton"],
-}
 
 
 class ModuleMeta(type):
@@ -90,7 +84,7 @@ class Container:
         modules: Sequence[Module | type[Module] | Callable[[Container], None] | str]
         | None = None,
         strict: bool = False,
-        default_scope: Scope = "transient",
+        default_scope: ScopeOrStr = "transient",
         testing: bool = False,
         logger: logging.Logger | None = None,
     ) -> None:
@@ -100,13 +94,18 @@ class Container:
         self._testing = testing
         self._logger = logger or logging.getLogger(__name__)
         self._resources: dict[str, list[type[Any]]] = defaultdict(list)
+        self._scopes: dict[str, Sequence[str]] = {
+            "transient": ("transient", "singleton"),
+            "singleton": ("singleton",),
+        }
         self._singleton_context = InstanceContext()
-        self._request_context_var: ContextVar[InstanceContext | None] = ContextVar(
-            "request_context", default=None
-        )
+        self._scoped_context: dict[str, ContextVar[InstanceContext]] = {}
         self._override_instances: dict[type[Any], Any] = {}
         self._unresolved_interfaces: set[type[Any]] = set()
         self._inject_cache: dict[Callable[..., Any], Callable[..., Any]] = {}
+
+        # Register default scopes
+        self.register_scope("request", parents=["singleton"])
 
         # Register providers
         providers = providers or []
@@ -132,7 +131,7 @@ class Container:
         return self._strict
 
     @property
-    def default_scope(self) -> Scope:
+    def default_scope(self) -> ScopeOrStr:
         """Get the default scope."""
         return self._default_scope
 
@@ -203,54 +202,99 @@ class Container:
         await self._singleton_context.aclose()
 
     @contextlib.contextmanager
-    def request_context(self) -> Iterator[InstanceContext]:
-        """Obtain a context manager for the request-scoped context."""
+    def scoped_context(self, scope: ScopeOrStr) -> Iterator[InstanceContext]:
+        """Obtain a context manager for the specified scoped context."""
         context = InstanceContext()
-
-        token = self._request_context_var.set(context)
+        scoped_context_var = self._get_scoped_context_var(scope)
+        token = scoped_context_var.set(context)
 
         # Resolve all request resources
-        for interface in self._resources.get("request", []):
+        for interface in self._resources.get(scope, []):
             if not is_event_type(interface):
                 continue
             self.resolve(interface)
 
         with context:
             yield context
-            self._request_context_var.reset(token)
+            scoped_context_var.reset(token)
 
     @contextlib.asynccontextmanager
-    async def arequest_context(self) -> AsyncIterator[InstanceContext]:
-        """Obtain an async context manager for the request-scoped context."""
+    async def ascoped_context(self, scope: str) -> AsyncIterator[InstanceContext]:
+        """Obtain a context manager for the specified scoped context."""
         context = InstanceContext()
+        scoped_context_var = self._get_scoped_context_var(scope)
+        token = scoped_context_var.set(context)
 
-        token = self._request_context_var.set(context)
-
-        for interface in self._resources.get("request", []):
+        # Resolve all request resources
+        for interface in self._resources.get(scope, []):
             if not is_event_type(interface):
                 continue
             await self.aresolve(interface)
 
         async with context:
             yield context
-            self._request_context_var.reset(token)
+            scoped_context_var.reset(token)
 
-    def _get_request_context(self) -> InstanceContext:
-        """Get the current request context."""
-        request_context = self._request_context_var.get()
-        if request_context is None:
+    @contextlib.contextmanager
+    def request_context(self) -> Iterator[InstanceContext]:
+        """Obtain a context manager for the request-scoped context."""
+        with self.scoped_context("request") as context:
+            yield context
+
+    @contextlib.asynccontextmanager
+    async def arequest_context(self) -> AsyncIterator[InstanceContext]:
+        """Obtain an async context manager for the request-scoped context."""
+        async with self.ascoped_context("request") as context:
+            yield context
+
+    def _get_scoped_context(self, scope: str) -> InstanceContext:
+        scoped_context_var = self._get_scoped_context_var(scope)
+        try:
+            scoped_context = scoped_context_var.get()
+        except LookupError as exc:
             raise LookupError(
-                "The request context has not been started. Please ensure that "
-                "the request context is properly initialized before attempting "
+                f"The {scope} context has not been started. Please ensure that "
+                f"the {scope} context is properly initialized before attempting "
                 "to use it."
-            )
-        return request_context
+            ) from exc
+        return scoped_context
 
-    def _get_instance_context(self, scope: Scope) -> InstanceContext:
+    def _get_scoped_context_var(self, scope: str) -> ContextVar[InstanceContext]:
+        """Get the context variable for the specified scope."""
+        if scope not in self._scoped_context:
+            self._scoped_context[scope] = ContextVar(f"{scope}_context")
+        return self._scoped_context[scope]
+
+    def _get_instance_context(self, scope: ScopeOrStr) -> InstanceContext:
         """Get the instance context for the specified scope."""
         if scope == "singleton":
             return self._singleton_context
-        return self._get_request_context()
+        return self._get_scoped_context(scope)
+
+    ############################
+    # Scope Methods
+    ############################
+
+    def register_scope(self, scope: str, *, parents: Sequence[str] | None = None) -> None:
+        """Register a new scope with the specified parents."""
+        # Check if the scope is reserved
+        if scope in ("transient", "singleton"):
+            raise ValueError(
+                f"The scope `{scope}` is reserved and cannot be overridden."
+            )
+
+        # Check if the scope is already registered
+        if scope in self._scopes:
+            raise ValueError(f"The scope `{scope}` is already registered.")
+
+        # Validate parents
+        parents = parents or []
+        for parent in parents:
+            if parent not in self._scopes:
+                raise ValueError(f"The parent scope `{parent}` is not registered.")
+
+        # Register the scope
+        self._scopes[scope] = {scope, "singleton"} | set(parents)
 
     ############################
     # Provider Methods
@@ -261,7 +305,7 @@ class Container:
         interface: AnyInterface,
         call: Callable[..., Any],
         *,
-        scope: Scope,
+        scope: ScopeOrStr,
         override: bool = False,
     ) -> Provider:
         """Register a provider for the specified interface."""
@@ -294,7 +338,7 @@ class Container:
         self._delete_provider(provider)
 
     def provider(
-        self, *, scope: Scope, override: bool = False
+        self, *, scope: ScopeOrStr, override: bool = False
     ) -> Callable[[Callable[P, T]], Callable[P, T]]:
         """Decorator to register a provider function with the specified scope."""
 
@@ -307,7 +351,7 @@ class Container:
     def _register_provider(  # noqa: C901
         self,
         call: Callable[..., Any],
-        scope: Scope | None,
+        scope: ScopeOrStr | None,
         interface: Any = NOT_SET,
         override: bool = False,
         /,
@@ -403,6 +447,7 @@ class Container:
         if detected_scope is None:
             if "transient" in scopes:
                 detected_scope = "transient"
+            # TODO: include other scopes
             elif "request" in scopes:
                 detected_scope = "request"
             elif "singleton" in scopes:
@@ -428,13 +473,15 @@ class Container:
                 ) from None
 
         # Check scope compatibility
-        for sub_provider in scopes.values():
-            if sub_provider.scope not in ALLOWED_SCOPES.get(detected_scope, []):
-                raise ValueError(
-                    f"The provider `{name}` with a `{detected_scope}` scope cannot "
-                    f"depend on `{sub_provider}` with a `{sub_provider.scope}` scope. "
-                    "Please ensure all providers are registered with matching scopes."
-                )
+        if detected_scope != "transient":
+            for sub_provider in scopes.values():
+                if sub_provider.scope not in self._scopes.get(detected_scope, []):
+                    raise ValueError(
+                        f"The provider `{name}` with a `{detected_scope}` scope cannot "
+                        f"depend on `{sub_provider}` with a `{sub_provider.scope}` "
+                        "scope. Please ensure all providers are registered with "
+                        "matching scopes."
+                    )
 
         provider = Provider(
             call=call,
@@ -449,13 +496,13 @@ class Container:
         return provider
 
     def _validate_provider_scope(
-        self, scope: Scope, name: str, kind: ProviderKind
+        self, scope: ScopeOrStr, name: str, kind: ProviderKind
     ) -> None:
         """Validate the provider scope."""
-        if scope not in (allowed_scopes := get_args(Scope)):
+        if scope not in self._scopes:
             raise ValueError(
                 f"The provider `{name}` scope is invalid. Only the following "
-                f"scopes are supported: {', '.join(allowed_scopes)}. "
+                f"scopes are supported: {', '.join(self._scopes.keys())}. "
                 "Please use one of the supported scopes when registering a provider."
             )
         if scope == "transient" and ProviderKind.is_resource(kind):
@@ -476,7 +523,11 @@ class Container:
             ) from exc
 
     def _get_or_register_provider(
-        self, interface: AnyInterface, parent_scope: Scope | None, /, **defaults: Any
+        self,
+        interface: AnyInterface,
+        parent_scope: ScopeOrStr | None,
+        /,
+        **defaults: Any,
     ) -> Provider:
         """Get or register a provider by interface."""
         try:
@@ -1134,7 +1185,7 @@ def singleton(target: T) -> T:
 
 
 def provider(
-    *, scope: Scope, override: bool = False
+    *, scope: ScopeOrStr, override: bool = False
 ) -> Callable[[Callable[Concatenate[M, P], T]], Callable[Concatenate[M, P], T]]:
     """Decorator for marking a function or method as a provider in a AnyDI module."""
 

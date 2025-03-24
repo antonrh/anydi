@@ -12,6 +12,7 @@ import wrapt
 from typing_extensions import Literal, Self, TypeAlias
 
 Scope = Literal["transient", "singleton", "request"]
+ScopeOrStr = Union[Scope, str]
 
 AnyInterface: TypeAlias = Union[type[Any], Annotated[Any, ...]]
 
@@ -90,7 +91,7 @@ class ProviderKind(enum.IntEnum):
 @dataclass(kw_only=True, frozen=True)
 class Provider:
     call: Callable[..., Any]
-    scope: Scope
+    scope: ScopeOrStr
     interface: Any
     name: str
     parameters: list[inspect.Parameter]
@@ -126,12 +127,12 @@ class Provider:
 
 class ProviderArgs(NamedTuple):
     call: Callable[..., Any]
-    scope: Scope
+    scope: ScopeOrStr
     interface: Any = NOT_SET
 
 
 class ProviderDecoratorArgs(NamedTuple):
-    scope: Scope
+    scope: ScopeOrStr
     override: bool
 
 
