@@ -16,17 +16,17 @@ class InstanceContext:
     __slots__ = ("_instances", "_stack", "_async_stack", "_lock", "_async_lock")
 
     def __init__(self) -> None:
-        self._instances: dict[type[Any], Any] = {}
+        self._instances: dict[Any, Any] = {}
         self._stack = contextlib.ExitStack()
         self._async_stack = contextlib.AsyncExitStack()
         self._lock = threading.RLock()
         self._async_lock = AsyncRLock()
 
-    def get(self, interface: type[Any]) -> Any | None:
+    def get(self, interface: Any) -> Any | None:
         """Get an instance from the context."""
         return self._instances.get(interface)
 
-    def set(self, interface: type[Any], value: Any) -> None:
+    def set(self, interface: Any, value: Any) -> None:
         """Set an instance in the context."""
         self._instances[interface] = value
 
@@ -38,16 +38,16 @@ class InstanceContext:
         """Enter the context asynchronously."""
         return await self._async_stack.enter_async_context(cm)
 
-    def __setitem__(self, interface: type[Any], value: Any) -> None:
+    def __setitem__(self, interface: Any, value: Any) -> None:
         self._instances[interface] = value
 
-    def __getitem__(self, interface: type[Any]) -> Any:
+    def __getitem__(self, interface: Any) -> Any:
         return self._instances[interface]
 
-    def __contains__(self, interface: type[Any]) -> bool:
+    def __contains__(self, interface: Any) -> bool:
         return interface in self._instances
 
-    def __delitem__(self, interface: type[Any]) -> None:
+    def __delitem__(self, interface: Any) -> None:
         self._instances.pop(interface, None)
 
     def __enter__(self) -> Self:
@@ -78,9 +78,9 @@ class InstanceContext:
         exc_tb: TracebackType | None,
     ) -> bool:
         """Exit the context asynchronously."""
-        return await run_async(
-            self.__exit__, exc_type, exc_val, exc_tb
-        ) or await self._async_stack.__aexit__(exc_type, exc_val, exc_tb)
+        sync_exit = await run_async(self.__exit__, exc_type, exc_val, exc_tb)
+        async_exit = await self._async_stack.__aexit__(exc_type, exc_val, exc_tb)
+        return bool(sync_exit) or bool(async_exit)
 
     async def aclose(self) -> None:
         """Close the scoped context asynchronously."""

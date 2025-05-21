@@ -64,6 +64,7 @@ dev = [
     "redis>=5.0.4,<6",
     "pydantic-settings>=2.4.0,<3",
     "bump-my-version>=0.31.1",
+    "pyright>=1.1.401",
 ]
 docs = [
     "mkdocs>=1.4.2,<2",
@@ -93,15 +94,19 @@ forced-separate = ["tests", "app"]
 [tool.ruff.lint.pydocstyle]
 convention = "google"
 
+[tool.pyright]
+include = [
+    "anydi/**/*.py",
+    "tests/**/*.py",
+]
+strict = [
+    "anydi/*.py",
+]
+typeCheckingMode = "standard"
+
 [tool.mypy]
 strict = true
-
-[[tool.mypy.overrides]]
-module = [
-    "django.*",
-    "wrapt.*",
-]
-ignore_missing_imports = true
+warn_unused_ignores = false
 
 [[tool.mypy.overrides]]
 module = [

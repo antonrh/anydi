@@ -8,7 +8,7 @@ from functools import cached_property
 from types import ModuleType
 from typing import Annotated, Any, Callable, NamedTuple, Union
 
-import wrapt
+import wrapt  # type: ignore
 from typing_extensions import Literal, Self, TypeAlias
 
 Scope = Literal["transient", "singleton", "request"]
@@ -43,9 +43,9 @@ def is_event_type(obj: Any) -> bool:
     return inspect.isclass(obj) and issubclass(obj, Event)
 
 
-class InstanceProxy(wrapt.ObjectProxy):  # type: ignore[misc]
+class InstanceProxy(wrapt.ObjectProxy):  # type: ignore
     def __init__(self, wrapped: Any, *, interface: type[Any]) -> None:
-        super().__init__(wrapped)
+        super().__init__(wrapped)  # type: ignore
         self._self_interface = interface
 
     @property

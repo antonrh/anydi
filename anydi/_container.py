@@ -14,7 +14,7 @@ from collections import defaultdict
 from collections.abc import AsyncIterator, Iterable, Iterator, Sequence
 from contextvars import ContextVar
 from types import ModuleType
-from typing import Annotated, Any, Callable, TypeVar, Union, cast, overload
+from typing import Annotated, Any, Callable, TypeVar, cast, overload
 
 from typing_extensions import Concatenate, ParamSpec, Self, final, get_args, get_origin
 
@@ -94,18 +94,18 @@ class Container:
         testing: bool = False,
         logger: logging.Logger | None = None,
     ) -> None:
-        self._providers: dict[type[Any], Provider] = {}
+        self._providers: dict[Any, Provider] = {}
         self._strict = strict
-        self._default_scope = default_scope
+        self._default_scope: Scope = default_scope
         self._testing = testing
         self._logger = logger or logging.getLogger(__name__)
-        self._resources: dict[str, list[type[Any]]] = defaultdict(list)
+        self._resources: dict[str, list[Any]] = defaultdict(list)
         self._singleton_context = InstanceContext()
         self._request_context_var: ContextVar[InstanceContext | None] = ContextVar(
             "request_context", default=None
         )
-        self._override_instances: dict[type[Any], Any] = {}
-        self._unresolved_interfaces: set[type[Any]] = set()
+        self._override_instances: dict[Any, Any] = {}
+        self._unresolved_interfaces: set[Any] = set()
         self._inject_cache: dict[Callable[..., Any], Callable[..., Any]] = {}
 
         # Register providers
@@ -364,8 +364,8 @@ class Container:
             )
 
         unresolved_parameter = None
-        parameters = []
-        scopes = {}
+        parameters: list[inspect.Parameter] = []
+        scopes: dict[Scope, Provider] = {}
 
         for parameter in signature.parameters.values():
             if parameter.annotation is inspect.Parameter.empty:
@@ -490,7 +490,10 @@ class Container:
                 call = interface
             if inspect.isclass(call) and not is_builtin_type(call):
                 # Try to get defined scope
-                scope = getattr(interface, "__scope__", parent_scope)
+                if hasattr(call, "__scope__"):
+                    scope = getattr(call, "__scope__")
+                else:
+                    scope = parent_scope
                 return self._register_provider(call, scope, interface, **defaults)
             raise
 
@@ -510,9 +513,11 @@ class Container:
     def _parameter_has_default(
         self, parameter: inspect.Parameter, /, **defaults: Any
     ) -> bool:
-        return (defaults and parameter.name in defaults) or (
-            not self.strict and parameter.default is not inspect.Parameter.empty
+        has_default_in_kwargs = parameter.name in defaults if defaults else False
+        has_non_strict_default = not self.strict and (
+            parameter.default is not inspect.Parameter.empty
         )
+        return has_default_in_kwargs or has_non_strict_default
 
     ############################
     # Instance Methods
@@ -942,7 +947,7 @@ class Container:
 
     def _get_injected_params(self, call: Callable[..., Any]) -> dict[str, Any]:
         """Get the injected parameters of a callable object."""
-        injected_params = {}
+        injected_params: dict[str, Any] = {}
         for parameter in get_typed_parameters(call):
             if not is_marker(parameter.default):
                 continue
@@ -1022,10 +1027,10 @@ class Container:
         """Scan packages or modules for decorated members and inject dependencies."""
         dependencies: list[ScannedDependency] = []
 
-        if isinstance(packages, Iterable) and not isinstance(packages, str):
-            scan_packages: Iterable[ModuleType | str] = packages
+        if isinstance(packages, ModuleType | str):
+            scan_packages: Iterable[ModuleType | str] = [packages]
         else:
-            scan_packages = cast(Iterable[Union[ModuleType, str]], [packages])
+            scan_packages = packages
 
         for package in scan_packages:
             dependencies.extend(self._scan_package(package, tags=tags))
@@ -1117,19 +1122,19 @@ class Container:
 
 def transient(target: T) -> T:
     """Decorator for marking a class as transient scope."""
-    setattr(target, "__scope__", "transient")
+    target.__scope__ = "transient"
     return target
 
 
 def request(target: T) -> T:
     """Decorator for marking a class as request scope."""
-    setattr(target, "__scope__", "request")
+    target.__scope__ = "request"
     return target
 
 
 def singleton(target: T) -> T:
     """Decorator for marking a class as singleton scope."""
-    setattr(target, "__scope__", "singleton")
+    target.__scope__ = "singleton"
     return target
 
 
@@ -1141,11 +1146,7 @@ def provider(
     def decorator(
         target: Callable[Concatenate[M, P], T],
     ) -> Callable[Concatenate[M, P], T]:
-        setattr(
-            target,
-            "__provider__",
-            ProviderDecoratorArgs(scope=scope, override=override),
-        )
+        target.__provider__ = ProviderDecoratorArgs(scope=scope, override=override)  # type: ignore
         return target
 
     return decorator

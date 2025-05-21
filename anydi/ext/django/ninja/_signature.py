@@ -53,8 +53,9 @@ class ViewSignature(BaseViewSignature):
             func_param = self._get_param_type(name, arg)
             self.params.append(func_param)
 
-        if hasattr(view_func, "_ninja_contribute_args"):
-            for p_name, p_type, p_source in view_func._ninja_contribute_args:  # noqa
+        ninja_contribute_args = getattr(view_func, "_ninja_contribute_args", None)
+        if ninja_contribute_args is not None:
+            for p_name, p_type, p_source in ninja_contribute_args:
                 self.params.append(
                     FuncParam(p_name, p_source.alias or p_name, p_source, p_type, False)
                 )
