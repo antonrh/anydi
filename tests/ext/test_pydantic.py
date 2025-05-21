@@ -36,7 +36,9 @@ def test_install_multiple_settings() -> None:
     container = Container()
 
     anydi.ext.pydantic_settings.install(
-        [Settings(), DBSettings()], container, prefix="settings."
+        [Settings(), DBSettings()],
+        container,
+        prefix="settings.",
     )
 
     assert container.resolve(Annotated[str, "settings.param_str"]) == "test"

@@ -33,7 +33,8 @@ def test_is_builtin_type(tp: type[Any], expected: bool) -> None:
             Annotated[Service, "service"],
             'Annotated[tests.fixtures.Service, "service"]',
             marks=pytest.mark.skipif(
-                sys.version_info >= (3, 9), reason="Requires Python 3.9"
+                sys.version_info >= (3, 9),
+                reason="Requires Python 3.9",
             ),
         ),
         (lambda x: x, "tests.test_utils.<lambda>"),
@@ -44,14 +45,16 @@ def test_is_builtin_type(tp: type[Any], expected: bool) -> None:
             Union[str, int],
             "Union[str, int]",
             marks=pytest.mark.skipif(
-                sys.version_info < (3, 10), reason="Requires Python 3.10"
+                sys.version_info < (3, 10),
+                reason="Requires Python 3.10",
             ),
         ),
         pytest.param(
             Union[str, int],
             "_SpecialForm[str, int]",
             marks=pytest.mark.skipif(
-                sys.version_info >= (3, 10), reason="Requires Python 3.9"
+                sys.version_info >= (3, 10),
+                reason="Requires Python 3.9",
             ),
         ),
     ],

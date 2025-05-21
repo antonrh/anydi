@@ -33,7 +33,7 @@ class ContainerConfig(AppConfig):
                 )
             except ImportError as exc:
                 raise ImproperlyConfigured(
-                    f"Cannot import container factory '{container_factory_path}'."
+                    f"Cannot import container factory '{container_factory_path}'.",
                 ) from exc
             self.container = container_factory()
         else:
@@ -41,7 +41,7 @@ class ContainerConfig(AppConfig):
                 strict=self.settings["STRICT_MODE"],
             )
 
-    def ready(self) -> None:  # noqa: C901
+    def ready(self) -> None:
         # Register Django settings
         if self.settings["REGISTER_SETTINGS"]:
             register_settings(
@@ -63,7 +63,7 @@ class ContainerConfig(AppConfig):
                 module_cls = import_string(module_path)
             except ImportError as exc:
                 raise ImproperlyConfigured(
-                    f"Cannot import module '{module_path}'."
+                    f"Cannot import module '{module_path}'.",
                 ) from exc
             self.container.register_module(module_cls)
 

@@ -30,5 +30,5 @@ def test_auto_register(caplog: pytest.LogCaptureFixture) -> None:
             ".send_email` injected parameter `mail_service` with an annotation of "
             "`tests.ext.fixtures.MailService` is not registered. It will be "
             "registered at runtime with the first call because it is running in "
-            "non-strict mode."
+            "non-strict mode.",
         ]

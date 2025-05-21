@@ -4,7 +4,7 @@ from typing import Any
 
 from django.http import HttpRequest, HttpResponseBase
 from ninja.operation import (
-    AsyncOperation as BaseAsyncOperation,  # noqa
+    AsyncOperation as BaseAsyncOperation,
     Operation as BaseOperation,
 )
 

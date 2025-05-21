@@ -68,7 +68,9 @@ class Resource:
 class TestModule(Module):
     def configure(self, container: Container) -> None:
         container.register(
-            Annotated[str, "msg1"], lambda: "Message 1", scope="singleton"
+            Annotated[str, "msg1"],
+            lambda: "Message 1",
+            scope="singleton",
         )
 
     @provider(scope="singleton")

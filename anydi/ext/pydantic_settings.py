@@ -3,7 +3,7 @@ from __future__ import annotations
 from collections.abc import Iterable
 from typing import Annotated, Any, Callable
 
-from pydantic.fields import ComputedFieldInfo, FieldInfo  # noqa
+from pydantic.fields import ComputedFieldInfo, FieldInfo
 from pydantic_settings import BaseSettings
 
 from anydi import Container
@@ -16,7 +16,6 @@ def install(
     prefix: str = "settings.",
 ) -> None:
     """Install Pydantic settings into an AnyDI container."""
-
     # Ensure prefix ends with a dot
     if prefix[-1] != ".":
         prefix += "."

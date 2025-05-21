@@ -16,7 +16,7 @@ from anydi._utils import get_typed_parameters
 from ._utils import HasInterface, patch_call_parameter
 from .starlette.middleware import RequestScopedMiddleware
 
-__all__ = ["RequestScopedMiddleware", "install", "get_container", "Inject"]
+__all__ = ["Inject", "RequestScopedMiddleware", "get_container", "install"]
 
 
 def install(app: FastAPI, container: Container) -> None:
@@ -26,7 +26,7 @@ def install(app: FastAPI, container: Container) -> None:
     it to the application state. It also patches the route dependencies to inject the
     required dependencies using AnyDI.
     """
-    app.state.container = container  # noqa
+    app.state.container = container
 
     patched = []
 

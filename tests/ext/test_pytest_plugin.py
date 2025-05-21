@@ -24,7 +24,8 @@ def test_anydi_inject_all_default(request: pytest.FixtureRequest) -> None:
 
 
 def test_no_container_setup(
-    request: pytest.FixtureRequest, monkeypatch: pytest.MonkeyPatch
+    request: pytest.FixtureRequest,
+    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     monkeypatch.setattr(pytest_plugin, "CONTAINER_FIXTURE_NAME", "container1")
 

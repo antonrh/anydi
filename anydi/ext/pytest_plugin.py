@@ -58,7 +58,7 @@ def _anydi_injected_parameter_iterator(
     request: pytest.FixtureRequest,
 ) -> Callable[[], Iterator[tuple[str, Any]]]:
     fixturenames = set(request.node._fixtureinfo.initialnames) - set(
-        request.node._fixtureinfo.name2fixturedefs.keys()
+        request.node._fixtureinfo.name2fixturedefs.keys(),
     )
 
     def _iterator() -> Iterator[tuple[str, inspect.Parameter]]:
@@ -81,7 +81,6 @@ def _anydi_inject(
     _anydi_injected_parameter_iterator: Callable[[], Iterator[tuple[str, Any]]],
 ) -> None:
     """Inject dependencies into the test function."""
-
     if inspect.iscoroutinefunction(request.function) or not _anydi_should_inject:
         return
 
@@ -97,7 +96,8 @@ def _anydi_inject(
             request.node.funcargs[argname] = container.resolve(interface)
         except Exception as exc:
             logger.warning(
-                f"Failed to resolve dependency for argument '{argname}'.", exc_info=exc
+                f"Failed to resolve dependency for argument '{argname}'.",
+                exc_info=exc,
             )
 
 
@@ -111,8 +111,7 @@ def _anydi_ainject(
     if (
         not inspect.iscoroutinefunction(request.function)
         and not inspect.isasyncgenfunction(request.function)
-        or not _anydi_should_inject
-    ):
+    ) or not _anydi_should_inject:
         return
 
     # Skip if the anyio backend is not available

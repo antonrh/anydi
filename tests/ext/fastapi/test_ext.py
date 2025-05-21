@@ -28,7 +28,8 @@ def test_install_without_annotation() -> None:
         return message
 
     with pytest.raises(
-        TypeError, match="Missing `(.*?).say_hello` parameter `message` annotation."
+        TypeError,
+        match="Missing `(.*?).say_hello` parameter `message` annotation.",
     ):
         install(app, container)
 

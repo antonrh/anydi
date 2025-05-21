@@ -38,7 +38,7 @@ async def send_email(
         {
             "email": user.email,
             "message": mail.message,
-        }
+        },
     )
 
 

@@ -16,7 +16,9 @@ class RequestScopedMiddleware(BaseHTTPMiddleware):
         self.container = container
 
     async def dispatch(
-        self, request: Request, call_next: RequestResponseEndpoint
+        self,
+        request: Request,
+        call_next: RequestResponseEndpoint,
     ) -> Response:
         async with self.container.arequest_context() as context:
             context.set(Request, request)

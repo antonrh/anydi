@@ -61,13 +61,15 @@ def patch_annotated_parameter(parameter: inspect.Parameter) -> inspect.Parameter
 
 
 def patch_call_parameter(
-    container: Container, call: Callable[..., Any], parameter: inspect.Parameter
+    container: Container,
+    call: Callable[..., Any],
+    parameter: inspect.Parameter,
 ) -> None:
     """Patch a parameter to inject dependencies using AnyDI."""
     parameter = patch_annotated_parameter(parameter)
 
     if not isinstance(parameter.default, HasInterface):
-        return None
+        return
 
     if not container.strict and not container.is_registered(parameter.annotation):
         logger.debug(
@@ -75,7 +77,7 @@ def patch_call_parameter(
             f"`{parameter.name}` with an annotation of "
             f"`{get_full_qualname(parameter.annotation)}` "
             "is not registered. It will be registered at runtime with the "
-            "first call because it is running in non-strict mode."
+            "first call because it is running in non-strict mode.",
         )
     else:
         container._validate_injected_parameter(call, parameter)  # noqa

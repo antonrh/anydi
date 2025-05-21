@@ -24,9 +24,9 @@ jobs:
       - name: Install dependencies
         run: uv sync --all-extras --dev
       - name: Static type checking
-        run: uv run mypy anydi tests
+        run: uv run pyright
       - name: Code formatting
-        run: uv run ruff check anydi tests && uv run ruff format anydi tests --check
+        run: uv run ruff check && uv run ruff format --check
 
   tests:
     name: Run unit tests ${{ matrix.name }}

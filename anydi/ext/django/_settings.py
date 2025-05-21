@@ -35,5 +35,5 @@ def get_settings() -> Settings:
         **{
             **DEFAULTS,
             **getattr(settings, "ANYDI", {}),
-        }
+        },
     )

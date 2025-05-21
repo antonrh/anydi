@@ -15,10 +15,10 @@ from anydi import Container
 
 
 def register_settings(
-    container: Container, prefix: str = "django.conf.settings."
+    container: Container,
+    prefix: str = "django.conf.settings.",
 ) -> None:
     """Register Django settings into the container."""
-
     # Ensure prefix ends with a dot
     if prefix[-1] != ".":
         prefix += "."
@@ -121,8 +121,8 @@ def _patch_any_typed_annotated(container: Container, *, prefix: str) -> None:
         return wrapper
 
     container.resolve = _patch_resolve(  # type: ignore[method-assign]
-        container.resolve
+        container.resolve,
     )
     container.aresolve = _patch_aresolve(  # type: ignore[method-assign]
-        container.aresolve
+        container.aresolve,
     )

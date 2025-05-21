@@ -37,7 +37,7 @@ classifiers = [
     "Programming Language :: Python :: 3 :: Only",
 ]
 dependencies = [
-    "typing-extensions>=4.12.1,<5",
+    "typing-extensions>=4.13.2,<5",
     "anyio>=3.7.1",
     "wrapt>=1.17.0,<2",
 ]
@@ -50,7 +50,6 @@ anydi = "anydi.ext.pytest_plugin"
 
 [dependency-groups]
 dev = [
-    "mypy[faster-cache]>=1.15.0,<2",
     "ruff>=0.9.4,<1.0",
     "pytest>=8.3.1,<9",
     "pytest-cov>=6.0.0,<7",
@@ -64,6 +63,7 @@ dev = [
     "redis>=5.0.4,<6",
     "pydantic-settings>=2.4.0,<3",
     "bump-my-version>=0.31.1",
+    "pyright>=1.1.401",
 ]
 docs = [
     "mkdocs>=1.4.2,<2",
@@ -77,6 +77,10 @@ build-backend = "hatchling.build"
 [tool.ruff]
 line-length = 88
 target-version = "py39"
+include = [
+    "anydi/**/*.py",
+    "tests/**/*.py",
+]
 
 [tool.ruff.lint]
 select = ["A", "B", "C", "E", "F", "I", "W", "TID252", "T20", "UP", "FURB", "PT"]
@@ -89,21 +93,16 @@ forced-separate = ["tests", "app"]
 [tool.ruff.lint.pydocstyle]
 convention = "google"
 
-[tool.mypy]
-strict = true
-
-[[tool.mypy.overrides]]
-module = [
-    "django.*",
-    "wrapt.*",
+[tool.pyright]
+include = [
+    "anydi/**/*.py",
+    "tests/**/*.py",
 ]
-ignore_missing_imports = true
-
-[[tool.mypy.overrides]]
-module = [
-    "tests.*",
+strict = [
+    "anydi/*.py",
+    "anydi/starlette/*.py",
 ]
-disable_error_code = ["comparison-overlap"]
+typeCheckingMode = "standard"
 
 [tool.pytest.ini_options]
 addopts = [

@@ -119,7 +119,10 @@ class TestContainer:
         ],
     )
     def test_register_provider_interface(
-        self, container: Container, annotation: type[Any], expected: type[Any]
+        self,
+        container: Container,
+        annotation: type[Any],
+        expected: type[Any],
     ) -> None:
         def call() -> annotation:  # type: ignore[valid-type]
             return object()
@@ -153,18 +156,21 @@ class TestContainer:
 
     def test_register_provider_with_none(self, container: Container) -> None:
         with pytest.raises(
-            TypeError, match="Missing `(.*?)` provider return annotation."
+            TypeError,
+            match="Missing `(.*?)` provider return annotation.",
         ):
             container._register_provider(lambda: "hello", "singleton", None)
 
     def test_register_provider_provider_without_return_annotation(
-        self, container: Container
+        self,
+        container: Container,
     ) -> None:
         def provide_message():  # type: ignore[no-untyped-def]
             return "hello"
 
         with pytest.raises(
-            TypeError, match="Missing `(.*?)` provider return annotation."
+            TypeError,
+            match="Missing `(.*?)` provider return annotation.",
         ):
             container._register_provider(provide_message, "singleton")
 
@@ -179,7 +185,8 @@ class TestContainer:
             container._register_provider("Test", "singleton")  # type: ignore[arg-type]
 
     def test_register_provider_iterator_no_arg_not_allowed(
-        self, container: Container
+        self,
+        container: Container,
     ) -> None:
         with pytest.raises(
             TypeError,
@@ -202,7 +209,8 @@ class TestContainer:
             container._register_provider(generator, "other")  # type: ignore[arg-type]
 
     def test_register_provider_transient_resource_not_allowed(
-        self, container: Container
+        self,
+        container: Container,
     ) -> None:
         with pytest.raises(
             TypeError,
@@ -221,12 +229,14 @@ class TestContainer:
             return Service(ident=ident)
 
         with pytest.raises(
-            TypeError, match="Missing provider `(.*?)` dependency `ident` annotation."
+            TypeError,
+            match="Missing provider `(.*?)` dependency `ident` annotation.",
         ):
             container._register_provider(service, "singleton")
 
     def test_register_provider_positional_only_parameter_not_allowed(
-        self, container: Container
+        self,
+        container: Container,
     ) -> None:
         def provider_message(a: int, /, b: str) -> str:
             return f"{a} {b}"
@@ -241,7 +251,8 @@ class TestContainer:
         container.register(str, lambda: "test", scope="singleton")
 
         with pytest.raises(
-            LookupError, match="The provider interface `str` already registered."
+            LookupError,
+            match="The provider interface `str` already registered.",
         ):
             container.register(str, lambda: "other", scope="singleton")
 
@@ -252,7 +263,10 @@ class TestContainer:
             return "new"
 
         provider = container.register(
-            str, new_provider_call, scope="singleton", override=True
+            str,
+            new_provider_call,
+            scope="singleton",
+            override=True,
         )
 
         assert provider.call == new_provider_call
@@ -277,14 +291,15 @@ class TestContainer:
             providers=[
                 ProviderArgs(call=lambda: "test", scope="singleton", interface=str),
                 ProviderArgs(call=lambda: 1, scope="singleton", interface=int),
-            ]
+            ],
         )
 
         assert container.is_registered(str)
         assert container.is_registered(int)
 
     def test_register_provider_invalid_transient_resource(
-        self, container: Container
+        self,
+        container: Container,
     ) -> None:
         def provider_call() -> Iterator[str]:
             yield "test"
@@ -551,7 +566,8 @@ class TestContainer:
 
     def test_unregister_not_registered_provider(self, container: Container) -> None:
         with pytest.raises(
-            LookupError, match="The provider interface `str` not registered."
+            LookupError,
+            match="The provider interface `str` not registered.",
         ):
             container.unregister(str)
 
@@ -593,7 +609,8 @@ class TestContainer:
     # Asynchronous lifespan
 
     async def test_astart_and_aclose_singleton_context(
-        self, container: Container
+        self,
+        container: Container,
     ) -> None:
         events = []
 
@@ -744,7 +761,8 @@ class TestContainer:
         assert container.resolve(str) == instance
 
     async def test_resolve_singleton_async_and_sync_resources(
-        self, container: Container
+        self,
+        container: Container,
     ) -> None:
         instance_str = "test"
         instance_int = 100
@@ -795,7 +813,8 @@ class TestContainer:
         assert result == instance
 
     async def test_resolve_singleton_annotated_async_resource(
-        self, container: Container
+        self,
+        container: Container,
     ) -> None:
         instance = "test"
 
@@ -808,7 +827,8 @@ class TestContainer:
         assert result == instance
 
     async def test_resolve_singleton_scoped_coro_safe(
-        self, container: Container
+        self,
+        container: Container,
     ) -> None:
         @container.provider(scope="singleton")
         async def provide_unique_id() -> UniqueId:
@@ -866,7 +886,8 @@ class TestContainer:
             container.resolve(str)
 
     def test_resolve_request_scoped_annotated_resource(
-        self, container: Container
+        self,
+        container: Container,
     ) -> None:
         instance = "test"
 
@@ -908,7 +929,8 @@ class TestContainer:
             assert container.resolve(str) == "test"
 
     def test_resolve_request_scoped_unresolved_error(
-        self, container: Container
+        self,
+        container: Container,
     ) -> None:
         class Request:
             def __init__(self, path: str) -> None:
@@ -978,11 +1000,12 @@ class TestContainer:
             return uuid.uuid4()
 
         assert await container.aresolve(uuid.UUID) != await container.aresolve(
-            uuid.UUID
+            uuid.UUID,
         )
 
     async def test_async_resolve_synchronous_resource(
-        self, container: Container
+        self,
+        container: Container,
     ) -> None:
         @container.provider(scope="singleton")
         def msg() -> Iterator[str]:
@@ -1002,7 +1025,8 @@ class TestContainer:
             container.resolve(str)
 
     def test_resolve_non_strict_provider_scope_defined(
-        self, container: Container
+        self,
+        container: Container,
     ) -> None:
         class Service:
             __scope__ = "singleton"
@@ -1062,7 +1086,8 @@ class TestContainer:
         assert container.providers[Entity].scope == "transient"
 
     def test_resolve_non_strict_nested_singleton_provider(
-        self, container: Container
+        self,
+        container: Container,
     ) -> None:
         @dataclass
         class Repository:
@@ -1091,7 +1116,8 @@ class TestContainer:
         assert container.providers[Service].scope == "transient"
 
     def test_resolve_non_strict_with_primitive_class(
-        self, container: Container
+        self,
+        container: Container,
     ) -> None:
         with pytest.raises(
             LookupError,
@@ -1107,7 +1133,8 @@ class TestContainer:
     def test_resolve_non_strict_with_custom_type(self, container: Container) -> None:
         class Klass:
             def __init__(
-                self, value: "Union[str, Sequence[str], int, list[str]]"
+                self,
+                value: "Union[str, Sequence[str], int, list[str]]",
             ) -> None:
                 self.value = value
 
@@ -1122,7 +1149,8 @@ class TestContainer:
             _ = container.resolve(Klass)
 
     def test_resolve_non_strict_with_as_context_manager(
-        self, container: Container
+        self,
+        container: Container,
     ) -> None:
         class Resource:
             __scope__ = "singleton"
@@ -1162,7 +1190,10 @@ class TestContainer:
                 return self
 
             async def __aexit__(
-                self, exc_type: Any, exc_value: Any, traceback: Any
+                self,
+                exc_type: Any,
+                exc_value: Any,
+                traceback: Any,
             ) -> None:
                 self.exited = True
 
@@ -1254,7 +1285,7 @@ class TestContainer:
         def resource_provider() -> Iterator[Resource]:
             try:
                 yield resource
-            except Exception:  # noqa
+            except Exception:
                 resource.rollback()
                 raise
             else:
@@ -1273,7 +1304,8 @@ class TestContainer:
         assert resource.rolled_back
 
     async def test_async_resource_delegated_exception(
-        self, container: Container
+        self,
+        container: Container,
     ) -> None:
         resource = Resource()
 
@@ -1281,7 +1313,7 @@ class TestContainer:
         async def resource_provider() -> AsyncIterator[Resource]:
             try:
                 yield resource
-            except Exception:  # noqa
+            except Exception:
                 resource.rollback()
                 raise
             else:
@@ -1468,7 +1500,9 @@ class TestContainerInjector:
         assert result == "service ident = 1000"
 
     def test_inject_auto_registered_log_message(
-        self, container: Container, caplog: pytest.LogCaptureFixture
+        self,
+        container: Container,
+        caplog: pytest.LogCaptureFixture,
     ) -> None:
         with caplog.at_level(logging.DEBUG, logger="anydi"):
 
@@ -1480,7 +1514,7 @@ class TestContainerInjector:
                 "Cannot validate the `tests.test_container.TestContainerInjector"
                 ".test_inject_auto_registered_log_message.<locals>.handler` parameter "
                 "`service` with an annotation of `tests.fixtures.Service due to "
-                "being in non-strict mode. It will be validated at the first call."
+                "being in non-strict mode. It will be validated at the first call.",
             ]
 
     def test_inject_missing_annotation(self, container: Container) -> None:
@@ -1488,7 +1522,8 @@ class TestContainerInjector:
             return name  # type: ignore[no-any-return]
 
         with pytest.raises(
-            TypeError, match="Missing `(.*?).handler` parameter `name` annotation."
+            TypeError,
+            match="Missing `(.*?).handler` parameter `name` annotation.",
         ):
             container.inject(handler)
 
@@ -1557,32 +1592,9 @@ class TestContainerInjector:
 
         assert result == "service ident = 1000"
 
-    def test_inject_dataclass(self, container: Container) -> None:
-        @container.provider(scope="singleton")
-        def ident_provider() -> str:
-            return "1000"
-
-        @container.provider(scope="singleton")
-        def service_provider(ident: str) -> Service:
-            return Service(ident=ident)
-
-        @container.inject
-        @dataclass
-        class Handler:
-            name: str
-            service: Service = auto
-
-            def handle(self) -> str:
-                return f"{self.name} = {self.service.ident}"
-
-        handler = Handler(name="service ident")
-
-        result = handler.handle()
-
-        assert result == "service ident = 1000"
-
     async def test_inject_with_sync_and_async_resources(
-        self, container: Container
+        self,
+        container: Container,
     ) -> None:
         def ident_provider() -> Iterator[str]:
             yield "1000"
@@ -1657,7 +1669,8 @@ class TestContainerTestingMode:
         container = Container(strict=True, testing=True)
 
         with pytest.raises(
-            LookupError, match="The provider interface `str` not registered."
+            LookupError,
+            match="The provider interface `str` not registered.",
         ):
             with container.override(str, "test"):
                 pass

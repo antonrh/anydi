@@ -14,7 +14,7 @@ from collections import defaultdict
 from collections.abc import AsyncIterator, Iterable, Iterator, Sequence
 from contextvars import ContextVar
 from types import ModuleType
-from typing import Annotated, Any, Callable, TypeVar, Union, cast, overload
+from typing import Annotated, Any, Callable, TypeVar, cast, overload
 
 from typing_extensions import Concatenate, ParamSpec, Self, final, get_args, get_origin
 
@@ -47,7 +47,7 @@ from ._utils import (
     run_async,
 )
 
-T = TypeVar("T", bound=Any)
+T = TypeVar("T")
 M = TypeVar("M", bound="Module")
 P = ParamSpec("P")
 
@@ -63,7 +63,7 @@ class ModuleMeta(type):
 
     def __new__(cls, name: str, bases: tuple[type, ...], attrs: dict[str, Any]) -> Any:
         attrs["providers"] = [
-            (name, getattr(value, "__provider__"))
+            (name, value.__provider__)
             for name, value in attrs.items()
             if hasattr(value, "__provider__")
         ]
@@ -94,18 +94,19 @@ class Container:
         testing: bool = False,
         logger: logging.Logger | None = None,
     ) -> None:
-        self._providers: dict[type[Any], Provider] = {}
+        self._providers: dict[Any, Provider] = {}
         self._strict = strict
-        self._default_scope = default_scope
+        self._default_scope: Scope = default_scope
         self._testing = testing
         self._logger = logger or logging.getLogger(__name__)
-        self._resources: dict[str, list[type[Any]]] = defaultdict(list)
+        self._resources: dict[str, list[Any]] = defaultdict(list)
         self._singleton_context = InstanceContext()
         self._request_context_var: ContextVar[InstanceContext | None] = ContextVar(
-            "request_context", default=None
+            "request_context",
+            default=None,
         )
-        self._override_instances: dict[type[Any], Any] = {}
-        self._unresolved_interfaces: set[type[Any]] = set()
+        self._override_instances: dict[Any, Any] = {}
+        self._unresolved_interfaces: set[Any] = set()
         self._inject_cache: dict[Callable[..., Any], Callable[..., Any]] = {}
 
         # Register providers
@@ -242,7 +243,7 @@ class Container:
             raise LookupError(
                 "The request context has not been started. Please ensure that "
                 "the request context is properly initialized before attempting "
-                "to use it."
+                "to use it.",
             )
         return request_context
 
@@ -276,7 +277,7 @@ class Container:
         if not self.is_registered(interface):
             raise LookupError(
                 "The provider interface "
-                f"`{get_full_qualname(interface)}` not registered."
+                f"`{get_full_qualname(interface)}` not registered.",
             )
 
         provider = self._get_provider(interface)
@@ -294,7 +295,10 @@ class Container:
         self._delete_provider(provider)
 
     def provider(
-        self, *, scope: Scope, override: bool = False
+        self,
+        *,
+        scope: Scope,
+        override: bool = False,
     ) -> Callable[[Callable[P, T]], Callable[P, T]]:
         """Decorator to register a provider function with the specified scope."""
 
@@ -349,7 +353,7 @@ class Container:
             else:
                 raise TypeError(
                     f"Cannot use `{name}` resource type annotation "
-                    "without actual type argument."
+                    "without actual type argument.",
                 )
 
         # None interface is not allowed
@@ -360,32 +364,33 @@ class Container:
         if interface in self._providers and not override:
             raise LookupError(
                 f"The provider interface `{get_full_qualname(interface)}` "
-                "already registered."
+                "already registered.",
             )
 
         unresolved_parameter = None
-        parameters = []
-        scopes = {}
+        parameters: list[inspect.Parameter] = []
+        scopes: dict[Scope, Provider] = {}
 
         for parameter in signature.parameters.values():
             if parameter.annotation is inspect.Parameter.empty:
                 raise TypeError(
                     f"Missing provider `{name}` "
-                    f"dependency `{parameter.name}` annotation."
+                    f"dependency `{parameter.name}` annotation.",
                 )
             if parameter.kind == inspect.Parameter.POSITIONAL_ONLY:
                 raise TypeError(
                     "Positional-only parameters "
-                    f"are not allowed in the provider `{name}`."
+                    f"are not allowed in the provider `{name}`.",
                 )
 
             parameter = parameter.replace(
-                annotation=get_typed_annotation(parameter.annotation, globalns, module)
+                annotation=get_typed_annotation(parameter.annotation, globalns, module),
             )
 
             try:
                 sub_provider = self._get_or_register_provider(
-                    parameter.annotation, scope
+                    parameter.annotation,
+                    scope,
                 )
             except LookupError:
                 if self._parameter_has_default(parameter, **defaults):
@@ -424,7 +429,7 @@ class Container:
                     f"of type `{get_full_qualname(unresolved_parameter.annotation)}`, "
                     "which has not been registered or set. To resolve this, ensure "
                     f"that `{unresolved_parameter.name}` is registered before "
-                    f"attempting to use it."
+                    f"attempting to use it.",
                 ) from None
 
         # Check scope compatibility
@@ -433,7 +438,7 @@ class Container:
                 raise ValueError(
                     f"The provider `{name}` with a `{detected_scope}` scope cannot "
                     f"depend on `{sub_provider}` with a `{sub_provider.scope}` scope. "
-                    "Please ensure all providers are registered with matching scopes."
+                    "Please ensure all providers are registered with matching scopes.",
                 )
 
         provider = Provider(
@@ -449,19 +454,22 @@ class Container:
         return provider
 
     def _validate_provider_scope(
-        self, scope: Scope, name: str, kind: ProviderKind
+        self,
+        scope: Scope,
+        name: str,
+        kind: ProviderKind,
     ) -> None:
         """Validate the provider scope."""
         if scope not in (allowed_scopes := get_args(Scope)):
             raise ValueError(
                 f"The provider `{name}` scope is invalid. Only the following "
                 f"scopes are supported: {', '.join(allowed_scopes)}. "
-                "Please use one of the supported scopes when registering a provider."
+                "Please use one of the supported scopes when registering a provider.",
             )
         if scope == "transient" and ProviderKind.is_resource(kind):
             raise TypeError(
                 f"The resource provider `{name}` is attempting to register "
-                "with a transient scope, which is not allowed."
+                "with a transient scope, which is not allowed.",
             )
 
     def _get_provider(self, interface: AnyInterface) -> Provider:
@@ -472,11 +480,15 @@ class Container:
             raise LookupError(
                 f"The provider interface for `{get_full_qualname(interface)}` has "
                 "not been registered. Please ensure that the provider interface is "
-                "properly registered before attempting to use it."
+                "properly registered before attempting to use it.",
             ) from exc
 
     def _get_or_register_provider(
-        self, interface: AnyInterface, parent_scope: Scope | None, /, **defaults: Any
+        self,
+        interface: AnyInterface,
+        parent_scope: Scope | None,
+        /,
+        **defaults: Any,
     ) -> Provider:
         """Get or register a provider by interface."""
         try:
@@ -490,7 +502,7 @@ class Container:
                 call = interface
             if inspect.isclass(call) and not is_builtin_type(call):
                 # Try to get defined scope
-                scope = getattr(interface, "__scope__", parent_scope)
+                scope = cast(Scope, getattr(interface, "__scope__", parent_scope))
                 return self._register_provider(call, scope, interface, **defaults)
             raise
 
@@ -508,11 +520,16 @@ class Container:
             self._resources[provider.scope].remove(provider.interface)
 
     def _parameter_has_default(
-        self, parameter: inspect.Parameter, /, **defaults: Any
+        self,
+        parameter: inspect.Parameter,
+        /,
+        **defaults: Any,
     ) -> bool:
-        return (defaults and parameter.name in defaults) or (
+        has_default_in_kwargs = parameter.name in defaults if defaults else False
+        has_non_strict_default = (
             not self.strict and parameter.default is not inspect.Parameter.empty
         )
+        return has_default_in_kwargs or has_non_strict_default
 
     ############################
     # Instance Methods
@@ -524,7 +541,7 @@ class Container:
     @overload
     def resolve(self, interface: T) -> T: ...
 
-    def resolve(self, interface: type[T]) -> T:
+    def resolve(self, interface: type[T] | T) -> T:
         """Resolve an instance by interface."""
         return self._resolve_or_create(interface, False)
 
@@ -534,15 +551,15 @@ class Container:
     @overload
     async def aresolve(self, interface: T) -> T: ...
 
-    async def aresolve(self, interface: type[T]) -> T:
+    async def aresolve(self, interface: type[T] | T) -> T:
         """Resolve an instance by interface asynchronously."""
         return await self._aresolve_or_create(interface, False)
 
-    def create(self, interface: type[T], /, **defaults: Any) -> T:
+    def create(self, interface: type[T] | T, /, **defaults: Any) -> T:
         """Create an instance by interface."""
         return self._resolve_or_create(interface, True, **defaults)
 
-    async def acreate(self, interface: type[T], /, **defaults: Any) -> T:
+    async def acreate(self, interface: type[T] | T, /, **defaults: Any) -> T:
         """Create an instance by interface asynchronously."""
         return await self._aresolve_or_create(interface, True, **defaults)
 
@@ -561,7 +578,7 @@ class Container:
         """Release an instance by interface."""
         provider = self._get_provider(interface)
         if provider.scope == "transient":
-            return None
+            return
         context = self._get_instance_context(provider.scope)
         del context[interface]
 
@@ -577,7 +594,11 @@ class Container:
             del context[interface]
 
     def _resolve_or_create(
-        self, interface: type[T], create: bool, /, **defaults: Any
+        self,
+        interface: type[T] | T,
+        create: bool,
+        /,
+        **defaults: Any,
     ) -> T:
         """Internal method to handle instance resolution and creation."""
         provider = self._get_or_register_provider(interface, None, **defaults)
@@ -598,7 +619,11 @@ class Container:
         return cast(T, instance)
 
     async def _aresolve_or_create(
-        self, interface: type[T], create: bool, /, **defaults: Any
+        self,
+        interface: type[T] | T,
+        create: bool,
+        /,
+        **defaults: Any,
     ) -> T:
         """Internal method to handle instance resolution and creation asynchronously."""
         provider = self._get_or_register_provider(interface, None, **defaults)
@@ -619,7 +644,9 @@ class Container:
         return cast(T, instance)
 
     def _get_or_create_instance(
-        self, provider: Provider, context: InstanceContext
+        self,
+        provider: Provider,
+        context: InstanceContext,
     ) -> Any:
         """Get an instance of a dependency from the scoped context."""
         instance = context.get(provider.interface)
@@ -630,7 +657,9 @@ class Container:
         return instance
 
     async def _aget_or_create_instance(
-        self, provider: Provider, context: InstanceContext
+        self,
+        provider: Provider,
+        context: InstanceContext,
     ) -> Any:
         """Get an async instance of a dependency from the scoped context."""
         instance = context.get(provider.interface)
@@ -641,13 +670,17 @@ class Container:
         return instance
 
     def _create_instance(
-        self, provider: Provider, context: InstanceContext | None, /, **defaults: Any
+        self,
+        provider: Provider,
+        context: InstanceContext | None,
+        /,
+        **defaults: Any,
     ) -> Any:
         """Create an instance using the provider."""
         if provider.is_async:
             raise TypeError(
                 f"The instance for the provider `{provider}` cannot be created in "
-                "synchronous mode."
+                "synchronous mode.",
             )
 
         provider_kwargs = self._get_provided_kwargs(provider, context, **defaults)
@@ -664,11 +697,17 @@ class Container:
         return instance
 
     async def _acreate_instance(
-        self, provider: Provider, context: InstanceContext | None, /, **defaults: Any
+        self,
+        provider: Provider,
+        context: InstanceContext | None,
+        /,
+        **defaults: Any,
     ) -> Any:
         """Create an instance asynchronously using the provider."""
         provider_kwargs = await self._aget_provided_kwargs(
-            provider, context, **defaults
+            provider,
+            context,
+            **defaults,
         )
 
         if provider.is_coroutine:
@@ -677,7 +716,7 @@ class Container:
         if provider.is_async_generator:
             if context is None:
                 raise ValueError(
-                    "The async stack is required for async generator providers."
+                    "The async stack is required for async generator providers.",
                 )
             cm = contextlib.asynccontextmanager(provider.call)(**provider_kwargs)
             return await context.aenter(cm)
@@ -702,13 +741,20 @@ class Container:
         return instance
 
     def _get_provided_kwargs(
-        self, provider: Provider, context: InstanceContext | None, /, **defaults: Any
+        self,
+        provider: Provider,
+        context: InstanceContext | None,
+        /,
+        **defaults: Any,
     ) -> dict[str, Any]:
         """Retrieve the arguments for a provider."""
         provided_kwargs = {}
         for parameter in provider.parameters:
             instance = self._get_provider_instance(
-                provider, parameter, context, **defaults
+                provider,
+                parameter,
+                context,
+                **defaults,
             )
             provided_kwargs[parameter.name] = instance
         return {**defaults, **provided_kwargs}
@@ -722,13 +768,12 @@ class Container:
         **defaults: Any,
     ) -> Any:
         """Retrieve an instance of a dependency from the scoped context."""
-
         # Try to get instance from defaults
         if parameter.name in defaults:
             return defaults[parameter.name]
 
         # Try to get instance from context
-        elif context and parameter.annotation in context:
+        if context and parameter.annotation in context:
             instance = context[parameter.annotation]
 
         # Resolve new instance
@@ -746,13 +791,20 @@ class Container:
         return instance
 
     async def _aget_provided_kwargs(
-        self, provider: Provider, context: InstanceContext | None, /, **defaults: Any
+        self,
+        provider: Provider,
+        context: InstanceContext | None,
+        /,
+        **defaults: Any,
     ) -> dict[str, Any]:
         """Asynchronously retrieve the arguments for a provider."""
         provided_kwargs = {}
         for parameter in provider.parameters:
             instance = await self._aget_provider_instance(
-                provider, parameter, context, **defaults
+                provider,
+                parameter,
+                context,
+                **defaults,
             )
             provided_kwargs[parameter.name] = instance
         return {**defaults, **provided_kwargs}
@@ -766,13 +818,12 @@ class Container:
         **defaults: Any,
     ) -> Any:
         """Asynchronously retrieve an instance of a dependency from the context."""
-
         # Try to get instance from defaults
         if parameter.name in defaults:
             return defaults[parameter.name]
 
         # Try to get instance from context
-        elif context and parameter.annotation in context:
+        if context and parameter.annotation in context:
             instance = context[parameter.annotation]
 
         # Resolve new instance
@@ -790,19 +841,25 @@ class Container:
         return instance
 
     def _resolve_parameter(
-        self, provider: Provider, parameter: inspect.Parameter
+        self,
+        provider: Provider,
+        parameter: inspect.Parameter,
     ) -> Any:
         self._validate_resolvable_parameter(provider, parameter)
         return self.resolve(parameter.annotation)
 
     async def _aresolve_parameter(
-        self, provider: Provider, parameter: inspect.Parameter
+        self,
+        provider: Provider,
+        parameter: inspect.Parameter,
     ) -> Any:
         self._validate_resolvable_parameter(provider, parameter)
         return await self.aresolve(parameter.annotation)
 
     def _validate_resolvable_parameter(
-        self, provider: Provider, parameter: inspect.Parameter
+        self,
+        provider: Provider,
+        parameter: inspect.Parameter,
     ) -> None:
         """Ensure that the specified interface is resolved."""
         if parameter.annotation in self._unresolved_interfaces:
@@ -810,22 +867,21 @@ class Container:
                 f"You are attempting to get the parameter `{parameter.name}` with the "
                 f"annotation `{get_full_qualname(parameter.annotation)}` as a "
                 f"dependency into `{get_full_qualname(provider.call)}` which is "
-                "not registered or set in the scoped context."
+                "not registered or set in the scoped context.",
             )
 
     @contextlib.contextmanager
     def override(self, interface: AnyInterface, instance: Any) -> Iterator[None]:
-        """
-        Override the provider for the specified interface with a specific instance.
-        """
+        """Override the provider for the specified interface
+        with a specific instance."""
         if not self.testing:
             raise RuntimeError(
-                "The `override` method can only be used in testing mode."
+                "The `override` method can only be used in testing mode.",
             )
         if not self.is_registered(interface) and self.strict:
             raise LookupError(
                 f"The provider interface `{get_full_qualname(interface)}` "
-                "not registered."
+                "not registered.",
             )
         self._override_instances[interface] = instance
         try:
@@ -843,7 +899,8 @@ class Container:
             return self._override_instances[interface]
 
         if not hasattr(instance, "__dict__") or hasattr(
-            instance, "__resolver_getter__"
+            instance,
+            "__resolver_getter__",
         ):
             return instance
 
@@ -896,7 +953,8 @@ class Container:
     def inject(self) -> Callable[[Callable[P, T]], Callable[P, T]]: ...
 
     def inject(
-        self, func: Callable[P, T] | None = None
+        self,
+        func: Callable[P, T] | None = None,
     ) -> Callable[[Callable[P, T]], Callable[P, T]] | Callable[P, T]:
         """Decorator to inject dependencies into a callable."""
 
@@ -942,7 +1000,7 @@ class Container:
 
     def _get_injected_params(self, call: Callable[..., Any]) -> dict[str, Any]:
         """Get the injected parameters of a callable object."""
-        injected_params = {}
+        injected_params: dict[str, Any] = {}
         for parameter in get_typed_parameters(call):
             if not is_marker(parameter.default):
                 continue
@@ -954,7 +1012,7 @@ class Container:
                         f"Cannot validate the `{get_full_qualname(call)}` parameter "
                         f"`{parameter.name}` with an annotation of "
                         f"`{get_full_qualname(parameter.annotation)} due to being "
-                        "in non-strict mode. It will be validated at the first call."
+                        "in non-strict mode. It will be validated at the first call.",
                     )
                 else:
                     raise exc
@@ -962,20 +1020,22 @@ class Container:
         return injected_params
 
     def _validate_injected_parameter(
-        self, call: Callable[..., Any], parameter: inspect.Parameter
+        self,
+        call: Callable[..., Any],
+        parameter: inspect.Parameter,
     ) -> None:
         """Validate an injected parameter."""
         if parameter.annotation is inspect.Parameter.empty:
             raise TypeError(
                 f"Missing `{get_full_qualname(call)}` parameter "
-                f"`{parameter.name}` annotation."
+                f"`{parameter.name}` annotation.",
             )
 
         if not self.is_registered(parameter.annotation):
             raise LookupError(
                 f"`{get_full_qualname(call)}` has an unknown dependency parameter "
                 f"`{parameter.name}` with an annotation of "
-                f"`{get_full_qualname(parameter.annotation)}`."
+                f"`{get_full_qualname(parameter.annotation)}`.",
             )
 
     ############################
@@ -983,7 +1043,8 @@ class Container:
     ############################
 
     def register_module(
-        self, module: Module | type[Module] | Callable[[Container], None] | str
+        self,
+        module: Module | type[Module] | Callable[[Container], None] | str,
     ) -> None:
         """Register a module as a callable, module type, or module instance."""
         # Callable Module
@@ -1022,10 +1083,10 @@ class Container:
         """Scan packages or modules for decorated members and inject dependencies."""
         dependencies: list[ScannedDependency] = []
 
-        if isinstance(packages, Iterable) and not isinstance(packages, str):
-            scan_packages: Iterable[ModuleType | str] = packages
+        if isinstance(packages, str | ModuleType):
+            scan_packages: Iterable[ModuleType | str] = [packages]
         else:
-            scan_packages = cast(Iterable[Union[ModuleType, str]], [packages])
+            scan_packages = packages
 
         for package in scan_packages:
             dependencies.extend(self._scan_package(package, tags=tags))
@@ -1053,7 +1114,8 @@ class Container:
         dependencies: list[ScannedDependency] = []
 
         for module_info in pkgutil.walk_packages(
-            path=package_path, prefix=package.__name__ + "."
+            path=package_path,
+            prefix=package.__name__ + ".",
         ):
             module = importlib.import_module(module_info.name)
             dependencies.extend(self._scan_module(module, tags=tags))
@@ -1061,14 +1123,17 @@ class Container:
         return dependencies
 
     def _scan_module(
-        self, module: ModuleType, *, tags: Iterable[str]
+        self,
+        module: ModuleType,
+        *,
+        tags: Iterable[str],
     ) -> list[ScannedDependency]:
         """Scan a module for decorated members."""
         dependencies: list[ScannedDependency] = []
 
         for _, member in inspect.getmembers(module):
             if getattr(member, "__module__", None) != module.__name__ or not callable(
-                member
+                member,
             ):
                 continue
 
@@ -1079,15 +1144,17 @@ class Container:
             )
 
             if tags and (
-                decorator_args.tags
-                and not set(decorator_args.tags).intersection(tags)
+                (
+                    decorator_args.tags
+                    and not set(decorator_args.tags).intersection(tags)
+                )
                 or not decorator_args.tags
             ):
                 continue
 
             if decorator_args.wrapped:
                 dependencies.append(
-                    self._create_scanned_dependency(member=member, module=module)
+                    self._create_scanned_dependency(member=member, module=module),
                 )
                 continue
 
@@ -1095,14 +1162,16 @@ class Container:
             for parameter in get_typed_parameters(member):
                 if is_marker(parameter.default):
                     dependencies.append(
-                        self._create_scanned_dependency(member=member, module=module)
+                        self._create_scanned_dependency(member=member, module=module),
                     )
                     continue
 
         return dependencies
 
     def _create_scanned_dependency(
-        self, member: Any, module: ModuleType
+        self,
+        member: Any,
+        module: ModuleType,
     ) -> ScannedDependency:
         """Create a `Dependency` object from the scanned member and module."""
         if hasattr(member, "__wrapped__"):
@@ -1134,7 +1203,9 @@ def singleton(target: T) -> T:
 
 
 def provider(
-    *, scope: Scope, override: bool = False
+    *,
+    scope: Scope,
+    override: bool = False,
 ) -> Callable[[Callable[Concatenate[M, P], T]], Callable[Concatenate[M, P], T]]:
     """Decorator for marking a function or method as a provider in a AnyDI module."""
 
@@ -1157,7 +1228,8 @@ def injectable(func: Callable[P, T]) -> Callable[P, T]: ...
 
 @overload
 def injectable(
-    *, tags: Iterable[str] | None = None
+    *,
+    tags: Iterable[str] | None = None,
 ) -> Callable[[Callable[P, T]], Callable[P, T]]: ...
 
 

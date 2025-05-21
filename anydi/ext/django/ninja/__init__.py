@@ -3,7 +3,7 @@ try:
 except ImportError as exc:  # pragma: no cover
     raise ImportError(
         "'django-ninja' is not installed. "
-        "Please install it using 'pip install django-ninja'."
+        "Please install it using 'pip install django-ninja'.",
     ) from exc
 
 from ._operation import AsyncOperation, Operation

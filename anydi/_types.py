@@ -8,7 +8,7 @@ from functools import cached_property
 from types import ModuleType
 from typing import Annotated, Any, Callable, NamedTuple, Union
 
-import wrapt
+import wrapt  # type: ignore[reportMissingTypeStubs]
 from typing_extensions import Literal, Self, TypeAlias
 
 Scope = Literal["transient", "singleton", "request"]
@@ -43,9 +43,9 @@ def is_event_type(obj: Any) -> bool:
     return inspect.isclass(obj) and issubclass(obj, Event)
 
 
-class InstanceProxy(wrapt.ObjectProxy):  # type: ignore[misc]
+class InstanceProxy(wrapt.ObjectProxy):  # type: ignore[reportUnknownMemberType]
     def __init__(self, wrapped: Any, *, interface: type[Any]) -> None:
-        super().__init__(wrapped)
+        super().__init__(wrapped)  # type: ignore[reportUnknownMemberType]
         self._self_interface = interface
 
     @property
@@ -69,17 +69,17 @@ class ProviderKind(enum.IntEnum):
     def from_call(cls, call: Callable[..., Any]) -> ProviderKind:
         if inspect.isclass(call):
             return cls.CLASS
-        elif inspect.iscoroutinefunction(call):
+        if inspect.iscoroutinefunction(call):
             return cls.COROUTINE
-        elif inspect.isasyncgenfunction(call):
+        if inspect.isasyncgenfunction(call):
             return cls.ASYNC_GENERATOR
-        elif inspect.isgeneratorfunction(call):
+        if inspect.isgeneratorfunction(call):
             return cls.GENERATOR
-        elif inspect.isfunction(call) or inspect.ismethod(call):
+        if inspect.isfunction(call) or inspect.ismethod(call):
             return cls.FUNCTION
         raise TypeError(
             f"The provider `{call}` is invalid because it is not a callable "
-            "object. Only callable providers are allowed."
+            "object. Only callable providers are allowed.",
         )
 
     @classmethod

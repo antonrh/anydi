@@ -12,7 +12,7 @@ from collections.abc import AsyncIterator, Iterator
 from types import TracebackType
 from typing import Any, Callable, ForwardRef, TypeVar
 
-import anyio
+import anyio.to_thread
 from typing_extensions import ParamSpec, Self, get_args, get_origin
 
 try:
@@ -74,7 +74,9 @@ def is_iterator_type(tp: Any) -> bool:
 
 
 def get_typed_annotation(
-    annotation: Any, globalns: dict[str, Any], module: Any = None
+    annotation: Any,
+    globalns: dict[str, Any],
+    module: Any = None,
 ) -> Any:
     """Get the typed annotation of a callable object."""
     if isinstance(annotation, str):
@@ -93,8 +95,10 @@ def get_typed_parameters(obj: Callable[..., Any]) -> list[inspect.Parameter]:
     return [
         parameter.replace(
             annotation=get_typed_annotation(
-                parameter.annotation, globalns, module=module
-            )
+                parameter.annotation,
+                globalns,
+                module=module,
+            ),
         )
         for parameter in inspect.signature(obj).parameters.values()
     ]
@@ -119,8 +123,7 @@ def import_string(dotted_path: str) -> Any:
         if module_path:
             module = importlib.import_module(module_path)
             return getattr(module, attribute_name)
-        else:
-            return importlib.import_module(attribute_name)
+        return importlib.import_module(attribute_name)
     except (ImportError, AttributeError) as exc:
         raise ImportError(f"Cannot import '{dotted_path}': {exc}") from exc
 
