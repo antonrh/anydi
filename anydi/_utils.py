@@ -13,13 +13,7 @@ from types import TracebackType
 from typing import Any, Callable, ForwardRef, TypeVar
 
 import anyio.to_thread
-from typing_extensions import (
-    ParamSpec,
-    Self,
-    evaluate_forward_ref,
-    get_args,
-    get_origin,
-)
+from typing_extensions import ParamSpec, Self, get_args, get_origin
 
 try:
     from types import NoneType
@@ -90,7 +84,7 @@ def get_typed_annotation(
             ref = ForwardRef(annotation, module=module)
         else:
             ref = ForwardRef(annotation)
-        annotation = evaluate_forward_ref(ref, globals=globalns)
+        annotation = ref._evaluate(globalns, recursive_guard=set())
     return annotation
 
 
