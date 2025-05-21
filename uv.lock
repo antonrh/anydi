@@ -38,6 +38,7 @@ dev = [
     { name = "pytest-django" },
     { name = "redis" },
     { name = "ruff" },
+    { name = "starlette" },
 ]
 docs = [
     { name = "mkdocs" },
@@ -57,7 +58,7 @@ dev = [
     { name = "django", specifier = "~=4.2" },
     { name = "django-ninja", specifier = ">=1.1.0,<2" },
     { name = "django-stubs", specifier = ">=5.1.1,<6" },
-    { name = "fastapi", specifier = ">=0.100.0,<0.101" },
+    { name = "fastapi", specifier = ">=0.100.0" },
     { name = "faststream", specifier = ">=0.5.10,<0.6" },
     { name = "httpx", specifier = ">=0.26.0" },
     { name = "mypy", extras = ["faster-cache"], specifier = ">=1.15.0,<2" },
@@ -68,6 +69,7 @@ dev = [
     { name = "pytest-django", specifier = ">=4.8.0,<5" },
     { name = "redis", specifier = ">=5.0.4,<6" },
     { name = "ruff", specifier = ">=0.11.10,<1.0" },
+    { name = "starlette", specifier = ">=0.37.2" },
 ]
 docs = [
     { name = "mkdocs", specifier = ">=1.4.2,<2" },
@@ -407,16 +409,16 @@ wheels = [
 
 [[package]]
 name = "fastapi"
-version = "0.100.1"
+version = "0.115.12"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "pydantic" },
     { name = "starlette" },
     { name = "typing-extensions" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/b2/72/6af07ac2417c6c8bf13069cac3673a5e4628247c62316b0f65a2eaea15c3/fastapi-0.100.1.tar.gz", hash = "sha256:522700d7a469e4a973d92321ab93312448fbe20fca9c8da97effc7e7bc56df23", size = 10494927, upload-time = "2023-07-27T19:21:07.54Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/f4/55/ae499352d82338331ca1e28c7f4a63bfd09479b16395dce38cf50a39e2c2/fastapi-0.115.12.tar.gz", hash = "sha256:1e2c2a2646905f9e83d32f04a3f86aff4a286669c6c950ca95b5fd68c2602681", size = 295236, upload-time = "2025-03-23T22:55:43.822Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/66/23/5db1adf057fc47f6575c4f317b98882a9312f59a7ec555ae38ca854aef42/fastapi-0.100.1-py3-none-any.whl", hash = "sha256:ec6dd52bfc4eff3063cfcd0713b43c87640fefb2687bbbe3d8a08d94049cdf32", size = 65754, upload-time = "2023-07-27T19:21:05.957Z" },
+    { url = "https://files.pythonhosted.org/packages/50/b3/b51f09c2ba432a576fe63758bddc81f78f0c6309d9e5c10d194313bf021e/fastapi-0.115.12-py3-none-any.whl", hash = "sha256:e94613d6c05e27be7ffebdd6ea5f388112e5e430c8f7d6494a9d1d88d43e814d", size = 95164, upload-time = "2025-03-23T22:55:42.101Z" },
 ]
 
 [[package]]
@@ -1395,15 +1397,15 @@ wheels = [
 
 [[package]]
 name = "starlette"
-version = "0.27.0"
+version = "0.46.2"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "anyio" },
     { name = "typing-extensions", marker = "python_full_version < '3.10'" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/06/68/559bed5484e746f1ab2ebbe22312f2c25ec62e4b534916d41a8c21147bf8/starlette-0.27.0.tar.gz", hash = "sha256:6a6b0d042acb8d469a01eba54e9cda6cbd24ac602c4cd016723117d6a7e73b75", size = 51394, upload-time = "2023-05-16T10:59:56.286Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/ce/20/08dfcd9c983f6a6f4a1000d934b9e6d626cff8d2eeb77a89a68eef20a2b7/starlette-0.46.2.tar.gz", hash = "sha256:7f7361f34eed179294600af672f565727419830b54b7b084efe44bb82d2fccd5", size = 2580846, upload-time = "2025-04-13T13:56:17.942Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/58/f8/e2cca22387965584a409795913b774235752be4176d276714e15e1a58884/starlette-0.27.0-py3-none-any.whl", hash = "sha256:918416370e846586541235ccd38a474c08b80443ed31c578a418e2209b3eef91", size = 66978, upload-time = "2023-05-16T10:59:53.927Z" },
+    { url = "https://files.pythonhosted.org/packages/8b/0c/9d30a4ebeb6db2b25a841afbb80f6ef9a854fc3b41be131d249a977b4959/starlette-0.46.2-py3-none-any.whl", hash = "sha256:595633ce89f8ffa71a015caed34a5b2dc1c0cdb3f0f1fbd1e69339cf2abeec35", size = 72037, upload-time = "2025-04-13T13:56:16.21Z" },
 ]
 
 [[package]]
