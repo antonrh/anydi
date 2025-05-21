@@ -527,7 +527,7 @@ class Container:
     def resolve(self, interface: type[T]) -> T: ...
 
     @overload
-    def resolve(self, interface: T) -> T: ...
+    def resolve(self, interface: T) -> T: ...  # type: ignore
 
     def resolve(self, interface: type[T]) -> T:
         """Resolve an instance by interface."""
@@ -1012,6 +1012,10 @@ class Container:
                     scope=decorator_args.scope,
                     override=decorator_args.override,
                 )(obj)
+        else:
+            raise TypeError(
+                "The module must be a callable, a module type, or a module instance."
+            )
 
     ############################
     # Scanner Methods
