@@ -153,22 +153,21 @@ assert not container.is_resolved(int)
 Consider a scenario with class dependencies:
 
 ```python
-from dataclasses import dataclass
-
 class Database:
     def connect(self) -> None:
         print("connect")
     def disconnect(self) -> None:
         print("disconnect")
 
-@dataclass
+
 class Repository:
-    db: Database
+    def __init__(self, db: Database) -> None:
+        self.db = db
 
 
-@dataclass
 class Service:
-    repo: Repository
+    def __init__(self, repo: Repository) -> None:
+        self.repo = repo
 ```
 
 You can instantiate these classes without manually registering each one:
@@ -746,17 +745,17 @@ class Item:
     name: str
 
 
-@dataclass(kw_only=True)
 class Repository:
-    items: list[Item] = field(default_factory=list)
+    def __init__(self) -> None:
+        self.items: list[Item] = []
 
     def all(self) -> list[Item]:
         return self.items
 
 
-@dataclass(kw_only=True)
 class Service:
-    repo: Repository
+    def __init__(self, repo: Repository) -> None:
+        self.repo = repo
 
     def get_items(self) -> list[Item]:
         return self.repo.all()

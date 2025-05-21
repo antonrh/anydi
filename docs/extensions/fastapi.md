@@ -144,15 +144,15 @@ from anydi import Container
 from anydi.ext.fastapi import Inject, RequestScopedMiddleware
 
 
-@dataclass
+@dataclass(kw_only=True)
 class User:
     id: str
     email: str
 
 
-@dataclass
 class UserService:
-    request: Request
+    def __init__(self, request: Request) -> None:
+        self.request = request
 
     async def get_user(self, user_id: str) -> User:
         # Use request headers, IP, etc., from the Request object as needed
