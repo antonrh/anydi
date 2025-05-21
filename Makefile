@@ -6,12 +6,12 @@ help:
 
 lint: ## Run code linters
 	uv run mypy anydi tests
-	uv run ruff check anydi tests
-	uv run ruff format anydi tests --check
+	uv run ruff check
+	uv run ruff format --check
 
 fmt: ## Run code formatters
-	uv run ruff check anydi tests --fix
-	uv run ruff format anydi tests
+	uv run ruff check --fix
+	uv run ruff format
 
 test:  ## Run unit tests
 	uv run pytest -vv tests --ignore=tests/ext/test_pytest_plugin.py --cov=anydi -p no:anydi -p no:testanydi
