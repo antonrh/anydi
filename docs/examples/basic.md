@@ -86,9 +86,9 @@ from app.models import User
 from app.repositories import UserRepository
 
 
-@dataclass
 class UserService:
-    user_repository: UserRepository
+    def __init__(self, user_repository: UserRepository) -> None:
+        self.user_repository = user_repository
 
     def get_users(self) -> List[User]:
         return self.user_repository.all()
