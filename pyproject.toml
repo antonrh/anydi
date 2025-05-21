@@ -55,7 +55,7 @@ dev = [
     "pytest>=8.3.1,<9",
     "pytest-cov>=6.0.0,<7",
     "fastapi>=0.100.0,<0.101",
-    "httpx>=0.26.0,<0.27",
+    "httpx>=0.26.0",
     "django~=4.2",
     "django-stubs>=5.1.1,<6",
     "django-ninja>=1.1.0,<2",
@@ -63,7 +63,7 @@ dev = [
     "faststream>=0.5.10,<0.6",
     "redis>=5.0.4,<6",
     "pydantic-settings>=2.4.0,<3",
-    "bump-my-version>=0.31.1",
+    "bump-my-version>=1.1.4",
     "pyright>=1.1.401",
 ]
 docs = [
