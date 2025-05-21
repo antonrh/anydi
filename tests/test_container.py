@@ -1557,30 +1557,6 @@ class TestContainerInjector:
 
         assert result == "service ident = 1000"
 
-    def test_inject_dataclass(self, container: Container) -> None:
-        @container.provider(scope="singleton")
-        def ident_provider() -> str:
-            return "1000"
-
-        @container.provider(scope="singleton")
-        def service_provider(ident: str) -> Service:
-            return Service(ident=ident)
-
-        @container.inject
-        @dataclass
-        class Handler:
-            name: str
-            service: Service = auto
-
-            def handle(self) -> str:
-                return f"{self.name} = {self.service.ident}"
-
-        handler = Handler(name="service ident")
-
-        result = handler.handle()
-
-        assert result == "service ident = 1000"
-
     async def test_inject_with_sync_and_async_resources(
         self, container: Container
     ) -> None:

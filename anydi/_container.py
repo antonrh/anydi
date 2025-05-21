@@ -364,8 +364,8 @@ class Container:
             )
 
         unresolved_parameter = None
-        parameters = []
-        scopes = {}
+        parameters: list[inspect.Parameter] = []
+        scopes: dict[Scope, Provider] = {}
 
         for parameter in signature.parameters.values():
             if parameter.annotation is inspect.Parameter.empty:
@@ -947,7 +947,7 @@ class Container:
 
     def _get_injected_params(self, call: Callable[..., Any]) -> dict[str, Any]:
         """Get the injected parameters of a callable object."""
-        injected_params = {}
+        injected_params: dict[str, Any] = {}
         for parameter in get_typed_parameters(call):
             if not is_marker(parameter.default):
                 continue
