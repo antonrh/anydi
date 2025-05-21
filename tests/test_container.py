@@ -1870,6 +1870,13 @@ class TestContainerModule:
             Annotated[str, "dep2"],
         ]
 
+    def test_register_module_invlid_path(self, container: Container) -> None:
+        with pytest.raises(
+            TypeError,
+            match="The module must be a callable, a module type, or a module instance.",
+        ):
+            container.register_module("anydi.Container")
+
 
 class TestContainerScanning:
     def test_scan(self, container: Container) -> None:
