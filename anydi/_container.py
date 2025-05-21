@@ -14,7 +14,7 @@ from collections import defaultdict
 from collections.abc import AsyncIterator, Iterable, Iterator, Sequence
 from contextvars import ContextVar
 from types import ModuleType
-from typing import Annotated, Any, Callable, TypeVar, Union, cast, overload
+from typing import Annotated, Any, Callable, TypeVar, cast, overload
 
 from typing_extensions import Concatenate, ParamSpec, Self, final, get_args, get_origin
 
@@ -1027,10 +1027,10 @@ class Container:
         """Scan packages or modules for decorated members and inject dependencies."""
         dependencies: list[ScannedDependency] = []
 
-        if isinstance(packages, Iterable) and not isinstance(packages, str):
-            scan_packages: Iterable[ModuleType | str] = packages
+        if isinstance(packages, ModuleType | str):
+            scan_packages: Iterable[ModuleType | str] = [packages]
         else:
-            scan_packages = cast(Iterable[Union[ModuleType, str]], [packages])
+            scan_packages = packages
 
         for package in scan_packages:
             dependencies.extend(self._scan_package(package, tags=tags))
