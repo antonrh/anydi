@@ -94,18 +94,18 @@ class Container:
         testing: bool = False,
         logger: logging.Logger | None = None,
     ) -> None:
-        self._providers: dict[type[Any], Provider] = {}
+        self._providers: dict[Any, Provider] = {}
         self._strict = strict
         self._default_scope: Scope = default_scope
         self._testing = testing
         self._logger = logger or logging.getLogger(__name__)
-        self._resources: dict[str, list[type[Any]]] = defaultdict(list)
+        self._resources: dict[str, list[Any]] = defaultdict(list)
         self._singleton_context = InstanceContext()
         self._request_context_var: ContextVar[InstanceContext | None] = ContextVar(
             "request_context", default=None
         )
-        self._override_instances: dict[type[Any], Any] = {}
-        self._unresolved_interfaces: set[type[Any]] = set()
+        self._override_instances: dict[Any, Any] = {}
+        self._unresolved_interfaces: set[Any] = set()
         self._inject_cache: dict[Callable[..., Any], Callable[..., Any]] = {}
 
         # Register providers
