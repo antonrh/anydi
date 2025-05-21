@@ -64,6 +64,7 @@ dev = [
     "redis>=5.0.4,<6",
     "pydantic-settings>=2.4.0,<3",
     "bump-my-version>=0.31.1",
+    "pyright>=1.1.401",
 ]
 docs = [
     "mkdocs>=1.4.2,<2",

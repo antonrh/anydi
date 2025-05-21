@@ -30,8 +30,8 @@ def install(broker: BrokerUsecase[Any, Any], container: Container) -> None:
 
 
 def _get_broken_handlers(broker: BrokerUsecase[Any, Any]) -> list[Any]:
-    if hasattr(broker, "handlers"):
-        return [handler.calls[0][0] for handler in broker.handlers.values()]
+    if (handlers := getattr(broker, "handlers", None)) is not None:
+        return [handler.calls[0][0] for handler in handlers.values()]
     # faststream > 0.5.0
     return [
         subscriber.calls[0].handler

@@ -78,9 +78,9 @@ class InstanceContext:
         exc_tb: TracebackType | None,
     ) -> bool:
         """Exit the context asynchronously."""
-        return await run_async(
-            self.__exit__, exc_type, exc_val, exc_tb
-        ) or await self._async_stack.__aexit__(exc_type, exc_val, exc_tb)
+        sync_exit = await run_async(self.__exit__, exc_type, exc_val, exc_tb)
+        async_exit = await self._async_stack.__aexit__(exc_type, exc_val, exc_tb)
+        return bool(sync_exit) or bool(async_exit)
 
     async def aclose(self) -> None:
         """Close the scoped context asynchronously."""
