@@ -12,7 +12,7 @@ from collections.abc import AsyncIterator, Iterator
 from types import TracebackType
 from typing import Any, Callable, ForwardRef, TypeVar
 
-import anyio
+import anyio.to_thread
 from typing_extensions import ParamSpec, Self, get_args, get_origin
 
 try:
