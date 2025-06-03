@@ -6,7 +6,6 @@ from collections.abc import Iterator
 from typing import Any, Callable, cast
 
 import pytest
-from _pytest.python import async_warn_and_skip
 from anyio.pytest_plugin import extract_backend_and_options, get_runner
 
 from anydi import Container
@@ -117,7 +116,12 @@ def _anydi_ainject(
 
     # Skip if the anyio backend is not available
     if "anyio_backend" not in request.fixturenames:
-        async_warn_and_skip(request.node.nodeid)
+        msg = (
+            "To run async test functions with `anyio`, "
+            "please configure the `anyio` pytest plugin.\n"
+            "See: https://anyio.readthedocs.io/en/stable/testing.html"
+        )
+        pytest.fail(msg, pytrace=False)
 
     async def _awrapper() -> None:
         # Setup the container
