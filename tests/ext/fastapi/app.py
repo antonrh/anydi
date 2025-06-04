@@ -4,13 +4,13 @@ from fastapi import Body, Depends, FastAPI
 from starlette.middleware import Middleware
 
 import anydi.ext.fastapi
-from anydi import Container
 from anydi.ext.fastapi import Inject
 from anydi.ext.starlette.middleware import RequestScopedMiddleware
+from anydi.testcontainer import TestContainer
 
 from tests.ext.fixtures import Mail, MailService, User, UserService
 
-container = Container(strict=True, testing=True)
+container = TestContainer(strict=True)
 
 
 @container.provider(scope="singleton")

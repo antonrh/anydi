@@ -10,7 +10,7 @@ from fastapi.dependencies.models import Dependant
 from fastapi.routing import APIRoute
 from starlette.requests import Request
 
-from anydi import Container
+from anydi._container import BaseContainer
 from anydi._utils import get_typed_parameters
 
 from ._utils import HasInterface, patch_call_parameter
@@ -19,7 +19,7 @@ from .starlette.middleware import RequestScopedMiddleware
 __all__ = ["RequestScopedMiddleware", "install", "get_container", "Inject"]
 
 
-def install(app: FastAPI, container: Container) -> None:
+def install(app: FastAPI, container: BaseContainer) -> None:
     """Install AnyDI into a FastAPI application.
 
     This function installs the AnyDI container into a FastAPI application by attaching
@@ -44,9 +44,9 @@ def install(app: FastAPI, container: Container) -> None:
                 patch_call_parameter(container, call, parameter)
 
 
-def get_container(request: Request) -> Container:
+def get_container(request: Request) -> BaseContainer:
     """Get the AnyDI container from a FastAPI request."""
-    return cast(Container, request.app.state.container)
+    return cast(BaseContainer, request.app.state.container)
 
 
 class Resolver(HasInterface, params.Depends):
@@ -55,7 +55,9 @@ class Resolver(HasInterface, params.Depends):
     def __init__(self) -> None:
         super().__init__(dependency=self._dependency, use_cache=True)
 
-    async def _dependency(self, container: Container = Depends(get_container)) -> Any:
+    async def _dependency(
+        self, container: BaseContainer = Depends(get_container)
+    ) -> Any:
         return await container.aresolve(self.interface)
 
 

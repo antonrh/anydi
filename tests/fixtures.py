@@ -3,7 +3,8 @@ from collections.abc import AsyncIterator, Iterator
 from dataclasses import dataclass, field
 from typing import Annotated
 
-from anydi import Container, Module, provider
+from anydi import Module, provider
+from anydi._container import BaseContainer
 
 
 def func() -> str:
@@ -66,7 +67,7 @@ class Resource:
 
 
 class TestModule(Module):
-    def configure(self, container: Container) -> None:
+    def configure(self, container: BaseContainer) -> None:
         container.register(
             Annotated[str, "msg1"], lambda: "Message 1", scope="singleton"
         )
