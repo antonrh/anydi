@@ -5,13 +5,13 @@ from starlette.requests import Request
 from starlette.responses import Response
 from starlette.types import ASGIApp
 
-from anydi import Container
+from anydi._container import BaseContainer
 
 
 class RequestScopedMiddleware(BaseHTTPMiddleware):
     """Starlette middleware for managing request-scoped AnyDI context."""
 
-    def __init__(self, app: ASGIApp, container: Container) -> None:
+    def __init__(self, app: ASGIApp, container: BaseContainer) -> None:
         super().__init__(app)
         self.container = container
 

@@ -79,7 +79,8 @@ class TestTestContainer:
         with container.override(str, overridden):
             assert (await container.aresolve(str)) == overridden
 
-    def test_override_instance_testing(self) -> None:
+    # TODO: add
+    def test_override_instance_TODO(self) -> None:
         container = TestContainer(strict=False)
         container.register(Annotated[str, "param"], lambda: "param", scope="singleton")
 
@@ -114,7 +115,7 @@ class TestTestContainer:
                 "param": "mock",
             }
 
-    async def test_override_instance_testing_async_resolved(self) -> None:
+    async def test_override_instance_async_resolved(self) -> None:
         container = TestContainer(strict=False)
         container.register(Annotated[str, "param"], lambda: "param", scope="singleton")
 
@@ -136,7 +137,7 @@ class TestTestContainer:
                 "param": "mock",
             }
 
-    def test_override_instance_testing_in_strict_mode(self) -> None:
+    def test_override_instance_in_strict_mode(self) -> None:
         container = TestContainer(strict=True)
 
         class Settings:
@@ -155,7 +156,7 @@ class TestTestContainer:
 
         assert service.ident == "test"
 
-    def test_override_instance_first_testing(self) -> None:
+    def test_override_instance_first(self) -> None:
         container = TestContainer(strict=True)
 
         @dataclass
