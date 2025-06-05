@@ -79,8 +79,7 @@ class TestTestContainer:
         with container.override(str, overridden):
             assert (await container.aresolve(str)) == overridden
 
-    # TODO: add
-    def test_override_instance_TODO(self) -> None:
+    def test_override_registered_instance(self) -> None:
         container = TestContainer(strict=False)
         container.register(Annotated[str, "param"], lambda: "param", scope="singleton")
 
