@@ -16,7 +16,7 @@ from contextvars import ContextVar
 from types import ModuleType
 from typing import Annotated, Any, Callable, TypeVar, cast, overload
 
-from typing_extensions import Concatenate, ParamSpec, Self, final, get_args, get_origin
+from typing_extensions import Concatenate, ParamSpec, Self, get_args, get_origin
 
 from ._context import InstanceContext
 from ._types import (
@@ -74,11 +74,11 @@ class Module(metaclass=ModuleMeta):
 
     providers: list[tuple[str, ProviderDecoratorArgs]]
 
-    def configure(self, container: BaseContainer | Container) -> None:
+    def configure(self, container: Container) -> None:
         """Configure the AnyDI container with providers and their dependencies."""
 
 
-class BaseContainer:
+class Container:
     """AnyDI is a dependency injection container."""
 
     def __init__(
@@ -1026,11 +1026,6 @@ class BaseContainer:
         if hasattr(member, "__wrapped__"):
             member = member.__wrapped__
         return ScannedDependency(member=member, module=module)
-
-
-@final
-class Container(BaseContainer):
-    pass
 
 
 ############################

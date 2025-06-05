@@ -4,7 +4,7 @@ from dataclasses import dataclass, field
 from typing import Annotated
 
 from anydi import Module, provider
-from anydi._container import BaseContainer
+from anydi._container import Container
 
 
 def func() -> str:
@@ -67,7 +67,7 @@ class Resource:
 
 
 class TestModule(Module):
-    def configure(self, container: BaseContainer) -> None:
+    def configure(self, container: Container) -> None:
         container.register(
             Annotated[str, "msg1"], lambda: "Message 1", scope="singleton"
         )

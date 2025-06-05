@@ -6,18 +6,18 @@ from typing import Any, Callable, cast
 
 import wrapt  # type: ignore
 
-from ._container import BaseContainer, Module, T
+from ._container import Container, Module, T
 from ._context import InstanceContext
 from ._types import AnyInterface, Provider, ProviderArgs, Scope
 from ._utils import get_full_qualname
 
 
-class TestContainer(BaseContainer):
+class TestContainer(Container):
     def __init__(
         self,
         *,
         providers: Sequence[ProviderArgs] | None = None,
-        modules: Sequence[Module | type[Module] | Callable[[BaseContainer], None] | str]
+        modules: Sequence[Module | type[Module] | Callable[[Container], None] | str]
         | None = None,
         strict: bool = False,
         default_scope: Scope = "transient",

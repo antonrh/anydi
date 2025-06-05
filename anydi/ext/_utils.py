@@ -8,7 +8,7 @@ from typing import Annotated, Any, Callable
 
 from typing_extensions import get_args, get_origin
 
-from anydi._container import BaseContainer
+from anydi._container import Container
 from anydi._utils import get_full_qualname
 
 logger = logging.getLogger(__name__)
@@ -61,7 +61,7 @@ def patch_annotated_parameter(parameter: inspect.Parameter) -> inspect.Parameter
 
 
 def patch_call_parameter(
-    container: BaseContainer, call: Callable[..., Any], parameter: inspect.Parameter
+    container: Container, call: Callable[..., Any], parameter: inspect.Parameter
 ) -> None:
     """Patch a parameter to inject dependencies using AnyDI."""
     parameter = patch_annotated_parameter(parameter)
