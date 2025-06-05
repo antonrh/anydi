@@ -696,7 +696,7 @@ class Container:
         """Retrieve the arguments for a provider."""
         provided_kwargs = {}
         for parameter in provider.parameters:
-            instance, is_default = self._get_provider_instance(
+            instance, _ = self._get_provider_instance(
                 provider, parameter, context, **defaults
             )
             provided_kwargs[parameter.name] = instance
@@ -739,7 +739,7 @@ class Container:
         """Asynchronously retrieve the arguments for a provider."""
         provided_kwargs = {}
         for parameter in provider.parameters:
-            instance, is_default = await self._aget_provider_instance(
+            instance, _ = await self._aget_provider_instance(
                 provider, parameter, context, **defaults
             )
             provided_kwargs[parameter.name] = instance

@@ -2,14 +2,16 @@ import contextlib
 import inspect
 import logging
 from collections.abc import Iterator, Sequence
-from typing import Any, Callable, cast
+from typing import Any, Callable, TypeVar, cast
 
 import wrapt  # type: ignore
 
-from ._container import Container, Module, T
+from ._container import Container, Module
 from ._context import InstanceContext
 from ._types import AnyInterface, Provider, ProviderArgs, Scope
 from ._utils import get_full_qualname
+
+T = TypeVar("T")
 
 
 class TestContainer(Container):
