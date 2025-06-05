@@ -5,6 +5,7 @@ from collections.abc import Iterator, Sequence
 from typing import Any, Callable, TypeVar, cast
 
 import wrapt  # type: ignore
+from typing_extensions import Self
 
 from ._container import Container, Module
 from ._context import InstanceContext
@@ -33,6 +34,20 @@ class TestContainer(Container):
             logger=logger,
         )
         self._override_instances: dict[Any, Any] = {}
+
+    @classmethod
+    def from_container(cls, container: Container) -> Self:
+        self = cls()
+        self._providers = container._providers
+        self._strict = container._strict
+        self._default_scope = container._default_scope
+        self._logger = container._logger
+        self._resources = container._resources
+        self._singleton_context = container._singleton_context
+        self._request_context_var = container._request_context_var
+        self._unresolved_interfaces = container._unresolved_interfaces
+        self._inject_cache = container._inject_cache
+        return self
 
     @contextlib.contextmanager
     def override(self, interface: AnyInterface, instance: Any) -> Iterator[None]:
