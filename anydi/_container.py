@@ -728,9 +728,6 @@ class Container:
                 if parameter.default is inspect.Parameter.empty:
                     raise
                 return parameter.default, True
-
-        # TODO: do we need to handle default
-
         return instance, False
 
     async def _aget_provided_kwargs(
@@ -771,8 +768,6 @@ class Container:
                 if parameter.default is inspect.Parameter.empty:
                     raise
                 return parameter.default, True
-
-        # TODO: do we need to handle default
         return instance, False
 
     def _resolve_parameter(
