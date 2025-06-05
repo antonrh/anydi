@@ -10,7 +10,7 @@ from fastapi.dependencies.models import Dependant
 from fastapi.routing import APIRoute
 from starlette.requests import Request
 
-from anydi import Container
+from anydi._container import Container
 from anydi._utils import get_typed_parameters
 
 from ._utils import HasInterface, patch_call_parameter

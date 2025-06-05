@@ -16,7 +16,7 @@ from contextvars import ContextVar
 from types import ModuleType
 from typing import Annotated, Any, Callable, TypeVar, cast, overload
 
-from typing_extensions import Concatenate, ParamSpec, Self, final, get_args, get_origin
+from typing_extensions import Concatenate, ParamSpec, Self, get_args, get_origin
 
 from ._context import InstanceContext
 from ._types import (
@@ -24,7 +24,6 @@ from ._types import (
     AnyInterface,
     Event,
     InjectableDecoratorArgs,
-    InstanceProxy,
     Provider,
     ProviderArgs,
     ProviderDecoratorArgs,
@@ -79,7 +78,6 @@ class Module(metaclass=ModuleMeta):
         """Configure the AnyDI container with providers and their dependencies."""
 
 
-@final
 class Container:
     """AnyDI is a dependency injection container."""
 
@@ -91,20 +89,17 @@ class Container:
         | None = None,
         strict: bool = False,
         default_scope: Scope = "transient",
-        testing: bool = False,
         logger: logging.Logger | None = None,
     ) -> None:
         self._providers: dict[Any, Provider] = {}
         self._strict = strict
         self._default_scope: Scope = default_scope
-        self._testing = testing
         self._logger = logger or logging.getLogger(__name__)
         self._resources: dict[str, list[Any]] = defaultdict(list)
         self._singleton_context = InstanceContext()
         self._request_context_var: ContextVar[InstanceContext | None] = ContextVar(
             "request_context", default=None
         )
-        self._override_instances: dict[Any, Any] = {}
         self._unresolved_interfaces: set[Any] = set()
         self._inject_cache: dict[Callable[..., Any], Callable[..., Any]] = {}
 
@@ -135,11 +130,6 @@ class Container:
     def default_scope(self) -> Scope:
         """Get the default scope."""
         return self._default_scope
-
-    @property
-    def testing(self) -> bool:
-        """Check if testing mode is enabled."""
-        return self._testing
 
     @property
     def providers(self) -> dict[type[Any], Provider]:
@@ -597,9 +587,6 @@ class Container:
                     else self._create_instance(provider, context, **defaults)
                 )
 
-        if self.testing:
-            instance = self._patch_test_resolver(provider.interface, instance)
-
         return cast(T, instance)
 
     async def _aresolve_or_create(
@@ -617,9 +604,6 @@ class Container:
                     if not create
                     else await self._acreate_instance(provider, context, **defaults)
                 )
-
-        if self.testing:
-            instance = self._patch_test_resolver(provider.interface, instance)
 
         return cast(T, instance)
 
@@ -712,7 +696,7 @@ class Container:
         """Retrieve the arguments for a provider."""
         provided_kwargs = {}
         for parameter in provider.parameters:
-            instance = self._get_provider_instance(
+            instance, _ = self._get_provider_instance(
                 provider, parameter, context, **defaults
             )
             provided_kwargs[parameter.name] = instance
@@ -725,12 +709,12 @@ class Container:
         context: InstanceContext | None,
         /,
         **defaults: Any,
-    ) -> Any:
+    ) -> tuple[Any, bool]:
         """Retrieve an instance of a dependency from the scoped context."""
 
         # Try to get instance from defaults
         if parameter.name in defaults:
-            return defaults[parameter.name]
+            return defaults[parameter.name], True
 
         # Try to get instance from context
         elif context and parameter.annotation in context:
@@ -743,12 +727,8 @@ class Container:
             except LookupError:
                 if parameter.default is inspect.Parameter.empty:
                     raise
-                return parameter.default
-
-        # Wrap the instance in a proxy for testing
-        if self.testing:
-            return InstanceProxy(instance, interface=parameter.annotation)
-        return instance
+                return parameter.default, True
+        return instance, False
 
     async def _aget_provided_kwargs(
         self, provider: Provider, context: InstanceContext | None, /, **defaults: Any
@@ -756,7 +736,7 @@ class Container:
         """Asynchronously retrieve the arguments for a provider."""
         provided_kwargs = {}
         for parameter in provider.parameters:
-            instance = await self._aget_provider_instance(
+            instance, _ = await self._aget_provider_instance(
                 provider, parameter, context, **defaults
             )
             provided_kwargs[parameter.name] = instance
@@ -769,12 +749,12 @@ class Container:
         context: InstanceContext | None,
         /,
         **defaults: Any,
-    ) -> Any:
+    ) -> tuple[Any, bool]:
         """Asynchronously retrieve an instance of a dependency from the context."""
 
         # Try to get instance from defaults
         if parameter.name in defaults:
-            return defaults[parameter.name]
+            return defaults[parameter.name], True
 
         # Try to get instance from context
         elif context and parameter.annotation in context:
@@ -787,12 +767,8 @@ class Container:
             except LookupError:
                 if parameter.default is inspect.Parameter.empty:
                     raise
-                return parameter.default
-
-        # Wrap the instance in a proxy for testing
-        if self.testing:
-            return InstanceProxy(instance, interface=parameter.annotation)
-        return instance
+                return parameter.default, True
+        return instance, False
 
     def _resolve_parameter(
         self, provider: Provider, parameter: inspect.Parameter
@@ -817,78 +793,6 @@ class Container:
                 f"dependency into `{get_full_qualname(provider.call)}` which is "
                 "not registered or set in the scoped context."
             )
-
-    @contextlib.contextmanager
-    def override(self, interface: AnyInterface, instance: Any) -> Iterator[None]:
-        """
-        Override the provider for the specified interface with a specific instance.
-        """
-        if not self.testing:
-            raise RuntimeError(
-                "The `override` method can only be used in testing mode."
-            )
-        if not self.is_registered(interface) and self.strict:
-            raise LookupError(
-                f"The provider interface `{get_full_qualname(interface)}` "
-                "not registered."
-            )
-        self._override_instances[interface] = instance
-        try:
-            yield
-        finally:
-            self._override_instances.pop(interface, None)
-
-    ############################
-    # Testing Methods
-    ############################
-
-    def _patch_test_resolver(self, interface: type[Any], instance: Any) -> Any:
-        """Patch the test resolver for the instance."""
-        if interface in self._override_instances:
-            return self._override_instances[interface]
-
-        if not hasattr(instance, "__dict__") or hasattr(
-            instance, "__resolver_getter__"
-        ):
-            return instance
-
-        wrapped = {
-            name: value.interface
-            for name, value in instance.__dict__.items()
-            if isinstance(value, InstanceProxy)
-        }
-
-        def __resolver_getter__(name: str) -> Any:
-            if name in wrapped:
-                _interface = wrapped[name]
-                # Resolve the dependency if it's wrapped
-                return self.resolve(_interface)
-            raise LookupError
-
-        # Attach the resolver getter to the instance
-        instance.__resolver_getter__ = __resolver_getter__
-
-        if not hasattr(instance.__class__, "__getattribute_patched__"):
-
-            def __getattribute__(_self: Any, name: str) -> Any:
-                # Skip the resolver getter
-                if name in {"__resolver_getter__", "__class__"}:
-                    return object.__getattribute__(_self, name)
-
-                if hasattr(_self, "__resolver_getter__"):
-                    try:
-                        return _self.__resolver_getter__(name)
-                    except LookupError:
-                        pass
-
-                # Fall back to default behavior
-                return object.__getattribute__(_self, name)
-
-            # Apply the patched resolver if wrapped attributes exist
-            instance.__class__.__getattribute__ = __getattribute__
-            instance.__class__.__getattribute_patched__ = True
-
-        return instance
 
     ############################
     # Injector Methods

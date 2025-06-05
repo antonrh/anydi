@@ -1,3 +1,5 @@
+from anydi.testcontainer import TestContainer
+
 # Usage
 
 ## Providers
@@ -728,16 +730,17 @@ With `AnyDI`'s Modules, you can keep your code organized and easily manage your 
 
 ## Testing
 
-To use `AnyDI` with your testing framework, set `testing=True` and use the `.override(interface=..., instance=...)` context manager
+To use `AnyDI` with your testing framework, use `TestContainer` and call the `.override(interface=..., instance=...)` context manager
 to temporarily replace a dependency with an overridden instance during testing. This allows you to isolate the code being tested from its dependencies.
 The with `container.override()` context manager ensures that the overridden instance is used only within the context of the with block.
 Once the block is exited, the original dependency is restored.
 
 ```python
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from unittest import mock
 
-from anydi import Container, auto
+from anydi import auto
+from anydi.testcontainer import TestContainer
 
 
 @dataclass(kw_only=True)
@@ -761,7 +764,7 @@ class Service:
         return self.repo.all()
 
 
-container = Container(testing=True)
+container = TestContainer()
 
 
 @container.inject
@@ -787,14 +790,16 @@ Additionally, you need to define a `container` fixture to provide a `Container` 
 ```python
 import pytest
 
+from anydi.testcontainer import TestContainer
+
 
 @pytest.fixture(scope="session")
-def container() -> Container:
-    return Container(testing=True)
+def container() -> TestContainer:
+    return TestContainer()
 
 
 @pytest.mark.inject
-def test_service_get_items(service: Service) -> None:
+def test_service_get_items(container: TestContainer, service: Service) -> None:
     repo_mock = mock.Mock(spec=Repository)
     repo_mock.all.return_value = [Item(name="mock1"), Item(name="mock2")]
 

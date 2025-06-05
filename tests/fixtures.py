@@ -3,7 +3,8 @@ from collections.abc import AsyncIterator, Iterator
 from dataclasses import dataclass, field
 from typing import Annotated
 
-from anydi import Container, Module, provider
+from anydi import Module, provider
+from anydi._container import Container
 
 
 def func() -> str:

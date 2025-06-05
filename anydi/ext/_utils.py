@@ -8,7 +8,7 @@ from typing import Annotated, Any, Callable
 
 from typing_extensions import get_args, get_origin
 
-from anydi import Container
+from anydi._container import Container
 from anydi._utils import get_full_qualname
 
 logger = logging.getLogger(__name__)
