@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import logging
 import types
 from typing import Callable, cast
 
@@ -13,8 +12,6 @@ import anydi
 
 from ._settings import get_settings
 from ._utils import inject_urlpatterns, register_components, register_settings
-
-logger = logging.getLogger(__name__)
 
 
 class ContainerConfig(AppConfig):
