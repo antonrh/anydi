@@ -6,13 +6,25 @@ from unittest import mock
 
 import pytest
 
-from anydi import auto
+from anydi import Container, auto
 from anydi.testcontainer import TestContainer
 
 from tests.fixtures import Service
 
 
 class TestTestContainer:
+    def test_from_container(self) -> None:
+        container = Container()
+        container.register(str, lambda: "Hello, world!", scope="singleton")
+
+        test_container = TestContainer.from_container(container)
+
+        assert test_container.providers == container.providers
+        assert test_container.strict == container.strict
+        assert test_container.default_scope == container.default_scope
+
+        assert test_container.resolve(str) == "Hello, world!"
+
     def test_override_instance(self) -> None:
         origin_name = "origin"
         overridden_name = "overridden"

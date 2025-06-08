@@ -5,6 +5,7 @@ from collections.abc import Iterator, Sequence
 from typing import Any, Callable, TypeVar, cast
 
 import wrapt  # type: ignore
+from typing_extensions import Self
 
 from ._container import Container, Module
 from ._context import InstanceContext
@@ -33,6 +34,22 @@ class TestContainer(Container):
             logger=logger,
         )
         self._override_instances: dict[Any, Any] = {}
+
+    @classmethod
+    def from_container(cls, container: Container) -> Self:
+        return cls(
+            providers=[
+                ProviderArgs(
+                    interface=provider.interface,
+                    call=provider.call,
+                    scope=provider.scope,
+                )
+                for provider in container.providers.values()
+            ],
+            strict=container.strict,
+            default_scope=container.default_scope,
+            logger=container.logger,
+        )
 
     @contextlib.contextmanager
     def override(self, interface: AnyInterface, instance: Any) -> Iterator[None]:
