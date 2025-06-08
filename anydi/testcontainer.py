@@ -37,17 +37,19 @@ class TestContainer(Container):
 
     @classmethod
     def from_container(cls, container: Container) -> Self:
-        self = cls()
-        self._providers = container._providers
-        self._strict = container._strict
-        self._default_scope = container._default_scope
-        self._logger = container._logger
-        self._resources = container._resources
-        self._singleton_context = container._singleton_context
-        self._request_context_var = container._request_context_var
-        self._unresolved_interfaces = container._unresolved_interfaces
-        self._inject_cache = container._inject_cache
-        return self
+        return cls(
+            providers=[
+                ProviderArgs(
+                    interface=provider.interface,
+                    call=provider.call,
+                    scope=provider.scope,
+                )
+                for provider in container.providers.values()
+            ],
+            strict=container.strict,
+            default_scope=container.default_scope,
+            logger=container.logger,
+        )
 
     @contextlib.contextmanager
     def override(self, interface: AnyInterface, instance: Any) -> Iterator[None]:
