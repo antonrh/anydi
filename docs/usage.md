@@ -780,6 +780,20 @@ def test_handler() -> None:
         assert get_items() == [Item(name="mock1"), Item(name="mock2")]
 ```
 
+To create a `TestContainer` from the original container for testing, use the `.from_container()` method:
+
+```python
+from anydi import Container
+from anydi.testcontainer import TestContainer
+
+
+def init_container(testing: bool = False) -> Container:
+    container = Container()
+    if testing:
+        return TestContainer.from_container(container)
+    return container
+```
+
 ### Pytest Plugin
 
 `AnyDI` offers a pytest plugin that simplifies the testing process. You can annotate a test function with the `@pytest.mark.inject` decorator to automatically inject dependencies into the test function, or you can set the global configuration value `anydi_inject_all` to `True` to inject dependencies into all test functions automatically.
