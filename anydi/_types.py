@@ -5,8 +5,7 @@ import inspect
 from collections.abc import Iterable
 from dataclasses import dataclass
 from functools import cached_property
-from types import ModuleType
-from typing import Annotated, Any, Callable, NamedTuple, Union
+from typing import Annotated, Any, Callable, NamedTuple, TypedDict, Union
 
 from typing_extensions import Literal, Self, TypeAlias
 
@@ -114,16 +113,11 @@ class ProviderArgs(NamedTuple):
     interface: Any = NOT_SET
 
 
-class ProviderDecoratorArgs(NamedTuple):
+class ProviderMetadata(TypedDict):
     scope: Scope
     override: bool
 
 
-class ScannedDependency(NamedTuple):
-    member: Any
-    module: ModuleType
-
-
-class InjectableDecoratorArgs(NamedTuple):
+class InjectableMetadata(TypedDict):
     wrapped: bool
     tags: Iterable[str] | None

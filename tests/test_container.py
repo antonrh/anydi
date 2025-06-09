@@ -12,20 +12,12 @@ from typing_extensions import Self
 
 from anydi import (
     Container,
-    Module,
     Scope,
     auto,
-    injectable,
-    provider,
-    request,
-    singleton,
-    transient,
 )
 from anydi._types import (
     Event,
-    InjectableDecoratorArgs,
     ProviderArgs,
-    ProviderDecoratorArgs,
     ProviderKind,
 )
 
@@ -33,7 +25,6 @@ from tests.fixtures import (
     Class,
     Resource,
     Service,
-    TestModule,
     UniqueId,
     async_event,
     async_generator,
@@ -43,7 +34,6 @@ from tests.fixtures import (
     generator,
     iterator,
 )
-from tests.scan_app import ScanAppModule
 
 
 @pytest.fixture
@@ -1609,156 +1599,3 @@ class TestContainerInjector:
         _ = container.run(handler)
 
         assert handler in container._inject_cache
-
-
-class TestContainerModule:
-    def test_register_modules(self) -> None:
-        container = Container(modules=[TestModule])
-
-        assert container.is_registered(Annotated[str, "msg1"])
-        assert container.is_registered(Annotated[str, "msg2"])
-
-    def test_register_module_class(self, container: Container) -> None:
-        container.register_module(TestModule)
-
-        assert container.is_registered(Annotated[str, "msg1"])
-        assert container.is_registered(Annotated[str, "msg2"])
-
-    def test_register_module_instance(self, container: Container) -> None:
-        container.register_module(TestModule())
-
-        assert container.is_registered(Annotated[str, "msg1"])
-        assert container.is_registered(Annotated[str, "msg2"])
-
-    def test_register_module_path(self, container: Container) -> None:
-        container.register_module("tests.test_container.TestModule")
-
-        assert container.is_registered(Annotated[str, "msg1"])
-        assert container.is_registered(Annotated[str, "msg2"])
-
-    def test_register_module_function(self, container: Container) -> None:
-        def configure(_container: Container) -> None:
-            _container.register(str, lambda: "Message 1", scope="singleton")
-
-        container.register_module(configure)
-
-        assert container.is_registered(str)
-
-    def test_register_module_ordered_providers(self, container: Container) -> None:
-        class OrderedModule(Module):
-            @provider(scope="singleton")
-            def dep3(self) -> Annotated[str, "dep3"]:
-                return "dep3"
-
-            @provider(scope="singleton")
-            def dep1(self) -> Annotated[str, "dep1"]:
-                return "dep1"
-
-            @provider(scope="singleton")
-            def dep2(self) -> Annotated[str, "dep2"]:
-                return "dep2"
-
-        container.register_module(OrderedModule)
-
-        assert list(container.providers.keys()) == [
-            Annotated[str, "dep3"],
-            Annotated[str, "dep1"],
-            Annotated[str, "dep2"],
-        ]
-
-    def test_register_module_invlid_path(self, container: Container) -> None:
-        with pytest.raises(
-            TypeError,
-            match="The module must be a callable, a module type, or a module instance.",
-        ):
-            container.register_module("anydi.Container")
-
-
-class TestContainerScanning:
-    def test_scan(self, container: Container) -> None:
-        container.register_module(ScanAppModule)
-        container.scan(["tests.scan_app"])
-
-        from .scan_app.a.a3.handlers import a_a3_handler_1, a_a3_handler_2
-
-        assert a_a3_handler_1() == "a.a1.str_provider"
-        assert a_a3_handler_2().ident == "a.a1.str_provider"
-
-    def test_scan_single_package(self, container: Container) -> None:
-        container.register_module(ScanAppModule)
-        container.scan("tests.scan_app.a.a3.handlers")
-
-        from .scan_app.a.a3.handlers import a_a3_handler_1
-
-        assert a_a3_handler_1() == "a.a1.str_provider"
-
-    def test_scan_non_existing_tag(self, container: Container) -> None:
-        container.scan(["tests.scan_app"], tags=["non_existing_tag"])
-
-        assert not container.providers
-
-    def test_scan_tagged(self, container: Container) -> None:
-        container.register_module(ScanAppModule)
-        container.scan(["tests.scan_app.a"], tags=["inject"])
-
-        from .scan_app.a.a3.handlers import a_a3_handler_1
-
-        assert a_a3_handler_1() == "a.a1.str_provider"
-
-
-class TestDecorators:
-    def test_provider_decorator(self) -> None:
-        class TestModule(Module):
-            @provider(scope="singleton", override=True)
-            def provider(self) -> str:
-                return "test"
-
-        assert getattr(TestModule.provider, "__provider__") == ProviderDecoratorArgs(
-            scope="singleton",
-            override=True,
-        )
-
-    def test_request_decorator(self) -> None:
-        request(Service)
-
-        assert getattr(Service, "__scope__") == "request"
-
-    def test_transient_decorator(self) -> None:
-        transient(Service)
-
-        assert getattr(Service, "__scope__") == "transient"
-
-    def test_singleton_decorator(self) -> None:
-        singleton(Service)
-
-        assert getattr(Service, "__scope__") == "singleton"
-
-    def test_injectable_decorator_no_args(self) -> None:
-        @injectable
-        def my_func() -> None:
-            pass
-
-        assert getattr(my_func, "__injectable__") == InjectableDecoratorArgs(
-            wrapped=True,
-            tags=None,
-        )
-
-    def test_injectable_decorator_no_args_provided(self) -> None:
-        @injectable()
-        def my_func() -> None:
-            pass
-
-        assert getattr(my_func, "__injectable__") == InjectableDecoratorArgs(
-            wrapped=True,
-            tags=None,
-        )
-
-    def test_injectable_decorator(self) -> None:
-        @injectable(tags=["tag1", "tag2"])
-        def my_func() -> None:
-            pass
-
-        assert getattr(my_func, "__injectable__") == InjectableDecoratorArgs(
-            wrapped=True,
-            tags=["tag1", "tag2"],
-        )

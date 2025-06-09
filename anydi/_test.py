@@ -1,14 +1,15 @@
 import contextlib
 import inspect
 import logging
-from collections.abc import Iterator, Sequence
-from typing import Any, Callable, TypeVar, cast
+from collections.abc import Iterable, Iterator, Sequence
+from typing import Any, TypeVar, cast
 
 import wrapt  # type: ignore
 from typing_extensions import Self
 
-from ._container import Container, Module
+from ._container import Container
 from ._context import InstanceContext
+from ._module import ModuleDefinition
 from ._types import AnyInterface, Provider, ProviderArgs, Scope
 from ._utils import get_full_qualname
 
@@ -20,8 +21,7 @@ class TestContainer(Container):
         self,
         *,
         providers: Sequence[ProviderArgs] | None = None,
-        modules: Sequence[Module | type[Module] | Callable[[Container], None] | str]
-        | None = None,
+        modules: Iterable[ModuleDefinition] | None = None,
         strict: bool = False,
         default_scope: Scope = "transient",
         logger: logging.Logger | None = None,
