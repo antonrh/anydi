@@ -8,7 +8,7 @@ from ._module import Module
 from ._provider import ProviderDefinition as Provider
 from ._scope import Scope
 from ._test import TestContainer
-from ._types import Marker
+from ._utils import Marker
 
 # Alias for dependency auto marker
 auto = cast(Any, Marker())

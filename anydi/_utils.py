@@ -100,14 +100,29 @@ def get_typed_parameters(obj: Callable[..., Any]) -> list[inspect.Parameter]:
     ]
 
 
-async def run_async(
-    func: Callable[P, T],
-    /,
-    *args: P.args,
-    **kwargs: P.kwargs,
-) -> T:
-    """Runs the given function asynchronously using the `anyio` library."""
-    return await anyio.to_thread.run_sync(functools.partial(func, *args, **kwargs))
+class Marker:
+    """A marker class for marking dependencies."""
+
+    __slots__ = ()
+
+    def __call__(self) -> Self:
+        return self
+
+
+def is_marker(obj: Any) -> bool:
+    """Checks if an object is a marker."""
+    return isinstance(obj, Marker)
+
+
+class Event:
+    """Represents an event object."""
+
+    __slots__ = ()
+
+
+def is_event_type(obj: Any) -> bool:
+    """Checks if an object is an event type."""
+    return inspect.isclass(obj) and issubclass(obj, Event)
 
 
 def import_string(dotted_path: str) -> Any:
@@ -123,6 +138,16 @@ def import_string(dotted_path: str) -> Any:
             return importlib.import_module(attribute_name)
     except (ImportError, AttributeError) as exc:
         raise ImportError(f"Cannot import '{dotted_path}': {exc}") from exc
+
+
+async def run_async(
+    func: Callable[P, T],
+    /,
+    *args: P.args,
+    **kwargs: P.kwargs,
+) -> T:
+    """Runs the given function asynchronously using the `anyio` library."""
+    return await anyio.to_thread.run_sync(functools.partial(func, *args, **kwargs))
 
 
 class AsyncRLock:
@@ -159,3 +184,22 @@ class AsyncRLock:
         exc_tb: TracebackType | None,
     ) -> Any:
         self.release()
+
+
+class _Sentinel:
+    __slots__ = ("_name",)
+
+    def __init__(self, name: str) -> None:
+        self._name = name
+
+    def __repr__(self) -> str:
+        return f"<{self._name}>"
+
+    def __eq__(self, other: object) -> bool:
+        return self is other
+
+    def __hash__(self) -> int:
+        return id(self)
+
+
+NOT_SET = _Sentinel("NOT_SET")

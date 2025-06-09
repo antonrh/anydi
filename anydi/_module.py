@@ -3,11 +3,11 @@ from __future__ import annotations
 import inspect
 from typing import TYPE_CHECKING, Any, Callable
 
-from ._types import ProviderMetadata
 from ._utils import import_string
 
 if TYPE_CHECKING:
     from ._container import Container
+    from ._decorators import ProviderMetadata
 
 
 class ModuleMeta(type):
