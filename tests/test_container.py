@@ -15,11 +15,8 @@ from anydi import (
     Scope,
     auto,
 )
-from anydi._types import (
-    Event,
-    ProviderArgs,
-    ProviderKind,
-)
+from anydi._provider import ProviderConfig, ProviderKind
+from anydi._types import Event
 
 from tests.fixtures import (
     Class,
@@ -159,10 +156,7 @@ class TestContainer:
     def test_register_provider_not_callable(self, container: Container) -> None:
         with pytest.raises(
             TypeError,
-            match=(
-                "The provider `Test` is invalid because it is not a callable object. "
-                "Only callable providers are allowed."
-            ),
+            match="The provider `Test` is invalid because it is not a callable object.",
         ):
             container._register_provider("Test", "singleton")  # type: ignore[arg-type]
 
@@ -263,8 +257,8 @@ class TestContainer:
     def test_register_providers_via_constructor(self) -> None:
         container = Container(
             providers=[
-                ProviderArgs(call=lambda: "test", scope="singleton", interface=str),
-                ProviderArgs(call=lambda: 1, scope="singleton", interface=int),
+                ProviderConfig(call=lambda: "test", scope="singleton", interface=str),
+                ProviderConfig(call=lambda: 1, scope="singleton", interface=int),
             ]
         )
 
@@ -325,10 +319,7 @@ class TestContainer:
     def test_register_invalid_provider_type(self, container: Container) -> None:
         with pytest.raises(
             TypeError,
-            match=(
-                "The provider `Test` is invalid because it is not a callable object. "
-                "Only callable providers are allowed."
-            ),
+            match="The provider `Test` is invalid because it is not a callable object.",
         ):
             container.register(str, "Test", scope="singleton")  # type: ignore[arg-type]
 

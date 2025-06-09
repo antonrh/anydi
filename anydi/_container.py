@@ -17,14 +17,16 @@ from typing_extensions import ParamSpec, Self, get_args, get_origin
 
 from ._context import InstanceContext
 from ._module import ModuleDefinition, ModuleRegistrar
+from ._provider import (
+    Provider,
+    ProviderConfig,
+    ProviderKind,
+)
 from ._scan import PackageOrIterable, Scanner
+from ._scope import ALLOWED_SCOPES, Scope
 from ._types import (
     NOT_SET,
     Event,
-    Provider,
-    ProviderArgs,
-    ProviderKind,
-    Scope,
     is_event_type,
     is_marker,
 )
@@ -43,12 +45,6 @@ from ._utils import (
 T = TypeVar("T", bound=Any)
 P = ParamSpec("P")
 
-ALLOWED_SCOPES: dict[Scope, list[Scope]] = {
-    "singleton": ["singleton"],
-    "request": ["request", "singleton"],
-    "transient": ["transient", "request", "singleton"],
-}
-
 
 class Container:
     """AnyDI is a dependency injection container."""
@@ -56,7 +52,7 @@ class Container:
     def __init__(
         self,
         *,
-        providers: Iterable[ProviderArgs] | None = None,
+        providers: Iterable[ProviderConfig] | None = None,
         modules: Iterable[ModuleDefinition] | None = None,
         strict: bool = False,
         default_scope: Scope = "transient",

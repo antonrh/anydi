@@ -2,7 +2,8 @@ from collections.abc import Iterable
 from typing import Any, Callable, Concatenate, ParamSpec, TypeVar, overload
 
 from ._module import Module
-from ._types import InjectableMetadata, ProviderMetadata, Scope
+from ._scope import Scope
+from ._types import InjectableMetadata, ProviderMetadata
 
 T = TypeVar("T", bound=Any)
 P = ParamSpec("P")
