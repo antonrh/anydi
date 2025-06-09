@@ -54,7 +54,7 @@ class AsyncOperation(BaseAsyncOperation):
         super().__init__(*args, **kwargs)
         self.dependencies = self.signature.dependencies
 
-    async def run(self, request: HttpRequest, **kw: Any) -> HttpResponseBase:  # type: ignore
+    async def run(self, request: HttpRequest, **kw: Any) -> HttpResponseBase:
         error = await self._run_checks(request)
         if error:
             return error

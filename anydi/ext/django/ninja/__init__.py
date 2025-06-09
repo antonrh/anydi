@@ -11,6 +11,6 @@ from ._signature import ViewSignature
 
 
 def patch_ninja() -> None:
-    operation.ViewSignature = ViewSignature  # type: ignore[attr-defined]
-    operation.Operation = Operation  # type: ignore[misc]
-    operation.AsyncOperation = AsyncOperation  # type: ignore[misc]
+    operation.ViewSignature = ViewSignature  # type: ignore
+    operation.Operation = Operation  # type: ignore
+    operation.AsyncOperation = AsyncOperation  # type: ignore

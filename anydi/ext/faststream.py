@@ -21,7 +21,7 @@ def install(broker: BrokerUsecase[Any, Any], container: Container) -> None:
     it to the broker. It also patches the broker handlers to inject the required
     dependencies using AnyDI.
     """
-    broker._container = container  # type: ignore[attr-defined]
+    broker._container = container  # type: ignore
 
     for handler in _get_broken_handlers(broker):
         call = handler._original_call  # noqa

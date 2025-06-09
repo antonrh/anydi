@@ -68,11 +68,7 @@ def injectable(
     """Decorator for marking a function or method as requiring dependency injection."""
 
     def decorator(inner: Callable[P, T]) -> Callable[P, T]:
-        setattr(
-            inner,
-            "__injectable__",
-            InjectableMetadata(wrapped=True, tags=tags),
-        )
+        inner.__injectable__ = InjectableMetadata(wrapped=True, tags=tags)  # type: ignore
         return inner
 
     if func is None:

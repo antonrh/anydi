@@ -18,13 +18,14 @@ jobs:
       - name: Install uv
         uses: astral-sh/setup-uv@v5
         with:
+          python-version: '3.10'
           enable-cache: true
       - name: Set up Python
         run: uv python install
       - name: Install dependencies
         run: uv sync --all-extras --dev
       - name: Static type checking
-        run: uv run mypy anydi tests
+        run: uv run pyright
       - name: Code formatting
         run: uv run ruff check && uv run ruff format --check
 
@@ -57,4 +58,4 @@ jobs:
           uv run pytest -vv tests/ext/test_pytest_plugin.py --cov=anydi --cov-append --cov-report=xml
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v3
-        if: matrix.python == '3.9'
+        if: matrix.python == '3.10'
