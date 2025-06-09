@@ -20,7 +20,6 @@ from ._module import ModuleDefinition, ModuleRegistrar
 from ._scan import PackageOrIterable, Scanner
 from ._types import (
     NOT_SET,
-    AnyInterface,
     Event,
     Provider,
     ProviderArgs,
@@ -224,7 +223,7 @@ class Container:
 
     def register(
         self,
-        interface: AnyInterface,
+        interface: Any,
         call: Callable[..., Any],
         *,
         scope: Scope,
@@ -233,11 +232,11 @@ class Container:
         """Register a provider for the specified interface."""
         return self._register_provider(call, scope, interface, override)
 
-    def is_registered(self, interface: AnyInterface) -> bool:
+    def is_registered(self, interface: Any) -> bool:
         """Check if a provider is registered for the specified interface."""
         return interface in self._providers
 
-    def unregister(self, interface: AnyInterface) -> None:
+    def unregister(self, interface: Any) -> None:
         """Unregister a provider by interface."""
         if not self.is_registered(interface):
             raise LookupError(
@@ -430,7 +429,7 @@ class Container:
                 "with a transient scope, which is not allowed."
             )
 
-    def _get_provider(self, interface: AnyInterface) -> Provider:
+    def _get_provider(self, interface: Any) -> Provider:
         """Get provider by interface."""
         try:
             return self._providers[interface]
@@ -442,7 +441,7 @@ class Container:
             ) from exc
 
     def _get_or_register_provider(
-        self, interface: AnyInterface, parent_scope: Scope | None, /, **defaults: Any
+        self, interface: Any, parent_scope: Scope | None, /, **defaults: Any
     ) -> Provider:
         """Get or register a provider by interface."""
         try:
@@ -517,7 +516,7 @@ class Container:
         """Create an instance by interface asynchronously."""
         return await self._aresolve_or_create(interface, True, **defaults)
 
-    def is_resolved(self, interface: AnyInterface) -> bool:
+    def is_resolved(self, interface: Any) -> bool:
         """Check if an instance by interface exists."""
         try:
             provider = self._get_provider(interface)
@@ -528,7 +527,7 @@ class Container:
         context = self._get_instance_context(provider.scope)
         return interface in context
 
-    def release(self, interface: AnyInterface) -> None:
+    def release(self, interface: Any) -> None:
         """Release an instance by interface."""
         provider = self._get_provider(interface)
         if provider.scope == "transient":

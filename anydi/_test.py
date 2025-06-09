@@ -10,7 +10,7 @@ from typing_extensions import Self
 from ._container import Container
 from ._context import InstanceContext
 from ._module import ModuleDefinition
-from ._types import AnyInterface, Provider, ProviderArgs, Scope
+from ._types import Provider, ProviderArgs, Scope
 from ._utils import get_full_qualname
 
 T = TypeVar("T")
@@ -52,7 +52,7 @@ class TestContainer(Container):
         )
 
     @contextlib.contextmanager
-    def override(self, interface: AnyInterface, instance: Any) -> Iterator[None]:
+    def override(self, interface: Any, instance: Any) -> Iterator[None]:
         """
         Override the provider for the specified interface with a specific instance.
         """

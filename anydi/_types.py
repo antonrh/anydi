@@ -5,13 +5,11 @@ import inspect
 from collections.abc import Iterable
 from dataclasses import dataclass
 from functools import cached_property
-from typing import Annotated, Any, Callable, NamedTuple, TypedDict, Union
+from typing import Any, Callable, NamedTuple, TypedDict
 
-from typing_extensions import Literal, Self, TypeAlias
+from typing_extensions import Literal, Self
 
 Scope = Literal["transient", "singleton", "request"]
-
-AnyInterface: TypeAlias = Union[type[Any], Annotated[Any, ...]]
 
 NOT_SET = object()
 
