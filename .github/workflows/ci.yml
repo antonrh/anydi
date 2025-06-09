@@ -24,7 +24,7 @@ jobs:
       - name: Install dependencies
         run: uv sync --all-extras --dev
       - name: Static type checking
-        run: uv run mypy anydi tests
+        run: uv run pyright
       - name: Code formatting
         run: uv run ruff check && uv run ruff format --check
 
