@@ -8,8 +8,8 @@ from dataclasses import dataclass
 from types import ModuleType
 from typing import TYPE_CHECKING, Any, Union
 
-from ._types import InjectableMetadata, is_marker
-from ._utils import get_typed_parameters
+from ._decorators import InjectableMetadata
+from ._utils import get_typed_parameters, is_marker
 
 if TYPE_CHECKING:
     from ._container import Container

@@ -7,7 +7,7 @@ from functools import cached_property
 from typing import Any, Callable, NamedTuple
 
 from ._scope import Scope
-from ._types import NOT_SET
+from ._utils import NOT_SET
 
 
 class ProviderKind(enum.IntEnum):

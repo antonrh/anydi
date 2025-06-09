@@ -1,9 +1,8 @@
 from collections.abc import Iterable
-from typing import Any, Callable, Concatenate, ParamSpec, TypeVar, overload
+from typing import Any, Callable, Concatenate, ParamSpec, TypedDict, TypeVar, overload
 
 from ._module import Module
 from ._scope import Scope
-from ._types import InjectableMetadata, ProviderMetadata
 
 T = TypeVar("T", bound=Any)
 P = ParamSpec("P")
@@ -28,6 +27,11 @@ def singleton(target: T) -> T:
     return target
 
 
+class ProviderMetadata(TypedDict):
+    scope: Scope
+    override: bool
+
+
 def provider(
     *, scope: Scope, override: bool = False
 ) -> Callable[[Callable[Concatenate[M, P], T]], Callable[Concatenate[M, P], T]]:
@@ -40,6 +44,11 @@ def provider(
         return target
 
     return decorator
+
+
+class InjectableMetadata(TypedDict):
+    wrapped: bool
+    tags: Iterable[str] | None
 
 
 @overload

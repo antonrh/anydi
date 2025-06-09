@@ -24,20 +24,18 @@ from ._provider import (
 )
 from ._scan import PackageOrIterable, Scanner
 from ._scope import ALLOWED_SCOPES, Scope
-from ._types import (
+from ._utils import (
     NOT_SET,
     Event,
-    is_event_type,
-    is_marker,
-)
-from ._utils import (
     get_full_qualname,
     get_typed_annotation,
     get_typed_parameters,
     is_async_context_manager,
     is_builtin_type,
     is_context_manager,
+    is_event_type,
     is_iterator_type,
+    is_marker,
     is_none_type,
     run_async,
 )
