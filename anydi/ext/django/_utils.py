@@ -75,7 +75,7 @@ def inject_urlpatterns(container: Container, *, urlconf: str) -> None:
         if pattern.lookup_str.startswith("ninja."):
             continue  # pragma: no cover
         pattern.callback = container.inject(pattern.callback)
-        pattern.callback._injected = True  # type: ignore[attr-defined]
+        pattern.callback._injected = True  # type: ignore
 
 
 def iter_urlpatterns(
@@ -120,9 +120,9 @@ def _patch_any_typed_annotated(container: Container, *, prefix: str) -> None:
 
         return wrapper
 
-    container.resolve = _patch_resolve(  # type: ignore[method-assign]
+    container.resolve = _patch_resolve(  # type: ignore
         container.resolve
     )
-    container.aresolve = _patch_aresolve(  # type: ignore[method-assign]
+    container.aresolve = _patch_aresolve(  # type: ignore
         container.aresolve
     )

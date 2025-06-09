@@ -18,7 +18,7 @@ from typing_extensions import ParamSpec, Self, get_args, get_origin
 try:
     from types import NoneType
 except ImportError:
-    NoneType = type(None)  # type: ignore[misc]
+    NoneType = type(None)
 
 T = TypeVar("T")
 P = ParamSpec("P")
