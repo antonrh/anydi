@@ -104,6 +104,7 @@ strict = [
 ]
 typeCheckingMode = "standard"
 enableExperimentalFeatures = true
+reportDeprecated = false
 
 [tool.pytest.ini_options]
 addopts = [
