@@ -75,7 +75,7 @@ class Provider:
         return ProviderKind.is_resource(self.kind)
 
 
-class ProviderConfig(NamedTuple):
+class ProviderDefinition(NamedTuple):
     call: Callable[..., Any]
     scope: Scope
     interface: Any = NOT_SET

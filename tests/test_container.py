@@ -10,12 +10,8 @@ from typing import Annotated, Any, Callable, Union
 import pytest
 from typing_extensions import Self
 
-from anydi import (
-    Container,
-    Scope,
-    auto,
-)
-from anydi._provider import ProviderConfig, ProviderKind
+from anydi import Container, Provider, Scope, auto
+from anydi._provider import ProviderKind
 from anydi._types import Event
 
 from tests.fixtures import (
@@ -257,8 +253,8 @@ class TestContainer:
     def test_register_providers_via_constructor(self) -> None:
         container = Container(
             providers=[
-                ProviderConfig(call=lambda: "test", scope="singleton", interface=str),
-                ProviderConfig(call=lambda: 1, scope="singleton", interface=int),
+                Provider(call=lambda: "test", scope="singleton", interface=str),
+                Provider(call=lambda: 1, scope="singleton", interface=int),
             ]
         )
 

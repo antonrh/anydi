@@ -19,7 +19,7 @@ from ._context import InstanceContext
 from ._module import ModuleDefinition, ModuleRegistrar
 from ._provider import (
     Provider,
-    ProviderConfig,
+    ProviderDefinition,
     ProviderKind,
 )
 from ._scan import PackageOrIterable, Scanner
@@ -52,7 +52,7 @@ class Container:
     def __init__(
         self,
         *,
-        providers: Iterable[ProviderConfig] | None = None,
+        providers: Iterable[ProviderDefinition] | None = None,
         modules: Iterable[ModuleDefinition] | None = None,
         strict: bool = False,
         default_scope: Scope = "transient",

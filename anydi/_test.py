@@ -10,7 +10,7 @@ from typing_extensions import Self
 from ._container import Container
 from ._context import InstanceContext
 from ._module import ModuleDefinition
-from ._provider import Provider, ProviderConfig
+from ._provider import Provider, ProviderDefinition
 from ._scope import Scope
 from ._utils import get_full_qualname
 
@@ -21,7 +21,7 @@ class TestContainer(Container):
     def __init__(
         self,
         *,
-        providers: Sequence[ProviderConfig] | None = None,
+        providers: Sequence[ProviderDefinition] | None = None,
         modules: Iterable[ModuleDefinition] | None = None,
         strict: bool = False,
         default_scope: Scope = "transient",
@@ -40,7 +40,7 @@ class TestContainer(Container):
     def from_container(cls, container: Container) -> Self:
         return cls(
             providers=[
-                ProviderConfig(
+                ProviderDefinition(
                     interface=provider.interface,
                     call=provider.call,
                     scope=provider.scope,
