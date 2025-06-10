@@ -7,7 +7,7 @@ from unittest import mock
 import pytest
 
 from anydi import Container, auto
-from anydi._test import TestContainer
+from anydi.testing import TestContainer
 
 from tests.fixtures import Service
 

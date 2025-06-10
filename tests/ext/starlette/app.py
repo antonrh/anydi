@@ -7,8 +7,8 @@ from starlette.responses import JSONResponse
 from starlette.routing import Route
 
 from anydi import auto
-from anydi._test import TestContainer
 from anydi.ext.starlette.middleware import RequestScopedMiddleware
+from anydi.testing import TestContainer
 
 from tests.ext.fixtures import MailService, UserService
 

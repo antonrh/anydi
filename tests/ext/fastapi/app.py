@@ -4,9 +4,9 @@ from fastapi import Body, Depends, FastAPI
 from starlette.middleware import Middleware
 
 import anydi.ext.fastapi
-from anydi._test import TestContainer
 from anydi.ext.fastapi import Inject
 from anydi.ext.starlette.middleware import RequestScopedMiddleware
+from anydi.testing import TestContainer
 
 from tests.ext.fixtures import Mail, MailService, User, UserService
 

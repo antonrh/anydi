@@ -2,7 +2,7 @@ from unittest import mock
 
 from starlette.testclient import TestClient
 
-from anydi._test import TestContainer
+from anydi.testing import TestContainer
 
 from tests.ext.fixtures import TEST_EMAIL, Mail, MailService, User, UserService
 
