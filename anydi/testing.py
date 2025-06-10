@@ -73,14 +73,14 @@ class TestContainer(Container):
     ) -> T:
         """Internal method to handle instance resolution and creation."""
         instance = super()._resolve_or_create(interface, create, **defaults)
-        return cast(T, self._patch_test_resolver(interface, instance))
+        return cast(T, self._patch_resolver(interface, instance))
 
     async def _aresolve_or_create(
         self, interface: type[T], create: bool, /, **defaults: Any
     ) -> T:
         """Internal method to handle instance resolution and creation asynchronously."""
         instance = await super()._aresolve_or_create(interface, create, **defaults)
-        return cast(T, self._patch_test_resolver(interface, instance))
+        return cast(T, self._patch_resolver(interface, instance))
 
     def _get_provider_instance(
         self,
@@ -95,7 +95,7 @@ class TestContainer(Container):
             provider, parameter, context, **defaults
         )
         if not is_default:
-            instance = TestInstance(instance, interface=parameter.annotation)
+            instance = InstanceProxy(instance, interface=parameter.annotation)
         return instance, is_default
 
     async def _aget_provider_instance(
@@ -111,10 +111,10 @@ class TestContainer(Container):
             provider, parameter, context, **defaults
         )
         if not is_default:
-            instance = TestInstance(instance, interface=parameter.annotation)
+            instance = InstanceProxy(instance, interface=parameter.annotation)
         return instance, is_default
 
-    def _patch_test_resolver(self, interface: type[Any], instance: Any) -> Any:
+    def _patch_resolver(self, interface: type[Any], instance: Any) -> Any:
         """Patch the test resolver for the instance."""
         if interface in self._override_instances:
             return self._override_instances[interface]
@@ -127,7 +127,7 @@ class TestContainer(Container):
         wrapped = {
             name: value.interface
             for name, value in instance.__dict__.items()
-            if isinstance(value, TestInstance)
+            if isinstance(value, InstanceProxy)
         }
 
         def __resolver_getter__(name: str) -> Any:
@@ -163,7 +163,7 @@ class TestContainer(Container):
         return instance
 
 
-class TestInstance(wrapt.ObjectProxy):  # type: ignore
+class InstanceProxy(wrapt.ObjectProxy):  # type: ignore
     def __init__(self, wrapped: Any, *, interface: type[Any]) -> None:
         super().__init__(wrapped)  # type: ignore
         self._self_interface = interface
