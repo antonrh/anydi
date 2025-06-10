@@ -737,7 +737,8 @@ Once the block is exited, the original dependency is restored.
 from dataclasses import dataclass
 from unittest import mock
 
-from anydi import auto, TestContainer
+from anydi import auto
+from anydi.testing import TestContainer
 
 
 @dataclass(kw_only=True)
@@ -780,7 +781,8 @@ def test_handler() -> None:
 To create a `TestContainer` from the original container for testing, use the `.from_container()` method:
 
 ```python
-from anydi import Container, TestContainer
+from anydi import Container
+from anydi.testing import TestContainer
 
 
 def init_container(testing: bool = False) -> Container:
@@ -799,7 +801,7 @@ Additionally, you need to define a `container` fixture to provide a `Container` 
 ```python
 import pytest
 
-from anydi import TestContainer
+from anydi.testing import TestContainer
 
 
 @pytest.fixture(scope="session")
