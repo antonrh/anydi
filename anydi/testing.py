@@ -171,8 +171,3 @@ class InstanceProxy(wrapt.ObjectProxy):  # type: ignore
     @property
     def interface(self) -> type[Any]:
         return self._self_interface
-
-    def __getattribute__(self, item: str) -> Any:
-        if item in "interface":
-            return object.__getattribute__(self, item)
-        return object.__getattribute__(self, item)
