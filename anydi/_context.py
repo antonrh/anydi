@@ -7,7 +7,7 @@ from typing import Any
 
 from typing_extensions import Self
 
-from ._utils import AsyncRLock, run_async
+from ._async import AsyncRLock, run_sync
 
 
 class InstanceContext:
@@ -78,7 +78,7 @@ class InstanceContext:
         exc_tb: TracebackType | None,
     ) -> bool:
         """Exit the context asynchronously."""
-        sync_exit = await run_async(self.__exit__, exc_type, exc_val, exc_tb)
+        sync_exit = await run_sync(self.__exit__, exc_type, exc_val, exc_tb)
         async_exit = await self._async_stack.__aexit__(exc_type, exc_val, exc_tb)
         return bool(sync_exit) or bool(async_exit)
 
