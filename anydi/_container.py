@@ -15,6 +15,7 @@ from typing import Annotated, Any, Callable, TypeVar, cast, overload
 
 from typing_extensions import ParamSpec, Self, get_args, get_origin
 
+from ._async import run_sync
 from ._context import InstanceContext
 from ._module import ModuleDefinition, ModuleRegistrar
 from ._provider import (
@@ -37,7 +38,6 @@ from ._utils import (
     is_iterator_type,
     is_marker,
     is_none_type,
-    run_async,
 )
 
 T = TypeVar("T", bound=Any)
@@ -648,9 +648,9 @@ class Container:
                 cm = contextlib.contextmanager(provider.call)(**provider_kwargs)
                 return context.enter(cm)
 
-            return await run_async(_create)
+            return await run_sync(_create)
 
-        instance = await run_async(provider.call, **provider_kwargs)
+        instance = await run_sync(provider.call, **provider_kwargs)
         if (
             context is not None
             and provider.is_class
