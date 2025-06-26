@@ -806,7 +806,7 @@ class Container:
 
             self._inject_cache[call] = awrapper
 
-            return awrapper  # type: ignore[return-value]
+            return awrapper  # type: ignore
 
         @functools.wraps(call)
         def wrapper(*args: P.args, **kwargs: P.kwargs) -> T:
