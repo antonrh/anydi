@@ -65,6 +65,7 @@ dev = [
     "pydantic-settings>=2.4.0,<3",
     "bump-my-version>=1.1.4",
     "pyright>=1.1.401",
+    "pytest-mock>=3.14.1",
 ]
 docs = [
     "mkdocs>=1.4.2,<2",

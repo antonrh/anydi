@@ -789,8 +789,8 @@ class Container:
             return cast(Callable[P, T], self._inject_cache[call])
 
         injected_params = self._get_injected_params(call)
-
         if not injected_params:
+            self._inject_cache[call] = call
             return call
 
         if inspect.iscoroutinefunction(call):
