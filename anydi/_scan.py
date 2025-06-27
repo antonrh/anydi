@@ -95,9 +95,10 @@ class Scanner:
                     continue
 
                 should_include = True
+
             elif not tags:
-                for param in get_typed_parameters(member):
-                    if is_marker(param.default):
+                for parameter in get_typed_parameters(member):
+                    if is_marker(parameter.default):
                         should_include = True
                         break
 
