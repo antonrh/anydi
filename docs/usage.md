@@ -205,8 +205,6 @@ container = Container(strict=True)
 _ = container.resolve(Service)
 ```
 
-Here's an improved version of the documentation with some enhancements for clarity, completeness, and formatting:
-
 ### Automatic Resource Management
 
 When your class dependencies implement the context manager protocol by defining the `__enter__/__aenter__` and `__exit__/__aexit__` methods, these resources are automatically managed by the container for `singleton` and `request` scoped providers.
