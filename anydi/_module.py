@@ -4,9 +4,10 @@ import importlib
 import inspect
 from typing import TYPE_CHECKING, Any, Callable
 
+from ._decorators import ProviderMetadata, is_provider
+
 if TYPE_CHECKING:
     from ._container import Container
-    from ._decorators import ProviderMetadata
 
 
 class ModuleMeta(type):
@@ -14,9 +15,9 @@ class ModuleMeta(type):
 
     def __new__(cls, name: str, bases: tuple[type, ...], attrs: dict[str, Any]) -> Any:
         attrs["providers"] = [
-            (name, getattr(value, "__provider__"))
+            (name, value.__provider__)
             for name, value in attrs.items()
-            if hasattr(value, "__provider__")
+            if is_provider(value)
         ]
         return super().__new__(cls, name, bases, attrs)
 

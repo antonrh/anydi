@@ -8,7 +8,7 @@ from dataclasses import dataclass
 from types import ModuleType
 from typing import TYPE_CHECKING, Any, Union
 
-from ._decorators import InjectableMetadata
+from ._decorators import is_injectable
 from ._typing import get_typed_parameters, is_marker
 
 if TYPE_CHECKING:
@@ -84,22 +84,18 @@ class Scanner:
             if getattr(member, "__module__", None) != module.__name__:
                 continue
 
-            metadata: InjectableMetadata = getattr(
-                member,
-                "__injectable__",
-                InjectableMetadata(wrapped=False, tags=[]),
-            )
+            should_include = False
 
-            member_tags = set(metadata.get("tags") or [])
-            has_matching_tags = bool(set(tags) & member_tags) if tags else True
+            if is_injectable(member):
+                member_tags = set(member.__injectable__["tags"] or [])
+                has_matching_tags = bool(set(tags) & member_tags) if tags else True
 
-            # If tags are provided, skip any members without matching tags
-            if tags and not has_matching_tags:
-                continue
+                # If tags are provided, skip any members without matching tags
+                if tags and not has_matching_tags:
+                    continue
 
-            should_include = metadata["wrapped"]
-
-            if not should_include:
+                should_include = True
+            elif not tags:
                 for param in get_typed_parameters(member):
                     if is_marker(param.default):
                         should_include = True

@@ -17,6 +17,7 @@ from typing_extensions import ParamSpec, Self, get_args, get_origin
 
 from ._async import run_sync
 from ._context import InstanceContext
+from ._decorators import is_provided
 from ._module import ModuleDef, ModuleRegistrar
 from ._provider import (
     Provider,
@@ -443,8 +444,8 @@ class Container:
                 raise
             if inspect.isclass(interface) and not is_builtin_type(interface):
                 # Try to get defined scope
-                if hasattr(interface, "__scope__"):
-                    scope = getattr(interface, "__scope__")
+                if is_provided(interface):
+                    scope = interface.__provided__["scope"]
                 else:
                     scope = parent_scope
                 return self._register_provider(interface, scope, interface, **defaults)

@@ -10,7 +10,7 @@ from typing import Annotated, Any, Callable, Union
 import pytest
 from typing_extensions import Self
 
-from anydi import Container, Provider, Scope, auto
+from anydi import Container, Provider, Scope, auto, request, singleton, transient
 from anydi._provider import ProviderKind
 from anydi._typing import Event
 
@@ -979,8 +979,9 @@ class TestContainer:
     def test_resolve_non_strict_provider_scope_defined(
         self, container: Container
     ) -> None:
+        @singleton
         class Service:
-            __scope__ = "singleton"
+            pass
 
         _ = container.resolve(Service)
 
@@ -1028,13 +1029,13 @@ class TestContainer:
     def test_resolve_non_strict_nested_singleton_provider(
         self, container: Container
     ) -> None:
-        @dataclass
+        @singleton
         class Repository:
-            __scope__ = "singleton"
+            pass
 
-        @dataclass
         class Service:
-            repository: Repository
+            def __init__(self, repository: Repository) -> None:
+                self.repository = repository
 
         with container.request_context():
             _ = container.resolve(Service)
@@ -1088,9 +1089,8 @@ class TestContainer:
     def test_resolve_non_strict_with_as_context_manager(
         self, container: Container
     ) -> None:
+        @singleton
         class Resource:
-            __scope__ = "singleton"
-
             def __init__(self) -> None:
                 self.entered = False
                 self.exited = False
@@ -1114,9 +1114,8 @@ class TestContainer:
         self,
         container: Container,
     ) -> None:
+        @singleton
         class Service:
-            __scope__ = "singleton"
-
             def __init__(self) -> None:
                 self.entered = False
                 self.exited = False
@@ -1315,11 +1314,10 @@ class TestContainer:
         assert kwargs == {"a": 10, "b": 1.0, "c": "test"}
 
     def test_create_transient_non_strict(self) -> None:
-        @dataclass
+        @transient
         class Component:
-            __scope__ = "transient"
-
-            name: str
+            def __init__(self, name: str) -> None:
+                self.name = name
 
         container = Container(strict=False)
 
@@ -1328,11 +1326,10 @@ class TestContainer:
         assert instance.name == "test"
 
     def test_create_singleton_non_strict(self) -> None:
-        @dataclass
+        @singleton
         class Component:
-            __scope__ = "singleton"
-
-            name: str
+            def __init__(self, name: str) -> None:
+                self.name = name
 
         container = Container(strict=False)
 
@@ -1341,11 +1338,10 @@ class TestContainer:
         assert instance.name == "test"
 
     def test_create_scoped_non_strict(self) -> None:
-        @dataclass
+        @request
         class Component:
-            __scope__ = "request"
-
-            name: str
+            def __init__(self, name: str) -> None:
+                self.name = name
 
         container = Container(strict=False)
 
@@ -1355,8 +1351,9 @@ class TestContainer:
         assert instance.name == "test"
 
     def test_create_non_existing_keyword_arg(self) -> None:
+        @singleton
         class Component:
-            __scope__ = "singleton"
+            pass
 
         container = Container(strict=False)
 
@@ -1364,11 +1361,10 @@ class TestContainer:
             container.create(Component, param="test")
 
     async def test_create_async_transient_non_strict(self) -> None:
-        @dataclass
+        @transient
         class Component:
-            __scope__ = "transient"
-
-            name: str
+            def __init__(self, name: str) -> None:
+                self.name = name
 
         container = Container(strict=False)
 
@@ -1377,11 +1373,10 @@ class TestContainer:
         assert instance.name == "test"
 
     async def test_create_async_singleton_non_strict(self) -> None:
-        @dataclass
+        @singleton
         class Component:
-            __scope__ = "singleton"
-
-            name: str
+            def __init__(self, name: str) -> None:
+                self.name = name
 
         container = Container(strict=False)
 
@@ -1390,11 +1385,10 @@ class TestContainer:
         assert instance.name == "test"
 
     async def test_create_async_scoped_non_strict(self) -> None:
-        @dataclass
+        @request
         class Component:
-            __scope__ = "request"
-
-            name: str
+            def __init__(self, name: str) -> None:
+                self.name = name
 
         container = Container(strict=False)
 
@@ -1404,8 +1398,9 @@ class TestContainer:
         assert instance.name == "test"
 
     async def test_create_async_non_existing_keyword_arg(self) -> None:
+        @singleton
         class Component:
-            __scope__ = "singleton"
+            pass
 
         container = Container(strict=False)
 

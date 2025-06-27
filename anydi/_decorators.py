@@ -1,22 +1,41 @@
 from collections.abc import Iterable
-from typing import Callable, Concatenate, ParamSpec, TypedDict, TypeVar, overload
+from typing import (
+    TYPE_CHECKING,
+    Any,
+    Callable,
+    Concatenate,
+    ParamSpec,
+    Protocol,
+    TypedDict,
+    TypeGuard,
+    TypeVar,
+    overload,
+)
 
-from ._module import Module
+if TYPE_CHECKING:
+    from ._module import Module
+
+
 from ._scope import Scope
 
 T = TypeVar("T")
 P = ParamSpec("P")
 
 ClassT = TypeVar("ClassT", bound=type)
-ModuleT = TypeVar("ModuleT", bound=Module)
+ModuleT = TypeVar("ModuleT", bound="Module")
+
+
+class ProvidedMetadata(TypedDict):
+    """Metadata for classes marked as provided by AnyDI."""
+
+    scope: Scope
 
 
 def provided(*, scope: Scope) -> Callable[[ClassT], ClassT]:
     """Decorator for marking a class as provided by AnyDI with a specific scope."""
 
     def decorator(cls: ClassT) -> ClassT:
-        cls.__provided__ = True
-        cls.__scope__ = scope
+        cls.__provided__ = ProvidedMetadata(scope=scope)
         return cls
 
     return decorator
@@ -26,6 +45,14 @@ def provided(*, scope: Scope) -> Callable[[ClassT], ClassT]:
 transient = provided(scope="transient")
 request = provided(scope="request")
 singleton = provided(scope="singleton")
+
+
+class Provided(Protocol):
+    __provided__: ProvidedMetadata
+
+
+def is_provided(cls: Any) -> TypeGuard[type[Provided]]:
+    return hasattr(cls, "__provided__")
 
 
 class ProviderMetadata(TypedDict):
@@ -49,8 +76,15 @@ def provider(
     return decorator
 
 
+class Provider(Protocol):
+    __provider__: ProviderMetadata
+
+
+def is_provider(obj: Callable[..., Any]) -> TypeGuard[Provider]:
+    return hasattr(obj, "__provider__")
+
+
 class InjectableMetadata(TypedDict):
-    wrapped: bool
     tags: Iterable[str] | None
 
 
@@ -71,10 +105,18 @@ def injectable(
     """Decorator for marking a function or method as requiring dependency injection."""
 
     def decorator(inner: Callable[P, T]) -> Callable[P, T]:
-        inner.__injectable__ = InjectableMetadata(wrapped=True, tags=tags)  # type: ignore
+        inner.__injectable__ = InjectableMetadata(tags=tags)  # type: ignore
         return inner
 
     if func is None:
         return decorator
 
     return decorator(func)
+
+
+class Injectable(Protocol):
+    __injectable__: InjectableMetadata
+
+
+def is_injectable(obj: Callable[..., Any]) -> TypeGuard[Injectable]:
+    return hasattr(obj, "__injectable__")

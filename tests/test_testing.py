@@ -6,7 +6,7 @@ from unittest import mock
 
 import pytest
 
-from anydi import Container, auto
+from anydi import Container, auto, singleton
 from anydi.testing import TestContainer
 
 from tests.fixtures import Service
@@ -99,9 +99,8 @@ class TestTestContainer:
             def get_user(self) -> str:
                 return "user"
 
+        @singleton
         class UserService:
-            __scope__ = "singleton"
-
             def __init__(self, repo: UserRepo, param: Annotated[str, "param"]) -> None:
                 self.repo = repo
                 self.param = param
@@ -130,9 +129,8 @@ class TestTestContainer:
         container = TestContainer(strict=False)
         container.register(Annotated[str, "param"], lambda: "param", scope="singleton")
 
+        @singleton
         class UserService:
-            __scope__ = "singleton"
-
             def __init__(self, param: Annotated[str, "param"]) -> None:
                 self.param = param
 
