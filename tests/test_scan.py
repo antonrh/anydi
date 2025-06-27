@@ -2,6 +2,7 @@ import pytest
 from pytest_mock import MockerFixture
 
 from anydi import Container
+
 from tests.scan_app import ScanAppModule
 
 
@@ -10,7 +11,9 @@ class TestContainerScan:
     def container(self) -> Container:
         return Container()
 
-    def test_scan_registers_all_dependencies(self, container: Container, mocker: MockerFixture) -> None:
+    def test_scan_registers_all_dependencies(
+        self, container: Container, mocker: MockerFixture
+    ) -> None:
         inject_spy = mocker.spy(container, "inject")
 
         container.register_module(ScanAppModule)
@@ -24,7 +27,9 @@ class TestContainerScan:
         assert a_a3_handler_1() == "a.a1.str_provider"
         assert a_a3_handler_2().ident == "a.a1.str_provider"
 
-    def test_scan_single_module_registers_limited_dependencies(self, container: Container, mocker: MockerFixture) -> None:
+    def test_scan_single_module_registers_limited_dependencies(
+        self, container: Container, mocker: MockerFixture
+    ) -> None:
         inject_spy = mocker.spy(container, "inject")
 
         container.register_module(ScanAppModule)
@@ -37,7 +42,9 @@ class TestContainerScan:
 
         assert a_a3_handler_1() == "a.a1.str_provider"
 
-    def test_scan_with_unknown_tag_registers_nothing(self, container: Container, mocker: MockerFixture) -> None:
+    def test_scan_with_unknown_tag_registers_nothing(
+        self, container: Container, mocker: MockerFixture
+    ) -> None:
         inject_spy = mocker.spy(container, "inject")
 
         container.scan(["tests.scan_app"], tags=["non_existing_tag"])
@@ -45,7 +52,9 @@ class TestContainerScan:
         # No injectable functions should be picked up with unmatched tags
         inject_spy.assert_not_called()
 
-    def test_scan_with_matching_tag_registers_only_matching_dependencies(self, container: Container, mocker: MockerFixture) -> None:
+    def test_scan_with_matching_tag_registers_only_matching_dependencies(
+        self, container: Container, mocker: MockerFixture
+    ) -> None:
         inject_spy = mocker.spy(container, "inject")
 
         container.register_module(ScanAppModule)
@@ -58,7 +67,9 @@ class TestContainerScan:
 
         assert a_a3_handler_1() == "a.a1.str_provider"
 
-    def test_scan_skips_wrapped_without_matching_tags(self, container: Container, mocker: MockerFixture) -> None:
+    def test_scan_skips_wrapped_without_matching_tags(
+        self, container: Container, mocker: MockerFixture
+    ) -> None:
         inject_spy = mocker.spy(container, "inject")
 
         # Assume there is a wrapped=True function without tags in the tree
