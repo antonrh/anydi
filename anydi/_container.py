@@ -19,11 +19,7 @@ from ._async import run_sync
 from ._context import InstanceContext
 from ._decorators import is_provided
 from ._module import ModuleDef, ModuleRegistrar
-from ._provider import (
-    Provider,
-    ProviderDef,
-    ProviderKind,
-)
+from ._provider import Provider, ProviderDef, ProviderKind
 from ._scan import PackageOrIterable, Scanner
 from ._scope import ALLOWED_SCOPES, Scope
 from ._typing import (
@@ -230,6 +226,10 @@ class Container:
     def is_registered(self, interface: Any) -> bool:
         """Check if a provider is registered for the specified interface."""
         return interface in self._providers
+
+    def has_provider_for(self, interface: Any) -> bool:
+        """Check if a provider exists for the specified interface."""
+        return self.is_registered(interface) or is_provided(interface)
 
     def unregister(self, interface: Any) -> None:
         """Unregister a provider by interface."""
@@ -846,7 +846,7 @@ class Container:
                 f"Missing `{type_repr(call)}` parameter `{parameter.name}` annotation."
             )
 
-        if not self.is_registered(parameter.annotation):
+        if not self.has_provider_for(parameter.annotation):
             raise LookupError(
                 f"`{type_repr(call)}` has an unknown dependency parameter "
                 f"`{parameter.name}` with an annotation of "

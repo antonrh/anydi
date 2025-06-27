@@ -88,8 +88,8 @@ def _anydi_inject(
     container = cast(Container, request.getfixturevalue("anydi_setup_container"))
 
     for argname, interface in _anydi_injected_parameter_iterator():
-        # Skip if the interface is not registered
-        if container.strict and not container.is_registered(interface):
+        # Skip if the interface has no provider
+        if not container.has_provider_for(interface):
             continue
 
         try:
@@ -128,8 +128,8 @@ def _anydi_ainject(
         container = cast(Container, request.getfixturevalue("anydi_setup_container"))
 
         for argname, interface in _anydi_injected_parameter_iterator():
-            # Skip if the interface is not registered
-            if container.strict and not container.is_registered(interface):
+            # Skip if the interface has no provider
+            if not container.has_provider_for(interface):
                 continue
 
             try:

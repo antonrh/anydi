@@ -57,7 +57,7 @@ class TestContainer(Container):
         """
         Override the provider for the specified interface with a specific instance.
         """
-        if not self.is_registered(interface) and self.strict:
+        if not self.has_provider_for(interface):
             raise LookupError(
                 f"The provider interface `{type_repr(interface)}` not registered."
             )
