@@ -6,7 +6,7 @@ import pkgutil
 from collections.abc import Iterable
 from dataclasses import dataclass
 from types import ModuleType
-from typing import TYPE_CHECKING, Any, Union
+from typing import TYPE_CHECKING, Any, Callable, Union
 
 from ._decorators import is_injectable
 from ._typing import get_typed_parameters, is_marker
@@ -73,9 +73,8 @@ class Scanner:
 
         return dependencies
 
-    @staticmethod
     def _scan_module(
-        module: ModuleType, *, tags: Iterable[str]
+        self, module: ModuleType, *, tags: Iterable[str]
     ) -> list[ScannedDependency]:
         """Scan a module for decorated members."""
         dependencies: list[ScannedDependency] = []
@@ -84,25 +83,28 @@ class Scanner:
             if getattr(member, "__module__", None) != module.__name__:
                 continue
 
-            should_include = False
-
-            if is_injectable(member):
-                member_tags = set(member.__injectable__["tags"] or [])
-                has_matching_tags = bool(set(tags) & member_tags) if tags else True
-
-                # If tags are provided, skip any members without matching tags
-                if tags and not has_matching_tags:
-                    continue
-
-                should_include = True
-
-            elif not tags:
-                for parameter in get_typed_parameters(member):
-                    if is_marker(parameter.default):
-                        should_include = True
-                        break
-
-            if should_include:
+            if self._should_include_member(member, tags=tags):
                 dependencies.append(ScannedDependency(member=member, module=module))
 
         return dependencies
+
+    @staticmethod
+    def _should_include_member(
+        member: Callable[..., Any], *, tags: Iterable[str]
+    ) -> bool:
+        """Determine if a member should be included based on tags or marker defaults."""
+
+        if is_injectable(member):
+            member_tags = set(member.__injectable__["tags"] or [])
+            if tags:
+                return bool(set(tags) & member_tags)
+            return True  # No tags passed → include all injectables
+
+        # If no tags are passed and not explicitly injectable,
+        # check for parameter markers
+        if not tags:
+            for param in get_typed_parameters(member):
+                if is_marker(param.default):
+                    return True
+
+        return False
