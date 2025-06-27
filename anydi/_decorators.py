@@ -9,22 +9,22 @@ P = ParamSpec("P")
 M = TypeVar("M", bound=Module)
 
 
-def transient(target: T) -> T:
+def transient(cls: T) -> T:
     """Decorator for marking a class as transient scope."""
-    target.__scope__ = "transient"
-    return target
+    cls.__scope__ = "transient"
+    return cls
 
 
-def request(target: T) -> T:
+def request(cls: T) -> T:
     """Decorator for marking a class as request scope."""
-    target.__scope__ = "request"
-    return target
+    cls.__scope__ = "request"
+    return cls
 
 
-def singleton(target: T) -> T:
+def singleton(cls: T) -> T:
     """Decorator for marking a class as singleton scope."""
-    target.__scope__ = "singleton"
-    return target
+    cls.__scope__ = "singleton"
+    return cls
 
 
 class ProviderMetadata(TypedDict):
