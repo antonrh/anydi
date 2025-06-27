@@ -794,6 +794,9 @@ class Container:
 
         injected_params = self._get_injected_params(call)
 
+        if not injected_params:
+            return call
+
         if inspect.iscoroutinefunction(call):
 
             @functools.wraps(call)
