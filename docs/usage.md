@@ -178,7 +178,7 @@ from typing import Iterator
 
 from anydi import Container
 
-container = Container()  # Non-strict mode
+container = Container()
 
 @container.provider(scope="singleton")
 def db() -> Iterator[Database]:
