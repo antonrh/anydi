@@ -990,17 +990,6 @@ class TestContainer:
         assert provider.scope == "singleton"
         assert provider.interface == Service
 
-    def test_resolve_non_strict_annotated(self, container: Container) -> None:
-        class Service:
-            pass
-
-        service_1 = container.resolve(Annotated[Service, "service_1"])
-        service_2 = container.resolve(Annotated[Service, "service_2"])
-
-        assert service_1 != service_2
-        assert container.is_registered(Annotated[Service, "service_1"])
-        assert container.is_registered(Annotated[Service, "service_2"])
-
     def test_resolve_non_strict_provider_scope_from_sub_provider_request(
         self,
         container: Container,

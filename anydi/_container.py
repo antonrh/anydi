@@ -11,7 +11,7 @@ import uuid
 from collections import defaultdict
 from collections.abc import AsyncIterator, Iterable, Iterator
 from contextvars import ContextVar
-from typing import Annotated, Any, Callable, TypeVar, cast, overload
+from typing import Any, Callable, TypeVar, cast, overload
 
 from typing_extensions import ParamSpec, Self, get_args, get_origin
 
@@ -441,17 +441,13 @@ class Container:
         except LookupError:
             if self.strict or interface is inspect.Parameter.empty:
                 raise
-            if get_origin(interface) is Annotated and (args := get_args(interface)):
-                call = args[0]
-            else:
-                call = interface
-            if inspect.isclass(call) and not is_builtin_type(call):
+            if inspect.isclass(interface) and not is_builtin_type(interface):
                 # Try to get defined scope
-                if hasattr(call, "__scope__"):
-                    scope = getattr(call, "__scope__")
+                if hasattr(interface, "__scope__"):
+                    scope = getattr(interface, "__scope__")
                 else:
                     scope = parent_scope
-                return self._register_provider(call, scope, interface, **defaults)
+                return self._register_provider(interface, scope, interface, **defaults)
             raise
 
     def _set_provider(self, provider: Provider) -> None:
