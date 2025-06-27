@@ -58,7 +58,7 @@ class TestContainerScan:
         inject_spy = mocker.spy(container, "inject")
 
         container.register_module(ScanAppModule)
-        container.scan(["tests.scan_app.a"], tags=["inject"])
+        container.scan(["tests.scan_app"], tags=["inject"])
 
         # Only handlers with @injectable(..., tags=["inject"]) should be included
         assert inject_spy.call_count == 1
@@ -66,14 +66,3 @@ class TestContainerScan:
         from .scan_app.a.a3.handlers import a_a3_handler_1
 
         assert a_a3_handler_1() == "a.a1.str_provider"
-
-    def test_scan_skips_wrapped_without_matching_tags(
-        self, container: Container, mocker: MockerFixture
-    ) -> None:
-        inject_spy = mocker.spy(container, "inject")
-
-        # Assume there is a wrapped=True function without tags in the tree
-        container.scan(["tests.scan_app"], tags=["inject"])
-
-        # It should be skipped if it has no matching tags
-        assert inject_spy.call_count == 1  # Still only the explicitly tagged one
