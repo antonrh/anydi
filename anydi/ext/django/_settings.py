@@ -8,7 +8,6 @@ from typing_extensions import TypedDict
 
 class Settings(TypedDict):
     CONTAINER_FACTORY: str | None
-    STRICT_MODE: bool
     REGISTER_SETTINGS: bool
     REGISTER_COMPONENTS: bool
     INJECT_URLCONF: str | Sequence[str] | None
@@ -19,7 +18,6 @@ class Settings(TypedDict):
 
 DEFAULTS = Settings(
     CONTAINER_FACTORY=None,
-    STRICT_MODE=False,
     REGISTER_SETTINGS=False,
     REGISTER_COMPONENTS=False,
     MODULES=[],

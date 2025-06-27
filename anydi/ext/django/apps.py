@@ -34,9 +34,7 @@ class ContainerConfig(AppConfig):
                 ) from exc
             self.container = container_factory()
         else:
-            self.container = anydi.Container(
-                strict=self.settings["STRICT_MODE"],
-            )
+            self.container = anydi.Container()
 
     def ready(self) -> None:  # noqa: C901
         # Register Django settings

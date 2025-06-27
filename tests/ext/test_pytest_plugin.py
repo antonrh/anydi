@@ -14,7 +14,7 @@ class UnknownService:
 
 @pytest.fixture(scope="module")
 def container() -> Container:
-    container = Container(strict=True)
+    container = Container()
     container.register(Service, lambda: Service(), scope="singleton")
     return container
 

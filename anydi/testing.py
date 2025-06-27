@@ -23,14 +23,12 @@ class TestContainer(Container):
         *,
         providers: Sequence[ProviderDef] | None = None,
         modules: Iterable[ModuleDef] | None = None,
-        strict: bool = False,
         default_scope: Scope = "transient",
         logger: logging.Logger | None = None,
     ) -> None:
         super().__init__(
             providers=providers,
             modules=modules,
-            strict=strict,
             default_scope=default_scope,
             logger=logger,
         )
@@ -47,7 +45,6 @@ class TestContainer(Container):
                 )
                 for provider in container.providers.values()
             ],
-            strict=container.strict,
             default_scope=container.default_scope,
             logger=container.logger,
         )
@@ -57,7 +54,7 @@ class TestContainer(Container):
         """
         Override the provider for the specified interface with a specific instance.
         """
-        if not self.is_registered(interface) and self.strict:
+        if not self.has_provider_for(interface):
             raise LookupError(
                 f"The provider interface `{type_repr(interface)}` not registered."
             )

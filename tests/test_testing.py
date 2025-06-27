@@ -20,7 +20,6 @@ class TestTestContainer:
         test_container = TestContainer.from_container(container)
 
         assert test_container.providers == container.providers
-        assert test_container.strict == container.strict
         assert test_container.default_scope == container.default_scope
 
         assert test_container.resolve(str) == "Hello, world!"
@@ -41,7 +40,7 @@ class TestTestContainer:
         assert container.resolve(str) == origin_name
 
     def test_override_instance_provider_not_registered_using_strict_mode(self) -> None:
-        container = TestContainer(strict=True)
+        container = TestContainer()
 
         with pytest.raises(
             LookupError, match="The provider interface `str` not registered."
@@ -92,7 +91,7 @@ class TestTestContainer:
             assert (await container.aresolve(str)) == overridden
 
     def test_override_registered_instance(self) -> None:
-        container = TestContainer(strict=False)
+        container = TestContainer()
         container.register(Annotated[str, "param"], lambda: "param", scope="singleton")
 
         class UserRepo:
@@ -126,7 +125,7 @@ class TestTestContainer:
             }
 
     async def test_override_instance_async_resolved(self) -> None:
-        container = TestContainer(strict=False)
+        container = TestContainer()
         container.register(Annotated[str, "param"], lambda: "param", scope="singleton")
 
         @singleton
@@ -147,7 +146,7 @@ class TestTestContainer:
             }
 
     def test_override_instance_in_strict_mode(self) -> None:
-        container = TestContainer(strict=True)
+        container = TestContainer()
 
         class Settings:
             def __init__(self, name: str) -> None:
@@ -166,7 +165,7 @@ class TestTestContainer:
         assert service.ident == "test"
 
     def test_override_instance_first(self) -> None:
-        container = TestContainer(strict=True)
+        container = TestContainer()
 
         @dataclass
         class Item:

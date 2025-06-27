@@ -59,7 +59,6 @@ The `HelloService` will be automatically injected into the hello view through th
 `ANYDI` supports the following settings:
 
 * `CONTAINER_FACTORY: str | None` - Specifies the factory function used to create the container. If not provided, the default container factory will be utilized.
-* `STRICT_MODE: bool` - Determines the container's behavior when a dependency cannot be resolved. If set to `True`, the container will raise an exception. If `False`, it will attempt to automatically create the dependency.
 * `REGISTER_SETTINGS: bool` - If `True`, the container will register the Django settings within it.
 * `REGISTER_COMPONENTS: bool` - If `True`, the container will register Django components such as the database and cache.
 * `INJECT_URLCONF: str | Sequence[str] | None` - Specifies the URL configuration where dependencies should be injected.
@@ -148,7 +147,7 @@ from anydi import Container
 
 
 def get_container() -> Container:
-    container = Container(strict=True)
+    container = Container()
     # Add custom container configuration here
     return container
 ```

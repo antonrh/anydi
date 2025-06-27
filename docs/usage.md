@@ -145,10 +145,11 @@ assert not container.is_resolved(int)
 
     This pattern can be used while writing unit tests to ensure that each test case has a clean dependency graph.
 
-## Strict Mode
+## Auto-Registration
 
 
-`AnyDI` operates in non-strict mode by default, meaning it doesn't require explicit registration for every type. It can dynamically resolve or auto-register dependencies, simplifying setups where manual registration for each type is impractical.
+`AnyDI` doesn't require explicit registration for every type. It can dynamically resolve and auto-register dependencies,
+simplifying setups where manual registration for each type is impractical.
 
 Consider a scenario with class dependencies:
 
@@ -194,17 +195,6 @@ assert container.is_resolved(Repository)
 assert container.is_resolved(Database)
 ```
 
-### Enabling Strict Mode
-
-For strict checking, enable strict mode by setting `strict=True` when creating the `Container`. In strict mode, all types must be explicitly registered or have a definable provider before instantiation.
-
-```python
-container = Container(strict=True)
-
-# Raises LookupError if `Service` or dependencies aren't registered.
-_ = container.resolve(Service)
-```
-
 ### Automatic Resource Management
 
 When your class dependencies implement the context manager protocol by defining the `__enter__/__aenter__` and `__exit__/__aexit__` methods, these resources are automatically managed by the container for `singleton` and `request` scoped providers.
@@ -227,7 +217,7 @@ class Connection:
         self.disconnected = True
 
 
-container = Container(strict=False)
+container = Container()
 connection = container.resolve(Connection)
 
 assert container.is_resolved(Connection)
