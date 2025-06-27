@@ -18,7 +18,7 @@ class UserMessage(BaseModel):
 
 @pytest.fixture(scope="session")
 def container() -> Container:
-    container = Container(strict=True)
+    container = Container()
 
     @container.provider(scope="singleton")
     def provide_user_service() -> UserService:

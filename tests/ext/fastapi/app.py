@@ -10,7 +10,7 @@ from anydi.testing import TestContainer
 
 from tests.ext.fixtures import Mail, MailService, User, UserService
 
-container = TestContainer(strict=True)
+container = TestContainer()
 
 
 @container.provider(scope="singleton")

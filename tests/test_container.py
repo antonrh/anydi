@@ -1,5 +1,4 @@
 import asyncio
-import logging
 import sys
 import threading
 import uuid
@@ -35,12 +34,6 @@ def container() -> Container:
 
 
 class TestContainer:
-    def test_default_properties(self) -> None:
-        container = Container()
-
-        assert not container.strict
-        assert container.default_scope == "transient"
-
     def test_register_provider(self, container: Container) -> None:
         def provider_call() -> str:
             return "test"
@@ -1319,7 +1312,7 @@ class TestContainer:
             def __init__(self, name: str) -> None:
                 self.name = name
 
-        container = Container(strict=False)
+        container = Container()
 
         instance = container.create(Component, name="test")
 
@@ -1331,7 +1324,7 @@ class TestContainer:
             def __init__(self, name: str) -> None:
                 self.name = name
 
-        container = Container(strict=False)
+        container = Container()
 
         instance = container.create(Component, name="test")
 
@@ -1343,7 +1336,7 @@ class TestContainer:
             def __init__(self, name: str) -> None:
                 self.name = name
 
-        container = Container(strict=False)
+        container = Container()
 
         with container.request_context():
             instance = container.create(Component, name="test")
@@ -1355,7 +1348,7 @@ class TestContainer:
         class Component:
             pass
 
-        container = Container(strict=False)
+        container = Container()
 
         with pytest.raises(TypeError, match="takes no arguments"):
             container.create(Component, param="test")
@@ -1366,7 +1359,7 @@ class TestContainer:
             def __init__(self, name: str) -> None:
                 self.name = name
 
-        container = Container(strict=False)
+        container = Container()
 
         instance = await container.acreate(Component, name="test")
 
@@ -1378,7 +1371,7 @@ class TestContainer:
             def __init__(self, name: str) -> None:
                 self.name = name
 
-        container = Container(strict=False)
+        container = Container()
 
         instance = await container.acreate(Component, name="test")
 
@@ -1390,7 +1383,7 @@ class TestContainer:
             def __init__(self, name: str) -> None:
                 self.name = name
 
-        container = Container(strict=False)
+        container = Container()
 
         with container.request_context():
             instance = await container.acreate(Component, name="test")
@@ -1402,7 +1395,7 @@ class TestContainer:
         class Component:
             pass
 
-        container = Container(strict=False)
+        container = Container()
 
         with pytest.raises(TypeError, match="takes no arguments"):
             await container.acreate(Component, param="test")
@@ -1426,22 +1419,6 @@ class TestContainerInjector:
 
         assert result == "service ident = 1000"
 
-    def test_inject_auto_registered_log_message(
-        self, container: Container, caplog: pytest.LogCaptureFixture
-    ) -> None:
-        with caplog.at_level(logging.DEBUG, logger="anydi"):
-
-            @container.inject
-            def handler(service: Service = auto) -> None:
-                pass
-
-            assert caplog.messages == [
-                "Cannot validate the `tests.test_container.TestContainerInjector"
-                ".test_inject_auto_registered_log_message.<locals>.handler` parameter "
-                "`service` with an annotation of `tests.fixtures.Service due to "
-                "being in non-strict mode. It will be validated at the first call."
-            ]
-
     def test_inject_missing_annotation(self, container: Container) -> None:
         def handler(name=auto) -> str:  # type: ignore[no-untyped-def]
             return name  # type: ignore[no-any-return]
@@ -1452,7 +1429,7 @@ class TestContainerInjector:
             container.inject(handler)
 
     def test_inject_unknown_dependency_using_strict_mode(self) -> None:
-        container = Container(strict=True)
+        container = Container()
 
         def handler(message: str = auto) -> None:
             pass

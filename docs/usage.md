@@ -148,7 +148,8 @@ assert not container.is_resolved(int)
 ## Strict Mode
 
 
-`AnyDI` operates in non-strict mode by default, meaning it doesn't require explicit registration for every type. It can dynamically resolve or auto-register dependencies, simplifying setups where manual registration for each type is impractical.
+`AnyDI` operates in non-strict mode by default, meaning it doesn't require explicit registration for every type.
+It can dynamically resolve or auto-register dependencies, simplifying setups where manual registration for each type is impractical.
 
 Consider a scenario with class dependencies:
 
@@ -192,17 +193,6 @@ _ = container.resolve(Service)
 assert container.is_resolved(Service)
 assert container.is_resolved(Repository)
 assert container.is_resolved(Database)
-```
-
-### Enabling Strict Mode
-
-For strict checking, enable strict mode by setting `strict=True` when creating the `Container`. In strict mode, all types must be explicitly registered or have a definable provider before instantiation.
-
-```python
-container = Container(strict=True)
-
-# Raises LookupError if `Service` or dependencies aren't registered.
-_ = container.resolve(Service)
 ```
 
 Here's an improved version of the documentation with some enhancements for clarity, completeness, and formatting:

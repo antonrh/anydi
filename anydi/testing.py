@@ -23,14 +23,12 @@ class TestContainer(Container):
         *,
         providers: Sequence[ProviderDef] | None = None,
         modules: Iterable[ModuleDef] | None = None,
-        strict: bool = False,
         default_scope: Scope = "transient",
         logger: logging.Logger | None = None,
     ) -> None:
         super().__init__(
             providers=providers,
             modules=modules,
-            strict=strict,
             default_scope=default_scope,
             logger=logger,
         )
@@ -47,7 +45,6 @@ class TestContainer(Container):
                 )
                 for provider in container.providers.values()
             ],
-            strict=container.strict,
             default_scope=container.default_scope,
             logger=container.logger,
         )

@@ -15,7 +15,7 @@ def test_inject_param_missing_interface() -> None:
 
 
 def test_install_without_annotation() -> None:
-    container = Container(strict=True)
+    container = Container()
 
     @container.provider(scope="singleton")
     def message() -> str:
@@ -34,7 +34,7 @@ def test_install_without_annotation() -> None:
 
 
 def test_install_unknown_annotation() -> None:
-    container = Container(strict=True)
+    container = Container()
 
     broker = RedisBroker()
 

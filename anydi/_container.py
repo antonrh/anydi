@@ -49,12 +49,10 @@ class Container:
         *,
         providers: Iterable[ProviderDef] | None = None,
         modules: Iterable[ModuleDef] | None = None,
-        strict: bool = False,
         default_scope: Scope = "transient",
         logger: logging.Logger | None = None,
     ) -> None:
         self._providers: dict[Any, Provider] = {}
-        self._strict = strict
         self._default_scope: Scope = default_scope
         self._logger = logger or logging.getLogger(__name__)
         self._resources: dict[str, list[Any]] = defaultdict(list)
@@ -86,11 +84,6 @@ class Container:
     ############################
     # Properties
     ############################
-
-    @property
-    def strict(self) -> bool:
-        """Check if strict mode is enabled."""
-        return self._strict
 
     @property
     def default_scope(self) -> Scope:
@@ -440,7 +433,7 @@ class Container:
         try:
             return self._get_provider(interface)
         except LookupError:
-            if self.strict or interface is inspect.Parameter.empty:
+            if interface is inspect.Parameter.empty:
                 raise
             if inspect.isclass(interface) and not is_builtin_type(interface):
                 # Try to get defined scope
@@ -464,14 +457,13 @@ class Container:
         if provider.is_resource:
             self._resources[provider.scope].remove(provider.interface)
 
+    @staticmethod
     def _parameter_has_default(
-        self, parameter: inspect.Parameter, /, **defaults: Any
+        parameter: inspect.Parameter, /, **defaults: Any
     ) -> bool:
         has_default_in_kwargs = parameter.name in defaults if defaults else False
-        has_non_strict_default = not self.strict and (
-            parameter.default is not inspect.Parameter.empty
-        )
-        return has_default_in_kwargs or has_non_strict_default
+        has_default = parameter.default is not inspect.Parameter.empty
+        return has_default_in_kwargs or has_default
 
     ############################
     # Instance Methods
@@ -822,18 +814,7 @@ class Container:
         for parameter in get_typed_parameters(call):
             if not is_marker(parameter.default):
                 continue
-            try:
-                self._validate_injected_parameter(call, parameter)
-            except LookupError as exc:
-                if not self.strict:
-                    self.logger.debug(
-                        f"Cannot validate the `{type_repr(call)}` parameter "
-                        f"`{parameter.name}` with an annotation of "
-                        f"`{type_repr(parameter.annotation)} due to being "
-                        "in non-strict mode. It will be validated at the first call."
-                    )
-                else:
-                    raise exc
+            self._validate_injected_parameter(call, parameter)
             injected_params[parameter.name] = parameter.annotation
         return injected_params
 
