@@ -147,7 +147,7 @@ from anydi import Container
 
 
 def get_container() -> Container:
-    container = Container(strict=True)
+    container = Container()
     # Add custom container configuration here
     return container
 ```
