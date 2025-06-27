@@ -90,13 +90,14 @@ class Scanner:
                 InjectableMetadata(wrapped=False, tags=[]),
             )
 
-            should_include = False
-            if metadata["wrapped"]:
-                should_include = True
-            elif tags and metadata["tags"]:
-                should_include = bool(set(metadata["tags"]) & set(tags))
-            elif tags and not metadata["tags"]:
-                continue  # tags are provided but member has none
+            member_tags = set(metadata.get("tags") or [])
+            has_matching_tags = bool(set(tags) & member_tags) if tags else True
+
+            # If tags are provided, skip any members without matching tags
+            if tags and not has_matching_tags:
+                continue
+
+            should_include = metadata["wrapped"]
 
             if not should_include:
                 for param in get_typed_parameters(member):
