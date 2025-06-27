@@ -17,10 +17,10 @@ from typing_extensions import ParamSpec, Self, get_args, get_origin
 
 from ._async import run_sync
 from ._context import InstanceContext
-from ._module import ModuleDefinition, ModuleRegistrar
+from ._module import ModuleDef, ModuleRegistrar
 from ._provider import (
     Provider,
-    ProviderDefinition,
+    ProviderDef,
     ProviderKind,
 )
 from ._scan import PackageOrIterable, Scanner
@@ -50,8 +50,8 @@ class Container:
     def __init__(
         self,
         *,
-        providers: Iterable[ProviderDefinition] | None = None,
-        modules: Iterable[ModuleDefinition] | None = None,
+        providers: Iterable[ProviderDef] | None = None,
+        modules: Iterable[ModuleDef] | None = None,
         strict: bool = False,
         default_scope: Scope = "transient",
         logger: logging.Logger | None = None,
@@ -860,7 +860,7 @@ class Container:
     # Module Methods
     ############################
 
-    def register_module(self, module: ModuleDefinition) -> None:
+    def register_module(self, module: ModuleDef) -> None:
         """Register a module as a callable, module type, or module instance."""
         self._modules.register(module)
 

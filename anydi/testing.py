@@ -9,8 +9,8 @@ from typing_extensions import Self
 
 from ._container import Container
 from ._context import InstanceContext
-from ._module import ModuleDefinition
-from ._provider import Provider, ProviderDefinition
+from ._module import ModuleDef
+from ._provider import Provider, ProviderDef
 from ._scope import Scope
 from ._typing import type_repr
 
@@ -21,8 +21,8 @@ class TestContainer(Container):
     def __init__(
         self,
         *,
-        providers: Sequence[ProviderDefinition] | None = None,
-        modules: Iterable[ModuleDefinition] | None = None,
+        providers: Sequence[ProviderDef] | None = None,
+        modules: Iterable[ModuleDef] | None = None,
         strict: bool = False,
         default_scope: Scope = "transient",
         logger: logging.Logger | None = None,
@@ -40,7 +40,7 @@ class TestContainer(Container):
     def from_container(cls, container: Container) -> Self:
         return cls(
             providers=[
-                ProviderDefinition(
+                ProviderDef(
                     interface=provider.interface,
                     call=provider.call,
                     scope=provider.scope,

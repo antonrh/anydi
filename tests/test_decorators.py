@@ -19,18 +19,21 @@ def test_request_decorator() -> None:
     request(Service)
 
     assert getattr(Service, "__scope__") == "request"
+    assert getattr(Service, "__provided__")
 
 
 def test_transient_decorator() -> None:
     transient(Service)
 
     assert getattr(Service, "__scope__") == "transient"
+    assert getattr(Service, "__provided__")
 
 
 def test_singleton_decorator() -> None:
     singleton(Service)
 
     assert getattr(Service, "__scope__") == "singleton"
+    assert getattr(Service, "__provided__")
 
 
 def test_injectable_no_args() -> None:
