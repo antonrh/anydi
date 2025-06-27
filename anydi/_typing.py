@@ -3,26 +3,22 @@
 from __future__ import annotations
 
 import builtins
-import importlib
 import inspect
 import re
 import sys
 from collections.abc import AsyncIterator, Iterator
-from typing import Any, Callable, ForwardRef, TypeVar
+from typing import Any, Callable, ForwardRef
 
-from typing_extensions import ParamSpec, Self, get_args, get_origin
+from typing_extensions import Self, get_args, get_origin
 
 try:
     from types import NoneType
 except ImportError:
     NoneType = type(None)
 
-T = TypeVar("T")
-P = ParamSpec("P")
 
-
-def get_full_qualname(obj: Any) -> str:
-    """Get the fully qualified name of an object."""
+def type_repr(obj: Any) -> str:
+    """Get a string representation of a type or object."""
     if isinstance(obj, str):
         return obj
 
@@ -33,8 +29,8 @@ def get_full_qualname(obj: Any) -> str:
     origin = get_origin(obj)
     # If origin exists, handle generics recursively
     if origin:
-        args = ", ".join(get_full_qualname(arg) for arg in get_args(obj))
-        return f"{get_full_qualname(origin)}[{args}]"
+        args = ", ".join(type_repr(arg) for arg in get_args(obj))
+        return f"{type_repr(origin)}[{args}]"
 
     # Substitute standard library prefixes for clarity
     full_qualname = f"{module}.{qualname}"
@@ -124,21 +120,6 @@ class Event:
 def is_event_type(obj: Any) -> bool:
     """Checks if an object is an event type."""
     return inspect.isclass(obj) and issubclass(obj, Event)
-
-
-def import_string(dotted_path: str) -> Any:
-    """
-    Import a module or a specific attribute from a module using its dotted string path.
-    """
-    try:
-        module_path, _, attribute_name = dotted_path.rpartition(".")
-        if module_path:
-            module = importlib.import_module(module_path)
-            return getattr(module, attribute_name)
-        else:
-            return importlib.import_module(attribute_name)
-    except (ImportError, AttributeError) as exc:
-        raise ImportError(f"Cannot import '{dotted_path}': {exc}") from exc
 
 
 class _Sentinel:

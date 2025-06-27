@@ -25,10 +25,9 @@ from ._provider import (
 )
 from ._scan import PackageOrIterable, Scanner
 from ._scope import ALLOWED_SCOPES, Scope
-from ._utils import (
+from ._typing import (
     NOT_SET,
     Event,
-    get_full_qualname,
     get_typed_annotation,
     get_typed_parameters,
     is_async_context_manager,
@@ -38,6 +37,7 @@ from ._utils import (
     is_iterator_type,
     is_marker,
     is_none_type,
+    type_repr,
 )
 
 T = TypeVar("T", bound=Any)
@@ -234,8 +234,7 @@ class Container:
         """Unregister a provider by interface."""
         if not self.is_registered(interface):
             raise LookupError(
-                "The provider interface "
-                f"`{get_full_qualname(interface)}` not registered."
+                f"The provider interface `{type_repr(interface)}` not registered."
             )
 
         provider = self._get_provider(interface)
@@ -273,7 +272,7 @@ class Container:
         **defaults: Any,
     ) -> Provider:
         """Register a provider with the specified scope."""
-        name = get_full_qualname(call)
+        name = type_repr(call)
         kind = ProviderKind.from_call(call)
         detected_scope = scope
 
@@ -318,8 +317,7 @@ class Container:
         # Check for existing provider
         if interface in self._providers and not override:
             raise LookupError(
-                f"The provider interface `{get_full_qualname(interface)}` "
-                "already registered."
+                f"The provider interface `{type_repr(interface)}` already registered."
             )
 
         unresolved_parameter = None
@@ -380,7 +378,7 @@ class Container:
             else:
                 raise LookupError(
                     f"The provider `{name}` depends on `{unresolved_parameter.name}` "
-                    f"of type `{get_full_qualname(unresolved_parameter.annotation)}`, "
+                    f"of type `{type_repr(unresolved_parameter.annotation)}`, "
                     "which has not been registered or set. To resolve this, ensure "
                     f"that `{unresolved_parameter.name}` is registered before "
                     f"attempting to use it."
@@ -429,7 +427,7 @@ class Container:
             return self._providers[interface]
         except KeyError as exc:
             raise LookupError(
-                f"The provider interface for `{get_full_qualname(interface)}` has "
+                f"The provider interface for `{type_repr(interface)}` has "
                 "not been registered. Please ensure that the provider interface is "
                 "properly registered before attempting to use it."
             ) from exc
@@ -758,8 +756,8 @@ class Container:
         if parameter.annotation in self._unresolved_interfaces:
             raise LookupError(
                 f"You are attempting to get the parameter `{parameter.name}` with the "
-                f"annotation `{get_full_qualname(parameter.annotation)}` as a "
-                f"dependency into `{get_full_qualname(provider.call)}` which is "
+                f"annotation `{type_repr(parameter.annotation)}` as a "
+                f"dependency into `{type_repr(provider.call)}` which is "
                 "not registered or set in the scoped context."
             )
 
@@ -829,9 +827,9 @@ class Container:
             except LookupError as exc:
                 if not self.strict:
                     self.logger.debug(
-                        f"Cannot validate the `{get_full_qualname(call)}` parameter "
+                        f"Cannot validate the `{type_repr(call)}` parameter "
                         f"`{parameter.name}` with an annotation of "
-                        f"`{get_full_qualname(parameter.annotation)} due to being "
+                        f"`{type_repr(parameter.annotation)} due to being "
                         "in non-strict mode. It will be validated at the first call."
                     )
                 else:
@@ -845,15 +843,14 @@ class Container:
         """Validate an injected parameter."""
         if parameter.annotation is inspect.Parameter.empty:
             raise TypeError(
-                f"Missing `{get_full_qualname(call)}` parameter "
-                f"`{parameter.name}` annotation."
+                f"Missing `{type_repr(call)}` parameter `{parameter.name}` annotation."
             )
 
         if not self.is_registered(parameter.annotation):
             raise LookupError(
-                f"`{get_full_qualname(call)}` has an unknown dependency parameter "
+                f"`{type_repr(call)}` has an unknown dependency parameter "
                 f"`{parameter.name}` with an annotation of "
-                f"`{get_full_qualname(parameter.annotation)}`."
+                f"`{type_repr(parameter.annotation)}`."
             )
 
     ############################

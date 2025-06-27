@@ -9,7 +9,7 @@ from types import ModuleType
 from typing import TYPE_CHECKING, Any, Union
 
 from ._decorators import InjectableMetadata
-from ._utils import get_typed_parameters, is_marker
+from ._typing import get_typed_parameters, is_marker
 
 if TYPE_CHECKING:
     from ._container import Container

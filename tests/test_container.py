@@ -12,7 +12,7 @@ from typing_extensions import Self
 
 from anydi import Container, Provider, Scope, auto
 from anydi._provider import ProviderKind
-from anydi._utils import Event
+from anydi._typing import Event
 
 from tests.fixtures import (
     Class,
