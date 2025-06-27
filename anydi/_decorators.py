@@ -1,30 +1,31 @@
 from collections.abc import Iterable
-from typing import Any, Callable, Concatenate, ParamSpec, TypedDict, TypeVar, overload
+from typing import Callable, Concatenate, ParamSpec, TypedDict, TypeVar, overload
 
 from ._module import Module
 from ._scope import Scope
 
-T = TypeVar("T", bound=Any)
+T = TypeVar("T")
 P = ParamSpec("P")
-M = TypeVar("M", bound=Module)
+
+ClassT = TypeVar("ClassT", bound=type)
+ModuleT = TypeVar("ModuleT", bound=Module)
 
 
-def transient(cls: T) -> T:
-    """Decorator for marking a class as transient scope."""
-    cls.__scope__ = "transient"
-    return cls
+def provided(*, scope: Scope) -> Callable[[ClassT], ClassT]:
+    """Decorator for marking a class as provided by AnyDI with a specific scope."""
+
+    def decorator(cls: ClassT) -> ClassT:
+        cls.__provided__ = True
+        cls.__scope__ = scope
+        return cls
+
+    return decorator
 
 
-def request(cls: T) -> T:
-    """Decorator for marking a class as request scope."""
-    cls.__scope__ = "request"
-    return cls
-
-
-def singleton(cls: T) -> T:
-    """Decorator for marking a class as singleton scope."""
-    cls.__scope__ = "singleton"
-    return cls
+# Scoped decorators for class-level providers
+transient = provided(scope="transient")
+request = provided(scope="request")
+singleton = provided(scope="singleton")
 
 
 class ProviderMetadata(TypedDict):
@@ -34,12 +35,14 @@ class ProviderMetadata(TypedDict):
 
 def provider(
     *, scope: Scope, override: bool = False
-) -> Callable[[Callable[Concatenate[M, P], T]], Callable[Concatenate[M, P], T]]:
+) -> Callable[
+    [Callable[Concatenate[ModuleT, P], T]], Callable[Concatenate[ModuleT, P], T]
+]:
     """Decorator for marking a function or method as a provider in a AnyDI module."""
 
     def decorator(
-        target: Callable[Concatenate[M, P], T],
-    ) -> Callable[Concatenate[M, P], T]:
+        target: Callable[Concatenate[ModuleT, P], T],
+    ) -> Callable[Concatenate[ModuleT, P], T]:
         target.__provider__ = ProviderMetadata(scope=scope, override=override)  # type: ignore
         return target
 

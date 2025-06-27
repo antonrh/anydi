@@ -30,14 +30,14 @@ class Module(metaclass=ModuleMeta):
         """Configure the AnyDI container with providers and their dependencies."""
 
 
-ModuleDefinition = Module | type[Module] | Callable[["Container"], None] | str
+ModuleDef = Module | type[Module] | Callable[["Container"], None] | str
 
 
 class ModuleRegistrar:
     def __init__(self, container: Container) -> None:
         self._container = container
 
-    def register(self, module: ModuleDefinition) -> None:
+    def register(self, module: ModuleDef) -> None:
         """Register a module as a callable, module type, or module instance."""
         # Callable Module
         if inspect.isfunction(module):
