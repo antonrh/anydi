@@ -9,7 +9,7 @@ from typing import Annotated, Any, Callable
 from typing_extensions import get_args, get_origin
 
 from anydi._container import Container
-from anydi._utils import get_full_qualname
+from anydi._typing import type_repr
 
 logger = logging.getLogger(__name__)
 
@@ -71,9 +71,9 @@ def patch_call_parameter(
 
     if not container.strict and not container.is_registered(parameter.annotation):
         logger.debug(
-            f"Callable `{get_full_qualname(call)}` injected parameter "
+            f"Callable `{type_repr(call)}` injected parameter "
             f"`{parameter.name}` with an annotation of "
-            f"`{get_full_qualname(parameter.annotation)}` "
+            f"`{type_repr(parameter.annotation)}` "
             "is not registered. It will be registered at runtime with the "
             "first call because it is running in non-strict mode."
         )

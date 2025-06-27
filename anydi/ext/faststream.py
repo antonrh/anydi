@@ -9,7 +9,7 @@ from faststream import ContextRepo
 from faststream.broker.core.usecase import BrokerUsecase
 
 from anydi import Container
-from anydi._utils import get_typed_parameters
+from anydi._typing import get_typed_parameters
 
 from ._utils import HasInterface, patch_call_parameter
 

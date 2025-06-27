@@ -1,9 +1,8 @@
 from __future__ import annotations
 
+import importlib
 import inspect
 from typing import TYPE_CHECKING, Any, Callable
-
-from ._utils import import_string
 
 if TYPE_CHECKING:
     from ._container import Container
@@ -47,7 +46,7 @@ class ModuleRegistrar:
 
         # Module path
         if isinstance(module, str):
-            module = import_string(module)
+            module = self.import_module_from_string(module)
 
         # Class based Module or Module type
         if inspect.isclass(module) and issubclass(module, Module):
@@ -62,3 +61,16 @@ class ModuleRegistrar:
             raise TypeError(
                 "The module must be a callable, a module type, or a module instance."
             )
+
+    @staticmethod
+    def import_module_from_string(dotted_path: str) -> Any:
+        """Import a module or attribute from a dotted path."""
+        try:
+            module_path, _, attribute_name = dotted_path.rpartition(".")
+            if module_path:
+                module = importlib.import_module(module_path)
+                return getattr(module, attribute_name)
+            else:
+                return importlib.import_module(attribute_name)
+        except (ImportError, AttributeError) as exc:
+            raise ImportError(f"Cannot import '{dotted_path}': {exc}") from exc

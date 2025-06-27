@@ -9,7 +9,7 @@ import pytest
 from anyio.pytest_plugin import extract_backend_and_options, get_runner
 
 from anydi import Container
-from anydi._utils import get_typed_parameters
+from anydi._typing import get_typed_parameters
 
 logger = logging.getLogger(__name__)
 

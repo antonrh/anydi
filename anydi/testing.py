@@ -12,7 +12,7 @@ from ._context import InstanceContext
 from ._module import ModuleDefinition
 from ._provider import Provider, ProviderDefinition
 from ._scope import Scope
-from ._utils import get_full_qualname
+from ._typing import type_repr
 
 T = TypeVar("T")
 
@@ -59,8 +59,7 @@ class TestContainer(Container):
         """
         if not self.is_registered(interface) and self.strict:
             raise LookupError(
-                f"The provider interface `{get_full_qualname(interface)}` "
-                "not registered."
+                f"The provider interface `{type_repr(interface)}` not registered."
             )
         self._override_instances[interface] = instance
         try:

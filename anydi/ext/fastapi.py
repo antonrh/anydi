@@ -11,7 +11,7 @@ from fastapi.routing import APIRoute
 from starlette.requests import Request
 
 from anydi._container import Container
-from anydi._utils import get_typed_parameters
+from anydi._typing import get_typed_parameters
 
 from ._utils import HasInterface, patch_call_parameter
 from .starlette.middleware import RequestScopedMiddleware

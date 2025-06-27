@@ -5,7 +5,7 @@ from ._decorators import injectable, provider, request, singleton, transient
 from ._module import Module
 from ._provider import ProviderDefinition as Provider
 from ._scope import Scope
-from ._utils import Marker
+from ._typing import Marker
 
 # Alias for dependency auto marker
 auto = Marker()
