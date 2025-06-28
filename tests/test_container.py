@@ -3,7 +3,6 @@ import sys
 import threading
 import uuid
 from collections.abc import AsyncIterator, Iterator, Sequence
-from dataclasses import dataclass
 from typing import Annotated, Any, Callable, Union
 
 import pytest
@@ -863,6 +862,7 @@ class TestContainer:
         assert result == instance
 
     def test_resolve_request_scoped_unresolved_yet(self, container: Container) -> None:
+        @request
         class Request:
             def __init__(self, path: str) -> None:
                 self.path = path
@@ -878,6 +878,7 @@ class TestContainer:
     def test_resolve_request_scoped_unresolved_error(
         self, container: Container
     ) -> None:
+        @request
         class Request:
             def __init__(self, path: str) -> None:
                 self.path = path
@@ -969,9 +970,7 @@ class TestContainer:
         ):
             container.resolve(str)
 
-    def test_resolve_non_strict_provider_scope_defined(
-        self, container: Container
-    ) -> None:
+    def test_resolve_provider_scope_defined(self, container: Container) -> None:
         @singleton
         class Service:
             pass
@@ -984,13 +983,18 @@ class TestContainer:
         assert provider.scope == "singleton"
         assert provider.interface == Service
 
-    def test_resolve_non_strict_provider_scope_from_sub_provider_request(
+    def test_resolve_provider_scope_from_sub_provider_request(
         self,
         container: Container,
     ) -> None:
         @container.provider(scope="request")
         def ident() -> str:
             return "test"
+
+        @request
+        class Service:
+            def __init__(self, ident: str) -> None:
+                self.ident = ident
 
         with container.request_context():
             _ = container.resolve(Service)
@@ -1003,29 +1007,12 @@ class TestContainer:
         assert provider.scope == "request"
         assert provider.interface is str
 
-    def test_resolve_non_strict_provider_scope_from_sub_provider_transient(
-        self,
-        container: Container,
-    ) -> None:
-        @container.provider(scope="transient")
-        def uuid_generator() -> Annotated[str, "uuid_generator"]:
-            return str(uuid.uuid4())
-
-        @dataclass
-        class Entity:
-            id: Annotated[str, "uuid_generator"]
-
-        _ = container.resolve(Entity)
-
-        assert container.providers[Entity].scope == "transient"
-
-    def test_resolve_non_strict_nested_singleton_provider(
-        self, container: Container
-    ) -> None:
+    def test_resolve_nested_singleton_provider(self, container: Container) -> None:
         @singleton
         class Repository:
             pass
 
+        @singleton
         class Service:
             def __init__(self, repository: Repository) -> None:
                 self.repository = repository
@@ -1035,34 +1022,25 @@ class TestContainer:
 
         assert container.providers[Service].scope == "singleton"
 
-    def test_resolve_non_strict_default_scope(self, container: Container) -> None:
-        @dataclass
-        class Repository:
-            pass
-
-        @dataclass
+    def test_resolve_with_primitive_class(self, container: Container) -> None:
+        @singleton
         class Service:
-            repository: Repository
+            def __init__(self, name: str) -> None:
+                self.name = name
 
-        _ = container.resolve(Service)
-
-        assert container.providers[Service].scope == "transient"
-
-    def test_resolve_non_strict_with_primitive_class(
-        self, container: Container
-    ) -> None:
         with pytest.raises(
             LookupError,
             match=(
-                "The provider `tests.fixtures.Service` depends on `ident` of type "
+                "The provider `(.*?)` depends on `name` of type "
                 "`str`, which has not been registered or set. To resolve this, "
-                "ensure that `ident` is registered before attempting to use it."
+                "ensure that `name` is registered before attempting to use it."
             ),
         ):
-            _ = container.resolve(Service).ident
+            container.resolve(Service)
 
     @pytest.mark.skipif(sys.version_info < (3, 10), reason="Requires Python 3.10")
-    def test_resolve_non_strict_with_custom_type(self, container: Container) -> None:
+    def test_resolve_with_custom_type(self, container: Container) -> None:
+        @singleton
         class Klass:
             def __init__(
                 self, value: "Union[str, Sequence[str], int, list[str]]"
@@ -1079,9 +1057,7 @@ class TestContainer:
         ):
             _ = container.resolve(Klass)
 
-    def test_resolve_non_strict_with_as_context_manager(
-        self, container: Container
-    ) -> None:
+    def test_resolve_with_as_context_manager(self, container: Container) -> None:
         @singleton
         class Resource:
             def __init__(self) -> None:
@@ -1103,7 +1079,7 @@ class TestContainer:
 
         assert resource.exited
 
-    async def test_resolve_non_strict_with_as_async_context_manager(
+    async def test_resolve_with_as_async_context_manager(
         self,
         container: Container,
     ) -> None:
@@ -1130,11 +1106,13 @@ class TestContainer:
 
         assert service.exited
 
-    def test_resolve_non_strict_with_defaults(self, container: Container) -> None:
-        @dataclass
+    def test_resolve_with_defaults(self, container: Container) -> None:
+        @singleton
         class Repo:
-            name: str = "repo"
+            def __init__(self, name: str = "repo") -> None:
+                self.name = name
 
+        @singleton
         class Service:
             def __init__(self, repo: Repo, name: str = "service") -> None:
                 self.repo = repo
@@ -1145,14 +1123,16 @@ class TestContainer:
         assert service.name == "service"
         assert service.repo.name == "repo"
 
-    async def test_resolve_non_strict_with_defaults_async_resolver(
+    async def test_resolve_with_defaults_async_resolver(
         self,
         container: Container,
     ) -> None:
-        @dataclass
+        @singleton
         class Repo:
-            name: str = "repo"
+            def __init__(self, name: str = "repo") -> None:
+                self.name = name
 
+        @singleton
         class Service:
             def __init__(self, repo: Repo, name: str = "service") -> None:
                 self.repo = repo
@@ -1306,7 +1286,7 @@ class TestContainer:
 
         assert kwargs == {"a": 10, "b": 1.0, "c": "test"}
 
-    def test_create_transient_non_strict(self) -> None:
+    def test_create_transient(self) -> None:
         @transient
         class Component:
             def __init__(self, name: str) -> None:
@@ -1318,7 +1298,7 @@ class TestContainer:
 
         assert instance.name == "test"
 
-    def test_create_singleton_non_strict(self) -> None:
+    def test_create_singleton(self) -> None:
         @singleton
         class Component:
             def __init__(self, name: str) -> None:
@@ -1330,7 +1310,7 @@ class TestContainer:
 
         assert instance.name == "test"
 
-    def test_create_scoped_non_strict(self) -> None:
+    def test_create_scoped(self) -> None:
         @request
         class Component:
             def __init__(self, name: str) -> None:
@@ -1353,7 +1333,7 @@ class TestContainer:
         with pytest.raises(TypeError, match="takes no arguments"):
             container.create(Component, param="test")
 
-    async def test_create_async_transient_non_strict(self) -> None:
+    async def test_create_async_transient(self) -> None:
         @transient
         class Component:
             def __init__(self, name: str) -> None:
@@ -1365,7 +1345,7 @@ class TestContainer:
 
         assert instance.name == "test"
 
-    async def test_create_async_singleton_non_strict(self) -> None:
+    async def test_create_async_singleton(self) -> None:
         @singleton
         class Component:
             def __init__(self, name: str) -> None:
@@ -1377,7 +1357,7 @@ class TestContainer:
 
         assert instance.name == "test"
 
-    async def test_create_async_scoped_non_strict(self) -> None:
+    async def test_create_async_scoped(self) -> None:
         @request
         class Component:
             def __init__(self, name: str) -> None:
