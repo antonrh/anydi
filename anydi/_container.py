@@ -433,8 +433,6 @@ class Container:
         try:
             return self._get_provider(interface)
         except LookupError:
-            if interface is inspect.Parameter.empty:
-                raise
             if inspect.isclass(interface) and not is_builtin_type(interface):
                 # Try to get defined scope
                 if is_provided(interface):
