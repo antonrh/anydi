@@ -963,9 +963,10 @@ class TestContainer:
         with pytest.raises(
             LookupError,
             match=(
-                "The provider interface for `str` has not been registered. Please "
-                "ensure that the provider interface is properly registered before "
-                "attempting to use it."
+                "The provider interface `str` is either not registered, not provided, "
+                "or not set in the scoped context. Please ensure that the provider "
+                "interface is properly registered and that the class is decorated with "
+                "a scope before attempting to use it."
             ),
         ):
             container.resolve(str)

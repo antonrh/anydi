@@ -409,8 +409,8 @@ class Container:
     def _get_or_register_provider(self, interface: Any, /, **defaults: Any) -> Provider:
         """Get or register a provider by interface."""
         try:
-            return self._get_provider(interface)
-        except LookupError:
+            return self._providers[interface]
+        except KeyError:
             if inspect.isclass(interface) and is_provided(interface):
                 return self._register_provider(
                     interface,
@@ -418,7 +418,12 @@ class Container:
                     NOT_SET,
                     **defaults,
                 )
-            raise
+            raise LookupError(
+                f"The provider interface `{type_repr(interface)}` is either not "
+                "registered, not provided, or not set in the scoped context. "
+                "Please ensure that the provider interface is properly registered and "
+                "that the class is decorated with a scope before attempting to use it."
+            ) from None
 
     def _set_provider(self, provider: Provider) -> None:
         """Set a provider by interface."""
