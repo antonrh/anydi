@@ -154,6 +154,10 @@ simplifying setups where manual registration for each type is impractical.
 Consider a scenario with class dependencies:
 
 ```python
+from anydi import provided
+
+
+@provided(scope="singleton")
 class Database:
     def connect(self) -> None:
         print("connect")
@@ -161,6 +165,7 @@ class Database:
         print("disconnect")
 
 
+@provided(scope="singleton")
 class Repository:
     def __init__(self, db: Database) -> None:
         self.db = db
@@ -200,10 +205,10 @@ assert container.is_resolved(Database)
 When your class dependencies implement the context manager protocol by defining the `__enter__/__aenter__` and `__exit__/__aexit__` methods, these resources are automatically managed by the container for `singleton` and `request` scoped providers.
 
 ```python
-from anydi import Container, singleton
+from anydi import Container, provided
 
 
-@singleton
+@provided(scope="singleton")
 class Connection:
     def __init__(self) -> None:
         self.connected = False
