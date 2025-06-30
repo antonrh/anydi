@@ -509,40 +509,34 @@ class Container:
             del context[interface]
 
     def _resolve_or_create(
-        self, interface: type[T], create: bool, /, **defaults: Any
-    ) -> T:
+        self, interface: Any, create: bool, /, **defaults: Any
+    ) -> Any:
         """Internal method to handle instance resolution and creation."""
         provider = self._get_or_register_provider(interface, **defaults)
         if provider.scope == "transient":
-            instance = self._create_instance(provider, None, **defaults)
-        else:
-            context = self._get_instance_context(provider.scope)
-            with context.lock():
-                instance = (
-                    self._get_or_create_instance(provider, context)
-                    if not create
-                    else self._create_instance(provider, context, **defaults)
-                )
-
-        return cast(T, instance)
+            return self._create_instance(provider, None, **defaults)
+        context = self._get_instance_context(provider.scope)
+        with context.lock():
+            return (
+                self._get_or_create_instance(provider, context)
+                if not create
+                else self._create_instance(provider, context, **defaults)
+            )
 
     async def _aresolve_or_create(
-        self, interface: type[T], create: bool, /, **defaults: Any
-    ) -> T:
+        self, interface: Any, create: bool, /, **defaults: Any
+    ) -> Any:
         """Internal method to handle instance resolution and creation asynchronously."""
         provider = self._get_or_register_provider(interface, **defaults)
         if provider.scope == "transient":
-            instance = await self._acreate_instance(provider, None, **defaults)
-        else:
-            context = self._get_instance_context(provider.scope)
-            async with context.alock():
-                instance = (
-                    await self._aget_or_create_instance(provider, context)
-                    if not create
-                    else await self._acreate_instance(provider, context, **defaults)
-                )
-
-        return cast(T, instance)
+            return await self._acreate_instance(provider, None, **defaults)
+        context = self._get_instance_context(provider.scope)
+        async with context.alock():
+            return (
+                await self._aget_or_create_instance(provider, context)
+                if not create
+                else await self._acreate_instance(provider, context, **defaults)
+            )
 
     def _get_or_create_instance(
         self, provider: Provider, context: InstanceContext
@@ -711,13 +705,13 @@ class Container:
         self, provider: Provider, parameter: inspect.Parameter
     ) -> Any:
         self._validate_resolvable_parameter(provider, parameter)
-        return self.resolve(parameter.annotation)
+        return self._resolve_or_create(parameter.annotation, False)
 
     async def _aresolve_parameter(
         self, provider: Provider, parameter: inspect.Parameter
     ) -> Any:
         self._validate_resolvable_parameter(provider, parameter)
-        return await self.aresolve(parameter.annotation)
+        return await self._resolve_or_create(parameter.annotation, False)
 
     def _validate_resolvable_parameter(
         self, provider: Provider, parameter: inspect.Parameter
