@@ -627,7 +627,7 @@ class Container:
         """Retrieve the arguments for a provider."""
         provided_kwargs = {}
         for parameter in provider.parameters:
-            instance, _ = self._get_provider_instance(
+            instance = self._get_provider_instance(
                 provider, parameter, context, **defaults
             )
             provided_kwargs[parameter.name] = instance
@@ -640,12 +640,12 @@ class Container:
         context: InstanceContext | None,
         /,
         **defaults: Any,
-    ) -> tuple[Any, bool]:
+    ) -> Any:
         """Retrieve an instance of a dependency from the scoped context."""
 
         # Try to get instance from defaults
         if parameter.name in defaults:
-            return defaults[parameter.name], True
+            return defaults[parameter.name]
 
         # Try to get instance from context
         elif context and parameter.annotation in context:
@@ -658,8 +658,8 @@ class Container:
             except LookupError:
                 if parameter.default is inspect.Parameter.empty:
                     raise
-                return parameter.default, True
-        return instance, False
+                return parameter.default
+        return instance
 
     async def _aget_provided_kwargs(
         self, provider: Provider, context: InstanceContext | None, /, **defaults: Any
@@ -667,7 +667,7 @@ class Container:
         """Asynchronously retrieve the arguments for a provider."""
         provided_kwargs = {}
         for parameter in provider.parameters:
-            instance, _ = await self._aget_provider_instance(
+            instance = await self._aget_provider_instance(
                 provider, parameter, context, **defaults
             )
             provided_kwargs[parameter.name] = instance
@@ -680,12 +680,12 @@ class Container:
         context: InstanceContext | None,
         /,
         **defaults: Any,
-    ) -> tuple[Any, bool]:
+    ) -> Any:
         """Asynchronously retrieve an instance of a dependency from the context."""
 
         # Try to get instance from defaults
         if parameter.name in defaults:
-            return defaults[parameter.name], True
+            return defaults[parameter.name]
 
         # Try to get instance from context
         elif context and parameter.annotation in context:
@@ -698,8 +698,8 @@ class Container:
             except LookupError:
                 if parameter.default is inspect.Parameter.empty:
                     raise
-                return parameter.default, True
-        return instance, False
+                return parameter.default
+        return instance
 
     def _resolve_parameter(
         self, provider: Provider, parameter: inspect.Parameter
@@ -711,7 +711,7 @@ class Container:
         self, provider: Provider, parameter: inspect.Parameter
     ) -> Any:
         self._validate_resolvable_parameter(provider, parameter)
-        return await self._resolve_or_create(parameter.annotation, False)
+        return await self._aresolve_or_create(parameter.annotation, False)
 
     def _validate_resolvable_parameter(
         self, provider: Provider, parameter: inspect.Parameter
