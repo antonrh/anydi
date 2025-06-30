@@ -94,7 +94,7 @@ class TestContainer:
     def test_register_provider_interface(
         self, container: Container, annotation: type[Any], expected: type[Any]
     ) -> None:
-        def call() -> annotation:  # type: ignore[valid-type]
+        def call() -> annotation:  # type: ignore
             return object()
 
         provider = container._register_provider(call, "singleton")
@@ -187,7 +187,7 @@ class TestContainer:
         def service_ident() -> str:
             return "10000"
 
-        def service(ident) -> Service:  # type: ignore[no-untyped-def]
+        def service(ident) -> Service:  # type: ignore
             return Service(ident=ident)
 
         with pytest.raises(
@@ -309,7 +309,7 @@ class TestContainer:
             TypeError,
             match="The provider `Test` is invalid because it is not a callable object.",
         ):
-            container.register(str, "Test", scope="singleton")  # type: ignore[arg-type]
+            container.register(str, "Test", scope="singleton")  # type: ignore
 
     @pytest.mark.parametrize(
         ("scope1", "scope2", "scope3", "valid"),
@@ -1162,7 +1162,7 @@ class TestContainer:
 
         assert not container.is_resolved(str)
 
-    def test_is_resolved_false(self, container: Container) -> None:
+    def test_is_not_resolved(self, container: Container) -> None:
         assert not container.is_resolved(str)
 
     def test_release_instance(self, container: Container) -> None:
