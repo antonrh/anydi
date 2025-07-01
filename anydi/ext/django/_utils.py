@@ -62,15 +62,16 @@ def register_components(container: Container) -> None:
 def inject_urlpatterns(container: Container, *, urlconf: str) -> None:
     """Auto-inject the container into views."""
     resolver = get_resolver(urlconf)
+    injected_urlpatterns = []
     for pattern in iter_urlpatterns(resolver.url_patterns):
         # Skip already injected views
-        if hasattr(pattern.callback, "_injected"):
+        if pattern.lookup_str in injected_urlpatterns:
             continue
         # Skip django-ninja views
         if pattern.lookup_str.startswith("ninja."):
             continue  # pragma: no cover
         pattern.callback = container.inject(pattern.callback)
-        pattern.callback._injected = True  # type: ignore
+        injected_urlpatterns.append(pattern.lookup_str)
 
 
 def iter_urlpatterns(
