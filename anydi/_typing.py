@@ -93,8 +93,8 @@ def get_typed_parameters(obj: Callable[..., Any]) -> list[inspect.Parameter]:
     ]
 
 
-class _Marker:
-    """A marker class for marking dependencies."""
+class _InjectMarker:
+    """A marker object for declaring injectable dependencies."""
 
     __slots__ = ()
 
@@ -102,13 +102,12 @@ class _Marker:
         return self
 
 
-def Marker() -> Any:
-    return _Marker()
+def InjectMarker() -> Any:
+    return _InjectMarker()
 
 
-def is_marker(obj: Any) -> bool:
-    """Checks if an object is a marker."""
-    return isinstance(obj, _Marker)
+def is_inject_marker(obj: Any) -> bool:
+    return isinstance(obj, _InjectMarker)
 
 
 class Event:

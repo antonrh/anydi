@@ -31,8 +31,8 @@ from ._typing import (
     is_builtin_type,
     is_context_manager,
     is_event_type,
+    is_inject_marker,
     is_iterator_type,
-    is_marker,
     is_none_type,
     type_repr,
 )
@@ -818,7 +818,7 @@ class Container:
     ) -> tuple[Any, bool]:
         """Validate an injected parameter."""
         interface, should_inject = parameter.annotation, False
-        if is_marker(parameter.default):
+        if is_inject_marker(parameter.default):
             if parameter.annotation is inspect.Parameter.empty:
                 raise TypeError(
                     f"Missing `{type_repr(call)}` "

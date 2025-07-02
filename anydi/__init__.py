@@ -5,10 +5,10 @@ from ._decorators import injectable, provided, provider, request, singleton, tra
 from ._module import Module
 from ._provider import ProviderDef as Provider
 from ._scope import Scope
-from ._typing import Marker
+from ._typing import InjectMarker
 
 # Alias for dependency auto marker
-auto = Marker()
+auto = InjectMarker()
 
 
 __all__ = [

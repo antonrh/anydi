@@ -9,12 +9,12 @@ from typing import Annotated, Any, Callable
 from typing_extensions import get_args, get_origin
 
 from anydi import Container
-from anydi._typing import _Marker
+from anydi._typing import _InjectMarker
 
 logger = logging.getLogger(__name__)
 
 
-class HasInterface(_Marker):
+class HasInterface(_InjectMarker):
     __slots__ = ("_interface",)
 
     def __init__(self, interface: Any = None) -> None:
