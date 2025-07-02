@@ -14,7 +14,10 @@ logger = logging.getLogger(__name__)
 
 
 class HasInterface:
-    _interface: Any = None
+    __slots__ = ("_interface",)
+
+    def __init__(self, interface: Any = None) -> None:
+        self._interface = interface
 
     @property
     def interface(self) -> Any:
@@ -35,27 +38,19 @@ def patch_annotated_parameter(parameter: inspect.Parameter) -> inspect.Parameter
     ):
         return parameter
 
-    tp_origin, *tp_metadata = get_args(parameter.annotation)
-    default = tp_metadata[-1]
+    origin, *metadata = get_args(parameter.annotation)
+    default = metadata[-1]
 
     if not isinstance(default, HasInterface):
         return parameter
 
-    if (num := len(tp_metadata[:-1])) == 0:
-        interface = tp_origin
-    elif num == 1:
-        interface = Annotated[tp_origin, tp_metadata[0]]
-    elif num == 2:
-        interface = Annotated[tp_origin, tp_metadata[0], tp_metadata[1]]
-    elif num == 3:
-        interface = Annotated[
-            tp_origin,
-            tp_metadata[0],
-            tp_metadata[1],
-            tp_metadata[2],
-        ]
+    new_metadata = metadata[:-1]
+
+    if new_metadata:
+        interface = Annotated.__class_getitem__((origin, *metadata[:-1]))  # type: ignore
     else:
-        raise TypeError("Too many annotated arguments.")  # pragma: no cover
+        interface = origin
+
     return parameter.replace(annotation=interface, default=default)
 
 

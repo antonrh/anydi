@@ -43,11 +43,12 @@ def get_container(broker: BrokerUsecase[Any, Any]) -> Container:
     return cast(Container, getattr(broker, "_container"))  # noqa
 
 
-class Resolver(HasInterface, Depends):
+class Resolver(Depends, HasInterface):
     """Parameter dependency class for injecting dependencies using AnyDI."""
 
     def __init__(self) -> None:
         super().__init__(dependency=self._dependency, use_cache=True, cast=True)
+        HasInterface.__init__(self)
 
     async def _dependency(self, context: ContextRepo) -> Any:
         container = get_container(context.get("broker"))
