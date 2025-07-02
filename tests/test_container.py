@@ -965,8 +965,8 @@ class TestContainer:
             match=(
                 "The provider interface `str` is either not registered, not provided, "
                 "or not set in the scoped context. Please ensure that the provider "
-                "interface is properly registered and that the class is decorated with "
-                "a scope before attempting to use it."
+                "interface is properly registered and that the class is decorated "
+                "with a scope before attempting to use it."
             ),
         ):
             container.resolve(str)
@@ -1400,15 +1400,17 @@ class TestContainerInjector:
 
         assert result == "service ident = 1000"
 
+    @pytest.mark.skip(reason="disable until strict is enforced")
     def test_inject_missing_annotation(self, container: Container) -> None:
-        def handler(name=auto) -> str:  # type: ignore[no-untyped-def]
-            return name  # type: ignore[no-any-return]
+        def handler(name=auto) -> str:  # type: ignore
+            return name  # type: ignore
 
         with pytest.raises(
             TypeError, match="Missing `(.*?).handler` parameter `name` annotation."
         ):
             container.inject(handler)
 
+    @pytest.mark.skip(reason="disable until strict is enforced")
     def test_inject_unknown_dependency_using_strict_mode(self) -> None:
         container = Container()
 

@@ -18,6 +18,8 @@ T = TypeVar("T")
 
 
 class TestContainer(Container):
+    __test__ = False
+
     def __init__(
         self,
         *,
@@ -106,7 +108,7 @@ class TestContainer(Container):
         )
         return InstanceProxy(instance, interface=parameter.annotation)
 
-    def _patch_resolver(self, interface: type[Any], instance: Any) -> Any:
+    def _patch_resolver(self, interface: Any, instance: Any) -> Any:
         """Patch the test resolver for the instance."""
         if interface in self._override_instances:
             return self._override_instances[interface]

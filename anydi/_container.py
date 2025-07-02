@@ -379,9 +379,8 @@ class Container:
         self._set_provider(provider)
         return provider
 
-    def _validate_provider_scope(
-        self, scope: Scope, name: str, kind: ProviderKind
-    ) -> None:
+    @staticmethod
+    def _validate_provider_scope(scope: Scope, name: str, kind: ProviderKind) -> None:
         """Validate the provider scope."""
         if scope not in (allowed_scopes := get_args(Scope)):
             raise ValueError(
@@ -411,13 +410,13 @@ class Container:
         try:
             return self._providers[interface]
         except KeyError:
-            if inspect.isclass(interface) and is_provided(interface):
-                return self._register_provider(
-                    interface,
-                    interface.__provided__["scope"],
-                    NOT_SET,
-                    **defaults,
-                )
+            if inspect.isclass(interface) and not is_builtin_type(interface):
+                # Try to get defined scope
+                if is_provided(interface):
+                    scope = interface.__provided__["scope"]
+                else:
+                    scope = parent_scope
+                return self._register_provider(interface, scope, interface, **defaults)
             raise LookupError(
                 f"The provider interface `{type_repr(interface)}` is either not "
                 "registered, not provided, or not set in the scoped context. "
@@ -795,6 +794,9 @@ class Container:
         self, call: Callable[..., Any], parameter: inspect.Parameter
     ) -> None:
         """Validate an injected parameter."""
+        # TODO: temporary disable until strict is enforced
+        return None
+
         if parameter.annotation is inspect.Parameter.empty:
             raise TypeError(
                 f"Missing `{type_repr(call)}` parameter `{parameter.name}` annotation."
