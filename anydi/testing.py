@@ -2,7 +2,7 @@ import contextlib
 import inspect
 import logging
 from collections.abc import Iterable, Iterator, Sequence
-from typing import Any, TypeVar, cast
+from typing import Any, TypeVar
 
 import wrapt  # type: ignore
 from typing_extensions import Self
@@ -65,18 +65,18 @@ class TestContainer(Container):
             self._override_instances.pop(interface, None)
 
     def _resolve_or_create(
-        self, interface: type[T], create: bool, /, **defaults: Any
-    ) -> T:
+        self, interface: Any, create: bool, /, **defaults: Any
+    ) -> Any:
         """Internal method to handle instance resolution and creation."""
         instance = super()._resolve_or_create(interface, create, **defaults)
-        return cast(T, self._patch_resolver(interface, instance))
+        return self._patch_resolver(interface, instance)
 
     async def _aresolve_or_create(
-        self, interface: type[T], create: bool, /, **defaults: Any
-    ) -> T:
+        self, interface: Any, create: bool, /, **defaults: Any
+    ) -> Any:
         """Internal method to handle instance resolution and creation asynchronously."""
         instance = await super()._aresolve_or_create(interface, create, **defaults)
-        return cast(T, self._patch_resolver(interface, instance))
+        return self._patch_resolver(interface, instance)
 
     def _get_provider_instance(
         self,
@@ -87,12 +87,10 @@ class TestContainer(Container):
         **defaults: Any,
     ) -> Any:
         """Retrieve an instance of a dependency from the scoped context."""
-        instance, is_default = super()._get_provider_instance(
+        instance = super()._get_provider_instance(
             provider, parameter, context, **defaults
         )
-        if not is_default:
-            instance = InstanceProxy(instance, interface=parameter.annotation)
-        return instance, is_default
+        return InstanceProxy(instance, interface=parameter.annotation)
 
     async def _aget_provider_instance(
         self,
@@ -103,14 +101,12 @@ class TestContainer(Container):
         **defaults: Any,
     ) -> Any:
         """Asynchronously retrieve an instance of a dependency from the context."""
-        instance, is_default = await super()._aget_provider_instance(
+        instance = await super()._aget_provider_instance(
             provider, parameter, context, **defaults
         )
-        if not is_default:
-            instance = InstanceProxy(instance, interface=parameter.annotation)
-        return instance, is_default
+        return InstanceProxy(instance, interface=parameter.annotation)
 
-    def _patch_resolver(self, interface: type[Any], instance: Any) -> Any:
+    def _patch_resolver(self, interface: Any, instance: Any) -> Any:
         """Patch the test resolver for the instance."""
         if interface in self._override_instances:
             return self._override_instances[interface]
