@@ -28,7 +28,6 @@ from ._typing import (
     get_typed_annotation,
     get_typed_parameters,
     is_async_context_manager,
-    is_builtin_type,
     is_context_manager,
     is_event_type,
     is_inject_marker,
@@ -259,7 +258,7 @@ class Container:
     def _register_provider(  # noqa: C901
         self,
         call: Callable[..., Any],
-        scope: Scope | None,
+        scope: Scope,
         interface: Any = NOT_SET,
         override: bool = False,
         /,
@@ -268,11 +267,9 @@ class Container:
         """Register a provider with the specified scope."""
         name = type_repr(call)
         kind = ProviderKind.from_call(call)
-        detected_scope = scope
 
         # Validate scope if it provided
-        if scope:
-            self._validate_provider_scope(scope, name, kind)
+        self._validate_provider_scope(scope, name, kind)
 
         # Get the signature
         globalns = getattr(call, "__globals__", {})
@@ -335,9 +332,7 @@ class Container:
             )
 
             try:
-                sub_provider = self._get_or_register_provider(
-                    parameter.annotation, scope
-                )
+                sub_provider = self._get_or_register_provider(parameter.annotation)
             except LookupError:
                 if self._parameter_has_default(parameter, **defaults):
                     continue
@@ -350,24 +345,9 @@ class Container:
 
             parameters.append(parameter)
 
-        # Set detected scope
-        if detected_scope is None:
-            if "transient" in scopes:
-                detected_scope = "transient"
-            elif "request" in scopes:
-                detected_scope = "request"
-            elif "singleton" in scopes:
-                detected_scope = "singleton"
-            else:
-                detected_scope = self.default_scope
-
-        # Validate the provider scope after detection
-        if scope is None:
-            self._validate_provider_scope(detected_scope, name, kind)
-
         # Check for unresolved parameters
         if unresolved_parameter:
-            if detected_scope not in ("singleton", "transient"):
+            if scope not in ("singleton", "transient"):
                 self._unresolved_interfaces.add(interface)
             else:
                 raise LookupError(
@@ -380,16 +360,16 @@ class Container:
 
         # Check scope compatibility
         for sub_provider in scopes.values():
-            if sub_provider.scope not in ALLOWED_SCOPES.get(detected_scope, []):
+            if sub_provider.scope not in ALLOWED_SCOPES.get(scope, []):
                 raise ValueError(
-                    f"The provider `{name}` with a `{detected_scope}` scope cannot "
+                    f"The provider `{name}` with a `{scope}` scope cannot "
                     f"depend on `{sub_provider}` with a `{sub_provider.scope}` scope. "
                     "Please ensure all providers are registered with matching scopes."
                 )
 
         provider = Provider(
             call=call,
-            scope=detected_scope,
+            scope=scope,
             interface=interface,
             name=name,
             kind=kind,
@@ -425,20 +405,18 @@ class Container:
                 "properly registered before attempting to use it."
             ) from exc
 
-    def _get_or_register_provider(
-        self, interface: Any, parent_scope: Scope | None, /, **defaults: Any
-    ) -> Provider:
+    def _get_or_register_provider(self, interface: Any, /, **defaults: Any) -> Provider:
         """Get or register a provider by interface."""
         try:
             return self._providers[interface]
         except KeyError:
-            if inspect.isclass(interface) and not is_builtin_type(interface):
-                # Try to get defined scope
-                if is_provided(interface):
-                    scope = interface.__provided__["scope"]
-                else:
-                    scope = parent_scope
-                return self._register_provider(interface, scope, interface, **defaults)
+            if inspect.isclass(interface) and is_provided(interface):
+                return self._register_provider(
+                    interface,
+                    interface.__provided__["scope"],
+                    NOT_SET,
+                    **defaults,
+                )
             raise LookupError(
                 f"The provider interface `{type_repr(interface)}` is either not "
                 "registered, not provided, or not set in the scoped context. "
@@ -533,7 +511,7 @@ class Container:
         self, interface: Any, create: bool, /, **defaults: Any
     ) -> Any:
         """Internal method to handle instance resolution and creation."""
-        provider = self._get_or_register_provider(interface, None, **defaults)
+        provider = self._get_or_register_provider(interface, **defaults)
         if provider.scope == "transient":
             return self._create_instance(provider, None, **defaults)
         context = self._get_instance_context(provider.scope)
@@ -548,7 +526,7 @@ class Container:
         self, interface: Any, create: bool, /, **defaults: Any
     ) -> Any:
         """Internal method to handle instance resolution and creation asynchronously."""
-        provider = self._get_or_register_provider(interface, None, **defaults)
+        provider = self._get_or_register_provider(interface, **defaults)
         if provider.scope == "transient":
             return await self._acreate_instance(provider, None, **defaults)
         context = self._get_instance_context(provider.scope)

@@ -94,6 +94,7 @@ class TestTestContainer:
         container = TestContainer()
         container.register(Annotated[str, "param"], lambda: "param", scope="singleton")
 
+        @singleton
         class UserRepo:
             def get_user(self) -> str:
                 return "user"
@@ -208,14 +209,3 @@ class TestTestContainer:
         service = container.resolve(ItemService)
 
         assert service.get_items() == []
-
-    def test_override_prop(self) -> None:
-        class ServiceWithProp:
-            def __init__(self, name: str = "origin") -> None:
-                self.name = name
-
-        container = TestContainer()
-
-        service = container.resolve(ServiceWithProp)
-
-        assert service.name == "origin"
