@@ -11,7 +11,7 @@ from ninja.signature.details import (
 )
 from ninja.signature.utils import get_path_param_names, get_typed_signature
 
-from anydi._typing import is_inject_annotated, is_inject_marker  # noqa
+from anydi._typing import is_inject_annotation, is_inject_marker  # noqa
 from anydi.ext.django import container
 
 

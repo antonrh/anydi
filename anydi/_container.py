@@ -31,7 +31,7 @@ from ._typing import (
     is_builtin_type,
     is_context_manager,
     is_event_type,
-    is_inject_annotated,
+    is_inject_annotation,
     is_inject_marker,
     is_iterator_type,
     is_none_type,
@@ -829,7 +829,7 @@ class Container:
                 )
             should_inject = True
 
-        if is_inject_annotated(interface):
+        if is_inject_annotation(interface):
             interface, should_inject = interface.interface, True
 
         # TODO: temporary disable until strict is enforced

@@ -136,8 +136,8 @@ else:
     Inject = _InjectAnnotated
 
 
-def is_inject_annotated(tp: Any) -> TypeGuard[_InjectAnnotated]:
-    return isinstance(tp, _InjectAnnotated)
+def is_inject_annotation(obj: Any) -> TypeGuard[_InjectAnnotated]:
+    return isinstance(obj, _InjectAnnotated)
 
 
 class Event:
