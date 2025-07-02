@@ -31,8 +31,8 @@ from ._typing import (
     is_builtin_type,
     is_context_manager,
     is_event_type,
+    is_inject_marker,
     is_iterator_type,
-    is_marker,
     is_none_type,
     type_repr,
 )
@@ -809,9 +809,8 @@ class Container:
             interface, should_inject = self._validate_injected_parameter(
                 parameter, call=call
             )
-            if not should_inject:
-                continue
-            injected_params[parameter.name] = interface
+            if should_inject:
+                injected_params[parameter.name] = interface
         return injected_params
 
     def _validate_injected_parameter(
@@ -819,23 +818,22 @@ class Container:
     ) -> tuple[Any, bool]:
         """Validate an injected parameter."""
         interface, should_inject = parameter.annotation, False
-
-        if is_marker(parameter.default):
+        if is_inject_marker(parameter.default):
             if parameter.annotation is inspect.Parameter.empty:
                 raise TypeError(
-                    f"Missing `{type_repr(call)}` parameter "
-                    f"`{parameter.name}` annotation."
+                    f"Missing `{type_repr(call)}` "
+                    f"parameter `{parameter.name}` annotation."
                 )
             should_inject = True
 
         return interface, should_inject
 
         # TODO: temporary disable until strict is enforced
-        if not self.has_provider_for(parameter.annotation):
+        if not self.has_provider_for(interface):
             raise LookupError(
                 f"`{type_repr(call)}` has an unknown dependency parameter "
                 f"`{parameter.name}` with an annotation of "
-                f"`{type_repr(parameter.annotation)}`."
+                f"`{type_repr(interface)}`."
             )
 
     ############################

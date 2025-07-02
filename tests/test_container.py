@@ -1430,7 +1430,7 @@ class TestContainerInjector:
             container.inject(handler)
 
     @pytest.mark.skip(reason="disable until strict is enforced")
-    def test_inject_unknown_dependency_using_strict_mode(self) -> None:
+    def test_inject_unknown_dependency(self) -> None:
         container = Container()
 
         def handler(message: str = auto) -> None:
