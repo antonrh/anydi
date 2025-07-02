@@ -1,6 +1,6 @@
 [project]
 name = "anydi"
-version = "0.45.1"
+version = "0.46.0rc1"
 description = "Dependency Injection library"
 authors = [{ name = "Anton Ruhlov", email = "antonruhlov@gmail.com" }]
 requires-python = "~=3.9"
@@ -137,7 +137,7 @@ omit = [
 ]
 
 [tool.bumpversion]
-current_version = "0.45.1"
+current_version = "0.46.0rc1"
 parse = """(?x)
     (?P<major>0|[1-9]\\d*)\\.
     (?P<minor>0|[1-9]\\d*)\\.
