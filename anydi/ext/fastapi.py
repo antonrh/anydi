@@ -62,7 +62,7 @@ class Resolver(params.Depends, HasInterface):
         return await container.aresolve(self.interface)
 
 
-def Inject() -> Any:  # noqa
+def Inject() -> Any:
     """Decorator for marking a function parameter as requiring injection."""
     return Resolver()
 

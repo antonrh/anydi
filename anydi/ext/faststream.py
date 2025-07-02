@@ -55,5 +55,5 @@ class Resolver(Depends, HasInterface):
         return await container.aresolve(self.interface)
 
 
-def Inject() -> Any:  # noqa
+def Inject() -> Any:
     return Resolver()
