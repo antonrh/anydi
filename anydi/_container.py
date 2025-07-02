@@ -806,24 +806,31 @@ class Container:
         """Get the injected parameters of a callable object."""
         injected_params: dict[str, Any] = {}
         for parameter in get_typed_parameters(call):
-            if not is_marker(parameter.default):
+            interface, should_inject = self._validate_injected_parameter(
+                parameter, call=call
+            )
+            if not should_inject:
                 continue
-            self._validate_injected_parameter(parameter, call=call)
-            injected_params[parameter.name] = parameter.annotation
+            injected_params[parameter.name] = interface
         return injected_params
 
     def _validate_injected_parameter(
         self, parameter: inspect.Parameter, *, call: Callable[..., Any]
-    ) -> None:
+    ) -> tuple[Any, bool]:
         """Validate an injected parameter."""
+        interface, should_inject = parameter.annotation, False
+
+        if is_marker(parameter.default):
+            if parameter.annotation is inspect.Parameter.empty:
+                raise TypeError(
+                    f"Missing `{type_repr(call)}` parameter "
+                    f"`{parameter.name}` annotation."
+                )
+            should_inject = True
+
+        return interface, should_inject
+
         # TODO: temporary disable until strict is enforced
-        return None
-
-        if parameter.annotation is inspect.Parameter.empty:
-            raise TypeError(
-                f"Missing `{type_repr(call)}` parameter `{parameter.name}` annotation."
-            )
-
         if not self.has_provider_for(parameter.annotation):
             raise LookupError(
                 f"`{type_repr(call)}` has an unknown dependency parameter "

@@ -8,12 +8,13 @@ from typing import Annotated, Any, Callable
 
 from typing_extensions import get_args, get_origin
 
-from anydi._container import Container
+from anydi import Container
+from anydi._typing import _Marker
 
 logger = logging.getLogger(__name__)
 
 
-class HasInterface:
+class HasInterface(_Marker):
     __slots__ = ("_interface",)
 
     def __init__(self, interface: Any = None) -> None:
@@ -47,9 +48,9 @@ def patch_parameter(
             interface = origin
         parameter = parameter.replace(annotation=interface, default=default)
 
-    if not isinstance(parameter.default, HasInterface):
-        return None
-
-    container._validate_injected_parameter(parameter, call=call)  # noqa
-    parameter.default.interface = parameter.annotation
+    interface, should_inject = container._validate_injected_parameter(
+        parameter, call=call
+    )  # noqa
+    if should_inject:
+        parameter.default.interface = interface
     return None
