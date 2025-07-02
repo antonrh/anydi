@@ -18,6 +18,8 @@ T = TypeVar("T")
 
 
 class TestContainer(Container):
+    __test__ = False
+
     def __init__(
         self,
         *,
