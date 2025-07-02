@@ -30,39 +30,26 @@ class HasInterface:
         self._interface = interface
 
 
-def patch_annotated_parameter(parameter: inspect.Parameter) -> inspect.Parameter:
-    """Patch an annotated parameter to resolve the default value."""
-    if not (
+def patch_parameter(
+    container: Container, parameter: inspect.Parameter, *, call: Callable[..., Any]
+) -> None:
+    """Patch a parameter to inject dependencies using AnyDI."""
+    if (
         get_origin(parameter.annotation) is Annotated
         and parameter.default is inspect.Parameter.empty
     ):
-        return parameter
-
-    origin, *metadata = get_args(parameter.annotation)
-    default = metadata[-1]
-
-    if not isinstance(default, HasInterface):
-        return parameter
-
-    new_metadata = metadata[:-1]
-
-    if new_metadata:
-        interface = Annotated.__class_getitem__((origin, *metadata[:-1]))  # type: ignore
-    else:
-        interface = origin
-
-    return parameter.replace(annotation=interface, default=default)
-
-
-def patch_call_parameter(
-    container: Container, call: Callable[..., Any], parameter: inspect.Parameter
-) -> None:
-    """Patch a parameter to inject dependencies using AnyDI."""
-    parameter = patch_annotated_parameter(parameter)
+        origin, *metadata = get_args(parameter.annotation)
+        default = metadata[-1]
+        new_metadata = metadata[:-1]
+        if new_metadata:
+            interface = Annotated.__class_getitem__((origin, *metadata[:-1]))  # type: ignore
+        else:
+            interface = origin
+        parameter = parameter.replace(annotation=interface, default=default)
 
     if not isinstance(parameter.default, HasInterface):
         return None
 
-    container._validate_injected_parameter(call, parameter)  # noqa
-
+    container._validate_injected_parameter(parameter, call=call)  # noqa
     parameter.default.interface = parameter.annotation
+    return None

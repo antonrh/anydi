@@ -808,12 +808,12 @@ class Container:
         for parameter in get_typed_parameters(call):
             if not is_marker(parameter.default):
                 continue
-            self._validate_injected_parameter(call, parameter)
+            self._validate_injected_parameter(parameter, call=call)
             injected_params[parameter.name] = parameter.annotation
         return injected_params
 
     def _validate_injected_parameter(
-        self, call: Callable[..., Any], parameter: inspect.Parameter
+        self, parameter: inspect.Parameter, *, call: Callable[..., Any]
     ) -> None:
         """Validate an injected parameter."""
         # TODO: temporary disable until strict is enforced

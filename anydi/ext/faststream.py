@@ -11,7 +11,7 @@ from faststream.broker.core.usecase import BrokerUsecase
 from anydi import Container
 from anydi._typing import get_typed_parameters
 
-from ._utils import HasInterface, patch_call_parameter
+from ._utils import HasInterface, patch_parameter
 
 
 def install(broker: BrokerUsecase[Any, Any], container: Container) -> None:
@@ -26,7 +26,7 @@ def install(broker: BrokerUsecase[Any, Any], container: Container) -> None:
     for handler in _get_broken_handlers(broker):
         call = handler._original_call  # noqa
         for parameter in get_typed_parameters(call):
-            patch_call_parameter(container, call, parameter)
+            patch_parameter(container, parameter, call=call)
 
 
 def _get_broken_handlers(broker: BrokerUsecase[Any, Any]) -> list[Any]:

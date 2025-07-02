@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from collections.abc import Iterator
-from typing import Any, cast
+from typing import Annotated, Any, cast
 
 from fastapi import Depends, FastAPI, params
 from fastapi.dependencies.models import Dependant
@@ -13,7 +13,7 @@ from starlette.requests import Request
 from anydi._container import Container
 from anydi._typing import get_typed_parameters
 
-from ._utils import HasInterface, patch_call_parameter
+from ._utils import HasInterface, patch_parameter
 from .starlette.middleware import RequestScopedMiddleware
 
 __all__ = ["RequestScopedMiddleware", "install", "get_container", "Inject"]
@@ -41,7 +41,7 @@ def install(app: FastAPI, container: Container) -> None:
             if not call:
                 continue  # pragma: no cover
             for parameter in get_typed_parameters(call):
-                patch_call_parameter(container, call, parameter)
+                patch_parameter(container, parameter, call=call)
 
 
 def get_container(request: Request) -> Container:
@@ -56,7 +56,9 @@ class Resolver(params.Depends, HasInterface):
         super().__init__(dependency=self._dependency, use_cache=True)
         HasInterface.__init__(self)
 
-    async def _dependency(self, container: Container = Depends(get_container)) -> Any:
+    async def _dependency(
+        self, container: Annotated[Container, Depends(get_container)]
+    ) -> Any:
         return await container.aresolve(self.interface)
 
 
