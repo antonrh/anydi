@@ -410,13 +410,13 @@ class Container:
         try:
             return self._providers[interface]
         except KeyError:
-            if inspect.isclass(interface) and not is_builtin_type(interface):
-                # Try to get defined scope
-                if is_provided(interface):
-                    scope = interface.__provided__["scope"]
-                else:
-                    scope = parent_scope
-                return self._register_provider(interface, scope, interface, **defaults)
+            if inspect.isclass(interface) and is_provided(interface):
+                return self._register_provider(
+                    interface,
+                    interface.__provided__["scope"],
+                    NOT_SET,
+                    **defaults,
+                )
             raise LookupError(
                 f"The provider interface `{type_repr(interface)}` is either not "
                 "registered, not provided, or not set in the scoped context. "
