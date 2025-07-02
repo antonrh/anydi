@@ -68,6 +68,7 @@ def patch_call_parameter(
     if not isinstance(parameter.default, HasInterface):
         return None
 
-    container._validate_injected_parameter(call, parameter)  # noqa
+    interface, _ = container._validate_injected_parameter(parameter, call=call)  # noqa
+    parameter.default.interface = interface
 
-    parameter.default.interface = parameter.annotation
+    return None

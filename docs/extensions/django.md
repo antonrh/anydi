@@ -81,7 +81,7 @@ This setting will modify the `Django Ninja framework` to support dependency inje
 ```python
 from typing import Any
 
-import anydi
+from anydi import Inject
 from django.http import HttpRequest
 from ninja import Router
 
@@ -91,7 +91,7 @@ from your_module import HelloService
 router = Router()
 
 @router.get("/hello")
-def hello(request: HttpRequest, hello_service: HelloService = anydi.auto) -> dict[str, Any]:
+def hello(request: HttpRequest, hello_service: Inject[HelloService]) -> dict[str, Any]:
     return {
         "message": hello_service.get_message(),
     }

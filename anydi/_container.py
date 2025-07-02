@@ -31,8 +31,9 @@ from ._typing import (
     is_builtin_type,
     is_context_manager,
     is_event_type,
+    is_inject_annotated,
+    is_inject_marker,
     is_iterator_type,
-    is_marker,
     is_none_type,
     type_repr,
 )
@@ -806,30 +807,40 @@ class Container:
         """Get the injected parameters of a callable object."""
         injected_params: dict[str, Any] = {}
         for parameter in get_typed_parameters(call):
-            if not is_marker(parameter.default):
+            interface, should_inject = self._validate_injected_parameter(
+                parameter, call=call
+            )
+            if not should_inject:
                 continue
-            self._validate_injected_parameter(call, parameter)
-            injected_params[parameter.name] = parameter.annotation
+            injected_params[parameter.name] = interface
         return injected_params
 
     def _validate_injected_parameter(
-        self, call: Callable[..., Any], parameter: inspect.Parameter
-    ) -> None:
+        self, parameter: inspect.Parameter, *, call: Callable[..., Any]
+    ) -> tuple[Any, bool]:
         """Validate an injected parameter."""
+        interface, should_inject = parameter.annotation, False
+
+        if is_inject_marker(parameter.default):
+            if interface is inspect.Parameter.empty:
+                raise TypeError(
+                    f"Missing `{type_repr(call)}` parameter "
+                    f"`{parameter.name}` annotation."
+                )
+            should_inject = True
+
+        if is_inject_annotated(interface):
+            interface, should_inject = interface.interface, True
+
         # TODO: temporary disable until strict is enforced
-        return None
-
-        if parameter.annotation is inspect.Parameter.empty:
-            raise TypeError(
-                f"Missing `{type_repr(call)}` parameter `{parameter.name}` annotation."
-            )
-
-        if not self.has_provider_for(parameter.annotation):
+        if False and should_inject and not self.has_provider_for(interface):
             raise LookupError(
                 f"`{type_repr(call)}` has an unknown dependency parameter "
                 f"`{parameter.name}` with an annotation of "
-                f"`{type_repr(parameter.annotation)}`."
+                f"`{type_repr(interface)}`."
             )
+
+        return interface, should_inject
 
     ############################
     # Module Methods

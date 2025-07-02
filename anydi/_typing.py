@@ -7,14 +7,17 @@ import inspect
 import re
 import sys
 from collections.abc import AsyncIterator, Iterator
-from typing import Any, Callable, ForwardRef
+from typing import TYPE_CHECKING, Annotated, Any, Callable, ForwardRef
 
-from typing_extensions import Self, get_args, get_origin
+from typing_extensions import Self, TypeGuard, TypeVar, get_args, get_origin
 
 try:
     from types import NoneType
 except ImportError:
     NoneType = type(None)
+
+
+T = TypeVar("T")
 
 
 def type_repr(obj: Any) -> str:
@@ -93,7 +96,7 @@ def get_typed_parameters(obj: Callable[..., Any]) -> list[inspect.Parameter]:
     ]
 
 
-class _Marker:
+class _InjectMarker:
     """A marker class for marking dependencies."""
 
     __slots__ = ()
@@ -102,13 +105,39 @@ class _Marker:
         return self
 
 
-def Marker() -> Any:
-    return _Marker()
+def InjectMarker() -> Any:
+    return _InjectMarker()
 
 
-def is_marker(obj: Any) -> bool:
+def is_inject_marker(obj: Any) -> bool:
     """Checks if an object is a marker."""
-    return isinstance(obj, _Marker)
+    return isinstance(obj, _InjectMarker)
+
+
+class _InjectAnnotated:
+    __slots__ = ("_interface",)
+
+    def __init__(self, interface: Any) -> None:
+        self._interface = interface
+
+    def __class_getitem__(cls, item: Any) -> Self:
+        return cls(item)
+
+    @property
+    def interface(self) -> Any:
+        if self._interface is None:
+            raise TypeError("Interface is not set.")
+        return self._interface
+
+
+if TYPE_CHECKING:
+    Inject = Annotated[T, ...]
+else:
+    Inject = _InjectAnnotated
+
+
+def is_inject_annotated(tp: Any) -> TypeGuard[_InjectAnnotated]:
+    return isinstance(tp, _InjectAnnotated)
 
 
 class Event:

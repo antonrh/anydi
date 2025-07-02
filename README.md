@@ -142,13 +142,13 @@ from django.http import HttpRequest
 from django.urls import path
 from ninja import NinjaAPI
 
-from anydi import auto
+from anydi import Inject
 
 api = NinjaAPI()
 
 
 @api.get("/hello")
-def say_hello(request: HttpRequest, message: str = auto) -> dict[str, str]:
+def say_hello(request: HttpRequest, message: Inject[str]) -> dict[str, str]:
     return {"message": message}
 
 
