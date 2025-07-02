@@ -8,13 +8,17 @@ from typing import Annotated, Any, Callable
 
 from typing_extensions import get_args, get_origin
 
-from anydi._container import Container
+from anydi import Container
+from anydi._typing import _InjectMarker
 
 logger = logging.getLogger(__name__)
 
 
-class HasInterface:
-    _interface: Any = None
+class HasInterface(_InjectMarker):
+    __slots__ = ("_interface",)
+
+    def __init__(self, interface: Any = None) -> None:
+        self._interface = interface
 
     @property
     def interface(self) -> Any:
@@ -65,9 +69,9 @@ def patch_call_parameter(
     """Patch a parameter to inject dependencies using AnyDI."""
     parameter = patch_annotated_parameter(parameter)
 
-    if not isinstance(parameter.default, HasInterface):
-        return None
-
-    container._validate_injected_parameter(call, parameter)  # noqa
-
-    parameter.default.interface = parameter.annotation
+    interface, should_inject = container._validate_injected_parameter(
+        parameter, call=call
+    )  # noqa
+    if should_inject:
+        parameter.default.interface = interface
+    return None
