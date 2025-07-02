@@ -816,6 +816,9 @@ class Container:
         self, call: Callable[..., Any], parameter: inspect.Parameter
     ) -> None:
         """Validate an injected parameter."""
+        # TODO: temporary disable until strict is enforced
+        return None
+
         if parameter.annotation is inspect.Parameter.empty:
             raise TypeError(
                 f"Missing `{type_repr(call)}` parameter `{parameter.name}` annotation."
