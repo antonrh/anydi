@@ -49,11 +49,12 @@ def get_container(request: Request) -> Container:
     return cast(Container, request.app.state.container)
 
 
-class Resolver(HasInterface, params.Depends):
+class Resolver(params.Depends, HasInterface):
     """Parameter dependency class for injecting dependencies using AnyDI."""
 
     def __init__(self) -> None:
         super().__init__(dependency=self._dependency, use_cache=True)
+        HasInterface.__init__(self)
 
     async def _dependency(self, container: Container = Depends(get_container)) -> Any:
         return await container.aresolve(self.interface)

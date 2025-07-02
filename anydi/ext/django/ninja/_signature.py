@@ -12,6 +12,7 @@ from ninja.signature.details import (
 from ninja.signature.utils import get_path_param_names, get_typed_signature
 
 from anydi._typing import is_marker  # noqa
+from anydi.ext.django import container
 
 
 class ViewSignature(BaseViewSignature):
@@ -45,8 +46,10 @@ class ViewSignature(BaseViewSignature):
                 self.response_arg = name
                 continue
 
-            # Skip default values that are anydi dependency markers
-            if is_marker(arg.default):
+            interface, should_inject = container._validate_injected_parameter(
+                arg, call=self.view_func
+            )
+            if should_inject:
                 self.dependencies.append((name, arg.annotation))
                 continue
 
