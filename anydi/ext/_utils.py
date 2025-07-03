@@ -51,9 +51,6 @@ def patch_parameter(
     interface, should_inject = container._validate_injected_parameter(
         parameter, call=call
     )  # noqa
-    interface, should_inject = container._validate_injected_parameter(
-        parameter, call=call
-    )  # noqa
     if should_inject:
         parameter.default.interface = interface
     return None
