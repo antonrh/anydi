@@ -9,7 +9,7 @@ from typing import Annotated, Any, Callable, Union
 import pytest
 from typing_extensions import Self
 
-from anydi import Container, Provider, Scope, auto, request, singleton, transient
+from anydi import Container, Inject, Provider, Scope, request, singleton, transient
 from anydi._provider import ProviderKind
 from anydi._typing import Event
 
@@ -1403,25 +1403,53 @@ class TestContainer:
 
 
 class TestContainerInjector:
-    def test_inject(self, container: Container) -> None:
+    def test_inject_using_inject_marker(self, container: Container) -> None:
         @container.provider(scope="singleton")
-        def ident_provider() -> str:
-            return "1000"
-
-        @container.provider(scope="singleton")
-        def service_provider(ident: str) -> Service:
-            return Service(ident=ident)
+        def message() -> str:
+            return "test"
 
         @container.inject
-        def func(name: str, service: Service = auto) -> str:
-            return f"{name} = {service.ident}"
+        def func(message: str = Inject()) -> str:
+            return message
 
-        result = func(name="service ident")
+        result = func()
 
-        assert result == "service ident = 1000"
+        assert result == "test"
+
+    def test_inject_using_inject_annotated_marker(self, container: Container) -> None:
+        @container.provider(scope="singleton")
+        def message() -> str:
+            return "test"
+
+        @container.inject
+        def func(message: Annotated[str, Inject()]) -> str:
+            return message
+
+        result = func()  # type: ignore
+
+        assert result == "test"
+
+    def test_inject_using_inject_annotated_with_marker(
+        self, container: Container
+    ) -> None:
+        @container.provider(scope="singleton")
+        def message() -> str:
+            return "test"
+
+        with pytest.raises(
+            TypeError,
+            match=(
+                "Cannot specify `Inject` in `Annotated` and default value "
+                "together for 'message'"
+            ),
+        ):
+
+            @container.inject
+            def func(message: Annotated[str, Inject()] = Inject()) -> str:
+                return message
 
     def test_inject_missing_annotation(self, container: Container) -> None:
-        def handler(name=auto) -> str:  # type: ignore
+        def handler(name=Inject()) -> str:  # type: ignore
             return name  # type: ignore
 
         with pytest.raises(
@@ -1433,7 +1461,7 @@ class TestContainerInjector:
     def test_inject_unknown_dependency(self) -> None:
         container = Container()
 
-        def handler(message: str = auto) -> None:
+        def handler(message: str = Inject()) -> None:
             pass
 
         with pytest.raises(
@@ -1444,32 +1472,6 @@ class TestContainerInjector:
             ),
         ):
             container.inject(handler)
-
-    def test_inject_auto_marker(self, container: Container) -> None:
-        @container.provider(scope="singleton")
-        def message() -> str:
-            return "test"
-
-        @container.inject
-        def func(message: str = auto) -> str:
-            return message
-
-        result = func()
-
-        assert result == "test"
-
-    def test_inject_auto_marker_call(self, container: Container) -> None:
-        @container.provider(scope="singleton")
-        def message() -> str:
-            return "test"
-
-        @container.inject
-        def func(message: str = auto()) -> str:
-            return message
-
-        result = func()
-
-        assert result == "test"
 
     def test_inject_class(self, container: Container) -> None:
         @container.provider(scope="singleton")
@@ -1482,7 +1484,7 @@ class TestContainerInjector:
 
         @container.inject
         class Handler:
-            def __init__(self, name: str, service: Service = auto) -> None:
+            def __init__(self, name: str, service: Service = Inject()) -> None:
                 self.name = name
                 self.service = service
 
@@ -1510,7 +1512,7 @@ class TestContainerInjector:
         await container.astart()
 
         @container.inject
-        async def func(name: str, service: Service = auto) -> str:
+        async def func(name: str, service: Service = Inject()) -> str:
             return f"{name} = {service.ident}"
 
         result = await func(name="service ident")
@@ -1528,8 +1530,8 @@ class TestContainerInjector:
 
         def sum_handler(
             value1: int,
-            value2: Annotated[int, "value1"] = auto,
-            value3: Annotated[int, "value2"] = auto,
+            value2: Annotated[int, "value1"] = Inject(),
+            value3: Annotated[int, "value2"] = Inject(),
         ) -> int:
             return value1 + value2 + value3
 
@@ -1542,7 +1544,7 @@ class TestContainerInjector:
         def message() -> str:
             return "hello"
 
-        def handler(message: str = auto) -> str:
+        def handler(message: str = Inject()) -> str:
             return message
 
         _ = container.run(handler)

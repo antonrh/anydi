@@ -6,7 +6,7 @@ from starlette.requests import Request
 from starlette.responses import JSONResponse
 from starlette.routing import Route
 
-from anydi import auto
+from anydi import Inject
 from anydi.ext.starlette.middleware import RequestScopedMiddleware
 from anydi.testing import TestContainer
 
@@ -28,8 +28,8 @@ def mail_service() -> MailService:
 @container.inject
 async def send_email(
     request: Request,
-    user_service: UserService = auto,
-    mail_service: MailService = auto,
+    user_service: UserService = Inject(),
+    mail_service: MailService = Inject(),
 ) -> JSONResponse:
     data = await request.json()
     message = cast(str, data.get("message"))
