@@ -11,9 +11,8 @@ from fastapi.routing import APIRoute
 from starlette.requests import Request
 
 from anydi._container import Container
-from anydi._typing import get_typed_parameters
+from anydi._typing import InjectMarker, get_typed_parameters
 
-from ._utils import HasInterface, patch_parameter
 from .starlette.middleware import RequestScopedMiddleware
 
 __all__ = ["RequestScopedMiddleware", "install", "get_container", "Inject"]
@@ -41,7 +40,7 @@ def install(app: FastAPI, container: Container) -> None:
             if not call:
                 continue  # pragma: no cover
             for parameter in get_typed_parameters(call):
-                patch_parameter(container, parameter, call=call)
+                container.validate_injected_parameter(parameter, call=call)
 
 
 def get_container(request: Request) -> Container:
@@ -49,12 +48,10 @@ def get_container(request: Request) -> Container:
     return cast(Container, request.app.state.container)
 
 
-class Resolver(params.Depends, HasInterface):
-    """Parameter dependency class for injecting dependencies using AnyDI."""
-
+class _Inject(params.Depends, InjectMarker):
     def __init__(self) -> None:
         super().__init__(dependency=self._dependency, use_cache=True)
-        HasInterface.__init__(self)
+        InjectMarker.__init__(self)
 
     async def _dependency(
         self, container: Annotated[Container, Depends(get_container)]
@@ -63,8 +60,7 @@ class Resolver(params.Depends, HasInterface):
 
 
 def Inject() -> Any:
-    """Decorator for marking a function parameter as requiring injection."""
-    return Resolver()
+    return _Inject()
 
 
 def _iter_dependencies(dependant: Dependant) -> Iterator[Dependant]:

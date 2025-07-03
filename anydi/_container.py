@@ -11,7 +11,7 @@ import uuid
 from collections import defaultdict
 from collections.abc import AsyncIterator, Iterable, Iterator
 from contextvars import ContextVar
-from typing import Any, Callable, TypeVar, cast, overload
+from typing import Annotated, Any, Callable, TypeVar, cast, overload
 
 from typing_extensions import ParamSpec, Self, get_args, get_origin
 
@@ -806,35 +806,67 @@ class Container:
         """Get the injected parameters of a callable object."""
         injected_params: dict[str, Any] = {}
         for parameter in get_typed_parameters(call):
-            interface, should_inject = self._validate_injected_parameter(
+            interface, should_inject = self.validate_injected_parameter(
                 parameter, call=call
             )
             if should_inject:
                 injected_params[parameter.name] = interface
         return injected_params
 
-    def _validate_injected_parameter(
+    @staticmethod
+    def _unwrap_injected_parameter(parameter: inspect.Parameter) -> inspect.Parameter:
+        if get_origin(parameter.annotation) is not Annotated:
+            return parameter
+
+        origin, *metadata = get_args(parameter.annotation)
+
+        if not metadata or not is_inject_marker(metadata[-1]):
+            return parameter
+
+        if is_inject_marker(parameter.default):
+            raise TypeError(
+                "Cannot specify `Inject` in `Annotated` and "
+                f"default value together for '{parameter.name}'"
+            )
+
+        if parameter.default is not inspect.Parameter.empty:
+            return parameter
+
+        marker = metadata[-1]
+        new_metadata = metadata[:-1]
+        if new_metadata:
+            new_annotation = Annotated.__class_getitem__((origin, *new_metadata))  # type: ignore
+        else:
+            new_annotation = origin
+        return parameter.replace(annotation=new_annotation, default=marker)
+
+    def validate_injected_parameter(
         self, parameter: inspect.Parameter, *, call: Callable[..., Any]
     ) -> tuple[Any, bool]:
         """Validate an injected parameter."""
-        interface, should_inject = parameter.annotation, False
-        if is_inject_marker(parameter.default):
-            if parameter.annotation is inspect.Parameter.empty:
-                raise TypeError(
-                    f"Missing `{type_repr(call)}` "
-                    f"parameter `{parameter.name}` annotation."
-                )
-            should_inject = True
+        parameter = self._unwrap_injected_parameter(parameter)
+        interface = parameter.annotation
 
-        return interface, should_inject
+        if not is_inject_marker(parameter.default):
+            return interface, False
 
-        # TODO: temporary disable until strict is enforced
-        if not self.has_provider_for(interface):
+        if interface is inspect.Parameter.empty:
+            raise TypeError(
+                f"Missing `{type_repr(call)}` parameter `{parameter.name}` annotation."
+            )
+
+        # Set inject marker interface
+        parameter.default.interface = interface
+
+        # TODO: temporary disable until strict is enforced (remove False)
+        if False and not self.has_provider_for(interface):
             raise LookupError(
                 f"`{type_repr(call)}` has an unknown dependency parameter "
                 f"`{parameter.name}` with an annotation of "
                 f"`{type_repr(interface)}`."
             )
+
+        return interface, True
 
     ############################
     # Module Methods
