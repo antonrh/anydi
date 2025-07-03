@@ -3,15 +3,12 @@
 from __future__ import annotations
 
 import inspect
-import logging
 from typing import Annotated, Any, Callable
 
 from typing_extensions import get_args, get_origin
 
 from anydi import Container
 from anydi._typing import _InjectMarker
-
-logger = logging.getLogger(__name__)
 
 
 class HasInterface(_InjectMarker):
