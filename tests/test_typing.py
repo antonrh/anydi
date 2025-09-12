@@ -3,23 +3,9 @@ from typing import Annotated, Any, Union
 
 import pytest
 
-from anydi._typing import is_builtin_type, type_repr
+from anydi._typing import type_repr
 
 from tests.fixtures import Service
-
-
-@pytest.mark.parametrize(
-    ("tp", "expected"),
-    [
-        (bool, True),
-        (str, True),
-        (int, True),
-        (float, True),
-        (Service, False),
-    ],
-)
-def test_is_builtin_type(tp: type[Any], expected: bool) -> None:
-    assert is_builtin_type(tp) == expected
 
 
 @pytest.mark.parametrize(
@@ -35,7 +21,7 @@ def test_is_builtin_type(tp: type[Any], expected: bool) -> None:
                 sys.version_info >= (3, 9), reason="Requires Python 3.9"
             ),
         ),
-        (lambda x: x, "tests.test_utils.<lambda>"),
+        (lambda x: x, "tests.test_typing.<lambda>"),
         (123, "int"),
         ("hello", "hello"),
         (list[str], "list[str]"),

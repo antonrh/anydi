@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import builtins
 import inspect
 import re
 import sys
@@ -42,11 +41,6 @@ def type_repr(obj: Any) -> str:
         "",
         full_qualname,
     )
-
-
-def is_builtin_type(tp: type[Any]) -> bool:
-    """Check if the given type is a built-in type."""
-    return tp.__module__ == builtins.__name__
 
 
 def is_context_manager(obj: Any) -> bool:

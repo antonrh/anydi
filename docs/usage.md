@@ -145,89 +145,6 @@ assert not container.is_resolved(int)
 
     This pattern can be used while writing unit tests to ensure that each test case has a clean dependency graph.
 
-## Auto-Registration
-
-
-`AnyDI` doesn't require explicit registration for every type. It can dynamically resolve and auto-register dependencies,
-simplifying setups where manual registration for each type is impractical.
-
-Consider a scenario with class dependencies:
-
-```python
-class Database:
-    def connect(self) -> None:
-        print("connect")
-    def disconnect(self) -> None:
-        print("disconnect")
-
-
-class Repository:
-    def __init__(self, db: Database) -> None:
-        self.db = db
-
-
-class Service:
-    def __init__(self, repo: Repository) -> None:
-        self.repo = repo
-```
-
-You can instantiate these classes without manually registering each one:
-
-```python
-from typing import Iterator
-
-from anydi import Container
-
-container = Container()
-
-@container.provider(scope="singleton")
-def db() -> Iterator[Database]:
-    db = Database()
-    db.connect()
-    yield db
-    db.disconnect()
-
-# Retrieving an instance of Service
-_ = container.resolve(Service)
-
-assert container.is_resolved(Service)
-assert container.is_resolved(Repository)
-assert container.is_resolved(Database)
-```
-
-### Automatic Resource Management
-
-When your class dependencies implement the context manager protocol by defining the `__enter__/__aenter__` and `__exit__/__aexit__` methods, these resources are automatically managed by the container for `singleton` and `request` scoped providers.
-
-```python
-from anydi import Container, singleton
-
-
-@singleton
-class Connection:
-    def __init__(self) -> None:
-        self.connected = False
-        self.disconnected = False
-
-    def __enter__(self) -> None:
-        self.connected = True
-
-    def __exit__(self, exc_type, exc_val, exc_tb) -> None:
-        self.connected = False
-        self.disconnected = True
-
-
-container = Container()
-connection = container.resolve(Connection)
-
-assert container.is_resolved(Connection)
-assert connection.connected
-
-container.close()
-
-assert connection.disconnected
-```
-
 ## Scopes
 
 `AnyDI` supports three different scopes for providers:
@@ -500,6 +417,94 @@ assert client.closed
 
     This pattern can be used for both synchronous and asynchronous resources.
 
+## Auto-Registration
+
+
+`AnyDI` doesn't require explicit registration for every type. It can dynamically resolve and auto-register dependencies,
+simplifying setups where manual registration for each type is impractical.
+
+Consider a scenario with class dependencies:
+
+```python
+from anydi import singleton
+
+
+@singleton
+class Database:
+    def connect(self) -> None:
+        print("connect")
+    def disconnect(self) -> None:
+        print("disconnect")
+
+
+@singleton
+class Repository:
+    def __init__(self, db: Database) -> None:
+        self.db = db
+
+
+@singleton
+class Service:
+    def __init__(self, repo: Repository) -> None:
+        self.repo = repo
+```
+
+You can instantiate these classes without manually registering each one:
+
+```python
+from typing import Iterator
+
+from anydi import Container
+
+container = Container()
+
+@container.provider(scope="singleton")
+def db() -> Iterator[Database]:
+    db = Database()
+    db.connect()
+    yield db
+    db.disconnect()
+
+# Retrieving an instance of Service
+_ = container.resolve(Service)
+
+assert container.is_resolved(Service)
+assert container.is_resolved(Repository)
+assert container.is_resolved(Database)
+```
+
+### Automatic Resource Management
+
+When your class dependencies implement the context manager protocol by defining the `__enter__/__aenter__` and `__exit__/__aexit__` methods, these resources are automatically managed by the container for `singleton` and `request` scoped providers.
+
+```python
+from anydi import Container, singleton
+
+
+@singleton
+class Connection:
+    def __init__(self) -> None:
+        self.connected = False
+        self.disconnected = False
+
+    def __enter__(self) -> None:
+        self.connected = True
+
+    def __exit__(self, exc_type, exc_val, exc_tb) -> None:
+        self.connected = False
+        self.disconnected = True
+
+
+container = Container()
+connection = container.resolve(Connection)
+
+assert container.is_resolved(Connection)
+assert connection.connected
+
+container.close()
+
+assert connection.disconnected
+```
 
 ## Overriding Providers
 
