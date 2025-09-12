@@ -862,3 +862,16 @@ class Container:
         self, /, packages: PackageOrIterable, *, tags: Iterable[str] | None = None
     ) -> None:
         self._scanner.scan(packages=packages, tags=tags)
+
+    ############################
+    # Testing
+    ############################
+
+    @contextlib.contextmanager
+    def override(self, interface: Any, instance: Any) -> Iterator[None]:
+        raise RuntimeError(
+            "Dependency overriding is not supported in this container.\n"
+            "Wrap your container with `anydi.testing.Container` instead.\n"
+            "Example:\n\n"
+            "    container = TestContainer.from_container(container)"
+        )

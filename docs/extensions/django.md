@@ -6,7 +6,7 @@ Add `anydi.ext.django` to the **bottom** of your `INSTALLED_APPS` setting in you
 
 ```python
 INSTALLED_APPS = [
-    ...
+    # ...
     "anydi.ext.django",
 ]
 ```
@@ -169,3 +169,14 @@ MIDDLEWARE = [
 With this setup, you can define and utilize `request`-scoped dependencies throughout your application.
 Additionally, `HttpRequest` dependencies are automatically available in request-scoped providers,
 allowing convenient access to the request object and its data in these dependencies.
+
+## Testing
+
+To use `TestContainer` instead of the regular `Container`, set the environment variable:
+
+```python
+# tests/settings.py
+from yourproject.settings import *
+
+ANYDI_TESTING = True
+```

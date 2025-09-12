@@ -9,6 +9,7 @@ from django.core.exceptions import ImproperlyConfigured
 from django.utils.module_loading import import_string
 
 import anydi
+from anydi.testing import TestContainer
 
 from ._settings import get_settings
 from ._utils import inject_urlpatterns, register_components, register_settings
@@ -32,9 +33,16 @@ class ContainerConfig(AppConfig):
                 raise ImproperlyConfigured(
                     f"Cannot import container factory '{container_factory_path}'."
                 ) from exc
-            self.container = container_factory()
+            container = container_factory()
         else:
-            self.container = anydi.Container()
+            container = anydi.Container()
+
+        # Use test container
+        testing = getattr(settings, "ANYDI_TESTING", False)
+        if testing:
+            container = TestContainer.from_container(container)
+
+        self.container = container
 
     def ready(self) -> None:  # noqa: C901
         # Register Django settings

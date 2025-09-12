@@ -1381,6 +1381,11 @@ class TestContainer:
         with pytest.raises(TypeError, match="takes no arguments"):
             await container.acreate(Component, param="test")
 
+    def test_override_is_not_supported(self, container: Container) -> None:
+        with pytest.raises(RuntimeError, match="not supported"):
+            with container.override(str, "other"):
+                pass
+
 
 class TestContainerInjector:
     def test_inject_using_inject_marker(self, container: Container) -> None:
