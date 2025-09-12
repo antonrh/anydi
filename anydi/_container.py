@@ -305,6 +305,7 @@ class Container:
             )
 
         unresolved_parameter = None
+        unresolved_exc: LookupError | None = None
         parameters: list[inspect.Parameter] = []
         scopes: dict[Scope, Provider] = {}
 
@@ -326,10 +327,11 @@ class Container:
 
             try:
                 sub_provider = self._get_or_register_provider(parameter.annotation)
-            except LookupError:
+            except LookupError as exc:
                 if self._parameter_has_default(parameter, **defaults):
                     continue
                 unresolved_parameter = parameter
+                unresolved_exc = exc
                 continue
 
             # Store first provider for each scope
@@ -349,7 +351,7 @@ class Container:
                     "which has not been registered or set. To resolve this, ensure "
                     f"that `{unresolved_parameter.name}` is registered before "
                     f"attempting to use it."
-                ) from None
+                ) from unresolved_exc
 
         # Check scope compatibility
         for sub_provider in scopes.values():
