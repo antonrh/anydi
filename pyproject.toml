@@ -1,6 +1,6 @@
 [project]
 name = "anydi"
-version = "0.47.0"
+version = "0.48.0"
 description = "Dependency Injection library"
 authors = [{ name = "Anton Ruhlov", email = "antonruhlov@gmail.com" }]
 requires-python = "~=3.9"
@@ -73,8 +73,12 @@ docs = [
 ]
 
 [build-system]
-requires = ["hatchling"]
-build-backend = "hatchling.build"
+requires = ["uv_build>=0.8.17,<0.9.0"]
+build-backend = "uv_build"
+
+[tool.uv.build-backend]
+module-name = "anydi"
+module-root = "."
 
 [tool.ruff]
 line-length = 88
@@ -137,7 +141,7 @@ omit = [
 ]
 
 [tool.bumpversion]
-current_version = "0.47.0"
+current_version = "0.48.0"
 parse = """(?x)
     (?P<major>0|[1-9]\\d*)\\.
     (?P<minor>0|[1-9]\\d*)\\.
@@ -164,3 +168,4 @@ replace = "version = \"{new_version}\""
 [tool.bumpversion.parts.pre_l]
 values = ["rc", "final"]
 optional_value = "final"
+
