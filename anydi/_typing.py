@@ -6,14 +6,17 @@ import inspect
 import re
 import sys
 from collections.abc import AsyncIterator, Iterator
-from typing import Any, Callable, ForwardRef
+from typing import Any, Callable, ForwardRef, TypeVar
 
-from typing_extensions import Self, get_args, get_origin
+from typing_extensions import get_args, get_origin
 
 try:
     from types import NoneType
 except ImportError:
     NoneType = type(None)
+
+
+T = TypeVar("T")
 
 
 def type_repr(obj: Any) -> str:
@@ -87,35 +90,6 @@ def get_typed_parameters(obj: Callable[..., Any]) -> list[inspect.Parameter]:
     ]
 
 
-class _Marker:
-    """A marker class for marking dependencies."""
-
-    __slots__ = ()
-
-    def __call__(self) -> Self:
-        return self
-
-
-def Marker() -> Any:
-    return _Marker()
-
-
-def is_marker(obj: Any) -> bool:
-    """Checks if an object is a marker."""
-    return isinstance(obj, _Marker)
-
-
-class Event:
-    """Represents an event object."""
-
-    __slots__ = ()
-
-
-def is_event_type(obj: Any) -> bool:
-    """Checks if an object is an event type."""
-    return inspect.isclass(obj) and issubclass(obj, Event)
-
-
 class _Sentinel:
     __slots__ = ("_name",)
 
@@ -133,3 +107,41 @@ class _Sentinel:
 
 
 NOT_SET = _Sentinel("NOT_SET")
+
+
+class InjectMarker:
+    """A marker object for declaring injectable dependencies."""
+
+    __slots__ = ("_interface",)
+
+    def __init__(self, interface: Any = NOT_SET) -> None:
+        self._interface = interface
+
+    @property
+    def interface(self) -> Any:
+        if self._interface is NOT_SET:
+            raise TypeError("Interface is not set.")
+        return self._interface
+
+    @interface.setter
+    def interface(self, interface: Any) -> None:
+        self._interface = interface
+
+
+def is_inject_marker(obj: Any) -> bool:
+    return isinstance(obj, InjectMarker)
+
+
+def Inject() -> Any:
+    return InjectMarker()
+
+
+class Event:
+    """Represents an event object."""
+
+    __slots__ = ()
+
+
+def is_event_type(obj: Any) -> bool:
+    """Checks if an object is an event type."""
+    return inspect.isclass(obj) and issubclass(obj, Event)
