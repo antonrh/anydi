@@ -28,12 +28,7 @@ class TestContainer(Container):
         default_scope: Scope = "transient",
         logger: logging.Logger | None = None,
     ) -> None:
-        super().__init__(
-            providers=providers,
-            modules=modules,
-            default_scope=default_scope,
-            logger=logger,
-        )
+        super().__init__(providers=providers, modules=modules, logger=logger)
         self._override_instances: dict[Any, Any] = {}
 
     @classmethod
@@ -47,7 +42,6 @@ class TestContainer(Container):
                 )
                 for provider in container.providers.values()
             ],
-            default_scope=container.default_scope,
             logger=container.logger,
         )
 

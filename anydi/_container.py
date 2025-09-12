@@ -48,11 +48,9 @@ class Container:
         *,
         providers: Iterable[ProviderDef] | None = None,
         modules: Iterable[ModuleDef] | None = None,
-        default_scope: Scope = "transient",
         logger: logging.Logger | None = None,
     ) -> None:
         self._providers: dict[Any, Provider] = {}
-        self._default_scope: Scope = default_scope
         self._logger = logger or logging.getLogger(__name__)
         self._resources: dict[str, list[Any]] = defaultdict(list)
         self._singleton_context = InstanceContext()
@@ -83,11 +81,6 @@ class Container:
     ############################
     # Properties
     ############################
-
-    @property
-    def default_scope(self) -> Scope:
-        """Get the default scope."""
-        return self._default_scope
 
     @property
     def providers(self) -> dict[type[Any], Provider]:
