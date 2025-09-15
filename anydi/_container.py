@@ -831,8 +831,7 @@ class Container:
         # Set inject marker interface
         parameter.default.interface = interface
 
-        # TODO: temporary disable until strict is enforced (remove False)
-        if False and not self.has_provider_for(interface):
+        if not self.has_provider_for(interface):
             raise LookupError(
                 f"`{type_repr(call)}` has an unknown dependency parameter "
                 f"`{parameter.name}` with an annotation of "
