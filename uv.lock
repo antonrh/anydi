@@ -1,6 +1,6 @@
 version = 1
-revision = 2
-requires-python = ">=3.9, <4"
+revision = 3
+requires-python = ">=3.9.0, <3.14"
 
 [[package]]
 name = "annotated-types"
@@ -13,7 +13,7 @@ wheels = [
 
 [[package]]
 name = "anydi"
-version = "0.48.1"
+version = "0.48.2"
 source = { editable = "." }
 dependencies = [
     { name = "anyio" },
