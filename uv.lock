@@ -23,9 +23,6 @@ dependencies = [
 
 [package.dev-dependencies]
 dev = [
-    { name = "django" },
-    { name = "django-ninja" },
-    { name = "django-stubs" },
     { name = "fastapi" },
     { name = "faststream" },
     { name = "httpx" },
@@ -33,7 +30,6 @@ dev = [
     { name = "pyright" },
     { name = "pytest" },
     { name = "pytest-cov" },
-    { name = "pytest-django" },
     { name = "pytest-mock" },
     { name = "redis" },
     { name = "ruff" },
@@ -53,9 +49,6 @@ requires-dist = [
 
 [package.metadata.requires-dev]
 dev = [
-    { name = "django", specifier = "~=4.2" },
-    { name = "django-ninja", specifier = ">=1.1.0,<2" },
-    { name = "django-stubs", specifier = ">=5.1.1,<6" },
     { name = "fastapi", specifier = ">=0.100.0" },
     { name = "faststream", specifier = ">=0.5.10,<0.6" },
     { name = "httpx", specifier = ">=0.26.0" },
@@ -63,7 +56,6 @@ dev = [
     { name = "pyright", specifier = ">=1.1.406" },
     { name = "pytest", specifier = ">=8.4.0,<9" },
     { name = "pytest-cov", specifier = ">=6.0.0,<7" },
-    { name = "pytest-django", specifier = ">=4.8.0,<5" },
     { name = "pytest-mock", specifier = ">=3.14.1" },
     { name = "redis", specifier = ">=5.0.4,<6" },
     { name = "ruff", specifier = ">=0.14.0" },
@@ -87,18 +79,6 @@ dependencies = [
 sdist = { url = "https://files.pythonhosted.org/packages/a3/73/199a98fc2dae33535d6b8e8e6ec01f8c1d76c9adb096c6b7d64823038cde/anyio-4.8.0.tar.gz", hash = "sha256:1d9fe889df5212298c0c0723fa20479d1b94883a2df44bd3897aa91083316f7a", size = 181126, upload-time = "2025-01-05T13:13:11.095Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/46/eb/e7f063ad1fec6b3178a3cd82d1a3c4de82cccf283fc42746168188e1cdd5/anyio-4.8.0-py3-none-any.whl", hash = "sha256:b5011f270ab5eb0abf13385f851315585cc37ef330dd88e27ec3d34d651fd47a", size = 96041, upload-time = "2025-01-05T13:13:07.985Z" },
-]
-
-[[package]]
-name = "asgiref"
-version = "3.8.1"
-source = { registry = "https://pypi.org/simple" }
-dependencies = [
-    { name = "typing-extensions", marker = "python_full_version < '3.11'" },
-]
-sdist = { url = "https://files.pythonhosted.org/packages/29/38/b3395cc9ad1b56d2ddac9970bc8f4141312dbaec28bc7c218b0dfafd0f42/asgiref-3.8.1.tar.gz", hash = "sha256:c343bd80a0bec947a9860adb4c432ffa7db769836c64238fc34bdc3fec84d590", size = 35186, upload-time = "2024-03-22T14:39:36.863Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/39/e3/893e8757be2612e6c266d9bb58ad2e3651524b5b40cf56761e985a28b13e/asgiref-3.8.1-py3-none-any.whl", hash = "sha256:3e1e3ecc849832fe52ccf2cb6686b7a55f82bb1d6aee72a58826471390335e47", size = 23828, upload-time = "2024-03-22T14:39:34.521Z" },
 ]
 
 [[package]]
@@ -272,63 +252,6 @@ wheels = [
 [package.optional-dependencies]
 toml = [
     { name = "tomli", marker = "python_full_version <= '3.11'" },
-]
-
-[[package]]
-name = "django"
-version = "4.2.19"
-source = { registry = "https://pypi.org/simple" }
-dependencies = [
-    { name = "asgiref" },
-    { name = "sqlparse" },
-    { name = "tzdata", marker = "sys_platform == 'win32'" },
-]
-sdist = { url = "https://files.pythonhosted.org/packages/cf/49/8e71f8a30aecc8e236bbb0ce056ff705a4782db4ab836e588c1a0e0a26aa/Django-4.2.19.tar.gz", hash = "sha256:6c833be4b0ca614f0a919472a1028a3bbdeb6f056fa04023aeb923346ba2c306", size = 10426865, upload-time = "2025-02-05T14:01:58.547Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/14/db/6fc8c55f3b482776ac245623cd713b00ba894ad8f32cf438a40d9f1ea29e/Django-4.2.19-py3-none-any.whl", hash = "sha256:a104e13f219fc55996a4e416ef7d18ab4eeb44e0aa95174c192f16cda9f94e75", size = 7993670, upload-time = "2025-02-05T14:01:52.988Z" },
-]
-
-[[package]]
-name = "django-ninja"
-version = "1.3.0"
-source = { registry = "https://pypi.org/simple" }
-dependencies = [
-    { name = "django" },
-    { name = "pydantic" },
-]
-sdist = { url = "https://files.pythonhosted.org/packages/9c/77/89ee4ebaa5151b7d85cebaf8d6ec0b9e5074326c3ad8259c763763306d51/django_ninja-1.3.0.tar.gz", hash = "sha256:5b320e2dc0f41a6032bfa7e1ebc33559ae1e911a426f0c6be6674a50b20819be", size = 3702324, upload-time = "2024-08-15T09:15:04.464Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/00/72/fd2589323b40893d3224e174eeec0c4ce5a42c7d2d384d11ba269ad4d050/django_ninja-1.3.0-py3-none-any.whl", hash = "sha256:f58096b6c767d1403dfd6c49743f82d780d7b9688d9302ecab316ac1fa6131bb", size = 2423381, upload-time = "2024-08-15T09:15:02.396Z" },
-]
-
-[[package]]
-name = "django-stubs"
-version = "5.1.2"
-source = { registry = "https://pypi.org/simple" }
-dependencies = [
-    { name = "asgiref" },
-    { name = "django" },
-    { name = "django-stubs-ext" },
-    { name = "tomli", marker = "python_full_version < '3.11'" },
-    { name = "types-pyyaml" },
-    { name = "typing-extensions" },
-]
-sdist = { url = "https://files.pythonhosted.org/packages/32/d6/b29debed5527ead981b69cef404f7589cca7b6e4aa65fe3e60a478b4588e/django_stubs-5.1.2.tar.gz", hash = "sha256:a0fcb3659bab46a6d835cc2d9bff3fc29c36ccea41a10e8b1930427bc0f9f0df", size = 267374, upload-time = "2025-01-14T11:04:18.96Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/77/28/137af496de2419ac521b4530f4f6340adbf709befd7d63ce590537c7432a/django_stubs-5.1.2-py3-none-any.whl", hash = "sha256:04ddc778faded6fb48468a8da9e98b8d12b9ba983faa648d37a73ebde0f024da", size = 472598, upload-time = "2025-01-14T11:04:16.85Z" },
-]
-
-[[package]]
-name = "django-stubs-ext"
-version = "5.1.2"
-source = { registry = "https://pypi.org/simple" }
-dependencies = [
-    { name = "django" },
-    { name = "typing-extensions" },
-]
-sdist = { url = "https://files.pythonhosted.org/packages/ed/83/b673bf5131c61949f7840b70f9d25a52d90d27416fe2692f13ade14496f1/django_stubs_ext-5.1.2.tar.gz", hash = "sha256:421c0c3025a68e3ab8e16f065fad9ba93335ecefe2dd92a0cff97a665680266c", size = 9629, upload-time = "2025-01-14T11:03:48.069Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/73/c1/5df5231c5db00e3981e71f295c7e5269cbddb0a2c666b3a6f03831b24bd1/django_stubs_ext-5.1.2-py3-none-any.whl", hash = "sha256:6c559214538d6a26f631ca638ddc3251a0a891d607de8ce01d23d3201ad8ad6c", size = 9032, upload-time = "2025-01-14T11:03:45.252Z" },
 ]
 
 [[package]]
@@ -828,18 +751,6 @@ wheels = [
 ]
 
 [[package]]
-name = "pytest-django"
-version = "4.9.0"
-source = { registry = "https://pypi.org/simple" }
-dependencies = [
-    { name = "pytest" },
-]
-sdist = { url = "https://files.pythonhosted.org/packages/02/c0/43c8b2528c24d7f1a48a47e3f7381f5ab2ae8c64634b0c3f4bd843063955/pytest_django-4.9.0.tar.gz", hash = "sha256:8bf7bc358c9ae6f6fc51b6cebb190fe20212196e6807121f11bd6a3b03428314", size = 84067, upload-time = "2024-09-02T15:49:18.407Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/47/fe/54f387ee1b41c9ad59e48fb8368a361fad0600fe404315e31a12bacaea7d/pytest_django-4.9.0-py3-none-any.whl", hash = "sha256:1d83692cb39188682dbb419ff0393867e9904094a549a7d38a3154d5731b2b99", size = 23723, upload-time = "2024-09-02T15:49:17.127Z" },
-]
-
-[[package]]
 name = "pytest-mock"
 version = "3.14.1"
 source = { registry = "https://pypi.org/simple" }
@@ -1069,15 +980,6 @@ wheels = [
 ]
 
 [[package]]
-name = "sqlparse"
-version = "0.5.3"
-source = { registry = "https://pypi.org/simple" }
-sdist = { url = "https://files.pythonhosted.org/packages/e5/40/edede8dd6977b0d3da179a342c198ed100dd2aba4be081861ee5911e4da4/sqlparse-0.5.3.tar.gz", hash = "sha256:09f67787f56a0b16ecdbde1bfc7f5d9c3371ca683cfeaa8e6ff60b4807ec9272", size = 84999, upload-time = "2024-12-10T12:05:30.728Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/a9/5c/bfd6bd0bf979426d405cc6e71eceb8701b148b16c21d2dc3c261efc61c7b/sqlparse-0.5.3-py3-none-any.whl", hash = "sha256:cf2196ed3418f3ba5de6af7e82c694a9fbdbfecccdfc72e281548517081f16ca", size = 44415, upload-time = "2024-12-10T12:05:27.824Z" },
-]
-
-[[package]]
 name = "starlette"
 version = "0.46.2"
 source = { registry = "https://pypi.org/simple" }
@@ -1129,30 +1031,12 @@ wheels = [
 ]
 
 [[package]]
-name = "types-pyyaml"
-version = "6.0.12.20241230"
-source = { registry = "https://pypi.org/simple" }
-sdist = { url = "https://files.pythonhosted.org/packages/9a/f9/4d566925bcf9396136c0a2e5dc7e230ff08d86fa011a69888dd184469d80/types_pyyaml-6.0.12.20241230.tar.gz", hash = "sha256:7f07622dbd34bb9c8b264fe860a17e0efcad00d50b5f27e93984909d9363498c", size = 17078, upload-time = "2024-12-30T02:44:38.168Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/e8/c1/48474fbead512b70ccdb4f81ba5eb4a58f69d100ba19f17c92c0c4f50ae6/types_PyYAML-6.0.12.20241230-py3-none-any.whl", hash = "sha256:fa4d32565219b68e6dee5f67534c722e53c00d1cfc09c435ef04d7353e1e96e6", size = 20029, upload-time = "2024-12-30T02:44:36.162Z" },
-]
-
-[[package]]
 name = "typing-extensions"
 version = "4.15.0"
 source = { registry = "https://pypi.org/simple" }
 sdist = { url = "https://files.pythonhosted.org/packages/72/94/1a15dd82efb362ac84269196e94cf00f187f7ed21c242792a923cdb1c61f/typing_extensions-4.15.0.tar.gz", hash = "sha256:0cea48d173cc12fa28ecabc3b837ea3cf6f38c6d1136f85cbaaf598984861466", size = 109391, upload-time = "2025-08-25T13:49:26.313Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/18/67/36e9267722cc04a6b9f15c7f3441c2363321a3ea07da7ae0c0707beb2a9c/typing_extensions-4.15.0-py3-none-any.whl", hash = "sha256:f0fa19c6845758ab08074a0cfa8b7aecb71c999ca73d62883bc25cc018c4e548", size = 44614, upload-time = "2025-08-25T13:49:24.86Z" },
-]
-
-[[package]]
-name = "tzdata"
-version = "2025.1"
-source = { registry = "https://pypi.org/simple" }
-sdist = { url = "https://files.pythonhosted.org/packages/43/0f/fa4723f22942480be4ca9527bbde8d43f6c3f2fe8412f00e7f5f6746bc8b/tzdata-2025.1.tar.gz", hash = "sha256:24894909e88cdb28bd1636c6887801df64cb485bd593f2fd83ef29075a81d694", size = 194950, upload-time = "2025-01-21T19:49:38.686Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/0f/dd/84f10e23edd882c6f968c21c2434fe67bd4a528967067515feca9e611e5e/tzdata-2025.1-py2.py3-none-any.whl", hash = "sha256:7e127113816800496f027041c570f50bcd464a020098a3b6b199517772303639", size = 346762, upload-time = "2025-01-21T19:49:37.187Z" },
 ]
 
 [[package]]

@@ -2,12 +2,18 @@
 
 ## Quick Start
 
-Add `anydi.ext.django` to the **bottom** of your `INSTALLED_APPS` setting in your `Django` settings file:
+Install `anydi` with `Django` support:
+
+```sh
+pip install 'anydi[django]'
+```
+
+Add `anydi_django` to the **bottom** of your `INSTALLED_APPS` setting in your `Django` settings file:
 
 ```python
 INSTALLED_APPS = [
     # ...
-    "anydi.ext.django",
+    "anydi_django",
 ]
 ```
 
@@ -67,6 +73,12 @@ The `HelloService` will be automatically injected into the hello view through th
 * `PATCH_NINJA: bool` - If `True`, the container will modify the `ninja` framework to support dependency injection.
 
 ## Django Ninja
+
+Install `anydi` with `Django` support:
+
+```sh
+pip install 'anydi[ninja]'
+```
 
 If you are using the [Django Ninja](https://django-ninja.dev/) framework, you can enable dependency injection by setting the `PATCH_NINJA` to `True`.
 
@@ -161,7 +173,7 @@ Add the middleware to your `settings.py`:
 
 ```python
 MIDDLEWARE = [
-    "anydi.ext.django.middleware.request_scoped_middleware",
+    "anydi_django.middleware.request_scoped_middleware",
     ...
 ]
 ```
