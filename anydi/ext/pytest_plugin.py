@@ -2,8 +2,8 @@ from __future__ import annotations
 
 import inspect
 import logging
-from collections.abc import Iterator
-from typing import Any, Callable, cast
+from collections.abc import Callable, Iterator
+from typing import Any, cast
 
 import pytest
 from anyio.pytest_plugin import extract_backend_and_options, get_runner

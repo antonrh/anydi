@@ -2,7 +2,8 @@ from __future__ import annotations
 
 import importlib
 import inspect
-from typing import TYPE_CHECKING, Any, Callable
+from collections.abc import Callable
+from typing import TYPE_CHECKING, Any
 
 from ._decorators import ProviderMetadata, is_provider
 

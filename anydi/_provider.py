@@ -2,9 +2,10 @@ from __future__ import annotations
 
 import enum
 import inspect
+from collections.abc import Callable
 from dataclasses import dataclass
 from functools import cached_property
-from typing import Any, Callable, NamedTuple
+from typing import Any, NamedTuple
 
 from ._scope import Scope
 from ._typing import NOT_SET

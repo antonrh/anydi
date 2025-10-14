@@ -1,7 +1,7 @@
 from __future__ import annotations
 
-from collections.abc import Iterable
-from typing import Annotated, Any, Callable
+from collections.abc import Callable, Iterable
+from typing import Annotated, Any
 
 from pydantic.fields import ComputedFieldInfo, FieldInfo  # noqa
 from pydantic_settings import BaseSettings

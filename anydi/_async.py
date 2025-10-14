@@ -1,6 +1,7 @@
 import functools
+from collections.abc import Callable
 from types import TracebackType
-from typing import Any, Callable, TypeVar
+from typing import Any, TypeVar
 
 import anyio.to_thread
 from typing_extensions import ParamSpec, Self

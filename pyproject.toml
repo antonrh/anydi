@@ -3,7 +3,7 @@ name = "anydi"
 version = "0.48.2"
 description = "Dependency Injection library"
 authors = [{ name = "Anton Ruhlov", email = "antonruhlov@gmail.com" }]
-requires-python = ">=3.9.0, <3.14"
+requires-python = ">=3.10.0, <3.14"
 readme = "README.md"
 license = "MIT"
 keywords = [
@@ -29,7 +29,6 @@ classifiers = [
     "Intended Audience :: Developers",
     "License :: OSI Approved :: MIT License",
     "Programming Language :: Python :: 3",
-    "Programming Language :: Python :: 3.9",
     "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
@@ -50,9 +49,11 @@ anydi = "anydi.ext.pytest_plugin"
 
 [dependency-groups]
 dev = [
-    "ruff>=0.13.0",
+    "ruff>=0.14.0",
+    "pyright>=1.1.406",
     "pytest>=8.4.0,<9",
     "pytest-cov>=6.0.0,<7",
+    "pytest-mock>=3.14.1",
     "starlette>=0.37.2",
     "fastapi>=0.100.0",
     "httpx>=0.26.0",
@@ -64,8 +65,6 @@ dev = [
     "redis>=5.0.4,<6",
     "pydantic-settings>=2.4.0,<3",
     "bump-my-version>=1.1.4",
-    "pyright>=1.1.405",
-    "pytest-mock>=3.14.1",
 ]
 docs = [
     "mkdocs>=1.4.2,<2",
@@ -82,7 +81,7 @@ module-root = "."
 
 [tool.ruff]
 line-length = 88
-target-version = "py39"
+target-version = "py310"
 include = [
     "anydi/**/*.py",
     "tests/**/*.py",

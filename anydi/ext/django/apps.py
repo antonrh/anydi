@@ -1,7 +1,8 @@
 from __future__ import annotations
 
 import types
-from typing import Callable, cast
+from collections.abc import Callable
+from typing import cast
 
 from django.apps import AppConfig
 from django.conf import settings

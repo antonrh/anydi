@@ -5,14 +5,13 @@ from collections.abc import Iterable, Iterator, Sequence
 from typing import Any, TypeVar
 
 import wrapt  # type: ignore
-from typing_extensions import Self
+from typing_extensions import Self, type_repr
 
 from ._container import Container
 from ._context import InstanceContext
 from ._module import ModuleDef
 from ._provider import Provider, ProviderDef
 from ._scope import Scope
-from ._typing import type_repr
 
 T = TypeVar("T")
 

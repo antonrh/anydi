@@ -9,11 +9,11 @@ import logging
 import types
 import uuid
 from collections import defaultdict
-from collections.abc import AsyncIterator, Iterable, Iterator
+from collections.abc import AsyncIterator, Callable, Iterable, Iterator
 from contextvars import ContextVar
-from typing import Annotated, Any, Callable, TypeVar, cast, overload
+from typing import Annotated, Any, TypeVar, cast, get_args, get_origin, overload
 
-from typing_extensions import ParamSpec, Self, get_args, get_origin
+from typing_extensions import ParamSpec, Self, type_repr
 
 from ._async import run_sync
 from ._context import InstanceContext
@@ -33,7 +33,6 @@ from ._typing import (
     is_inject_marker,
     is_iterator_type,
     is_none_type,
-    type_repr,
 )
 
 T = TypeVar("T", bound=Any)
@@ -808,7 +807,10 @@ class Container:
         marker = metadata[-1]
         new_metadata = metadata[:-1]
         if new_metadata:
-            new_annotation = Annotated.__class_getitem__((origin, *new_metadata))  # type: ignore
+            if hasattr(Annotated, "__getitem__"):
+                new_annotation = Annotated.__getitem__((origin, *new_metadata))  # type: ignore
+            else:
+                new_annotation = Annotated.__class_getitem__((origin, *new_metadata))  # type: ignore
         else:
             new_annotation = origin
         return parameter.replace(annotation=new_annotation, default=marker)

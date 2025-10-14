@@ -1,8 +1,7 @@
-from collections.abc import Iterable
+from collections.abc import Callable, Iterable
 from typing import (
     TYPE_CHECKING,
     Any,
-    Callable,
     Concatenate,
     ParamSpec,
     Protocol,

@@ -3,44 +3,9 @@
 from __future__ import annotations
 
 import inspect
-import re
-import sys
-from collections.abc import AsyncIterator, Iterator
-from typing import Any, Callable, ForwardRef, TypeVar
-
-from typing_extensions import get_args, get_origin
-
-try:
-    from types import NoneType
-except ImportError:
-    NoneType = type(None)
-
-
-T = TypeVar("T")
-
-
-def type_repr(obj: Any) -> str:
-    """Get a string representation of a type or object."""
-    if isinstance(obj, str):
-        return obj
-
-    # Get module and qualname with defaults to handle non-types directly
-    module = getattr(obj, "__module__", type(obj).__module__)
-    qualname = getattr(obj, "__qualname__", type(obj).__qualname__)
-
-    origin = get_origin(obj)
-    # If origin exists, handle generics recursively
-    if origin:
-        args = ", ".join(type_repr(arg) for arg in get_args(obj))
-        return f"{type_repr(origin)}[{args}]"
-
-    # Substitute standard library prefixes for clarity
-    full_qualname = f"{module}.{qualname}"
-    return re.sub(
-        r"\b(builtins|typing|typing_extensions|collections\.abc|types)\.",
-        "",
-        full_qualname,
-    )
+from collections.abc import AsyncIterator, Callable, Iterator
+from types import NoneType
+from typing import Any, ForwardRef
 
 
 def is_context_manager(obj: Any) -> bool:
@@ -68,11 +33,8 @@ def get_typed_annotation(
 ) -> Any:
     """Get the typed annotation of a callable object."""
     if isinstance(annotation, str):
-        if sys.version_info >= (3, 10):
-            ref = ForwardRef(annotation, module=module)
-        else:
-            ref = ForwardRef(annotation)
-        annotation = ref._evaluate(globalns, globalns, recursive_guard=frozenset())  # noqa
+        ref = ForwardRef(annotation, module=module)
+        annotation = ref._evaluate(globalns, globalns, recursive_guard=frozenset())  # type: ignore[reportDeprecated]
     return annotation
 
 
