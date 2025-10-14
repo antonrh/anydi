@@ -55,14 +55,24 @@ dev = [
     "pytest-cov>=6.0.0,<7",
     "pytest-mock>=3.14.1",
     "starlette>=0.37.2",
-    "fastapi>=0.100.0",
     "httpx>=0.26.0",
-    "django~=4.2",
     "django-stubs>=5.1.1,<6",
-    "django-ninja>=1.1.0,<2",
     "pytest-django>=4.8.0,<5",
-    "faststream>=0.5.10,<0.6",
     "redis>=5.0.4,<6",
+]
+django = [
+    "django~=4.2",
+]
+ninja = [
+    "django-ninja>=1.1.0,<2",
+]
+fastapi = [
+    "fastapi>=0.100.0",
+]
+faststream = [
+    "faststream>=0.5.10,<0.6",
+]
+pydantic-settings = [
     "pydantic-settings>=2.4.0,<3",
 ]
 docs = [

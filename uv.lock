@@ -23,13 +23,8 @@ dependencies = [
 
 [package.dev-dependencies]
 dev = [
-    { name = "django" },
-    { name = "django-ninja" },
     { name = "django-stubs" },
-    { name = "fastapi" },
-    { name = "faststream" },
     { name = "httpx" },
-    { name = "pydantic-settings" },
     { name = "pyright" },
     { name = "pytest" },
     { name = "pytest-cov" },
@@ -39,9 +34,24 @@ dev = [
     { name = "ruff" },
     { name = "starlette" },
 ]
+django = [
+    { name = "django" },
+]
 docs = [
     { name = "mkdocs" },
     { name = "mkdocs-material" },
+]
+fastapi = [
+    { name = "fastapi" },
+]
+faststream = [
+    { name = "faststream" },
+]
+ninja = [
+    { name = "django-ninja" },
+]
+pydantic-settings = [
+    { name = "pydantic-settings" },
 ]
 
 [package.metadata]
@@ -53,13 +63,8 @@ requires-dist = [
 
 [package.metadata.requires-dev]
 dev = [
-    { name = "django", specifier = "~=4.2" },
-    { name = "django-ninja", specifier = ">=1.1.0,<2" },
     { name = "django-stubs", specifier = ">=5.1.1,<6" },
-    { name = "fastapi", specifier = ">=0.100.0" },
-    { name = "faststream", specifier = ">=0.5.10,<0.6" },
     { name = "httpx", specifier = ">=0.26.0" },
-    { name = "pydantic-settings", specifier = ">=2.4.0,<3" },
     { name = "pyright", specifier = ">=1.1.406" },
     { name = "pytest", specifier = ">=8.4.0,<9" },
     { name = "pytest-cov", specifier = ">=6.0.0,<7" },
@@ -69,10 +74,15 @@ dev = [
     { name = "ruff", specifier = ">=0.14.0" },
     { name = "starlette", specifier = ">=0.37.2" },
 ]
+django = [{ name = "django", specifier = "~=4.2" }]
 docs = [
     { name = "mkdocs", specifier = ">=1.4.2,<2" },
     { name = "mkdocs-material", specifier = ">=9.5.29,<10" },
 ]
+fastapi = [{ name = "fastapi", specifier = ">=0.100.0" }]
+faststream = [{ name = "faststream", specifier = ">=0.5.10,<0.6" }]
+ninja = [{ name = "django-ninja", specifier = ">=1.1.0,<2" }]
+pydantic-settings = [{ name = "pydantic-settings", specifier = ">=2.4.0,<3" }]
 
 [[package]]
 name = "anyio"
