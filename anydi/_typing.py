@@ -3,41 +3,9 @@
 from __future__ import annotations
 
 import inspect
-import re
 from collections.abc import AsyncIterator, Callable, Iterator
-from typing import Any, ForwardRef, TypeVar, get_args, get_origin
-
-try:
-    from types import NoneType
-except ImportError:
-    NoneType = type(None)
-
-
-T = TypeVar("T")
-
-
-def type_repr(obj: Any) -> str:
-    """Get a string representation of a type or object."""
-    if isinstance(obj, str):
-        return obj
-
-    # Get module and qualname with defaults to handle non-types directly
-    module = getattr(obj, "__module__", type(obj).__module__)
-    qualname = getattr(obj, "__qualname__", type(obj).__qualname__)
-
-    origin = get_origin(obj)
-    # If origin exists, handle generics recursively
-    if origin:
-        args = ", ".join(type_repr(arg) for arg in get_args(obj))
-        return f"{type_repr(origin)}[{args}]"
-
-    # Substitute standard library prefixes for clarity
-    full_qualname = f"{module}.{qualname}"
-    return re.sub(
-        r"\b(builtins|typing|typing_extensions|collections\.abc|types)\.",
-        "",
-        full_qualname,
-    )
+from types import NoneType
+from typing import Any, ForwardRef
 
 
 def is_context_manager(obj: Any) -> bool:
