@@ -807,7 +807,10 @@ class Container:
         marker = metadata[-1]
         new_metadata = metadata[:-1]
         if new_metadata:
-            new_annotation = Annotated.__getitem__((origin, *new_metadata))  # type: ignore
+            if hasattr(Annotated, "__getitem__"):
+                new_annotation = Annotated.__getitem__((origin, *new_metadata))  # type: ignore
+            else:
+                new_annotation = Annotated.__class_getitem__((origin, *new_metadata))  # type: ignore
         else:
             new_annotation = origin
         return parameter.replace(annotation=new_annotation, default=marker)
