@@ -58,3 +58,27 @@ jobs:
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v3
         if: matrix.python == '3.10'
+
+
+  tests-faststream:
+    name: Run unit tests ${{ matrix.name }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - {name: '3.10', python: '3.10', os: ubuntu-latest, faststream: '>=0.5.0'}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Install uv and set the python version
+        uses: astral-sh/setup-uv@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+          enable-cache: true
+      - name: Install dependencies
+        run: uv sync --dev && uv pip install faststream${{ matrix.faststream }}
+      - name: Run tests
+        run: |
+          uv run pytest -vv tests/ext/faststream --ignore=tests/ext/test_pytest_plugin.py --cov=anydi -p no:anydi

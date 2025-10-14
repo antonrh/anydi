@@ -4,9 +4,9 @@ from __future__ import annotations
 
 from typing import Any, cast
 
-from fast_depends.dependencies import Depends
+from fast_depends.dependencies import Dependant
 from faststream import ContextRepo
-from faststream.broker.core.usecase import BrokerUsecase
+from faststream._internal.broker import BrokerUsecase
 
 from anydi import Container
 from anydi._typing import InjectMarker, get_typed_parameters
@@ -32,8 +32,8 @@ def _get_broken_handlers(broker: BrokerUsecase[Any, Any]) -> list[Any]:
         return [handler.calls[0][0] for handler in handlers.values()]
     # faststream > 0.5.0
     return [
-        subscriber.calls[0].handler
-        for subscriber in broker._subscribers.values()  # noqa
+        subscriber.calls.data[0].handler
+        for subscriber in broker.subscribers  # noqa
     ]
 
 
@@ -41,11 +41,11 @@ def get_container(broker: BrokerUsecase[Any, Any]) -> Container:
     return cast(Container, getattr(broker, "_container"))  # noqa
 
 
-class _Inject(Depends, InjectMarker):
+class _Inject(Dependant, InjectMarker):
     """Parameter dependency class for injecting dependencies using AnyDI."""
 
     def __init__(self) -> None:
-        super().__init__(dependency=self._dependency, use_cache=True, cast=True)
+        super().__init__(dependency=self._dependency, use_cache=True, cast=True, cast_result=True)
         InjectMarker.__init__(self)
 
     async def _dependency(self, context: ContextRepo) -> Any:
