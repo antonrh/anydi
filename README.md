@@ -108,7 +108,7 @@ anydi.ext.fastapi.install(app, container)
 ### Install
 
 ```sh
-pip install 'anydi[ninja]'
+pip install 'anydi-django[ninja]'
 ```
 
 *container.py*

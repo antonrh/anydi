@@ -5,7 +5,7 @@
 Install `anydi` with `Django` support:
 
 ```sh
-pip install 'anydi[django]'
+pip install 'anydi-django'
 ```
 
 Add `anydi_django` to the **bottom** of your `INSTALLED_APPS` setting in your `Django` settings file:
@@ -74,10 +74,10 @@ The `HelloService` will be automatically injected into the hello view through th
 
 ## Django Ninja
 
-Install `anydi` with `Django` support:
+Install `anydi` with `Django Ninja` support:
 
 ```sh
-pip install 'anydi[ninja]'
+pip install 'anydi-ninja'
 ```
 
 If you are using the [Django Ninja](https://django-ninja.dev/) framework, you can enable dependency injection by setting the `PATCH_NINJA` to `True`.
