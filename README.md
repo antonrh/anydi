@@ -105,6 +105,12 @@ anydi.ext.fastapi.install(app, container)
 
 ## Django Ninja Example
 
+### Install
+
+```sh
+pip install 'anydi[ninja]'
+```
+
 *container.py*
 
 ```python
@@ -126,7 +132,7 @@ def get_container() -> Container:
 ```python
 INSTALLED_APPS = [
     ...
-    "anydi.ext.django",
+    "anydi_django",
 ]
 
 ANYDI = {
