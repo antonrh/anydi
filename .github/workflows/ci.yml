@@ -23,7 +23,7 @@ jobs:
       - name: Set up Python
         run: uv python install
       - name: Install dependencies
-        run: uv sync --all-extras --dev
+        run: uv sync --all-groups --dev
       - name: Static type checking
         run: uv run pyright
       - name: Code formatting
@@ -50,7 +50,7 @@ jobs:
           python-version: ${{ matrix.python-version }}
           enable-cache: true
       - name: Install dependencies
-        run: uv sync --all-extras --dev
+        run: uv sync --all-groups --dev
       - name: Run tests
         run: |
           uv run pytest -vv tests --ignore=tests/ext/test_pytest_plugin.py --cov=anydi -p no:anydi
@@ -78,7 +78,7 @@ jobs:
           python-version: ${{ matrix.python-version }}
           enable-cache: true
       - name: Install dependencies
-        run: uv sync --dev && uv pip install faststream${{ matrix.faststream }}
+        run: uv sync --dev --all-groups && uv pip install faststream${{ matrix.faststream }}
       - name: Run tests
         run: |
           uv run pytest -vv tests/ext/faststream --ignore=tests/ext/test_pytest_plugin.py --cov=anydi -p no:anydi
