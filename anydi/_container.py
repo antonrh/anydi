@@ -9,11 +9,11 @@ import logging
 import types
 import uuid
 from collections import defaultdict
-from collections.abc import AsyncIterator, Iterable, Iterator
+from collections.abc import AsyncIterator, Callable, Iterable, Iterator
 from contextvars import ContextVar
-from typing import Annotated, Any, Callable, TypeVar, cast, overload
+from typing import Annotated, Any, TypeVar, cast, get_args, get_origin, overload
 
-from typing_extensions import ParamSpec, Self, get_args, get_origin
+from typing_extensions import ParamSpec, Self
 
 from ._async import run_sync
 from ._context import InstanceContext

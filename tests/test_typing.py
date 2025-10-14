@@ -1,5 +1,4 @@
-import sys
-from typing import Annotated, Any, Union
+from typing import Any
 
 import pytest
 
@@ -14,31 +13,11 @@ from tests.fixtures import Service
         (int, "int"),
         (Service, "tests.fixtures.Service"),
         (Service(ident="test"), "tests.fixtures.Service"),
-        pytest.param(
-            Annotated[Service, "service"],
-            'Annotated[tests.fixtures.Service, "service"]',
-            marks=pytest.mark.skipif(
-                sys.version_info >= (3, 9), reason="Requires Python 3.9"
-            ),
-        ),
         (lambda x: x, "tests.test_typing.<lambda>"),
         (123, "int"),
         ("hello", "hello"),
         (list[str], "list[str]"),
-        pytest.param(
-            Union[str, int],
-            "Union[str, int]",
-            marks=pytest.mark.skipif(
-                sys.version_info < (3, 10), reason="Requires Python 3.10"
-            ),
-        ),
-        pytest.param(
-            Union[str, int],
-            "_SpecialForm[str, int]",
-            marks=pytest.mark.skipif(
-                sys.version_info >= (3, 10), reason="Requires Python 3.9"
-            ),
-        ),
+        pytest.param(str | int, "Union[str, int]"),
     ],
 )
 def test_type_repr(obj: Any, expected_qualname: str) -> None:

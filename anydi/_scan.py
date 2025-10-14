@@ -3,10 +3,10 @@ from __future__ import annotations
 import importlib
 import inspect
 import pkgutil
-from collections.abc import Iterable
+from collections.abc import Callable, Iterable
 from dataclasses import dataclass
 from types import ModuleType
-from typing import TYPE_CHECKING, Any, Callable, Union
+from typing import TYPE_CHECKING, Any
 
 from ._decorators import is_injectable
 from ._typing import get_typed_parameters, is_inject_marker
@@ -14,8 +14,8 @@ from ._typing import get_typed_parameters, is_inject_marker
 if TYPE_CHECKING:
     from ._container import Container
 
-Package = Union[ModuleType, str]
-PackageOrIterable = Union[Package, Iterable[Package]]
+Package = ModuleType | str
+PackageOrIterable = Package | Iterable[Package]
 
 
 @dataclass(kw_only=True)

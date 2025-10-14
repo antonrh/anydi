@@ -2,8 +2,8 @@ import asyncio
 import sys
 import threading
 import uuid
-from collections.abc import AsyncIterator, Iterator, Sequence
-from typing import Annotated, Any, Callable, Union
+from collections.abc import AsyncIterator, Callable, Iterator, Sequence
+from typing import Annotated, Any
 
 import pytest
 from typing_extensions import Self
@@ -1043,9 +1043,7 @@ class TestContainer:
     def test_resolve_with_custom_type(self, container: Container) -> None:
         @singleton
         class Klass:
-            def __init__(
-                self, value: "Union[str, Sequence[str], int, list[str]]"
-            ) -> None:
+            def __init__(self, value: "str | Sequence[str] | int | list[str]") -> None:
                 self.value = value
 
         with pytest.raises(

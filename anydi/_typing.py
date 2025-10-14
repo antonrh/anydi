@@ -4,11 +4,8 @@ from __future__ import annotations
 
 import inspect
 import re
-import sys
-from collections.abc import AsyncIterator, Iterator
-from typing import Any, Callable, ForwardRef, TypeVar
-
-from typing_extensions import get_args, get_origin
+from collections.abc import AsyncIterator, Callable, Iterator
+from typing import Any, ForwardRef, TypeVar, get_args, get_origin
 
 try:
     from types import NoneType
@@ -68,11 +65,8 @@ def get_typed_annotation(
 ) -> Any:
     """Get the typed annotation of a callable object."""
     if isinstance(annotation, str):
-        if sys.version_info >= (3, 10):
-            ref = ForwardRef(annotation, module=module)
-        else:
-            ref = ForwardRef(annotation)
-        annotation = ref._evaluate(globalns, globalns, recursive_guard=frozenset())  # noqa
+        ref = ForwardRef(annotation, module=module)
+        annotation = ref._evaluate(globalns, globalns, recursive_guard=frozenset())  # type: ignore[reportDeprecated]
     return annotation
 
 

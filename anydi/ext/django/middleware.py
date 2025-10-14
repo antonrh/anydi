@@ -1,4 +1,5 @@
-from typing import Any, Callable
+from collections.abc import Callable
+from typing import Any
 
 from asgiref.sync import iscoroutinefunction
 from django.http import HttpRequest
