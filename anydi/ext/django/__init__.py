@@ -1,6 +1,8 @@
 raise ImportError(
-    "Django extension requires additional dependencies. "
-    "Install them with one of the following:\n\n"
-    "  pip install 'anydi[django]'     # for Django\n"
-    "  pip install 'anydi[ninja]'      # for Django Ninja\n"
+    "The Django extension requires additional dependencies.\n\n"
+    "Install one of the following extras:\n"
+    "  pip install 'anydi[django]'   # for Django\n"
+    "  pip install 'anydi[ninja]'    # for Django Ninja\n\n"
+    "Then, instead of importing from 'anydi.ext.django', import directly from:\n"
+    "  import anydi_django\n"
 )
