@@ -1,6 +1,6 @@
 [project]
 name = "anydi"
-version = "0.50.0"
+version = "0.51.0"
 description = "Dependency Injection library"
 authors = [{ name = "Anton Ruhlov", email = "antonruhlov@gmail.com" }]
 requires-python = ">=3.10.0, <3.15"
@@ -66,7 +66,7 @@ django = [
     "anydi-django>=0.1.0",
 ]
 ninja = [
-    "anydi-django[ninja]>=0.1.0",
+    "anydi-django[ninja]>=0.1.1",
 ]
 docs = [
     "mkdocs>=1.4.2,<2",
