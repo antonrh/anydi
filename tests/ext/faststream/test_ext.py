@@ -33,7 +33,6 @@ def test_install_without_annotation() -> None:
         install(broker, container)
 
 
-@pytest.mark.skip(reason="disable until strict is enforced")
 def test_install_unknown_annotation() -> None:
     container = Container()
 
