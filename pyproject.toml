@@ -62,12 +62,6 @@ dev = [
     "redis>=5.0.4,<6",
     "pydantic-settings>=2.4.0,<3",
 ]
-django = [
-    "anydi-django>=0.1.0",
-]
-ninja = [
-    "anydi-django[ninja]>=0.1.1",
-]
 docs = [
     "mkdocs>=1.4.2,<2",
     "mkdocs-material>=9.5.29,<10",

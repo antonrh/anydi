@@ -35,15 +35,9 @@ dev = [
     { name = "ruff" },
     { name = "starlette" },
 ]
-django = [
-    { name = "anydi-django" },
-]
 docs = [
     { name = "mkdocs" },
     { name = "mkdocs-material" },
-]
-ninja = [
-    { name = "anydi-django", extra = ["ninja"] },
 ]
 
 [package.metadata]
@@ -67,29 +61,9 @@ dev = [
     { name = "ruff", specifier = ">=0.14.0" },
     { name = "starlette", specifier = ">=0.37.2" },
 ]
-django = [{ name = "anydi-django", specifier = ">=0.1.0" }]
 docs = [
     { name = "mkdocs", specifier = ">=1.4.2,<2" },
     { name = "mkdocs-material", specifier = ">=9.5.29,<10" },
-]
-ninja = [{ name = "anydi-django", extras = ["ninja"], specifier = ">=0.1.1" }]
-
-[[package]]
-name = "anydi-django"
-version = "0.1.1"
-source = { registry = "https://pypi.org/simple" }
-dependencies = [
-    { name = "anydi" },
-    { name = "django" },
-]
-sdist = { url = "https://files.pythonhosted.org/packages/f0/43/3d86ad842a39c26ccd9ae1a7bfb7dd6b5389143773018d09d9f70284d0ad/anydi_django-0.1.1.tar.gz", hash = "sha256:ebb3bc5965cf3a5581e10bcd250fd306acfcea9610e88dcef0818ec974b00a91", size = 5418, upload-time = "2025-10-14T16:37:51.498Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/97/da/63da939883d0e4a8c5bb3a1247a48b830a95dee2ee430d1ef0d7a52eae47/anydi_django-0.1.1-py3-none-any.whl", hash = "sha256:28b298d45828360ccc06a16401789bd1171cb9493f7f6e3e8a578dbe2a678852", size = 7954, upload-time = "2025-10-14T16:37:50.32Z" },
-]
-
-[package.optional-dependencies]
-ninja = [
-    { name = "django-ninja" },
 ]
 
 [[package]]
@@ -105,18 +79,6 @@ dependencies = [
 sdist = { url = "https://files.pythonhosted.org/packages/c6/78/7d432127c41b50bccba979505f272c16cbcadcc33645d5fa3a738110ae75/anyio-4.11.0.tar.gz", hash = "sha256:82a8d0b81e318cc5ce71a5f1f8b5c4e63619620b63141ef8c995fa0db95a57c4", size = 219094, upload-time = "2025-09-23T09:19:12.58Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/15/b3/9b1a8074496371342ec1e796a96f99c82c945a339cd81a8e73de28b4cf9e/anyio-4.11.0-py3-none-any.whl", hash = "sha256:0287e96f4d26d4149305414d4e3bc32f0dcd0862365a4bddea19d7a1ec38c4fc", size = 109097, upload-time = "2025-09-23T09:19:10.601Z" },
-]
-
-[[package]]
-name = "asgiref"
-version = "3.10.0"
-source = { registry = "https://pypi.org/simple" }
-dependencies = [
-    { name = "typing-extensions", marker = "python_full_version < '3.11'" },
-]
-sdist = { url = "https://files.pythonhosted.org/packages/46/08/4dfec9b90758a59acc6be32ac82e98d1fbfc321cb5cfa410436dbacf821c/asgiref-3.10.0.tar.gz", hash = "sha256:d89f2d8cd8b56dada7d52fa7dc8075baa08fb836560710d38c292a7a3f78c04e", size = 37483, upload-time = "2025-10-05T09:15:06.557Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/17/9c/fc2331f538fbf7eedba64b2052e99ccf9ba9d6888e2f41441ee28847004b/asgiref-3.10.0-py3-none-any.whl", hash = "sha256:aef8a81283a34d0ab31630c9b7dfe70c812c95eba78171367ca8745e88124734", size = 24050, upload-time = "2025-10-05T09:15:05.11Z" },
 ]
 
 [[package]]
@@ -372,33 +334,6 @@ wheels = [
 [package.optional-dependencies]
 toml = [
     { name = "tomli", marker = "python_full_version <= '3.11'" },
-]
-
-[[package]]
-name = "django"
-version = "5.2.7"
-source = { registry = "https://pypi.org/simple" }
-dependencies = [
-    { name = "asgiref" },
-    { name = "sqlparse" },
-    { name = "tzdata", marker = "sys_platform == 'win32'" },
-]
-sdist = { url = "https://files.pythonhosted.org/packages/b1/96/bd84e2bb997994de8bcda47ae4560991084e86536541d7214393880f01a8/django-5.2.7.tar.gz", hash = "sha256:e0f6f12e2551b1716a95a63a1366ca91bbcd7be059862c1b18f989b1da356cdd", size = 10865812, upload-time = "2025-10-01T14:22:12.081Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/8f/ef/81f3372b5dd35d8d354321155d1a38894b2b766f576d0abffac4d8ae78d9/django-5.2.7-py3-none-any.whl", hash = "sha256:59a13a6515f787dec9d97a0438cd2efac78c8aca1c80025244b0fe507fe0754b", size = 8307145, upload-time = "2025-10-01T14:22:49.476Z" },
-]
-
-[[package]]
-name = "django-ninja"
-version = "1.4.3"
-source = { registry = "https://pypi.org/simple" }
-dependencies = [
-    { name = "django" },
-    { name = "pydantic" },
-]
-sdist = { url = "https://files.pythonhosted.org/packages/cd/1a/f0d051f54375cfd2310f803925993fdc4172e41e627d63ece48194b07892/django_ninja-1.4.3.tar.gz", hash = "sha256:e46d477ca60c228d2a5eb3cc912094928ea830d364501f966661eeada67cb038", size = 3709571, upload-time = "2025-06-04T15:11:13.408Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/08/ec/0cfa9b817f048cdec354354ae0569d7c0fd63907e5b1f927a7ee04a18635/django_ninja-1.4.3-py3-none-any.whl", hash = "sha256:f3204137a059437b95677049474220611f1cf9efedba9213556474b75168fa01", size = 2426185, upload-time = "2025-06-04T15:11:11.314Z" },
 ]
 
 [[package]]
@@ -1160,15 +1095,6 @@ wheels = [
 ]
 
 [[package]]
-name = "sqlparse"
-version = "0.5.3"
-source = { registry = "https://pypi.org/simple" }
-sdist = { url = "https://files.pythonhosted.org/packages/e5/40/edede8dd6977b0d3da179a342c198ed100dd2aba4be081861ee5911e4da4/sqlparse-0.5.3.tar.gz", hash = "sha256:09f67787f56a0b16ecdbde1bfc7f5d9c3371ca683cfeaa8e6ff60b4807ec9272", size = 84999, upload-time = "2024-12-10T12:05:30.728Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/a9/5c/bfd6bd0bf979426d405cc6e71eceb8701b148b16c21d2dc3c261efc61c7b/sqlparse-0.5.3-py3-none-any.whl", hash = "sha256:cf2196ed3418f3ba5de6af7e82c694a9fbdbfecccdfc72e281548517081f16ca", size = 44415, upload-time = "2024-12-10T12:05:27.824Z" },
-]
-
-[[package]]
 name = "starlette"
 version = "0.48.0"
 source = { registry = "https://pypi.org/simple" }
@@ -1249,15 +1175,6 @@ dependencies = [
 sdist = { url = "https://files.pythonhosted.org/packages/55/e3/70399cb7dd41c10ac53367ae42139cf4b1ca5f36bb3dc6c9d33acdb43655/typing_inspection-0.4.2.tar.gz", hash = "sha256:ba561c48a67c5958007083d386c3295464928b01faa735ab8547c5692e87f464", size = 75949, upload-time = "2025-10-01T02:14:41.687Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/dc/9b/47798a6c91d8bdb567fe2698fe81e0c6b7cb7ef4d13da4114b41d239f65d/typing_inspection-0.4.2-py3-none-any.whl", hash = "sha256:4ed1cacbdc298c220f1bd249ed5287caa16f34d44ef4e9c3d0cbad5b521545e7", size = 14611, upload-time = "2025-10-01T02:14:40.154Z" },
-]
-
-[[package]]
-name = "tzdata"
-version = "2025.2"
-source = { registry = "https://pypi.org/simple" }
-sdist = { url = "https://files.pythonhosted.org/packages/95/32/1a225d6164441be760d75c2c42e2780dc0873fe382da3e98a2e1e48361e5/tzdata-2025.2.tar.gz", hash = "sha256:b60a638fcc0daffadf82fe0f57e53d06bdec2f36c4df66280ae79bce6bd6f2b9", size = 196380, upload-time = "2025-03-23T13:54:43.652Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/5c/23/c7abc0ca0a1526a0774eca151daeb8de62ec457e77262b66b359c3c7679e/tzdata-2025.2-py2.py3-none-any.whl", hash = "sha256:1a403fada01ff9221ca8044d701868fa132215d84beb92242d9acd2147f667a8", size = 347839, upload-time = "2025-03-23T13:54:41.845Z" },
 ]
 
 [[package]]
