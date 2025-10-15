@@ -7,6 +7,8 @@ from collections.abc import AsyncIterator, Callable, Iterator
 from types import NoneType
 from typing import Any, ForwardRef
 
+from typing_extensions import Sentinel
+
 
 def is_context_manager(obj: Any) -> bool:
     """Check if the given object is a context manager."""
@@ -52,23 +54,7 @@ def get_typed_parameters(obj: Callable[..., Any]) -> list[inspect.Parameter]:
     ]
 
 
-class _Sentinel:
-    __slots__ = ("_name",)
-
-    def __init__(self, name: str) -> None:
-        self._name = name
-
-    def __repr__(self) -> str:
-        return f"<{self._name}>"
-
-    def __eq__(self, other: object) -> bool:
-        return self is other
-
-    def __hash__(self) -> int:
-        return id(self)
-
-
-NOT_SET = _Sentinel("NOT_SET")
+NOT_SET = Sentinel("NOT_SET")
 
 
 class InjectMarker:
