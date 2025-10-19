@@ -77,7 +77,7 @@ The `HelloService` will be automatically injected into the hello view through th
 Install `anydi` with `Django Ninja` support:
 
 ```sh
-pip install 'anydi-ninja'
+pip install 'anydi-django[ninja]'
 ```
 
 If you are using the [Django Ninja](https://django-ninja.dev/) framework, you can enable dependency injection by setting the `PATCH_NINJA` to `True`.
