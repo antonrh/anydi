@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import inspect
 from collections.abc import Iterator
 from typing import Annotated, Any, cast
 
@@ -11,7 +12,7 @@ from fastapi.routing import APIRoute
 from starlette.requests import Request
 
 from anydi._container import Container
-from anydi._typing import InjectMarker, get_typed_parameters
+from anydi._typing import InjectMarker
 
 from .starlette.middleware import RequestScopedMiddleware
 
@@ -39,7 +40,7 @@ def install(app: FastAPI, container: Container) -> None:
             call, *params = dependant.cache_key
             if not call:
                 continue  # pragma: no cover
-            for parameter in get_typed_parameters(call):
+            for parameter in inspect.signature(call, eval_str=True).parameters.values():
                 container.validate_injected_parameter(parameter, call=call)
 
 
