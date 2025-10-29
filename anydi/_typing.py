@@ -3,9 +3,9 @@
 from __future__ import annotations
 
 import inspect
-from collections.abc import AsyncIterator, Callable, Iterator
+from collections.abc import AsyncIterator, Iterator
 from types import NoneType
-from typing import Any, ForwardRef
+from typing import Any
 
 from typing_extensions import Sentinel
 
@@ -28,30 +28,6 @@ def is_none_type(tp: Any) -> bool:
 def is_iterator_type(tp: Any) -> bool:
     """Check if the given object is an iterator type."""
     return tp in (Iterator, AsyncIterator)
-
-
-def get_typed_annotation(
-    annotation: Any, globalns: dict[str, Any], module: Any = None
-) -> Any:
-    """Get the typed annotation of a callable object."""
-    if isinstance(annotation, str):
-        ref = ForwardRef(annotation, module=module)
-        annotation = ref._evaluate(globalns, globalns, recursive_guard=frozenset())  # type: ignore[reportDeprecated]
-    return annotation
-
-
-def get_typed_parameters(obj: Callable[..., Any]) -> list[inspect.Parameter]:
-    """Get the typed parameters of a callable object."""
-    globalns = getattr(obj, "__globals__", {})
-    module = getattr(obj, "__module__", None)
-    return [
-        parameter.replace(
-            annotation=get_typed_annotation(
-                parameter.annotation, globalns, module=module
-            )
-        )
-        for parameter in inspect.signature(obj).parameters.values()
-    ]
 
 
 NOT_SET = Sentinel("NOT_SET")

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import inspect
 from typing import Any, cast
 
 from fast_depends.dependencies import Depends
@@ -9,7 +10,7 @@ from faststream import ContextRepo
 from faststream.broker.core.usecase import BrokerUsecase
 
 from anydi import Container
-from anydi._typing import InjectMarker, get_typed_parameters
+from anydi._typing import InjectMarker
 
 
 def install(broker: BrokerUsecase[Any, Any], container: Container) -> None:
@@ -23,7 +24,7 @@ def install(broker: BrokerUsecase[Any, Any], container: Container) -> None:
 
     for handler in _get_broken_handlers(broker):
         call = handler._original_call  # noqa
-        for parameter in get_typed_parameters(call):
+        for parameter in inspect.signature(call, eval_str=True).parameters.values():
             container.validate_injected_parameter(parameter, call=call)
 
 

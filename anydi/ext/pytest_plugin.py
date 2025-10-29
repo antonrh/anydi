@@ -9,7 +9,6 @@ import pytest
 from anyio.pytest_plugin import extract_backend_and_options, get_runner
 
 from anydi import Container
-from anydi._typing import get_typed_parameters
 
 logger = logging.getLogger(__name__)
 
@@ -61,7 +60,9 @@ def _anydi_injected_parameter_iterator(
     )
 
     def _iterator() -> Iterator[tuple[str, inspect.Parameter]]:
-        for parameter in get_typed_parameters(request.function):
+        for parameter in inspect.signature(
+            request.function, eval_str=True
+        ).parameters.values():
             interface = parameter.annotation
             if (
                 interface is inspect.Parameter.empty

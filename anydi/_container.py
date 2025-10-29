@@ -25,8 +25,6 @@ from ._scope import ALLOWED_SCOPES, Scope
 from ._typing import (
     NOT_SET,
     Event,
-    get_typed_annotation,
-    get_typed_parameters,
     is_async_context_manager,
     is_context_manager,
     is_event_type,
@@ -264,9 +262,7 @@ class Container:
         self._validate_provider_scope(scope, name, kind)
 
         # Get the signature
-        globalns = getattr(call, "__globals__", {})
-        module = getattr(call, "__module__", None)
-        signature = inspect.signature(call, globals=globalns)
+        signature = inspect.signature(call, eval_str=True)
 
         # Detect the interface
         if interface is NOT_SET:
@@ -276,9 +272,6 @@ class Container:
                 interface = signature.return_annotation
                 if interface is inspect.Signature.empty:
                     interface = None
-
-        if isinstance(interface, str):
-            interface = get_typed_annotation(interface, globalns, module)
 
         # If the callable is an iterator, return the actual type
         if is_iterator_type(interface) or is_iterator_type(get_origin(interface)):
@@ -319,10 +312,6 @@ class Container:
                     "Positional-only parameters "
                     f"are not allowed in the provider `{name}`."
                 )
-
-            parameter = parameter.replace(
-                annotation=get_typed_annotation(parameter.annotation, globalns, module)
-            )
 
             try:
                 sub_provider = self._get_or_register_provider(parameter.annotation)
@@ -777,7 +766,7 @@ class Container:
     def _get_injected_params(self, call: Callable[..., Any]) -> dict[str, Any]:
         """Get the injected parameters of a callable object."""
         injected_params: dict[str, Any] = {}
-        for parameter in get_typed_parameters(call):
+        for parameter in inspect.signature(call, eval_str=True).parameters.values():
             interface, should_inject = self.validate_injected_parameter(
                 parameter, call=call
             )
