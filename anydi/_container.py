@@ -15,7 +15,6 @@ from typing import Annotated, Any, TypeVar, cast, get_args, get_origin, overload
 
 from typing_extensions import ParamSpec, Self, type_repr
 
-from . import _inspect
 from ._async import run_sync
 from ._context import InstanceContext
 from ._decorators import is_provided
@@ -767,7 +766,7 @@ class Container:
     def _get_injected_params(self, call: Callable[..., Any]) -> dict[str, Any]:
         """Get the injected parameters of a callable object."""
         injected_params: dict[str, Any] = {}
-        for parameter in _inspect.get_signature(call).parameters:
+        for parameter in inspect.signature(call, eval_str=True).parameters.values():
             interface, should_inject = self.validate_injected_parameter(
                 parameter, call=call
             )
@@ -776,7 +775,7 @@ class Container:
         return injected_params
 
     @staticmethod
-    def _unwrap_injected_parameter(parameter: _inspect.Parameter) -> _inspect.Parameter:
+    def _unwrap_injected_parameter(parameter: inspect.Parameter) -> inspect.Parameter:
         if get_origin(parameter.annotation) is not Annotated:
             return parameter
 
@@ -791,7 +790,7 @@ class Container:
                 f"default value together for '{parameter.name}'"
             )
 
-        if parameter.has_default:
+        if parameter.default is not inspect.Parameter.empty:
             return parameter
 
         marker = metadata[-1]
@@ -803,12 +802,10 @@ class Container:
                 new_annotation = Annotated.__class_getitem__((origin, *new_metadata))  # type: ignore
         else:
             new_annotation = origin
-        return _inspect.Parameter(
-            name=parameter.name, annotation=new_annotation, default=marker
-        )
+        return parameter.replace(annotation=new_annotation, default=marker)
 
     def validate_injected_parameter(
-        self, parameter: _inspect.Parameter, *, call: Callable[..., Any]
+        self, parameter: inspect.Parameter, *, call: Callable[..., Any]
     ) -> tuple[Any, bool]:
         """Validate an injected parameter."""
         parameter = self._unwrap_injected_parameter(parameter)
