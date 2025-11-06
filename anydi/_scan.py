@@ -103,9 +103,7 @@ class Scanner:
         # If no tags are passed and not explicitly injectable,
         # check for parameter markers
         if not tags:
-            for parameter in inspect.signature(
-                member, eval_str=True
-            ).parameters.values():
+            for parameter in inspect.signature(member).parameters.values():
                 if is_inject_marker(parameter.default):
                     return True
 
