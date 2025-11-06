@@ -7,6 +7,7 @@ from typing import Any, cast
 
 import pytest
 from anyio.pytest_plugin import extract_backend_and_options, get_runner
+from typing_extensions import get_annotations
 
 from anydi import Container
 
@@ -60,16 +61,14 @@ def _anydi_injected_parameter_iterator(
     )
 
     def _iterator() -> Iterator[tuple[str, inspect.Parameter]]:
-        for parameter in inspect.signature(
+        for name, annotation in get_annotations(
             request.function, eval_str=True
-        ).parameters.values():
-            interface = parameter.annotation
-            if (
-                interface is inspect.Parameter.empty
-                or parameter.name not in fixturenames
-            ):
+        ).items():
+            if name == "return":
                 continue
-            yield parameter.name, interface
+            if name not in fixturenames:
+                continue
+            yield name, annotation
 
     return _iterator
 
