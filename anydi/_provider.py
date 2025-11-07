@@ -40,12 +40,22 @@ class ProviderKind(enum.IntEnum):
 
 
 @dataclass(kw_only=True, frozen=True)
+class ProviderParameter:
+    name: str
+    annotation: Any
+    default: Any
+    has_default: bool
+    provider: Provider | None = None
+    same_scope: bool = False
+
+
+@dataclass(kw_only=True, frozen=True)
 class Provider:
     call: Callable[..., Any]
     scope: Scope
     interface: Any
     name: str
-    parameters: list[inspect.Parameter]
+    parameters: tuple[ProviderParameter, ...]
     kind: ProviderKind
 
     def __str__(self) -> str:
