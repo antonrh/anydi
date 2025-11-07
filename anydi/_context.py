@@ -8,6 +8,7 @@ from typing import Any
 from typing_extensions import Self
 
 from ._async import AsyncRLock, run_sync
+from ._typing import NOT_SET
 
 
 class InstanceContext:
@@ -22,9 +23,9 @@ class InstanceContext:
         self._lock = threading.RLock()
         self._async_lock = AsyncRLock()
 
-    def get(self, interface: Any) -> Any | None:
+    def get(self, interface: Any, default: Any = NOT_SET) -> Any:
         """Get an instance from the context."""
-        return self._instances.get(interface)
+        return self._instances.get(interface, default)
 
     def set(self, interface: Any, value: Any) -> None:
         """Set an instance in the context."""

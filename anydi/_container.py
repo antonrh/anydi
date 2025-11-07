@@ -498,6 +498,10 @@ class Container:
         if provider.scope == "transient":
             return self._create_instance(provider, None, **defaults)
         context = self._get_instance_context(provider.scope)
+        if not create:
+            cached = context.get(provider.interface, NOT_SET)
+            if cached is not NOT_SET:
+                return cached
         with context.lock():
             return (
                 self._get_or_create_instance(provider, context)
@@ -513,6 +517,10 @@ class Container:
         if provider.scope == "transient":
             return await self._acreate_instance(provider, None, **defaults)
         context = self._get_instance_context(provider.scope)
+        if not create:
+            cached = context.get(provider.interface, NOT_SET)
+            if cached is not NOT_SET:
+                return cached
         async with context.alock():
             return (
                 await self._aget_or_create_instance(provider, context)
@@ -524,8 +532,8 @@ class Container:
         self, provider: Provider, context: InstanceContext
     ) -> Any:
         """Get an instance of a dependency from the scoped context."""
-        instance = context.get(provider.interface)
-        if instance is None:
+        instance = context.get(provider.interface, NOT_SET)
+        if instance is NOT_SET:
             instance = self._create_instance(provider, context)
             context.set(provider.interface, instance)
             return instance
@@ -535,8 +543,8 @@ class Container:
         self, provider: Provider, context: InstanceContext
     ) -> Any:
         """Get an async instance of a dependency from the scoped context."""
-        instance = context.get(provider.interface)
-        if instance is None:
+        instance = context.get(provider.interface, NOT_SET)
+        if instance is NOT_SET:
             instance = await self._acreate_instance(provider, context)
             context.set(provider.interface, instance)
             return instance
@@ -629,18 +637,18 @@ class Container:
             return defaults[parameter.name]
 
         # Try to get instance from context
-        elif context and parameter.annotation in context:
-            instance = context[parameter.annotation]
+        if context:
+            cached = context.get(parameter.annotation, NOT_SET)
+            if cached is not NOT_SET:
+                return cached
 
         # Resolve new instance
-        else:
-            try:
-                instance = self._resolve_parameter(provider, parameter)
-            except LookupError:
-                if parameter.default is inspect.Parameter.empty:
-                    raise
-                return parameter.default
-        return instance
+        try:
+            return self._resolve_parameter(provider, parameter)
+        except LookupError:
+            if parameter.default is inspect.Parameter.empty:
+                raise
+            return parameter.default
 
     async def _aget_provided_kwargs(
         self, provider: Provider, context: InstanceContext | None, /, **defaults: Any
@@ -668,18 +676,18 @@ class Container:
             return defaults[parameter.name]
 
         # Try to get instance from context
-        elif context and parameter.annotation in context:
-            instance = context[parameter.annotation]
+        if context:
+            cached = context.get(parameter.annotation, NOT_SET)
+            if cached is not NOT_SET:
+                return cached
 
         # Resolve new instance
-        else:
-            try:
-                instance = await self._aresolve_parameter(provider, parameter)
-            except LookupError:
-                if parameter.default is inspect.Parameter.empty:
-                    raise
-                return parameter.default
-        return instance
+        try:
+            return await self._aresolve_parameter(provider, parameter)
+        except LookupError:
+            if parameter.default is inspect.Parameter.empty:
+                raise
+            return parameter.default
 
     def _resolve_parameter(
         self, provider: Provider, parameter: inspect.Parameter
