@@ -331,7 +331,6 @@ class Container:
                 if parameter.default is not inspect.Parameter.empty
                 else NOT_SET
             )
-            same_scope = sub_provider.scope == scope and scope != "transient"
             parameters.append(
                 ProviderParameter(
                     name=parameter.name,
@@ -339,7 +338,7 @@ class Container:
                     default=default,
                     has_default=default is not NOT_SET,
                     provider=sub_provider,
-                    same_scope=same_scope,
+                    shared_scope=sub_provider.scope == scope and scope != "transient",
                 )
             )
 
@@ -697,7 +696,7 @@ class Container:
 
         sub_provider = parameter.provider
 
-        if context and parameter.same_scope and sub_provider is not None:
+        if context and parameter.shared_scope and sub_provider is not None:
             existing = context.get(sub_provider.interface, NOT_SET)
             if existing is not NOT_SET:
                 return existing
@@ -759,7 +758,7 @@ class Container:
 
         sub_provider = parameter.provider
 
-        if context and parameter.same_scope and sub_provider is not None:
+        if context and parameter.shared_scope and sub_provider is not None:
             existing = context.get(sub_provider.interface, NOT_SET)
             if existing is not NOT_SET:
                 return existing
