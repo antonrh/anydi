@@ -19,7 +19,7 @@ from ._async import run_sync
 from ._context import InstanceContext
 from ._decorators import is_provided
 from ._module import ModuleDef, ModuleRegistrar
-from ._provider import Provider, ProviderDef, ProviderKind
+from ._provider import Provider, ProviderDef, ProviderKind, ProviderParameter
 from ._scan import PackageOrIterable, Scanner
 from ._scope import ALLOWED_SCOPES, Scope
 from ._typing import (
@@ -298,7 +298,7 @@ class Container:
 
         unresolved_parameter = None
         unresolved_exc: LookupError | None = None
-        parameters: list[inspect.Parameter] = []
+        parameters: list[ProviderParameter] = []
         scopes: dict[Scope, Provider] = {}
 
         for parameter in signature.parameters.values():
@@ -326,7 +326,21 @@ class Container:
             if sub_provider.scope not in scopes:
                 scopes[sub_provider.scope] = sub_provider
 
-            parameters.append(parameter)
+            default = (
+                parameter.default
+                if parameter.default is not inspect.Parameter.empty
+                else NOT_SET
+            )
+            parameters.append(
+                ProviderParameter(
+                    name=parameter.name,
+                    annotation=parameter.annotation,
+                    default=default,
+                    has_default=default is not NOT_SET,
+                    provider=sub_provider,
+                    shared_scope=sub_provider.scope == scope and scope != "transient",
+                )
+            )
 
         # Check for unresolved parameters
         if unresolved_parameter:
@@ -356,7 +370,7 @@ class Container:
             interface=interface,
             name=name,
             kind=kind,
-            parameters=parameters,
+            parameters=tuple(parameters),
         )
 
         self._set_provider(provider)
@@ -495,9 +509,36 @@ class Container:
     ) -> Any:
         """Internal method to handle instance resolution and creation."""
         provider = self._get_or_register_provider(interface, **defaults)
+        return self._resolve_with_provider(provider, create, **defaults)
+
+    async def _aresolve_or_create(
+        self, interface: Any, create: bool, /, **defaults: Any
+    ) -> Any:
+        """Internal method to handle instance resolution and creation asynchronously."""
+        provider = self._get_or_register_provider(interface, **defaults)
+        return await self._aresolve_with_provider(provider, create, **defaults)
+
+    def _resolve_with_provider(
+        self, provider: Provider, create: bool, /, **defaults: Any
+    ) -> Any:
         if provider.scope == "transient":
             return self._create_instance(provider, None, **defaults)
+
+        if provider.scope == "request":
+            context = self._get_request_context()
+            if not create:
+                cached = context.get(provider.interface, NOT_SET)
+                if cached is not NOT_SET:
+                    return cached
+            if not create:
+                return self._get_or_create_instance(provider, context)
+            return self._create_instance(provider, context, **defaults)
+
         context = self._get_instance_context(provider.scope)
+        if not create:
+            cached = context.get(provider.interface, NOT_SET)
+            if cached is not NOT_SET:
+                return cached
         with context.lock():
             return (
                 self._get_or_create_instance(provider, context)
@@ -505,14 +546,27 @@ class Container:
                 else self._create_instance(provider, context, **defaults)
             )
 
-    async def _aresolve_or_create(
-        self, interface: Any, create: bool, /, **defaults: Any
+    async def _aresolve_with_provider(
+        self, provider: Provider, create: bool, /, **defaults: Any
     ) -> Any:
-        """Internal method to handle instance resolution and creation asynchronously."""
-        provider = self._get_or_register_provider(interface, **defaults)
         if provider.scope == "transient":
             return await self._acreate_instance(provider, None, **defaults)
+
+        if provider.scope == "request":
+            context = self._get_request_context()
+            if not create:
+                cached = context.get(provider.interface, NOT_SET)
+                if cached is not NOT_SET:
+                    return cached
+            if not create:
+                return await self._aget_or_create_instance(provider, context)
+            return await self._acreate_instance(provider, context, **defaults)
+
         context = self._get_instance_context(provider.scope)
+        if not create:
+            cached = context.get(provider.interface, NOT_SET)
+            if cached is not NOT_SET:
+                return cached
         async with context.alock():
             return (
                 await self._aget_or_create_instance(provider, context)
@@ -524,8 +578,8 @@ class Container:
         self, provider: Provider, context: InstanceContext
     ) -> Any:
         """Get an instance of a dependency from the scoped context."""
-        instance = context.get(provider.interface)
-        if instance is None:
+        instance = context.get(provider.interface, NOT_SET)
+        if instance is NOT_SET:
             instance = self._create_instance(provider, context)
             context.set(provider.interface, instance)
             return instance
@@ -535,8 +589,8 @@ class Container:
         self, provider: Provider, context: InstanceContext
     ) -> Any:
         """Get an async instance of a dependency from the scoped context."""
-        instance = context.get(provider.interface)
-        if instance is None:
+        instance = context.get(provider.interface, NOT_SET)
+        if instance is NOT_SET:
             instance = await self._acreate_instance(provider, context)
             context.set(provider.interface, instance)
             return instance
@@ -552,7 +606,9 @@ class Container:
                 "synchronous mode."
             )
 
-        provider_kwargs = self._get_provided_kwargs(provider, context, **defaults)
+        provider_kwargs = self._get_provided_kwargs(
+            provider, context, defaults=defaults if defaults else None
+        )
 
         if provider.is_generator:
             if context is None:
@@ -570,7 +626,7 @@ class Container:
     ) -> Any:
         """Create an instance asynchronously using the provider."""
         provider_kwargs = await self._aget_provided_kwargs(
-            provider, context, **defaults
+            provider, context, defaults=defaults if defaults else None
         )
 
         if provider.is_coroutine:
@@ -604,97 +660,143 @@ class Container:
         return instance
 
     def _get_provided_kwargs(
-        self, provider: Provider, context: InstanceContext | None, /, **defaults: Any
-    ) -> dict[str, Any]:
-        """Retrieve the arguments for a provider."""
-        provided_kwargs = {}
-        for parameter in provider.parameters:
-            provided_kwargs[parameter.name] = self._get_provider_instance(
-                provider, parameter, context, **defaults
-            )
-        return {**defaults, **provided_kwargs}
-
-    def _get_provider_instance(
         self,
         provider: Provider,
-        parameter: inspect.Parameter,
         context: InstanceContext | None,
         /,
-        **defaults: Any,
+        defaults: dict[str, Any] | None = None,
+    ) -> dict[str, Any]:
+        """Retrieve the arguments for a provider."""
+        if not provider.parameters:
+            return defaults if defaults else {}
+
+        provided_kwargs = dict(defaults) if defaults else {}
+        for parameter in provider.parameters:
+            provided_kwargs[parameter.name] = self._get_provider_instance(
+                provider,
+                parameter,
+                context,
+                defaults=defaults,
+            )
+        return provided_kwargs
+
+    def _get_provider_instance(  # noqa: C901
+        self,
+        provider: Provider,
+        parameter: ProviderParameter,
+        context: InstanceContext | None,
+        /,
+        *,
+        defaults: dict[str, Any] | None = None,
     ) -> Any:
         """Retrieve an instance of a dependency from the scoped context."""
 
-        # Try to get instance from defaults
-        if parameter.name in defaults:
+        if defaults and parameter.name in defaults:
             return defaults[parameter.name]
 
-        # Try to get instance from context
-        elif context and parameter.annotation in context:
-            instance = context[parameter.annotation]
+        sub_provider = parameter.provider
 
-        # Resolve new instance
-        else:
-            try:
-                instance = self._resolve_parameter(provider, parameter)
-            except LookupError:
-                if parameter.default is inspect.Parameter.empty:
-                    raise
-                return parameter.default
-        return instance
+        if context and parameter.shared_scope and sub_provider is not None:
+            existing = context.get(sub_provider.interface, NOT_SET)
+            if existing is not NOT_SET:
+                return existing
+
+        if context:
+            cached = context.get(parameter.annotation, NOT_SET)
+            if cached is not NOT_SET:
+                return cached
+
+        sub_provider = parameter.provider
+
+        if sub_provider:
+            if sub_provider.scope == "transient":
+                return self._create_instance(sub_provider, None)
+            if sub_provider.scope == "singleton" and sub_provider is not provider:
+                return self._resolve_with_provider(sub_provider, False)
+
+        try:
+            return self._resolve_parameter(provider, parameter)
+        except LookupError:
+            if not parameter.has_default:
+                raise
+            return parameter.default
 
     async def _aget_provided_kwargs(
-        self, provider: Provider, context: InstanceContext | None, /, **defaults: Any
-    ) -> dict[str, Any]:
-        """Asynchronously retrieve the arguments for a provider."""
-        provided_kwargs = {}
-        for parameter in provider.parameters:
-            provided_kwargs[parameter.name] = await self._aget_provider_instance(
-                provider, parameter, context, **defaults
-            )
-        return {**defaults, **provided_kwargs}
-
-    async def _aget_provider_instance(
         self,
         provider: Provider,
-        parameter: inspect.Parameter,
         context: InstanceContext | None,
         /,
-        **defaults: Any,
+        defaults: dict[str, Any] | None = None,
+    ) -> dict[str, Any]:
+        """Asynchronously retrieve the arguments for a provider."""
+        if not provider.parameters:
+            return defaults if defaults else {}
+
+        provided_kwargs = dict(defaults) if defaults else {}
+        for parameter in provider.parameters:
+            provided_kwargs[parameter.name] = await self._aget_provider_instance(
+                provider,
+                parameter,
+                context,
+                defaults=defaults,
+            )
+        return provided_kwargs
+
+    async def _aget_provider_instance(  # noqa: C901
+        self,
+        provider: Provider,
+        parameter: ProviderParameter,
+        context: InstanceContext | None,
+        /,
+        *,
+        defaults: dict[str, Any] | None = None,
     ) -> Any:
         """Asynchronously retrieve an instance of a dependency from the context."""
 
-        # Try to get instance from defaults
-        if parameter.name in defaults:
+        if defaults and parameter.name in defaults:
             return defaults[parameter.name]
 
-        # Try to get instance from context
-        elif context and parameter.annotation in context:
-            instance = context[parameter.annotation]
+        sub_provider = parameter.provider
 
-        # Resolve new instance
-        else:
-            try:
-                instance = await self._aresolve_parameter(provider, parameter)
-            except LookupError:
-                if parameter.default is inspect.Parameter.empty:
-                    raise
-                return parameter.default
-        return instance
+        if context and parameter.shared_scope and sub_provider is not None:
+            existing = context.get(sub_provider.interface, NOT_SET)
+            if existing is not NOT_SET:
+                return existing
+
+        if context:
+            cached = context.get(parameter.annotation, NOT_SET)
+            if cached is not NOT_SET:
+                return cached
+
+        sub_provider = parameter.provider
+
+        if sub_provider:
+            if sub_provider.scope == "transient":
+                return await self._acreate_instance(sub_provider, None)
+            if sub_provider.scope == "singleton" and sub_provider is not provider:
+                return await self._aresolve_with_provider(sub_provider, False)
+
+        try:
+            return await self._aresolve_parameter(provider, parameter)
+        except LookupError:
+            if not parameter.has_default:
+                raise
+            return parameter.default
 
     def _resolve_parameter(
-        self, provider: Provider, parameter: inspect.Parameter
+        self, provider: Provider, parameter: ProviderParameter
     ) -> Any:
         self._validate_resolvable_parameter(provider, parameter)
         return self._resolve_or_create(parameter.annotation, False)
 
     async def _aresolve_parameter(
-        self, provider: Provider, parameter: inspect.Parameter
+        self, provider: Provider, parameter: ProviderParameter
     ) -> Any:
         self._validate_resolvable_parameter(provider, parameter)
         return await self._aresolve_or_create(parameter.annotation, False)
 
     def _validate_resolvable_parameter(
-        self, provider: Provider, parameter: inspect.Parameter
+        self, provider: Provider, parameter: ProviderParameter
     ) -> None:
         """Ensure that the specified interface is resolved."""
         if parameter.annotation in self._unresolved_interfaces:

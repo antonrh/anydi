@@ -5,7 +5,7 @@ import inspect
 from collections.abc import Callable
 from dataclasses import dataclass
 from functools import cached_property
-from typing import Any, NamedTuple
+from typing import Any
 
 from ._scope import Scope
 from ._typing import NOT_SET
@@ -39,13 +39,23 @@ class ProviderKind(enum.IntEnum):
         return kind in (cls.GENERATOR, cls.ASYNC_GENERATOR)
 
 
+@dataclass(kw_only=True, frozen=True, slots=True)
+class ProviderParameter:
+    name: str
+    annotation: Any
+    default: Any
+    has_default: bool
+    provider: Provider | None = None
+    shared_scope: bool = False
+
+
 @dataclass(kw_only=True, frozen=True)
 class Provider:
     call: Callable[..., Any]
     scope: Scope
     interface: Any
     name: str
-    parameters: list[inspect.Parameter]
+    parameters: tuple[ProviderParameter, ...]
     kind: ProviderKind
 
     def __str__(self) -> str:
@@ -76,7 +86,8 @@ class Provider:
         return ProviderKind.is_resource(self.kind)
 
 
-class ProviderDef(NamedTuple):
+@dataclass(kw_only=True, frozen=True, slots=True)
+class ProviderDef:
     call: Callable[..., Any]
     scope: Scope
     interface: Any = NOT_SET

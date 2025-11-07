@@ -1,5 +1,4 @@
 import contextlib
-import inspect
 import logging
 from collections.abc import Iterable, Iterator, Sequence
 from typing import Any, TypeVar
@@ -10,7 +9,7 @@ from typing_extensions import Self, type_repr
 from ._container import Container
 from ._context import InstanceContext
 from ._module import ModuleDef
-from ._provider import Provider, ProviderDef
+from ._provider import Provider, ProviderDef, ProviderParameter
 from ._scope import Scope
 
 T = TypeVar("T")
@@ -76,7 +75,7 @@ class TestContainer(Container):
     def _get_provider_instance(
         self,
         provider: Provider,
-        parameter: inspect.Parameter,
+        parameter: ProviderParameter,
         context: InstanceContext | None,
         /,
         **defaults: Any,
@@ -90,7 +89,7 @@ class TestContainer(Container):
     async def _aget_provider_instance(
         self,
         provider: Provider,
-        parameter: inspect.Parameter,
+        parameter: ProviderParameter,
         context: InstanceContext | None,
         /,
         **defaults: Any,
