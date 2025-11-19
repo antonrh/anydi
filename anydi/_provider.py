@@ -86,7 +86,7 @@ class Provider:
         return ProviderKind.is_resource(self.kind)
 
 
-@dataclass(kw_only=True, frozen=True, slots=True)
+@dataclass(frozen=True, slots=True)
 class ProviderDef:
     call: Callable[..., Any]
     scope: Scope
