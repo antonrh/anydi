@@ -620,16 +620,8 @@ class Container:
                 "synchronous mode."
             )
 
-        defaults_dict = defaults if defaults else None
-        if provider.scope == "transient" and context is None:
-            if defaults_dict or provider.has_kwonly_params:
-                provider_kwargs = self._get_transient_kwargs(provider, defaults_dict)
-                return provider.call(**provider_kwargs)
-            args = self._get_transient_args(provider)
-            return provider.call(*args)
-
         provider_kwargs = self._get_provided_kwargs(
-            provider, context, defaults=defaults_dict
+            provider, context, defaults=defaults
         )
 
         if provider.is_generator:
@@ -642,51 +634,6 @@ class Container:
         if context is not None and provider.is_class and is_context_manager(instance):
             context.enter(instance)
         return instance
-
-    def _get_transient_kwargs(
-        self, provider: Provider, defaults: dict[str, Any] | None = None
-    ) -> dict[str, Any]:
-        """Retrieve arguments for a transient provider."""
-        if not provider.parameters:
-            return defaults if defaults else {}
-
-        provided_kwargs = dict(defaults) if defaults else {}
-        for parameter in provider.parameters:
-            if defaults and parameter.name in defaults:
-                provided_kwargs[parameter.name] = defaults[parameter.name]
-                continue
-            provided_kwargs[parameter.name] = self._resolve_transient_parameter(
-                provider, parameter
-            )
-
-        return provided_kwargs
-
-    def _get_transient_args(self, provider: Provider) -> tuple[Any, ...]:
-        """Collect positional arguments for a transient provider."""
-        if not provider.parameters:
-            return ()
-
-        args = []
-        for parameter in provider.parameters:
-            args.append(self._resolve_transient_parameter(provider, parameter))
-        return tuple(args)
-
-    def _resolve_transient_parameter(
-        self, provider: Provider, parameter: ProviderParameter
-    ) -> Any:
-        sub_provider = parameter.provider
-        if sub_provider is not None:
-            if sub_provider.scope == "transient":
-                return self._create_instance(sub_provider, None)
-            if sub_provider.scope == "singleton" and sub_provider is not provider:
-                return self._resolve_with_provider(sub_provider, False)
-
-        try:
-            return self._resolve_parameter(provider, parameter)
-        except LookupError:
-            if not parameter.has_default:
-                raise
-            return parameter.default
 
     async def _acreate_instance(
         self, provider: Provider, context: InstanceContext | None, /, **defaults: Any
