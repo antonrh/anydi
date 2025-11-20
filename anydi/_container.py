@@ -257,16 +257,18 @@ class Container:
         """Register a provider with the specified scope."""
         name = type_repr(call)
         kind = ProviderKind.from_call(call)
+        is_class = kind == ProviderKind.CLASS
+        is_resource = kind in (ProviderKind.GENERATOR, ProviderKind.ASYNC_GENERATOR)
 
         # Validate scope if it provided
-        self._validate_provider_scope(scope, name, kind)
+        self._validate_provider_scope(scope, name, is_resource)
 
         # Get the signature
         signature = inspect.signature(call, eval_str=True)
 
         # Detect the interface
         if interface is NOT_SET:
-            if kind == ProviderKind.CLASS:
+            if is_class:
                 interface = call
             else:
                 interface = signature.return_annotation
@@ -364,20 +366,30 @@ class Container:
                     "Please ensure all providers are registered with matching scopes."
                 )
 
+        is_coroutine = kind == ProviderKind.COROUTINE
+        is_generator = kind == ProviderKind.GENERATOR
+        is_async_generator = kind == ProviderKind.ASYNC_GENERATOR
+        is_async = is_coroutine or is_async_generator
+
         provider = Provider(
             call=call,
             scope=scope,
             interface=interface,
             name=name,
-            kind=kind,
             parameters=tuple(parameters),
+            is_class=is_class,
+            is_coroutine=is_coroutine,
+            is_generator=is_generator,
+            is_async_generator=is_async_generator,
+            is_async=is_async,
+            is_resource=is_resource,
         )
 
         self._set_provider(provider)
         return provider
 
     @staticmethod
-    def _validate_provider_scope(scope: Scope, name: str, kind: ProviderKind) -> None:
+    def _validate_provider_scope(scope: Scope, name: str, is_resource: bool) -> None:
         """Validate the provider scope."""
         if scope not in (allowed_scopes := get_args(Scope)):
             raise ValueError(
@@ -385,7 +397,7 @@ class Container:
                 f"scopes are supported: {', '.join(allowed_scopes)}. "
                 "Please use one of the supported scopes when registering a provider."
             )
-        if scope == "transient" and ProviderKind.is_resource(kind):
+        if scope == "transient" and is_resource:
             raise TypeError(
                 f"The resource provider `{name}` is attempting to register "
                 "with a transient scope, which is not allowed."
@@ -602,12 +614,12 @@ class Container:
         """Create an instance using the provider."""
         if provider.is_async:
             raise TypeError(
-                f"The instance for the provider `{provider}` cannot be created in "
+                f"The instance for the provider `{provider.name}` cannot be created in "
                 "synchronous mode."
             )
 
         provider_kwargs = self._get_provided_kwargs(
-            provider, context, defaults=defaults if defaults else None
+            provider, context, defaults=defaults
         )
 
         if provider.is_generator:
@@ -696,19 +708,18 @@ class Container:
 
         sub_provider = parameter.provider
 
-        if context and parameter.shared_scope and sub_provider is not None:
-            existing = context.get(sub_provider.interface, NOT_SET)
-            if existing is not NOT_SET:
-                return existing
-
-        if context:
+        if context is not None:
+            if parameter.shared_scope and sub_provider is not None:
+                existing = context.get(sub_provider.interface, NOT_SET)
+                if existing is not NOT_SET:
+                    return existing
+                if sub_provider.interface not in self._unresolved_interfaces:
+                    return self._get_or_create_instance(sub_provider, context)
             cached = context.get(parameter.annotation, NOT_SET)
             if cached is not NOT_SET:
                 return cached
 
-        sub_provider = parameter.provider
-
-        if sub_provider:
+        if sub_provider is not None:
             if sub_provider.scope == "transient":
                 return self._create_instance(sub_provider, None)
             if sub_provider.scope == "singleton" and sub_provider is not provider:
@@ -758,19 +769,18 @@ class Container:
 
         sub_provider = parameter.provider
 
-        if context and parameter.shared_scope and sub_provider is not None:
-            existing = context.get(sub_provider.interface, NOT_SET)
-            if existing is not NOT_SET:
-                return existing
-
-        if context:
+        if context is not None:
+            if parameter.shared_scope and sub_provider is not None:
+                existing = context.get(sub_provider.interface, NOT_SET)
+                if existing is not NOT_SET:
+                    return existing
+                if sub_provider.interface not in self._unresolved_interfaces:
+                    return await self._aget_or_create_instance(sub_provider, context)
             cached = context.get(parameter.annotation, NOT_SET)
             if cached is not NOT_SET:
                 return cached
 
-        sub_provider = parameter.provider
-
-        if sub_provider:
+        if sub_provider is not None:
             if sub_provider.scope == "transient":
                 return await self._acreate_instance(sub_provider, None)
             if sub_provider.scope == "singleton" and sub_provider is not provider:
