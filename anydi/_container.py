@@ -257,16 +257,18 @@ class Container:
         """Register a provider with the specified scope."""
         name = type_repr(call)
         kind = ProviderKind.from_call(call)
+        is_class = kind == ProviderKind.CLASS
+        is_resource = kind in (ProviderKind.GENERATOR, ProviderKind.ASYNC_GENERATOR)
 
         # Validate scope if it provided
-        self._validate_provider_scope(scope, name, kind)
+        self._validate_provider_scope(scope, name, is_resource)
 
         # Get the signature
         signature = inspect.signature(call, eval_str=True)
 
         # Detect the interface
         if interface is NOT_SET:
-            if kind == ProviderKind.CLASS:
+            if is_class:
                 interface = call
             else:
                 interface = signature.return_annotation
@@ -300,7 +302,6 @@ class Container:
         unresolved_exc: LookupError | None = None
         parameters: list[ProviderParameter] = []
         scopes: dict[Scope, Provider] = {}
-        has_kwonly_params = False
 
         for parameter in signature.parameters.values():
             if parameter.annotation is inspect.Parameter.empty:
@@ -313,18 +314,6 @@ class Container:
                     "Positional-only parameters "
                     f"are not allowed in the provider `{name}`."
                 )
-            if parameter.kind == inspect.Parameter.VAR_POSITIONAL:
-                raise TypeError(
-                    "Variadic positional parameters are not allowed in the "
-                    f"provider `{name}`."
-                )
-            if parameter.kind == inspect.Parameter.VAR_KEYWORD:
-                raise TypeError(
-                    "Variadic keyword parameters are not allowed in the "
-                    f"provider `{name}`."
-                )
-            if parameter.kind == inspect.Parameter.KEYWORD_ONLY:
-                has_kwonly_params = True
 
             try:
                 sub_provider = self._get_or_register_provider(parameter.annotation)
@@ -377,21 +366,30 @@ class Container:
                     "Please ensure all providers are registered with matching scopes."
                 )
 
+        is_coroutine = kind == ProviderKind.COROUTINE
+        is_generator = kind == ProviderKind.GENERATOR
+        is_async_generator = kind == ProviderKind.ASYNC_GENERATOR
+        is_async = is_coroutine or is_async_generator
+
         provider = Provider(
             call=call,
             scope=scope,
             interface=interface,
             name=name,
-            kind=kind,
             parameters=tuple(parameters),
-            has_kwonly_params=has_kwonly_params,
+            is_class=is_class,
+            is_coroutine=is_coroutine,
+            is_generator=is_generator,
+            is_async_generator=is_async_generator,
+            is_async=is_async,
+            is_resource=is_resource,
         )
 
         self._set_provider(provider)
         return provider
 
     @staticmethod
-    def _validate_provider_scope(scope: Scope, name: str, kind: ProviderKind) -> None:
+    def _validate_provider_scope(scope: Scope, name: str, is_resource: bool) -> None:
         """Validate the provider scope."""
         if scope not in (allowed_scopes := get_args(Scope)):
             raise ValueError(
@@ -399,7 +397,7 @@ class Container:
                 f"scopes are supported: {', '.join(allowed_scopes)}. "
                 "Please use one of the supported scopes when registering a provider."
             )
-        if scope == "transient" and ProviderKind.is_resource(kind):
+        if scope == "transient" and is_resource:
             raise TypeError(
                 f"The resource provider `{name}` is attempting to register "
                 "with a transient scope, which is not allowed."
@@ -616,7 +614,7 @@ class Container:
         """Create an instance using the provider."""
         if provider.is_async:
             raise TypeError(
-                f"The instance for the provider `{provider}` cannot be created in "
+                f"The instance for the provider `{provider.name}` cannot be created in "
                 "synchronous mode."
             )
 

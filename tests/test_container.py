@@ -2,14 +2,13 @@ import asyncio
 import sys
 import threading
 import uuid
-from collections.abc import AsyncIterator, Callable, Iterator, Sequence
+from collections.abc import AsyncIterator, Iterator, Sequence
 from typing import Annotated, Any
 
 import pytest
 from typing_extensions import Self
 
 from anydi import Container, Inject, Provider, Scope, request, singleton, transient
-from anydi._provider import ProviderKind
 from anydi._typing import Event
 
 from tests.fixtures import (
@@ -21,7 +20,6 @@ from tests.fixtures import (
     async_generator,
     coro,
     event,
-    func,
     generator,
     iterator,
 )
@@ -53,27 +51,29 @@ class TestContainer:
         assert provider.scope == "singleton"
         assert provider.interface is str
 
-    @pytest.mark.parametrize(
-        ("call", "kind", "interface"),
-        [
-            (func, ProviderKind.FUNCTION, str),
-            (Class, ProviderKind.CLASS, Class),
-            (generator, ProviderKind.GENERATOR, str),
-            (async_generator, ProviderKind.ASYNC_GENERATOR, str),
-            (coro, ProviderKind.COROUTINE, str),
-        ],
-    )
-    def test_register_provider_different_kind(
-        self,
-        container: Container,
-        call: Callable[..., Any],
-        kind: ProviderKind,
-        interface: Any,
-    ) -> None:
-        provider = container._register_provider(call, "singleton")
+    def test_register_provider_is_class(self, container: Container) -> None:
+        provider = container._register_provider(Class, "singleton")
 
-        assert provider.kind == kind
-        assert provider.interface is interface
+        assert provider.is_class
+        assert provider.interface is Class
+
+    def test_register_provider_is_generator(self, container: Container) -> None:
+        provider = container._register_provider(generator, "singleton")
+
+        assert provider.is_generator
+        assert provider.interface is str
+
+    def test_register_provider_is_async_generator(self, container: Container) -> None:
+        provider = container._register_provider(async_generator, "singleton")
+
+        assert provider.is_async_generator
+        assert provider.interface is str
+
+    def test_register_provider_is_coro(self, container: Container) -> None:
+        provider = container._register_provider(coro, "singleton")
+
+        assert provider.is_coroutine
+        assert provider.interface is str
 
     @pytest.mark.parametrize(
         ("annotation", "expected"),
@@ -101,22 +101,16 @@ class TestContainer:
 
         assert provider.interface == expected
 
-    @pytest.mark.parametrize(
-        ("call", "kind"),
-        [
-            (event, ProviderKind.GENERATOR),
-            (async_event, ProviderKind.ASYNC_GENERATOR),
-        ],
-    )
-    def test_register_provider_event(
-        self,
-        container: Container,
-        call: Callable[..., Any],
-        kind: ProviderKind,
-    ) -> None:
-        provider = container._register_provider(call, "singleton")
+    def test_register_provider_event(self, container: Container) -> None:
+        provider = container._register_provider(event, "singleton")
 
-        assert provider.kind == kind
+        assert provider.is_generator
+        assert issubclass(provider.interface, Event)
+
+    def test_register_provider_async_event(self, container: Container) -> None:
+        provider = container._register_provider(async_event, "singleton")
+
+        assert provider.is_async_generator
         assert issubclass(provider.interface, Event)
 
     def test_register_provider_with_interface(self, container: Container) -> None:

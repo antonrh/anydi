@@ -4,7 +4,6 @@ import enum
 import inspect
 from collections.abc import Callable
 from dataclasses import dataclass
-from functools import cached_property
 from typing import Any
 
 from ._scope import Scope
@@ -34,12 +33,8 @@ class ProviderKind(enum.IntEnum):
             f"The provider `{call}` is invalid because it is not a callable object."
         )
 
-    @classmethod
-    def is_resource(cls, kind: ProviderKind) -> bool:
-        return kind in (cls.GENERATOR, cls.ASYNC_GENERATOR)
 
-
-@dataclass(kw_only=True, frozen=True, slots=True)
+@dataclass(frozen=True, slots=True)
 class ProviderParameter:
     name: str
     annotation: Any
@@ -49,42 +44,19 @@ class ProviderParameter:
     shared_scope: bool = False
 
 
-@dataclass(kw_only=True, frozen=True)
+@dataclass(frozen=True, slots=True)
 class Provider:
     call: Callable[..., Any]
     scope: Scope
     interface: Any
     name: str
     parameters: tuple[ProviderParameter, ...]
-    kind: ProviderKind
-    has_kwonly_params: bool
-
-    def __str__(self) -> str:
-        return self.name
-
-    @cached_property
-    def is_class(self) -> bool:
-        return self.kind == ProviderKind.CLASS
-
-    @cached_property
-    def is_coroutine(self) -> bool:
-        return self.kind == ProviderKind.COROUTINE
-
-    @cached_property
-    def is_generator(self) -> bool:
-        return self.kind == ProviderKind.GENERATOR
-
-    @cached_property
-    def is_async_generator(self) -> bool:
-        return self.kind == ProviderKind.ASYNC_GENERATOR
-
-    @cached_property
-    def is_async(self) -> bool:
-        return self.is_coroutine or self.is_async_generator
-
-    @cached_property
-    def is_resource(self) -> bool:
-        return ProviderKind.is_resource(self.kind)
+    is_class: bool
+    is_coroutine: bool
+    is_generator: bool
+    is_async_generator: bool
+    is_async: bool
+    is_resource: bool
 
 
 @dataclass(frozen=True, slots=True)
