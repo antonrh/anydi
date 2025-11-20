@@ -57,6 +57,7 @@ class Provider:
     name: str
     parameters: tuple[ProviderParameter, ...]
     kind: ProviderKind
+    has_kwonly_params: bool
 
     def __str__(self) -> str:
         return self.name

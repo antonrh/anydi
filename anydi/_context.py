@@ -18,10 +18,10 @@ class InstanceContext:
 
     def __init__(self) -> None:
         self._instances: dict[Any, Any] = {}
-        self._stack = contextlib.ExitStack()
-        self._async_stack = contextlib.AsyncExitStack()
-        self._lock = threading.RLock()
-        self._async_lock = AsyncRLock()
+        self._stack: contextlib.ExitStack | None = None
+        self._async_stack: contextlib.AsyncExitStack | None = None
+        self._lock: threading.RLock | None = None
+        self._async_lock: AsyncRLock | None = None
 
     def get(self, interface: Any, default: Any = NOT_SET) -> Any:
         """Get an instance from the context."""
@@ -33,10 +33,14 @@ class InstanceContext:
 
     def enter(self, cm: contextlib.AbstractContextManager[Any]) -> Any:
         """Enter the context."""
+        if self._stack is None:
+            self._stack = contextlib.ExitStack()
         return self._stack.enter_context(cm)
 
     async def aenter(self, cm: contextlib.AbstractAsyncContextManager[Any]) -> Any:
         """Enter the context asynchronously."""
+        if self._async_stack is None:
+            self._async_stack = contextlib.AsyncExitStack()
         return await self._async_stack.enter_async_context(cm)
 
     def __setitem__(self, interface: Any, value: Any) -> None:
@@ -62,11 +66,14 @@ class InstanceContext:
         exc_tb: TracebackType | None,
     ) -> Any:
         """Exit the context."""
+        if self._stack is None:
+            return False
         return self._stack.__exit__(exc_type, exc_val, exc_tb)
 
     def close(self) -> None:
         """Close the scoped context."""
-        self._stack.__exit__(None, None, None)
+        if self._stack is not None:
+            self._stack.__exit__(None, None, None)
 
     async def __aenter__(self) -> Self:
         """Enter the context asynchronously."""
@@ -80,7 +87,9 @@ class InstanceContext:
     ) -> bool:
         """Exit the context asynchronously."""
         sync_exit = await run_sync(self.__exit__, exc_type, exc_val, exc_tb)
-        async_exit = await self._async_stack.__aexit__(exc_type, exc_val, exc_tb)
+        async_exit = False
+        if self._async_stack is not None:
+            async_exit = await self._async_stack.__aexit__(exc_type, exc_val, exc_tb)
         return bool(sync_exit) or bool(async_exit)
 
     async def aclose(self) -> None:
@@ -89,8 +98,12 @@ class InstanceContext:
 
     def lock(self) -> threading.RLock:
         """Acquire the context lock."""
+        if self._lock is None:
+            self._lock = threading.RLock()
         return self._lock
 
     def alock(self) -> AsyncRLock:
         """Acquire the context lock asynchronously."""
+        if self._async_lock is None:
+            self._async_lock = AsyncRLock()
         return self._async_lock

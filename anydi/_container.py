@@ -300,6 +300,7 @@ class Container:
         unresolved_exc: LookupError | None = None
         parameters: list[ProviderParameter] = []
         scopes: dict[Scope, Provider] = {}
+        has_kwonly_params = False
 
         for parameter in signature.parameters.values():
             if parameter.annotation is inspect.Parameter.empty:
@@ -312,6 +313,18 @@ class Container:
                     "Positional-only parameters "
                     f"are not allowed in the provider `{name}`."
                 )
+            if parameter.kind == inspect.Parameter.VAR_POSITIONAL:
+                raise TypeError(
+                    "Variadic positional parameters are not allowed in the "
+                    f"provider `{name}`."
+                )
+            if parameter.kind == inspect.Parameter.VAR_KEYWORD:
+                raise TypeError(
+                    "Variadic keyword parameters are not allowed in the "
+                    f"provider `{name}`."
+                )
+            if parameter.kind == inspect.Parameter.KEYWORD_ONLY:
+                has_kwonly_params = True
 
             try:
                 sub_provider = self._get_or_register_provider(parameter.annotation)
@@ -371,6 +384,7 @@ class Container:
             name=name,
             kind=kind,
             parameters=tuple(parameters),
+            has_kwonly_params=has_kwonly_params,
         )
 
         self._set_provider(provider)
@@ -606,8 +620,16 @@ class Container:
                 "synchronous mode."
             )
 
+        defaults_dict = defaults if defaults else None
+        if provider.scope == "transient" and context is None:
+            if defaults_dict or provider.has_kwonly_params:
+                provider_kwargs = self._get_transient_kwargs(provider, defaults_dict)
+                return provider.call(**provider_kwargs)
+            args = self._get_transient_args(provider)
+            return provider.call(*args)
+
         provider_kwargs = self._get_provided_kwargs(
-            provider, context, defaults=defaults if defaults else None
+            provider, context, defaults=defaults_dict
         )
 
         if provider.is_generator:
@@ -620,6 +642,51 @@ class Container:
         if context is not None and provider.is_class and is_context_manager(instance):
             context.enter(instance)
         return instance
+
+    def _get_transient_kwargs(
+        self, provider: Provider, defaults: dict[str, Any] | None = None
+    ) -> dict[str, Any]:
+        """Retrieve arguments for a transient provider."""
+        if not provider.parameters:
+            return defaults if defaults else {}
+
+        provided_kwargs = dict(defaults) if defaults else {}
+        for parameter in provider.parameters:
+            if defaults and parameter.name in defaults:
+                provided_kwargs[parameter.name] = defaults[parameter.name]
+                continue
+            provided_kwargs[parameter.name] = self._resolve_transient_parameter(
+                provider, parameter
+            )
+
+        return provided_kwargs
+
+    def _get_transient_args(self, provider: Provider) -> tuple[Any, ...]:
+        """Collect positional arguments for a transient provider."""
+        if not provider.parameters:
+            return ()
+
+        args = []
+        for parameter in provider.parameters:
+            args.append(self._resolve_transient_parameter(provider, parameter))
+        return tuple(args)
+
+    def _resolve_transient_parameter(
+        self, provider: Provider, parameter: ProviderParameter
+    ) -> Any:
+        sub_provider = parameter.provider
+        if sub_provider is not None:
+            if sub_provider.scope == "transient":
+                return self._create_instance(sub_provider, None)
+            if sub_provider.scope == "singleton" and sub_provider is not provider:
+                return self._resolve_with_provider(sub_provider, False)
+
+        try:
+            return self._resolve_parameter(provider, parameter)
+        except LookupError:
+            if not parameter.has_default:
+                raise
+            return parameter.default
 
     async def _acreate_instance(
         self, provider: Provider, context: InstanceContext | None, /, **defaults: Any
@@ -696,19 +763,18 @@ class Container:
 
         sub_provider = parameter.provider
 
-        if context and parameter.shared_scope and sub_provider is not None:
-            existing = context.get(sub_provider.interface, NOT_SET)
-            if existing is not NOT_SET:
-                return existing
-
-        if context:
+        if context is not None:
+            if parameter.shared_scope and sub_provider is not None:
+                existing = context.get(sub_provider.interface, NOT_SET)
+                if existing is not NOT_SET:
+                    return existing
+                if sub_provider.interface not in self._unresolved_interfaces:
+                    return self._get_or_create_instance(sub_provider, context)
             cached = context.get(parameter.annotation, NOT_SET)
             if cached is not NOT_SET:
                 return cached
 
-        sub_provider = parameter.provider
-
-        if sub_provider:
+        if sub_provider is not None:
             if sub_provider.scope == "transient":
                 return self._create_instance(sub_provider, None)
             if sub_provider.scope == "singleton" and sub_provider is not provider:
@@ -758,19 +824,18 @@ class Container:
 
         sub_provider = parameter.provider
 
-        if context and parameter.shared_scope and sub_provider is not None:
-            existing = context.get(sub_provider.interface, NOT_SET)
-            if existing is not NOT_SET:
-                return existing
-
-        if context:
+        if context is not None:
+            if parameter.shared_scope and sub_provider is not None:
+                existing = context.get(sub_provider.interface, NOT_SET)
+                if existing is not NOT_SET:
+                    return existing
+                if sub_provider.interface not in self._unresolved_interfaces:
+                    return await self._aget_or_create_instance(sub_provider, context)
             cached = context.get(parameter.annotation, NOT_SET)
             if cached is not NOT_SET:
                 return cached
 
-        sub_provider = parameter.provider
-
-        if sub_provider:
+        if sub_provider is not None:
             if sub_provider.scope == "transient":
                 return await self._acreate_instance(sub_provider, None)
             if sub_provider.scope == "singleton" and sub_provider is not provider:
