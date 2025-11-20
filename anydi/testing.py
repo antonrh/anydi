@@ -1,7 +1,7 @@
 import contextlib
 import logging
 from collections.abc import Iterable, Iterator, Sequence
-from typing import Any, TypeVar
+from typing import Any
 
 import wrapt  # type: ignore
 from typing_extensions import Self, type_repr
@@ -10,9 +10,6 @@ from ._container import Container
 from ._context import InstanceContext
 from ._module import ModuleDef
 from ._provider import Provider, ProviderDef, ProviderParameter
-from ._scope import Scope
-
-T = TypeVar("T")
 
 
 class TestContainer(Container):
@@ -23,7 +20,6 @@ class TestContainer(Container):
         *,
         providers: Sequence[ProviderDef] | None = None,
         modules: Iterable[ModuleDef] | None = None,
-        default_scope: Scope = "transient",
         logger: logging.Logger | None = None,
     ) -> None:
         super().__init__(providers=providers, modules=modules, logger=logger)
