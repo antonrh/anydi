@@ -667,9 +667,9 @@ class Container:
     ) -> dict[str, Any]:
         """Retrieve the arguments for a provider."""
         if not provider.parameters:
-            return defaults if defaults else {}
+            return defaults or {}
 
-        provided_kwargs = dict(defaults) if defaults else {}
+        provided_kwargs = defaults or {}
         for parameter in provider.parameters:
             provided_kwargs[parameter.name] = self._get_provider_instance(
                 provider,
@@ -697,12 +697,12 @@ class Container:
 
         if context is not None:
             if parameter.shared_scope and sub_provider is not None:
-                existing = context.get(sub_provider.interface, NOT_SET)
+                existing = context.get(sub_provider.interface)
                 if existing is not NOT_SET:
                     return existing
                 if sub_provider.interface not in self._unresolved_interfaces:
                     return self._get_or_create_instance(sub_provider, context)
-            cached = context.get(parameter.annotation, NOT_SET)
+            cached = context.get(parameter.annotation)
             if cached is not NOT_SET:
                 return cached
 
@@ -728,7 +728,7 @@ class Container:
     ) -> dict[str, Any]:
         """Asynchronously retrieve the arguments for a provider."""
         if not provider.parameters:
-            return defaults if defaults else {}
+            return defaults or {}
 
         provided_kwargs = dict(defaults) if defaults else {}
         for parameter in provider.parameters:
@@ -758,12 +758,12 @@ class Container:
 
         if context is not None:
             if parameter.shared_scope and sub_provider is not None:
-                existing = context.get(sub_provider.interface, NOT_SET)
+                existing = context.get(sub_provider.interface)
                 if existing is not NOT_SET:
                     return existing
                 if sub_provider.interface not in self._unresolved_interfaces:
                     return await self._aget_or_create_instance(sub_provider, context)
-            cached = context.get(parameter.annotation, NOT_SET)
+            cached = context.get(parameter.annotation)
             if cached is not NOT_SET:
                 return cached
 
