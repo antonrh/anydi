@@ -542,21 +542,12 @@ class Container:
         if provider.scope == "transient":
             return self._create_instance(provider, None, **defaults)
 
-        if provider.scope == "request":
-            context = self._get_request_context()
-            if not create:
-                cached = context.get(provider.interface, NOT_SET)
-                if cached is not NOT_SET:
-                    return cached
-            if not create:
-                return self._get_or_create_instance(provider, context)
-            return self._create_instance(provider, context, **defaults)
-
         context = self._get_instance_context(provider.scope)
         if not create:
-            cached = context.get(provider.interface, NOT_SET)
+            cached = context.get(provider.interface)
             if cached is not NOT_SET:
                 return cached
+
         with context.lock():
             return (
                 self._get_or_create_instance(provider, context)
@@ -570,19 +561,9 @@ class Container:
         if provider.scope == "transient":
             return await self._acreate_instance(provider, None, **defaults)
 
-        if provider.scope == "request":
-            context = self._get_request_context()
-            if not create:
-                cached = context.get(provider.interface, NOT_SET)
-                if cached is not NOT_SET:
-                    return cached
-            if not create:
-                return await self._aget_or_create_instance(provider, context)
-            return await self._acreate_instance(provider, context, **defaults)
-
         context = self._get_instance_context(provider.scope)
         if not create:
-            cached = context.get(provider.interface, NOT_SET)
+            cached = context.get(provider.interface)
             if cached is not NOT_SET:
                 return cached
         async with context.alock():
@@ -596,7 +577,7 @@ class Container:
         self, provider: Provider, context: InstanceContext
     ) -> Any:
         """Get an instance of a dependency from the scoped context."""
-        instance = context.get(provider.interface, NOT_SET)
+        instance = context.get(provider.interface)
         if instance is NOT_SET:
             instance = self._create_instance(provider, context)
             context.set(provider.interface, instance)
@@ -607,7 +588,7 @@ class Container:
         self, provider: Provider, context: InstanceContext
     ) -> Any:
         """Get an async instance of a dependency from the scoped context."""
-        instance = context.get(provider.interface, NOT_SET)
+        instance = context.get(provider.interface)
         if instance is NOT_SET:
             instance = await self._acreate_instance(provider, context)
             context.set(provider.interface, instance)
@@ -686,9 +667,9 @@ class Container:
     ) -> dict[str, Any]:
         """Retrieve the arguments for a provider."""
         if not provider.parameters:
-            return defaults if defaults else {}
+            return defaults or {}
 
-        provided_kwargs = dict(defaults) if defaults else {}
+        provided_kwargs = defaults or {}
         for parameter in provider.parameters:
             provided_kwargs[parameter.name] = self._get_provider_instance(
                 provider,
@@ -716,12 +697,12 @@ class Container:
 
         if context is not None:
             if parameter.shared_scope and sub_provider is not None:
-                existing = context.get(sub_provider.interface, NOT_SET)
+                existing = context.get(sub_provider.interface)
                 if existing is not NOT_SET:
                     return existing
                 if sub_provider.interface not in self._unresolved_interfaces:
                     return self._get_or_create_instance(sub_provider, context)
-            cached = context.get(parameter.annotation, NOT_SET)
+            cached = context.get(parameter.annotation)
             if cached is not NOT_SET:
                 return cached
 
@@ -747,7 +728,7 @@ class Container:
     ) -> dict[str, Any]:
         """Asynchronously retrieve the arguments for a provider."""
         if not provider.parameters:
-            return defaults if defaults else {}
+            return defaults or {}
 
         provided_kwargs = dict(defaults) if defaults else {}
         for parameter in provider.parameters:
@@ -777,12 +758,12 @@ class Container:
 
         if context is not None:
             if parameter.shared_scope and sub_provider is not None:
-                existing = context.get(sub_provider.interface, NOT_SET)
+                existing = context.get(sub_provider.interface)
                 if existing is not NOT_SET:
                     return existing
                 if sub_provider.interface not in self._unresolved_interfaces:
                     return await self._aget_or_create_instance(sub_provider, context)
-            cached = context.get(parameter.annotation, NOT_SET)
+            cached = context.get(parameter.annotation)
             if cached is not NOT_SET:
                 return cached
 
