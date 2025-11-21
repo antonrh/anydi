@@ -542,16 +542,6 @@ class Container:
         if provider.scope == "transient":
             return self._create_instance(provider, None, **defaults)
 
-        if provider.scope == "request":
-            context = self._get_request_context()
-            if not create:
-                cached = context.get(provider.interface, NOT_SET)
-                if cached is not NOT_SET:
-                    return cached
-            if not create:
-                return self._get_or_create_instance(provider, context)
-            return self._create_instance(provider, context, **defaults)
-
         context = self._get_instance_context(provider.scope)
         if not create:
             cached = context.get(provider.interface, NOT_SET)
@@ -569,16 +559,6 @@ class Container:
     ) -> Any:
         if provider.scope == "transient":
             return await self._acreate_instance(provider, None, **defaults)
-
-        if provider.scope == "request":
-            context = self._get_request_context()
-            if not create:
-                cached = context.get(provider.interface, NOT_SET)
-                if cached is not NOT_SET:
-                    return cached
-            if not create:
-                return await self._aget_or_create_instance(provider, context)
-            return await self._acreate_instance(provider, context, **defaults)
 
         context = self._get_instance_context(provider.scope)
         if not create:
