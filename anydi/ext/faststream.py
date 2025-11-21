@@ -10,7 +10,7 @@ from faststream import ContextRepo
 from faststream.broker.core.usecase import BrokerUsecase
 
 from anydi import Container
-from anydi._typing import InjectMarker
+from anydi._types import InjectMarker
 
 
 def install(broker: BrokerUsecase[Any, Any], container: Container) -> None:

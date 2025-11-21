@@ -8,7 +8,7 @@ from typing import Any
 from typing_extensions import Self
 
 from ._async import AsyncRLock, run_sync
-from ._typing import NOT_SET
+from ._types import NOT_SET
 
 
 class InstanceContext:

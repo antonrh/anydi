@@ -15,7 +15,7 @@ if TYPE_CHECKING:
     from ._module import Module
 
 
-from ._scope import Scope
+from ._types import Scope
 
 T = TypeVar("T")
 P = ParamSpec("P")

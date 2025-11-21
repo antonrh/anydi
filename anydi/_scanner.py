@@ -9,7 +9,7 @@ from types import ModuleType
 from typing import TYPE_CHECKING, Any
 
 from ._decorators import is_injectable
-from ._typing import is_inject_marker
+from ._types import is_inject_marker
 
 if TYPE_CHECKING:
     from ._container import Container

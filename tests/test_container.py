@@ -9,7 +9,7 @@ import pytest
 from typing_extensions import Self
 
 from anydi import Container, Inject, Provider, Scope, request, singleton, transient
-from anydi._typing import Event
+from anydi._types import Event
 
 from tests.fixtures import (
     Class,

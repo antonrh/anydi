@@ -4,8 +4,7 @@ from ._container import Container
 from ._decorators import injectable, provided, provider, request, singleton, transient
 from ._module import Module
 from ._provider import ProviderDef as Provider
-from ._scope import Scope
-from ._typing import Inject
+from ._types import Inject, Scope
 
 # Alias for dependency auto marker
 # TODO: deprecate it

@@ -12,7 +12,7 @@ from fastapi.routing import APIRoute
 from starlette.requests import Request
 
 from anydi._container import Container
-from anydi._typing import InjectMarker
+from anydi._types import InjectMarker
 
 from .starlette.middleware import RequestScopedMiddleware
 

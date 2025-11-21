@@ -20,11 +20,11 @@ from ._context import InstanceContext
 from ._decorators import is_provided
 from ._module import ModuleDef, ModuleRegistrar
 from ._provider import Provider, ProviderDef, ProviderKind, ProviderParameter
-from ._scan import PackageOrIterable, Scanner
-from ._scope import ALLOWED_SCOPES, Scope
-from ._typing import (
+from ._scanner import PackageOrIterable, Scanner
+from ._types import (
     NOT_SET,
     Event,
+    Scope,
     is_async_context_manager,
     is_context_manager,
     is_event_type,
@@ -35,6 +35,12 @@ from ._typing import (
 
 T = TypeVar("T", bound=Any)
 P = ParamSpec("P")
+
+ALLOWED_SCOPES: dict[Scope, list[Scope]] = {
+    "singleton": ["singleton"],
+    "request": ["request", "singleton"],
+    "transient": ["transient", "request", "singleton"],
+}
 
 
 class Container:

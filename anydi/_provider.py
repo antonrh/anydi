@@ -6,8 +6,7 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from typing import Any
 
-from ._scope import Scope
-from ._typing import NOT_SET
+from ._types import NOT_SET, Scope
 
 
 class ProviderKind(enum.IntEnum):
