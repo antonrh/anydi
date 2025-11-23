@@ -42,7 +42,7 @@ class ProviderParameter:
     provider: Provider | None = None
 
 
-@dataclass
+@dataclass(frozen=True, slots=True)
 class Provider:
     call: Callable[..., Any]
     scope: Scope
