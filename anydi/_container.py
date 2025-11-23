@@ -473,7 +473,7 @@ class Container:
         """Resolve an instance by interface using compiled sync resolver."""
         provider = self._get_or_register_provider(interface)
         compiled_resolve, _ = self._get_compiled_resolvers(provider)
-        return compiled_resolve(self)  # type: ignore[call-arg]
+        return compiled_resolve(self)
 
     @overload
     async def aresolve(self, interface: type[T]) -> T: ...
@@ -485,21 +485,21 @@ class Container:
         """Resolve an instance by interface asynchronously."""
         provider = self._get_or_register_provider(interface)
         compiled_resolve, _ = self._get_compiled_async_resolvers(provider)
-        return await compiled_resolve(self)  # type: ignore[call-arg]
+        return await compiled_resolve(self)
 
     def create(self, interface: type[T], /, **defaults: Any) -> T:
         """Create an instance by interface."""
         provider = self._get_or_register_provider(interface, **defaults)
         _, compiled_create = self._get_compiled_resolvers(provider)
         defaults_mapping = defaults or None
-        return compiled_create(self, defaults_mapping)  # type: ignore[call-arg]
+        return compiled_create(self, defaults_mapping)
 
     async def acreate(self, interface: type[T], /, **defaults: Any) -> T:
         """Create an instance by interface asynchronously."""
         provider = self._get_or_register_provider(interface, **defaults)
         _, compiled_create = self._get_compiled_async_resolvers(provider)
         defaults_mapping = defaults or None
-        return await compiled_create(self, defaults_mapping)  # type: ignore[call-arg]
+        return await compiled_create(self, defaults_mapping)
 
     def is_resolved(self, interface: Any) -> bool:
         """Check if an instance by interface exists."""
