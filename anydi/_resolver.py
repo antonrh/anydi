@@ -5,9 +5,9 @@ from __future__ import annotations
 import contextlib
 from typing import Any
 
+import anyio.to_thread
 from typing_extensions import type_repr
 
-from ._async import run_sync
 from ._provider import Provider
 from ._types import NOT_SET, is_async_context_manager, is_context_manager
 
@@ -500,7 +500,7 @@ def compile_resolver(  # noqa: C901
     if is_async:
         ns["_asynccontextmanager"] = contextlib.asynccontextmanager
         ns["_is_acm"] = is_async_context_manager
-        ns["_run_sync"] = run_sync
+        ns["_run_sync"] = anyio.to_thread.run_sync
     else:
         ns["_is_async"] = provider.is_async
 

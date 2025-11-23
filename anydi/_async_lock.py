@@ -1,18 +1,8 @@
-import functools
-from collections.abc import Callable
 from types import TracebackType
-from typing import Any, TypeVar
+from typing import Any
 
-import anyio.to_thread
-from typing_extensions import ParamSpec, Self
-
-T = TypeVar("T")
-P = ParamSpec("P")
-
-
-async def run_sync(func: Callable[P, T], /, *args: P.args, **kwargs: P.kwargs) -> T:
-    """Runs the given function asynchronously using the `anyio` library."""
-    return await anyio.to_thread.run_sync(functools.partial(func, *args, **kwargs))
+import anyio
+from typing_extensions import Self
 
 
 class AsyncRLock:

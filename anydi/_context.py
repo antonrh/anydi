@@ -5,9 +5,10 @@ import threading
 from types import TracebackType
 from typing import Any
 
+import anyio.to_thread
 from typing_extensions import Self
 
-from ._async import AsyncRLock, run_sync
+from ._async_lock import AsyncRLock
 from ._types import NOT_SET
 
 
@@ -89,7 +90,9 @@ class InstanceContext:
         sync_exit = False
         async_exit = False
         if self._stack is not None:
-            sync_exit = await run_sync(self.__exit__, exc_type, exc_val, exc_tb)
+            sync_exit = await anyio.to_thread.run_sync(
+                self.__exit__, exc_type, exc_val, exc_tb
+            )
         if self._async_stack is not None:
             async_exit = await self._async_stack.__aexit__(exc_type, exc_val, exc_tb)
         return bool(sync_exit) or bool(async_exit)
