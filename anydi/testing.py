@@ -7,9 +7,9 @@ import wrapt  # type: ignore
 from typing_extensions import Self, type_repr
 
 from ._container import Container
-from ._context import InstanceContext
 from ._module import ModuleDef
-from ._provider import Provider, ProviderDef, ProviderParameter
+from ._provider import Provider, ProviderDef
+from ._types import NOT_SET
 
 
 class TestContainer(Container):
@@ -54,47 +54,16 @@ class TestContainer(Container):
         finally:
             self._override_instances.pop(interface, None)
 
-    def _resolve_or_create(
-        self, interface: Any, create: bool, /, **defaults: Any
-    ) -> Any:
-        """Internal method to handle instance resolution and creation."""
-        instance = super()._resolve_or_create(interface, create, **defaults)
-        return self._patch_resolver(interface, instance)
+    def _get_override_for(self, interface: Any) -> Any:
+        return self._override_instances.get(interface, NOT_SET)
 
-    async def _aresolve_or_create(
-        self, interface: Any, create: bool, /, **defaults: Any
+    def _wrap_compiled_dependency(
+        self, provider: Provider, annotation: Any, value: Any
     ) -> Any:
-        """Internal method to handle instance resolution and creation asynchronously."""
-        instance = await super()._aresolve_or_create(interface, create, **defaults)
-        return self._patch_resolver(interface, instance)
+        return InstanceProxy(value, interface=annotation)
 
-    def _get_provider_instance(
-        self,
-        provider: Provider,
-        parameter: ProviderParameter,
-        context: InstanceContext | None,
-        /,
-        **defaults: Any,
-    ) -> Any:
-        """Retrieve an instance of a dependency from the scoped context."""
-        instance = super()._get_provider_instance(
-            provider, parameter, context, **defaults
-        )
-        return InstanceProxy(instance, interface=parameter.annotation)
-
-    async def _aget_provider_instance(
-        self,
-        provider: Provider,
-        parameter: ProviderParameter,
-        context: InstanceContext | None,
-        /,
-        **defaults: Any,
-    ) -> Any:
-        """Asynchronously retrieve an instance of a dependency from the context."""
-        instance = await super()._aget_provider_instance(
-            provider, parameter, context, **defaults
-        )
-        return InstanceProxy(instance, interface=parameter.annotation)
+    def _after_compiled_resolve(self, provider: Provider, instance: Any) -> Any:
+        return self._patch_resolver(provider.interface, instance)
 
     def _patch_resolver(self, interface: Any, instance: Any) -> Any:
         """Patch the test resolver for the instance."""
