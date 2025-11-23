@@ -7,6 +7,7 @@ from typing import Any
 
 from typing_extensions import type_repr
 
+from ._async import run_sync
 from ._provider import Provider
 from ._types import NOT_SET, is_async_context_manager, is_context_manager
 
@@ -50,6 +51,7 @@ def compile_resolver(  # noqa: C901
         unresolved_messages[idx] = msg
 
     scope = provider.scope
+    is_class = provider.is_class
     is_generator = provider.is_generator
     is_async_generator = provider.is_async_generator if is_async else False
     is_coroutine = provider.is_coroutine if is_async else False
@@ -271,9 +273,12 @@ def compile_resolver(  # noqa: C901
             )
             create_lines.append("    else:")
             create_lines.append("        cm = _contextmanager(_provider_call)()")
-        create_lines.append("    inst = context.enter(cm)")
+        if is_async:
+            # In async mode, run sync context manager enter in thread
+            create_lines.append("    inst = await _run_sync(context.enter, cm)")
+        else:
+            create_lines.append("    inst = context.enter(cm)")
     else:
-        # Regular sync function - call directly
         if param_names:
             call_args = ", ".join(
                 f"{name}=arg_{idx}" for idx, name in enumerate(param_names)
@@ -299,6 +304,10 @@ def compile_resolver(  # noqa: C901
                 "    if context is not None and _is_class and _is_acm(inst):"
             )
             create_lines.append("        await context.aenter(inst)")
+            create_lines.append(
+                "    elif context is not None and _is_class and _is_cm(inst):"
+            )
+            create_lines.append("        await _run_sync(context.enter, inst)")
         else:
             create_lines.append(
                 "    if context is not None and _is_class and _is_cm(inst):"
@@ -492,6 +501,7 @@ def compile_resolver(  # noqa: C901
     if is_async:
         ns["_asynccontextmanager"] = contextlib.asynccontextmanager
         ns["_is_acm"] = is_async_context_manager
+        ns["_run_sync"] = run_sync
     else:
         ns["_is_async"] = provider.is_async
 
