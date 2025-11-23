@@ -81,9 +81,7 @@ class Container:
         for module in modules:
             self.register_module(module)
 
-    ############################
-    # Properties
-    ############################
+    # == Container Properties ==
 
     @property
     def providers(self) -> dict[type[Any], Provider]:
@@ -95,9 +93,7 @@ class Container:
         """Get the logger instance."""
         return self._logger
 
-    ############################
-    # Lifespan/Context Methods
-    ############################
+    # == Context & Lifespan Management ==
 
     def __enter__(self) -> Self:
         """Enter the singleton context."""
@@ -196,9 +192,7 @@ class Container:
             return self._singleton_context
         return self._get_request_context()
 
-    ############################
-    # Provider Methods
-    ############################
+    # == Provider Registry ==
 
     def register(
         self,
@@ -459,9 +453,7 @@ class Container:
         has_default = parameter.default is not inspect.Parameter.empty
         return has_default_in_kwargs or has_default
 
-    ############################
-    # Instance Methods
-    ############################
+    # == Instance Resolution ==
 
     @overload
     def resolve(self, interface: type[T]) -> T: ...
@@ -549,9 +541,7 @@ class Container:
                 continue
             del context[interface]
 
-    ############################
-    # Injector Methods
-    ############################
+    # == Injection Utilities ==
 
     @overload
     def inject(self, func: Callable[P, T]) -> Callable[P, T]: ...
@@ -675,24 +665,20 @@ class Container:
 
         return interface, True
 
-    ############################
-    # Module Methods
-    ############################
+    # == Module Registration ==
 
     def register_module(self, module: ModuleDef) -> None:
         """Register a module as a callable, module type, or module instance."""
         self._modules.register(module)
 
-    ############################
-    # Scanner Methods
-    ############################
+    # == Package Scanning ==
 
     def scan(
         self, /, packages: PackageOrIterable, *, tags: Iterable[str] | None = None
     ) -> None:
         self._scanner.scan(packages=packages, tags=tags)
 
-    # Testing
+    # == Testing Hooks ==
 
     @contextlib.contextmanager
     def override(self, interface: Any, instance: Any) -> Iterator[None]:
@@ -716,6 +702,8 @@ class Container:
     def _after_compiled_resolve(self, provider: Provider, instance: Any) -> Any:
         """Hook invoked before returning a compiled provider instance."""
         return instance
+
+    # == Resolver Compilation Helpers ==
 
     def _get_or_compile_resolver(
         self, provider: Provider, *, is_async: bool
