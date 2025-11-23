@@ -1231,54 +1231,6 @@ class TestContainer:
 
     # Inspections
 
-    def test_get_provider_arguments(self, container: Container) -> None:
-        @container.provider(scope="singleton")
-        def a() -> int:
-            return 10
-
-        @container.provider(scope="singleton")
-        def b() -> float:
-            return 1.0
-
-        @container.provider(scope="singleton")
-        def c() -> str:
-            return "test"
-
-        def service(a: int, b: float, *, c: str) -> Service:
-            return Service(ident=f"{a}/{b}/{c}")
-
-        provider = container.register(Service, service, scope="singleton")
-
-        context = container._get_instance_context("singleton")
-
-        kwargs = container._get_provided_kwargs(provider, context)
-
-        assert kwargs == {"a": 10, "b": 1.0, "c": "test"}
-
-    async def test_async_get_provider_arguments(self, container: Container) -> None:
-        @container.provider(scope="singleton")
-        async def a() -> int:
-            return 10
-
-        @container.provider(scope="singleton")
-        async def b() -> float:
-            return 1.0
-
-        @container.provider(scope="singleton")
-        async def c() -> str:
-            return "test"
-
-        async def service(a: int, b: float, *, c: str) -> Service:
-            return Service(ident=f"{a}/{b}/{c}")
-
-        provider = container.register(Service, service, scope="singleton")
-
-        context = container._get_instance_context("singleton")
-
-        kwargs = await container._aget_provided_kwargs(provider, context)
-
-        assert kwargs == {"a": 10, "b": 1.0, "c": "test"}
-
     def test_create_transient(self) -> None:
         @transient
         class Component:

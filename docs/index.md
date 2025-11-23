@@ -1,20 +1,14 @@
 # AnyDI
 
-<p align="center">
-    <i>Modern, lightweight Dependency Injection library using type annotations.</i>
-</p>
+<div style="text-align: center;">
 
-<p align="center">
-    <a href="https://github.com/antonrh/anydi/actions/workflows/ci.yml" target="_blank">
-        <img src="https://github.com/antonrh/anydi/actions/workflows/ci.yml/badge.svg" alt="CI">
-    </a>
-    <a href="https://codecov.io/gh/antonrh/anydi" target="_blank">
-        <img src="https://codecov.io/gh/antonrh/anydi/branch/main/graph/badge.svg?token=67CLD19I0C" alt="Coverage">
-    </a>
-    <a href="https://anydi.readthedocs.io/en/latest/?badge=latest" target="_blank">
-        <img src="https://readthedocs.org/projects/anydi/badge/?version=latest" alt="Documentation">
-    </a>
-</p>
+Modern, lightweight Dependency Injection library using type annotations.
+
+[![CI](https://github.com/antonrh/anydi/actions/workflows/ci.yml/badge.svg)](https://github.com/antonrh/anydi/actions/workflows/ci.yml)
+[![Coverage](https://codecov.io/gh/antonrh/anydi/branch/main/graph/badge.svg)](https://codecov.io/gh/antonrh/anydi)
+[![Documentation](https://readthedocs.org/projects/anydi/badge/?version=latest)](https://anydi.readthedocs.io/en/latest/)
+
+</div>
 
 ---
 

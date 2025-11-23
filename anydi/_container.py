@@ -15,18 +15,16 @@ from typing import Annotated, Any, TypeVar, cast, get_args, get_origin, overload
 
 from typing_extensions import ParamSpec, Self, type_repr
 
-from ._async import run_sync
 from ._context import InstanceContext
 from ._decorators import is_provided
 from ._module import ModuleDef, ModuleRegistrar
 from ._provider import Provider, ProviderDef, ProviderKind, ProviderParameter
+from ._resolver import compile_resolver
 from ._scanner import PackageOrIterable, Scanner
 from ._types import (
     NOT_SET,
     Event,
     Scope,
-    is_async_context_manager,
-    is_context_manager,
     is_event_type,
     is_inject_marker,
     is_iterator_type,
@@ -62,6 +60,8 @@ class Container:
         )
         self._unresolved_interfaces: set[Any] = set()
         self._inject_cache: dict[Callable[..., Any], Callable[..., Any]] = {}
+        self._resolver_cache: dict[Any, tuple[Any, Any]] = {}
+        self._async_resolver_cache: dict[Any, tuple[Any, Any]] = {}
 
         # Components
         self._modules = ModuleRegistrar(self)
@@ -81,9 +81,7 @@ class Container:
         for module in modules:
             self.register_module(module)
 
-    ############################
-    # Properties
-    ############################
+    # == Container Properties ==
 
     @property
     def providers(self) -> dict[type[Any], Provider]:
@@ -95,9 +93,7 @@ class Container:
         """Get the logger instance."""
         return self._logger
 
-    ############################
-    # Lifespan/Context Methods
-    ############################
+    # == Context & Lifespan Management ==
 
     def __enter__(self) -> Self:
         """Enter the singleton context."""
@@ -196,9 +192,7 @@ class Container:
             return self._singleton_context
         return self._get_request_context()
 
-    ############################
-    # Provider Methods
-    ############################
+    # == Provider Registry ==
 
     def register(
         self,
@@ -346,7 +340,6 @@ class Container:
                     default=default,
                     has_default=default is not NOT_SET,
                     provider=sub_provider,
-                    shared_scope=sub_provider.scope == scope and scope != "transient",
                 )
             )
 
@@ -460,9 +453,7 @@ class Container:
         has_default = parameter.default is not inspect.Parameter.empty
         return has_default_in_kwargs or has_default
 
-    ############################
-    # Instance Methods
-    ############################
+    # == Instance Resolution ==
 
     @overload
     def resolve(self, interface: type[T]) -> T: ...
@@ -471,8 +462,14 @@ class Container:
     def resolve(self, interface: T) -> T: ...  # type: ignore
 
     def resolve(self, interface: type[T]) -> T:
-        """Resolve an instance by interface."""
-        return self._resolve_or_create(interface, False)
+        """Resolve an instance by interface using compiled sync resolver."""
+        cached = self._resolver_cache.get(interface)
+        if cached is not None:
+            return cached[0](self)
+
+        provider = self._get_or_register_provider(interface)
+        compiled_resolve, _ = self._get_or_compile_resolver(provider, is_async=False)
+        return compiled_resolve(self)
 
     @overload
     async def aresolve(self, interface: type[T]) -> T: ...
@@ -482,15 +479,37 @@ class Container:
 
     async def aresolve(self, interface: type[T]) -> T:
         """Resolve an instance by interface asynchronously."""
-        return await self._aresolve_or_create(interface, False)
+        cached = self._async_resolver_cache.get(interface)
+        if cached is not None:
+            return await cached[0](self)
+
+        provider = self._get_or_register_provider(interface)
+        compiled_resolve, _ = self._get_or_compile_resolver(provider, is_async=True)
+        return await compiled_resolve(self)
 
     def create(self, interface: type[T], /, **defaults: Any) -> T:
         """Create an instance by interface."""
-        return self._resolve_or_create(interface, True, **defaults)
+        if not defaults:
+            cached = self._resolver_cache.get(interface)
+            if cached is not None:
+                return cached[1](self, None)
+
+        provider = self._get_or_register_provider(interface, **defaults)
+        _, compiled_create = self._get_or_compile_resolver(provider, is_async=False)
+        defaults_mapping = defaults or None
+        return compiled_create(self, defaults_mapping)
 
     async def acreate(self, interface: type[T], /, **defaults: Any) -> T:
         """Create an instance by interface asynchronously."""
-        return await self._aresolve_or_create(interface, True, **defaults)
+        if not defaults:
+            cached = self._async_resolver_cache.get(interface)
+            if cached is not None:
+                return await cached[1](self, None)
+
+        provider = self._get_or_register_provider(interface, **defaults)
+        _, compiled_create = self._get_or_compile_resolver(provider, is_async=True)
+        defaults_mapping = defaults or None
+        return await compiled_create(self, defaults_mapping)
 
     def is_resolved(self, interface: Any) -> bool:
         """Check if an instance by interface exists."""
@@ -522,291 +541,7 @@ class Container:
                 continue
             del context[interface]
 
-    def _resolve_or_create(
-        self, interface: Any, create: bool, /, **defaults: Any
-    ) -> Any:
-        """Internal method to handle instance resolution and creation."""
-        provider = self._get_or_register_provider(interface, **defaults)
-        return self._resolve_with_provider(provider, create, **defaults)
-
-    async def _aresolve_or_create(
-        self, interface: Any, create: bool, /, **defaults: Any
-    ) -> Any:
-        """Internal method to handle instance resolution and creation asynchronously."""
-        provider = self._get_or_register_provider(interface, **defaults)
-        return await self._aresolve_with_provider(provider, create, **defaults)
-
-    def _resolve_with_provider(
-        self, provider: Provider, create: bool, /, **defaults: Any
-    ) -> Any:
-        if provider.scope == "transient":
-            return self._create_instance(provider, None, **defaults)
-
-        context = self._get_instance_context(provider.scope)
-        if not create:
-            cached = context.get(provider.interface)
-            if cached is not NOT_SET:
-                return cached
-
-        with context.lock():
-            return (
-                self._get_or_create_instance(provider, context)
-                if not create
-                else self._create_instance(provider, context, **defaults)
-            )
-
-    async def _aresolve_with_provider(
-        self, provider: Provider, create: bool, /, **defaults: Any
-    ) -> Any:
-        if provider.scope == "transient":
-            return await self._acreate_instance(provider, None, **defaults)
-
-        context = self._get_instance_context(provider.scope)
-        if not create:
-            cached = context.get(provider.interface)
-            if cached is not NOT_SET:
-                return cached
-        async with context.alock():
-            return (
-                await self._aget_or_create_instance(provider, context)
-                if not create
-                else await self._acreate_instance(provider, context, **defaults)
-            )
-
-    def _get_or_create_instance(
-        self, provider: Provider, context: InstanceContext
-    ) -> Any:
-        """Get an instance of a dependency from the scoped context."""
-        instance = context.get(provider.interface)
-        if instance is NOT_SET:
-            instance = self._create_instance(provider, context)
-            context.set(provider.interface, instance)
-            return instance
-        return instance
-
-    async def _aget_or_create_instance(
-        self, provider: Provider, context: InstanceContext
-    ) -> Any:
-        """Get an async instance of a dependency from the scoped context."""
-        instance = context.get(provider.interface)
-        if instance is NOT_SET:
-            instance = await self._acreate_instance(provider, context)
-            context.set(provider.interface, instance)
-            return instance
-        return instance
-
-    def _create_instance(
-        self, provider: Provider, context: InstanceContext | None, /, **defaults: Any
-    ) -> Any:
-        """Create an instance using the provider."""
-        if provider.is_async:
-            raise TypeError(
-                f"The instance for the provider `{provider.name}` cannot be created in "
-                "synchronous mode."
-            )
-
-        provider_kwargs = self._get_provided_kwargs(
-            provider, context, defaults=defaults
-        )
-
-        if provider.is_generator:
-            if context is None:
-                raise ValueError("The context is required for generator providers.")
-            cm = contextlib.contextmanager(provider.call)(**provider_kwargs)
-            return context.enter(cm)
-
-        instance = provider.call(**provider_kwargs)
-        if context is not None and provider.is_class and is_context_manager(instance):
-            context.enter(instance)
-        return instance
-
-    async def _acreate_instance(
-        self, provider: Provider, context: InstanceContext | None, /, **defaults: Any
-    ) -> Any:
-        """Create an instance asynchronously using the provider."""
-        provider_kwargs = await self._aget_provided_kwargs(
-            provider, context, defaults=defaults if defaults else None
-        )
-
-        if provider.is_coroutine:
-            return await provider.call(**provider_kwargs)
-
-        if provider.is_async_generator:
-            if context is None:
-                raise ValueError(
-                    "The async stack is required for async generator providers."
-                )
-            cm = contextlib.asynccontextmanager(provider.call)(**provider_kwargs)
-            return await context.aenter(cm)
-
-        if provider.is_generator:
-
-            def _create() -> Any:
-                if context is None:
-                    raise ValueError("The stack is required for generator providers.")
-                cm = contextlib.contextmanager(provider.call)(**provider_kwargs)
-                return context.enter(cm)
-
-            return await run_sync(_create)
-
-        instance = provider.call(**provider_kwargs)
-        if (
-            context is not None
-            and provider.is_class
-            and is_async_context_manager(instance)
-        ):
-            await context.aenter(instance)
-        return instance
-
-    def _get_provided_kwargs(
-        self,
-        provider: Provider,
-        context: InstanceContext | None,
-        /,
-        defaults: dict[str, Any] | None = None,
-    ) -> dict[str, Any]:
-        """Retrieve the arguments for a provider."""
-        if not provider.parameters:
-            return defaults or {}
-
-        provided_kwargs = defaults or {}
-        for parameter in provider.parameters:
-            provided_kwargs[parameter.name] = self._get_provider_instance(
-                provider,
-                parameter,
-                context,
-                defaults=defaults,
-            )
-        return provided_kwargs
-
-    def _get_provider_instance(  # noqa: C901
-        self,
-        provider: Provider,
-        parameter: ProviderParameter,
-        context: InstanceContext | None,
-        /,
-        *,
-        defaults: dict[str, Any] | None = None,
-    ) -> Any:
-        """Retrieve an instance of a dependency from the scoped context."""
-
-        if defaults and parameter.name in defaults:
-            return defaults[parameter.name]
-
-        sub_provider = parameter.provider
-
-        if context is not None:
-            if parameter.shared_scope and sub_provider is not None:
-                existing = context.get(sub_provider.interface)
-                if existing is not NOT_SET:
-                    return existing
-                if sub_provider.interface not in self._unresolved_interfaces:
-                    return self._get_or_create_instance(sub_provider, context)
-            cached = context.get(parameter.annotation)
-            if cached is not NOT_SET:
-                return cached
-
-        if sub_provider is not None:
-            if sub_provider.scope == "transient":
-                return self._create_instance(sub_provider, None)
-            if sub_provider.scope == "singleton" and sub_provider is not provider:
-                return self._resolve_with_provider(sub_provider, False)
-
-        try:
-            return self._resolve_parameter(provider, parameter)
-        except LookupError:
-            if not parameter.has_default:
-                raise
-            return parameter.default
-
-    async def _aget_provided_kwargs(
-        self,
-        provider: Provider,
-        context: InstanceContext | None,
-        /,
-        defaults: dict[str, Any] | None = None,
-    ) -> dict[str, Any]:
-        """Asynchronously retrieve the arguments for a provider."""
-        if not provider.parameters:
-            return defaults or {}
-
-        provided_kwargs = dict(defaults) if defaults else {}
-        for parameter in provider.parameters:
-            provided_kwargs[parameter.name] = await self._aget_provider_instance(
-                provider,
-                parameter,
-                context,
-                defaults=defaults,
-            )
-        return provided_kwargs
-
-    async def _aget_provider_instance(  # noqa: C901
-        self,
-        provider: Provider,
-        parameter: ProviderParameter,
-        context: InstanceContext | None,
-        /,
-        *,
-        defaults: dict[str, Any] | None = None,
-    ) -> Any:
-        """Asynchronously retrieve an instance of a dependency from the context."""
-
-        if defaults and parameter.name in defaults:
-            return defaults[parameter.name]
-
-        sub_provider = parameter.provider
-
-        if context is not None:
-            if parameter.shared_scope and sub_provider is not None:
-                existing = context.get(sub_provider.interface)
-                if existing is not NOT_SET:
-                    return existing
-                if sub_provider.interface not in self._unresolved_interfaces:
-                    return await self._aget_or_create_instance(sub_provider, context)
-            cached = context.get(parameter.annotation)
-            if cached is not NOT_SET:
-                return cached
-
-        if sub_provider is not None:
-            if sub_provider.scope == "transient":
-                return await self._acreate_instance(sub_provider, None)
-            if sub_provider.scope == "singleton" and sub_provider is not provider:
-                return await self._aresolve_with_provider(sub_provider, False)
-
-        try:
-            return await self._aresolve_parameter(provider, parameter)
-        except LookupError:
-            if not parameter.has_default:
-                raise
-            return parameter.default
-
-    def _resolve_parameter(
-        self, provider: Provider, parameter: ProviderParameter
-    ) -> Any:
-        self._validate_resolvable_parameter(provider, parameter)
-        return self._resolve_or_create(parameter.annotation, False)
-
-    async def _aresolve_parameter(
-        self, provider: Provider, parameter: ProviderParameter
-    ) -> Any:
-        self._validate_resolvable_parameter(provider, parameter)
-        return await self._aresolve_or_create(parameter.annotation, False)
-
-    def _validate_resolvable_parameter(
-        self, provider: Provider, parameter: ProviderParameter
-    ) -> None:
-        """Ensure that the specified interface is resolved."""
-        if parameter.annotation in self._unresolved_interfaces:
-            raise LookupError(
-                f"You are attempting to get the parameter `{parameter.name}` with the "
-                f"annotation `{type_repr(parameter.annotation)}` as a "
-                f"dependency into `{type_repr(provider.call)}` which is "
-                "not registered or set in the scoped context."
-            )
-
-    ############################
-    # Injector Methods
-    ############################
+    # == Injection Utilities ==
 
     @overload
     def inject(self, func: Callable[P, T]) -> Callable[P, T]: ...
@@ -930,26 +665,20 @@ class Container:
 
         return interface, True
 
-    ############################
-    # Module Methods
-    ############################
+    # == Module Registration ==
 
     def register_module(self, module: ModuleDef) -> None:
         """Register a module as a callable, module type, or module instance."""
         self._modules.register(module)
 
-    ############################
-    # Scanner Methods
-    ############################
+    # == Package Scanning ==
 
     def scan(
         self, /, packages: PackageOrIterable, *, tags: Iterable[str] | None = None
     ) -> None:
         self._scanner.scan(packages=packages, tags=tags)
 
-    ############################
-    # Testing
-    ############################
+    # == Testing Hooks ==
 
     @contextlib.contextmanager
     def override(self, interface: Any, instance: Any) -> Iterator[None]:
@@ -959,3 +688,70 @@ class Container:
             "Example:\n\n"
             "    container = TestContainer.from_container(container)"
         )
+
+    def _get_override_for(self, interface: Any) -> Any:
+        """Return an overridden instance for the interface if configured."""
+        return NOT_SET
+
+    def _wrap_compiled_dependency(
+        self, provider: Provider, annotation: Any, value: Any
+    ) -> Any:
+        """Hook for wrapping compiled dependency values (used for testing)."""
+        return value
+
+    def _after_compiled_resolve(self, provider: Provider, instance: Any) -> Any:
+        """Hook invoked before returning a compiled provider instance."""
+        return instance
+
+    # == Resolver Compilation Helpers ==
+
+    def _get_or_compile_resolver(
+        self, provider: Provider, *, is_async: bool
+    ) -> tuple[Any, Any]:
+        """Get or compile resolver for the given provider."""
+        cache = self._async_resolver_cache if is_async else self._resolver_cache
+        cached = cache.get(provider.interface)
+        if cached is None:
+            self._compile_resolver(provider, is_async=is_async)
+            cached = cache[provider.interface]
+        return cached
+
+    def _compile_resolver(self, provider: Provider, *, is_async: bool) -> None:
+        """Compile an optimized resolver function for the given provider."""
+        # Select the appropriate cache based on sync/async mode
+        cache = self._async_resolver_cache if is_async else self._resolver_cache
+
+        # Check if already compiled in cache
+        if provider.interface in cache:
+            return
+
+        # Recursively compile dependencies first
+        for p in provider.parameters:
+            if p.provider is not None:
+                self._compile_resolver(p.provider, is_async=is_async)
+
+        # Determine compilation flags based on container type
+        has_override_support = (
+            type(self)._get_override_for is not Container._get_override_for
+        )
+        wrap_dependencies = (
+            type(self)._wrap_compiled_dependency
+            is not Container._wrap_compiled_dependency
+        )
+        wrap_instance = (
+            type(self)._after_compiled_resolve is not Container._after_compiled_resolve
+        )
+
+        # Compile the resolver and creator functions
+        resolver, creator = compile_resolver(
+            provider,
+            is_async=is_async,
+            unresolved_interfaces=self._unresolved_interfaces,
+            request_context_var=self._request_context_var,
+            has_override_support=has_override_support,
+            wrap_dependencies=wrap_dependencies,
+            wrap_instance=wrap_instance,
+        )
+
+        # Store the compiled functions in the container's cache
+        cache[provider.interface] = (resolver, creator)
