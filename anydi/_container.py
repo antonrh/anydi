@@ -649,7 +649,7 @@ class Container:
 
             return await run_sync(_create)
 
-        instance = await run_sync(provider.call, **provider_kwargs)
+        instance = provider.call(**provider_kwargs)
         if (
             context is not None
             and provider.is_class
