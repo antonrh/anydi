@@ -16,6 +16,7 @@ def compile_resolver(  # noqa: C901
     *,
     is_async: bool,
     unresolved_interfaces: set[Any],
+    request_context_var: Any,
     has_override_support: bool = False,
     wrap_dependencies: bool = False,
     wrap_instance: bool = False,
@@ -327,7 +328,15 @@ def compile_resolver(  # noqa: C901
     if scope == "singleton":
         resolver_lines.append("    context = container._singleton_context")
     elif scope == "request":
-        resolver_lines.append("    context = container._get_request_context()")
+        # Inline ContextVar.get() to avoid function call overhead
+        resolver_lines.append("    context = _request_context_var.get()")
+        resolver_lines.append("    if context is None:")
+        resolver_lines.append(
+            "        raise LookupError("
+            '"The request context has not been started. Please ensure that '
+            'the request context is properly initialized before attempting to use it."'
+            ")"
+        )
     else:
         resolver_lines.append("    context = None")
 
@@ -408,7 +417,14 @@ def compile_resolver(  # noqa: C901
     if scope == "singleton":
         create_resolver_lines.append("    context = container._singleton_context")
     elif scope == "request":
-        create_resolver_lines.append("    context = container._get_request_context()")
+        create_resolver_lines.append("    context = _request_context_var.get()")
+        create_resolver_lines.append("    if context is None:")
+        create_resolver_lines.append(
+            "        raise LookupError("
+            '"The request context has not been started. Please ensure that '
+            'the request context is properly initialized before attempting to use it."'
+            ")"
+        )
     else:
         create_resolver_lines.append("    context = None")
 
@@ -467,6 +483,10 @@ def compile_resolver(  # noqa: C901
         "_contextmanager": contextlib.contextmanager,
         "_is_cm": is_context_manager,
     }
+
+    # Add request scope ContextVar for direct access
+    if scope == "request":
+        ns["_request_context_var"] = request_context_var
 
     # Add async-specific namespace entries
     if is_async:

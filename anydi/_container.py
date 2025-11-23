@@ -471,6 +471,10 @@ class Container:
 
     def resolve(self, interface: type[T]) -> T:
         """Resolve an instance by interface using compiled sync resolver."""
+        cached = self._resolver_cache.get(interface)
+        if cached is not None:
+            return cached[0](self)
+
         provider = self._get_or_register_provider(interface)
         compiled_resolve, _ = self._get_or_compile_resolver(provider, is_async=False)
         return compiled_resolve(self)
@@ -483,12 +487,21 @@ class Container:
 
     async def aresolve(self, interface: type[T]) -> T:
         """Resolve an instance by interface asynchronously."""
+        cached = self._async_resolver_cache.get(interface)
+        if cached is not None:
+            return await cached[0](self)
+
         provider = self._get_or_register_provider(interface)
         compiled_resolve, _ = self._get_or_compile_resolver(provider, is_async=True)
         return await compiled_resolve(self)
 
     def create(self, interface: type[T], /, **defaults: Any) -> T:
         """Create an instance by interface."""
+        if not defaults:
+            cached = self._resolver_cache.get(interface)
+            if cached is not None:
+                return cached[1](self, None)
+
         provider = self._get_or_register_provider(interface, **defaults)
         _, compiled_create = self._get_or_compile_resolver(provider, is_async=False)
         defaults_mapping = defaults or None
@@ -496,6 +509,11 @@ class Container:
 
     async def acreate(self, interface: type[T], /, **defaults: Any) -> T:
         """Create an instance by interface asynchronously."""
+        if not defaults:
+            cached = self._async_resolver_cache.get(interface)
+            if cached is not None:
+                return await cached[1](self, None)
+
         provider = self._get_or_register_provider(interface, **defaults)
         _, compiled_create = self._get_or_compile_resolver(provider, is_async=True)
         defaults_mapping = defaults or None
@@ -741,6 +759,7 @@ class Container:
             provider,
             is_async=is_async,
             unresolved_interfaces=self._unresolved_interfaces,
+            request_context_var=self._request_context_var,
             has_override_support=has_override_support,
             wrap_dependencies=wrap_dependencies,
             wrap_instance=wrap_instance,
