@@ -86,7 +86,8 @@ class InstanceContext:
         exc_tb: TracebackType | None,
     ) -> bool:
         """Exit the context asynchronously."""
-        sync_exit, async_exit = False, False
+        sync_exit = False
+        async_exit = False
         if self._stack is not None:
             sync_exit = await run_sync(self.__exit__, exc_type, exc_val, exc_tb)
         if self._async_stack is not None:
