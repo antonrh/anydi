@@ -51,7 +51,6 @@ def compile_resolver(  # noqa: C901
         unresolved_messages[idx] = msg
 
     scope = provider.scope
-    is_class = provider.is_class
     is_generator = provider.is_generator
     is_async_generator = provider.is_async_generator if is_async else False
     is_coroutine = provider.is_coroutine if is_async else False
