@@ -1346,6 +1346,60 @@ class TestContainer:
 
         assert result == "Service(db=db, timeout=60, retries=5)"
 
+    def test_create_without_defaults(self) -> None:
+        """Test create without passing any defaults."""
+
+        @singleton
+        class Database:
+            def __init__(self) -> None:
+                self.name = "db"
+
+        @transient
+        class Service:
+            def __init__(self, db: Database) -> None:
+                self.db = db
+
+        container = Container()
+
+        # Create without any defaults - should use cached resolver
+        instance1 = container.create(Service)
+        instance2 = container.create(Service)
+
+        assert instance1.db.name == "db"
+        assert instance2.db.name == "db"
+
+        # Transient scope should create new instances
+        assert instance1 is not instance2
+        # But singleton dependency should be the same
+        assert instance1.db is instance2.db
+
+    async def test_create_async_without_defaults(self) -> None:
+        """Test acreate without passing any defaults."""
+
+        @singleton
+        class Database:
+            def __init__(self) -> None:
+                self.name = "db"
+
+        @transient
+        class Service:
+            def __init__(self, db: Database) -> None:
+                self.db = db
+
+        container = Container()
+
+        # Create without any defaults - should use cached resolver
+        instance1 = await container.acreate(Service)
+        instance2 = await container.acreate(Service)
+
+        assert instance1.db.name == "db"
+        assert instance2.db.name == "db"
+
+        # Transient scope should create new instances
+        assert instance1 is not instance2
+        # But singleton dependency should be the same
+        assert instance1.db is instance2.db
+
     def test_override_is_not_supported(self, container: Container) -> None:
         with pytest.raises(RuntimeError, match="not supported"):
             with container.override(str, "other"):
