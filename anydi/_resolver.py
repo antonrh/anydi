@@ -137,7 +137,7 @@ def compile_resolver(  # noqa: C901
                     "compiled"
                 )
                 create_lines.append(
-                    f"                    arg_{idx} = await compiled[0](container)"
+                    f"                    arg_{idx} = await compiled[0](container, context)"
                 )
             else:
                 create_lines.append(
@@ -159,19 +159,19 @@ def compile_resolver(  # noqa: C901
                     "compiled"
                 )
                 create_lines.append(
-                    f"                    arg_{idx} = compiled[0](container)"
+                    f"                    arg_{idx} = compiled[0](container, context)"
                 )
             if is_async:
                 create_lines.append("                else:")
                 create_lines.append(
                     f"                    arg_{idx} = "
-                    f"await resolver_cache[subprov.interface][0](container)"
+                    f"await resolver_cache[subprov.interface][0](container, context)"
                 )
             else:
                 create_lines.append("                else:")
                 create_lines.append(
                     f"                    arg_{idx} = "
-                    f"resolver_cache[subprov.interface][0](container)"
+                    f"resolver_cache[subprov.interface][0](container, context)"
                 )
             create_lines.append("            except LookupError:")
             create_lines.append(f"                if _param_has_default[{idx}]:")
@@ -324,9 +324,9 @@ def compile_resolver(  # noqa: C901
 
     resolver_lines: list[str] = []
     if is_async:
-        resolver_lines.append("async def _resolver(container):")
+        resolver_lines.append("async def _resolver(container, context=None):")
     else:
-        resolver_lines.append("def _resolver(container):")
+        resolver_lines.append("def _resolver(container, context=None):")
 
     # Only define NOT_SET_ if we actually need it
     needs_not_set = has_override_support or scope in ("singleton", "request")
@@ -334,9 +334,11 @@ def compile_resolver(  # noqa: C901
         resolver_lines.append("    NOT_SET_ = _NOT_SET")
 
     if scope == "singleton":
-        resolver_lines.append("    context = container._singleton_context")
+        resolver_lines.append("    if context is None:")
+        resolver_lines.append("        context = container._singleton_context")
     elif scope == "request":
-        resolver_lines.append("    context = container._get_request_context()")
+        resolver_lines.append("    if context is None:")
+        resolver_lines.append("        context = container._get_request_context()")
     else:
         resolver_lines.append("    context = None")
 
