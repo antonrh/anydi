@@ -54,15 +54,13 @@ class TestContainer(Container):
         finally:
             self._override_instances.pop(interface, None)
 
-    def _get_override_for(self, interface: Any) -> Any:
+    def _hook_override_for(self, interface: Any) -> Any:
         return self._override_instances.get(interface, NOT_SET)
 
-    def _wrap_compiled_dependency(
-        self, provider: Provider, annotation: Any, value: Any
-    ) -> Any:
+    def _hook_wrap_dependency(self, annotation: Any, value: Any) -> Any:
         return InstanceProxy(value, interface=annotation)
 
-    def _after_compiled_resolve(self, provider: Provider, instance: Any) -> Any:
+    def _hook_post_resolve(self, provider: Provider, instance: Any) -> Any:
         """Patch the test resolver for the instance."""
         if provider.interface in self._override_instances:
             return self._override_instances[provider.interface]

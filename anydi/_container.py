@@ -19,7 +19,7 @@ from ._context import InstanceContext
 from ._decorators import is_provided
 from ._module import ModuleDef, ModuleRegistrar
 from ._provider import Provider, ProviderDef, ProviderKind, ProviderParameter
-from ._resolver import CompiledResolver, compile_resolver
+from ._resolver import CompiledResolver, Resolver
 from ._scanner import PackageOrIterable, Scanner
 from ._types import (
     NOT_SET,
@@ -58,12 +58,12 @@ class Container:
         self._request_context_var: ContextVar[InstanceContext | None] = ContextVar(
             "request_context", default=None
         )
-        self._unresolved_interfaces: set[Any] = set()
         self._inject_cache: dict[Callable[..., Any], Callable[..., Any]] = {}
         self._resolver_cache: dict[Any, CompiledResolver] = {}
         self._async_resolver_cache: dict[Any, CompiledResolver] = {}
 
         # Components
+        self._resolver = Resolver(self)
         self._modules = ModuleRegistrar(self)
         self._scanner = Scanner(self)
 
@@ -346,7 +346,7 @@ class Container:
         # Check for unresolved parameters
         if unresolved_parameter:
             if scope not in ("singleton", "transient"):
-                self._unresolved_interfaces.add(interface)
+                self._resolver.add_unresolved(interface)
             else:
                 raise LookupError(
                     f"The provider `{name}` depends on `{unresolved_parameter.name}` "
@@ -687,20 +687,6 @@ class Container:
             "    container = TestContainer.from_container(container)"
         )
 
-    def _get_override_for(self, interface: Any) -> Any:
-        """Return an overridden instance for the interface if configured."""
-        return NOT_SET
-
-    def _wrap_compiled_dependency(
-        self, provider: Provider, annotation: Any, value: Any
-    ) -> Any:
-        """Hook for wrapping compiled dependency values (used for testing)."""
-        return value
-
-    def _after_compiled_resolve(self, provider: Provider, instance: Any) -> Any:
-        """Hook invoked before returning a compiled provider instance."""
-        return instance
-
     # == Resolver Compilation Helpers ==
 
     def _get_or_compile_resolver(
@@ -728,26 +714,10 @@ class Container:
             if p.provider is not None:
                 self._compile_resolver(p.provider, is_async=is_async)
 
-        # Determine compilation flags based on container type
-        has_override_support = (
-            type(self)._get_override_for is not Container._get_override_for
-        )
-        wrap_dependencies = (
-            type(self)._wrap_compiled_dependency
-            is not Container._wrap_compiled_dependency
-        )
-        wrap_instance = (
-            type(self)._after_compiled_resolve is not Container._after_compiled_resolve
-        )
-
         # Compile the resolver and creator functions
-        compiled = compile_resolver(
+        compiled = self._resolver.compile_resolver(
             provider,
             is_async=is_async,
-            unresolved_interfaces=self._unresolved_interfaces,
-            has_override_support=has_override_support,
-            wrap_dependencies=wrap_dependencies,
-            wrap_instance=wrap_instance,
         )
 
         # Store the compiled functions in the container's cache
