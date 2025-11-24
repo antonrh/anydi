@@ -670,7 +670,7 @@ class Container:
     ) -> None:
         self._scanner.scan(packages=packages, tags=tags)
 
-    # == Testing Hooks ==
+    # == Testing ==
 
     @contextlib.contextmanager
     def override(self, interface: Any, instance: Any) -> Iterator[None]:
