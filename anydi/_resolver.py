@@ -76,19 +76,27 @@ class Resolver:
         wrap_dependencies = self._wrap_dependencies
         wrap_instance = self._wrap_instance
         num_params = len(provider.parameters)
-        param_providers: list[Provider | None] = [None] * num_params
+        param_resolvers: list[Any] = [None] * num_params
         param_annotations: list[Any] = [None] * num_params
         param_defaults: list[Any] = [None] * num_params
         param_has_default: list[bool] = [False] * num_params
         param_names: list[str] = [""] * num_params
         unresolved_messages: list[str] = [""] * num_params
 
+        cache = self._async_cache if is_async else self._cache
+
         for idx, p in enumerate(provider.parameters):
-            param_providers[idx] = p.provider
             param_annotations[idx] = p.annotation
             param_defaults[idx] = p.default
             param_has_default[idx] = p.has_default
             param_names[idx] = p.name
+
+            if p.provider is not None:
+                compiled = cache.get(p.provider.interface)
+                if compiled is None:
+                    compiled = self.compile(p.provider, is_async=is_async)
+                    cache[p.provider.interface] = compiled
+                param_resolvers[idx] = compiled.resolve
 
             msg = (
                 f"You are attempting to get the parameter `{p.name}` with the "
@@ -107,12 +115,11 @@ class Resolver:
         create_lines: list[str] = []
         if is_async:
             create_lines.append(
-                "async def _create_instance("
-                "container, context, store_result, defaults):"
+                "async def _create_instance(container, context, store, defaults):"
             )
         else:
             create_lines.append(
-                "def _create_instance(container, context, store_result, defaults):"
+                "def _create_instance(container, context, store, defaults):"
             )
 
         if no_params:
@@ -161,11 +168,9 @@ class Resolver:
                 create_lines.append(
                     f"                raise LookupError(_unresolved_messages[{idx}])"
                 )
-                create_lines.append("            try:")
-                create_lines.append(
-                    f"                subprov = _param_providers[{idx}]"
-                )
-                create_lines.append("                if subprov is None:")
+                create_lines.append(f"            resolver = _param_resolvers[{idx}]")
+                create_lines.append("            if resolver is None:")
+                create_lines.append("                try:")
                 if is_async:
                     create_lines.append(
                         f"                    compiled = "
@@ -209,25 +214,25 @@ class Resolver:
                         f"                    arg_{idx} = "
                         f"compiled[0](container, context)"
                     )
+                create_lines.append("                except LookupError:")
+                create_lines.append(
+                    f"                    if _param_has_default[{idx}]:"
+                )
+                create_lines.append(
+                    f"                        arg_{idx} = _param_defaults[{idx}]"
+                )
+                create_lines.append("                    else:")
+                create_lines.append("                        raise")
+                create_lines.append("            else:")
                 if is_async:
-                    create_lines.append("                else:")
                     create_lines.append(
-                        f"                    arg_{idx} = await "
-                        f"cache[subprov.interface][0](container, context)"
+                        f"                arg_{idx} = await resolver("
+                        f"container, context)"
                     )
                 else:
-                    create_lines.append("                else:")
                     create_lines.append(
-                        f"                    arg_{idx} = "
-                        f"cache[subprov.interface][0](container, context)"
+                        f"                arg_{idx} = resolver(container, context)"
                     )
-                create_lines.append("            except LookupError:")
-                create_lines.append(f"                if _param_has_default[{idx}]:")
-                create_lines.append(
-                    f"                    arg_{idx} = _param_defaults[{idx}]"
-                )
-                create_lines.append("                else:")
-                create_lines.append("                    raise")
                 create_lines.append("        else:")
                 create_lines.append(f"            arg_{idx} = cached")
                 if wrap_dependencies:
@@ -365,7 +370,7 @@ class Resolver:
                 )
                 create_lines.append("        context.enter(inst)")
 
-        create_lines.append("    if context is not None and store_result:")
+        create_lines.append("    if context is not None and store:")
         create_lines.append("        context.set(_interface, inst)")
 
         if wrap_instance:
@@ -530,10 +535,10 @@ class Resolver:
             "_provider_call": provider.call,
             "_provider_name": provider.name,
             "_is_class": provider.is_class,
-            "_param_providers": param_providers,
             "_param_annotations": param_annotations,
             "_param_defaults": param_defaults,
             "_param_has_default": param_has_default,
+            "_param_resolvers": param_resolvers,
             "_unresolved_messages": unresolved_messages,
             "_unresolved_interfaces": self._unresolved_interfaces,
             "_NOT_SET": NOT_SET,
