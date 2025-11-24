@@ -24,6 +24,8 @@ class Resolver:
     def __init__(self, container: Container) -> None:
         self._container = container
         self._unresolved_interfaces: set[Any] = set()
+        self._cache: dict[Any, CompiledResolver] = {}
+        self._async_cache: dict[Any, CompiledResolver] = {}
 
         # Determine compilation flags based on whether methods are overridden
         self._has_override_support = callable(
@@ -39,11 +41,35 @@ class Resolver:
     def add_unresolved(self, interface: Any) -> None:
         self._unresolved_interfaces.add(interface)
 
-    def compile_resolver(  # noqa: C901
-        self,
-        provider: Provider,
-        *,
-        is_async: bool,
+    def get_cached(self, interface: Any, *, is_async: bool) -> CompiledResolver | None:
+        """Get cached resolver if it exists."""
+        cache = self._async_cache if is_async else self._cache
+        return cache.get(interface)
+
+    def compile(self, provider: Provider, *, is_async: bool) -> CompiledResolver:
+        """Compile an optimized resolver function for the given provider."""
+        # Select the appropriate cache based on sync/async mode
+        cache = self._async_cache if is_async else self._cache
+
+        # Check if already compiled in cache
+        if provider.interface in cache:
+            return cache[provider.interface]
+
+        # Recursively compile dependencies first
+        for p in provider.parameters:
+            if p.provider is not None:
+                self.compile(p.provider, is_async=is_async)
+
+        # Compile the resolver and creator functions
+        compiled = self._compile_resolver(provider, is_async=is_async)
+
+        # Store the compiled functions in the cache
+        cache[provider.interface] = compiled
+
+        return compiled
+
+    def _compile_resolver(  # noqa: C901
+        self, provider: Provider, *, is_async: bool
     ) -> CompiledResolver:
         """Compile optimized resolver functions for the given provider."""
         has_override_support = self._has_override_support
@@ -111,12 +137,7 @@ class Resolver:
                     ")"
                 )
             # Cache the resolver cache for faster repeated access
-            if is_async:
-                create_lines.append(
-                    "    resolver_cache = container._async_resolver_cache"
-                )
-            else:
-                create_lines.append("    resolver_cache = container._resolver_cache")
+            create_lines.append("    cache = _cache")
 
         if not no_params:
             # Only generate parameter resolution logic if there are parameters
@@ -148,7 +169,7 @@ class Resolver:
                 if is_async:
                     create_lines.append(
                         f"                    compiled = "
-                        f"resolver_cache.get(_param_annotations[{idx}])"
+                        f"cache.get(_param_annotations[{idx}])"
                     )
                     create_lines.append("                    if compiled is None:")
                     create_lines.append(
@@ -158,11 +179,10 @@ class Resolver:
                     )
                     create_lines.append(
                         "                        compiled = "
-                        "container._get_compiled_async_resolvers(provider)"
+                        "_compile(provider, is_async=True)"
                     )
                     create_lines.append(
-                        "                        resolver_cache[provider.interface] = "
-                        "compiled"
+                        "                        cache[provider.interface] = compiled"
                     )
                     create_lines.append(
                         f"                    arg_{idx} = "
@@ -171,21 +191,19 @@ class Resolver:
                 else:
                     create_lines.append(
                         f"                    compiled = "
-                        f"resolver_cache.get(_param_annotations[{idx}])"
+                        f"cache.get(_param_annotations[{idx}])"
                     )
                     create_lines.append("                    if compiled is None:")
                     create_lines.append(
                         "                        provider = "
-                        "container._get_or_register_provider("
-                        f"_param_annotations[{idx}])"
+                        "container._get_or_register_provider(_param_annotations[{idx}])"
                     )
                     create_lines.append(
                         "                        compiled = "
-                        "container._get_compiled_resolvers(provider)"
+                        "_compile(provider, is_async=False)"
                     )
                     create_lines.append(
-                        "                        resolver_cache[provider.interface] = "
-                        "compiled"
+                        "                        cache[provider.interface] = compiled"
                     )
                     create_lines.append(
                         f"                    arg_{idx} = "
@@ -195,13 +213,13 @@ class Resolver:
                     create_lines.append("                else:")
                     create_lines.append(
                         f"                    arg_{idx} = await "
-                        f"resolver_cache[subprov.interface][0](container, context)"
+                        f"cache[subprov.interface][0](container, context)"
                     )
                 else:
                     create_lines.append("                else:")
                     create_lines.append(
                         f"                    arg_{idx} = "
-                        f"resolver_cache[subprov.interface][0](container, context)"
+                        f"cache[subprov.interface][0](container, context)"
                     )
                 create_lines.append("            except LookupError:")
                 create_lines.append(f"                if _param_has_default[{idx}]:")
@@ -521,6 +539,8 @@ class Resolver:
             "_NOT_SET": NOT_SET,
             "_contextmanager": contextlib.contextmanager,
             "_is_cm": is_context_manager,
+            "_cache": self._async_cache if is_async else self._cache,
+            "_compile": self._compile_resolver,
         }
 
         # Add async-specific namespace entries
