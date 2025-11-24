@@ -19,7 +19,7 @@ from ._context import InstanceContext
 from ._decorators import is_provided
 from ._module import ModuleDef, ModuleRegistrar
 from ._provider import Provider, ProviderDef, ProviderKind, ProviderParameter
-from ._resolver import compile_resolver
+from ._resolver import Resolver
 from ._scanner import PackageOrIterable, Scanner
 from ._types import (
     NOT_SET,
@@ -58,12 +58,10 @@ class Container:
         self._request_context_var: ContextVar[InstanceContext | None] = ContextVar(
             "request_context", default=None
         )
-        self._unresolved_interfaces: set[Any] = set()
         self._inject_cache: dict[Callable[..., Any], Callable[..., Any]] = {}
-        self._resolver_cache: dict[Any, tuple[Any, Any]] = {}
-        self._async_resolver_cache: dict[Any, tuple[Any, Any]] = {}
 
         # Components
+        self._resolver = Resolver(self)
         self._modules = ModuleRegistrar(self)
         self._scanner = Scanner(self)
 
@@ -251,8 +249,7 @@ class Container:
         scope: Scope,
         interface: Any = NOT_SET,
         override: bool = False,
-        /,
-        **defaults: Any,
+        defaults: dict[str, Any] | None = None,
     ) -> Provider:
         """Register a provider with the specified scope."""
         name = type_repr(call)
@@ -315,10 +312,17 @@ class Container:
                     f"are not allowed in the provider `{name}`."
                 )
 
+            default = (
+                parameter.default
+                if parameter.default is not inspect.Parameter.empty
+                else NOT_SET
+            )
+            has_default = default is not NOT_SET
+
             try:
                 sub_provider = self._get_or_register_provider(parameter.annotation)
             except LookupError as exc:
-                if self._parameter_has_default(parameter, **defaults):
+                if parameter.name in defaults if defaults else False or has_default:
                     continue
                 unresolved_parameter = parameter
                 unresolved_exc = exc
@@ -328,17 +332,12 @@ class Container:
             if sub_provider.scope not in scopes:
                 scopes[sub_provider.scope] = sub_provider
 
-            default = (
-                parameter.default
-                if parameter.default is not inspect.Parameter.empty
-                else NOT_SET
-            )
             parameters.append(
                 ProviderParameter(
                     name=parameter.name,
                     annotation=parameter.annotation,
                     default=default,
-                    has_default=default is not NOT_SET,
+                    has_default=has_default,
                     provider=sub_provider,
                 )
             )
@@ -346,7 +345,7 @@ class Container:
         # Check for unresolved parameters
         if unresolved_parameter:
             if scope not in ("singleton", "transient"):
-                self._unresolved_interfaces.add(interface)
+                self._resolver.add_unresolved(interface)
             else:
                 raise LookupError(
                     f"The provider `{name}` depends on `{unresolved_parameter.name}` "
@@ -413,7 +412,9 @@ class Container:
                 "properly registered before attempting to use it."
             ) from exc
 
-    def _get_or_register_provider(self, interface: Any, /, **defaults: Any) -> Provider:
+    def _get_or_register_provider(
+        self, interface: Any, defaults: dict[str, Any] | None = None
+    ) -> Provider:
         """Get or register a provider by interface."""
         try:
             return self._providers[interface]
@@ -423,7 +424,8 @@ class Container:
                     interface,
                     interface.__provided__["scope"],
                     NOT_SET,
-                    **defaults,
+                    False,
+                    defaults,
                 )
             raise LookupError(
                 f"The provider interface `{type_repr(interface)}` is either not "
@@ -445,14 +447,6 @@ class Container:
         if provider.is_resource:
             self._resources[provider.scope].remove(provider.interface)
 
-    @staticmethod
-    def _parameter_has_default(
-        parameter: inspect.Parameter, /, **defaults: Any
-    ) -> bool:
-        has_default_in_kwargs = parameter.name in defaults if defaults else False
-        has_default = parameter.default is not inspect.Parameter.empty
-        return has_default_in_kwargs or has_default
-
     # == Instance Resolution ==
 
     @overload
@@ -463,13 +457,13 @@ class Container:
 
     def resolve(self, interface: type[T]) -> T:
         """Resolve an instance by interface using compiled sync resolver."""
-        cached = self._resolver_cache.get(interface)
+        cached = self._resolver.get_cached(interface, is_async=False)
         if cached is not None:
-            return cached[0](self)
+            return cached.resolve(self)
 
         provider = self._get_or_register_provider(interface)
-        compiled_resolve, _ = self._get_or_compile_resolver(provider, is_async=False)
-        return compiled_resolve(self)
+        compiled = self._resolver.compile(provider, is_async=False)
+        return compiled.resolve(self)
 
     @overload
     async def aresolve(self, interface: type[T]) -> T: ...
@@ -479,37 +473,35 @@ class Container:
 
     async def aresolve(self, interface: type[T]) -> T:
         """Resolve an instance by interface asynchronously."""
-        cached = self._async_resolver_cache.get(interface)
+        cached = self._resolver.get_cached(interface, is_async=True)
         if cached is not None:
-            return await cached[0](self)
+            return await cached.resolve(self)
 
         provider = self._get_or_register_provider(interface)
-        compiled_resolve, _ = self._get_or_compile_resolver(provider, is_async=True)
-        return await compiled_resolve(self)
+        compiled = self._resolver.compile(provider, is_async=True)
+        return await compiled.resolve(self)
 
     def create(self, interface: type[T], /, **defaults: Any) -> T:
         """Create an instance by interface."""
         if not defaults:
-            cached = self._resolver_cache.get(interface)
+            cached = self._resolver.get_cached(interface, is_async=False)
             if cached is not None:
-                return cached[1](self, None)
+                return cached.create(self, None)
 
-        provider = self._get_or_register_provider(interface, **defaults)
-        _, compiled_create = self._get_or_compile_resolver(provider, is_async=False)
-        defaults_mapping = defaults or None
-        return compiled_create(self, defaults_mapping)
+        provider = self._get_or_register_provider(interface, defaults)
+        compiled = self._resolver.compile(provider, is_async=False)
+        return compiled.create(self, defaults or None)
 
     async def acreate(self, interface: type[T], /, **defaults: Any) -> T:
         """Create an instance by interface asynchronously."""
         if not defaults:
-            cached = self._async_resolver_cache.get(interface)
+            cached = self._resolver.get_cached(interface, is_async=True)
             if cached is not None:
-                return await cached[1](self, None)
+                return await cached.create(self, None)
 
-        provider = self._get_or_register_provider(interface, **defaults)
-        _, compiled_create = self._get_or_compile_resolver(provider, is_async=True)
-        defaults_mapping = defaults or None
-        return await compiled_create(self, defaults_mapping)
+        provider = self._get_or_register_provider(interface, defaults)
+        compiled = self._resolver.compile(provider, is_async=True)
+        return await compiled.create(self, defaults or None)
 
     def is_resolved(self, interface: Any) -> bool:
         """Check if an instance by interface exists."""
@@ -678,7 +670,7 @@ class Container:
     ) -> None:
         self._scanner.scan(packages=packages, tags=tags)
 
-    # == Testing Hooks ==
+    # == Testing ==
 
     @contextlib.contextmanager
     def override(self, interface: Any, instance: Any) -> Iterator[None]:
@@ -688,70 +680,3 @@ class Container:
             "Example:\n\n"
             "    container = TestContainer.from_container(container)"
         )
-
-    def _get_override_for(self, interface: Any) -> Any:
-        """Return an overridden instance for the interface if configured."""
-        return NOT_SET
-
-    def _wrap_compiled_dependency(
-        self, provider: Provider, annotation: Any, value: Any
-    ) -> Any:
-        """Hook for wrapping compiled dependency values (used for testing)."""
-        return value
-
-    def _after_compiled_resolve(self, provider: Provider, instance: Any) -> Any:
-        """Hook invoked before returning a compiled provider instance."""
-        return instance
-
-    # == Resolver Compilation Helpers ==
-
-    def _get_or_compile_resolver(
-        self, provider: Provider, *, is_async: bool
-    ) -> tuple[Any, Any]:
-        """Get or compile resolver for the given provider."""
-        cache = self._async_resolver_cache if is_async else self._resolver_cache
-        cached = cache.get(provider.interface)
-        if cached is None:
-            self._compile_resolver(provider, is_async=is_async)
-            cached = cache[provider.interface]
-        return cached
-
-    def _compile_resolver(self, provider: Provider, *, is_async: bool) -> None:
-        """Compile an optimized resolver function for the given provider."""
-        # Select the appropriate cache based on sync/async mode
-        cache = self._async_resolver_cache if is_async else self._resolver_cache
-
-        # Check if already compiled in cache
-        if provider.interface in cache:
-            return
-
-        # Recursively compile dependencies first
-        for p in provider.parameters:
-            if p.provider is not None:
-                self._compile_resolver(p.provider, is_async=is_async)
-
-        # Determine compilation flags based on container type
-        has_override_support = (
-            type(self)._get_override_for is not Container._get_override_for
-        )
-        wrap_dependencies = (
-            type(self)._wrap_compiled_dependency
-            is not Container._wrap_compiled_dependency
-        )
-        wrap_instance = (
-            type(self)._after_compiled_resolve is not Container._after_compiled_resolve
-        )
-
-        # Compile the resolver and creator functions
-        resolver, creator = compile_resolver(
-            provider,
-            is_async=is_async,
-            unresolved_interfaces=self._unresolved_interfaces,
-            request_context_var=self._request_context_var,
-            has_override_support=has_override_support,
-            wrap_dependencies=wrap_dependencies,
-            wrap_instance=wrap_instance,
-        )
-
-        # Store the compiled functions in the container's cache
-        cache[provider.interface] = (resolver, creator)
