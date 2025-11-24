@@ -249,8 +249,7 @@ class Container:
         scope: Scope,
         interface: Any = NOT_SET,
         override: bool = False,
-        /,
-        **defaults: Any,
+        defaults: dict[str, Any] | None = None,
     ) -> Provider:
         """Register a provider with the specified scope."""
         name = type_repr(call)
@@ -316,7 +315,7 @@ class Container:
             try:
                 sub_provider = self._get_or_register_provider(parameter.annotation)
             except LookupError as exc:
-                if self._parameter_has_default(parameter, **defaults):
+                if self._parameter_has_default(parameter, defaults):
                     continue
                 unresolved_parameter = parameter
                 unresolved_exc = exc
@@ -411,7 +410,9 @@ class Container:
                 "properly registered before attempting to use it."
             ) from exc
 
-    def _get_or_register_provider(self, interface: Any, /, **defaults: Any) -> Provider:
+    def _get_or_register_provider(
+        self, interface: Any, defaults: dict[str, Any] | None = None
+    ) -> Provider:
         """Get or register a provider by interface."""
         try:
             return self._providers[interface]
@@ -421,7 +422,8 @@ class Container:
                     interface,
                     interface.__provided__["scope"],
                     NOT_SET,
-                    **defaults,
+                    False,
+                    defaults,
                 )
             raise LookupError(
                 f"The provider interface `{type_repr(interface)}` is either not "
@@ -445,7 +447,7 @@ class Container:
 
     @staticmethod
     def _parameter_has_default(
-        parameter: inspect.Parameter, /, **defaults: Any
+        parameter: inspect.Parameter, defaults: dict[str, Any] | None
     ) -> bool:
         has_default_in_kwargs = parameter.name in defaults if defaults else False
         has_default = parameter.default is not inspect.Parameter.empty
@@ -492,7 +494,7 @@ class Container:
             if cached is not None:
                 return cached.create(self, None)
 
-        provider = self._get_or_register_provider(interface, **defaults)
+        provider = self._get_or_register_provider(interface, defaults)
         compiled = self._resolver.compile(provider, is_async=False)
         return compiled.create(self, defaults or None)
 
@@ -503,7 +505,7 @@ class Container:
             if cached is not None:
                 return await cached.create(self, None)
 
-        provider = self._get_or_register_provider(interface, **defaults)
+        provider = self._get_or_register_provider(interface, defaults)
         compiled = self._resolver.compile(provider, is_async=True)
         return await compiled.create(self, defaults or None)
 
