@@ -8,7 +8,7 @@ from typing_extensions import Self, type_repr
 
 from ._container import Container
 from ._module import ModuleDef
-from ._provider import Provider, ProviderDef
+from ._provider import ProviderDef
 from ._types import NOT_SET
 
 
@@ -60,12 +60,14 @@ class TestContainer(Container):
     def _hook_wrap_dependency(self, annotation: Any, value: Any) -> Any:
         return InstanceProxy(value, interface=annotation)
 
-    def _hook_post_resolve(self, provider: Provider, instance: Any) -> Any:
+    def _hook_post_resolve(self, interface: Any, instance: Any) -> Any:
         """Patch the test resolver for the instance."""
-        if provider.interface in self._override_instances:
-            return self._override_instances[provider.interface]
+        if interface in self._override_instances:
+            return self._override_instances[interface]
 
-        if not hasattr(instance, "__dict__"):
+        if not hasattr(instance, "__dict__") or hasattr(
+            instance, "__resolver_getter__"
+        ):
             return instance
 
         wrapped = {
@@ -74,30 +76,35 @@ class TestContainer(Container):
             if isinstance(value, InstanceProxy)
         }
 
-        # If there are no wrapped dependencies, return instance as-is
-        if not wrapped:
-            return instance
+        def __resolver_getter__(name: str) -> Any:
+            if name in wrapped:
+                _interface = wrapped[name]
+                # Resolve the dependency if it's wrapped
+                return self.resolve(_interface)
+            raise LookupError
 
-        # Create a dynamic subclass with custom __getattribute__ for this instance
-        # This avoids class-level mutation while still intercepting attribute access
-        original_class = instance.__class__
+        # Attach the resolver getter to the instance
+        instance.__resolver_getter__ = __resolver_getter__
 
-        class _ResolverClass(original_class):  # type: ignore
-            def __getattribute__(_self, name: str) -> Any:
-                # Skip special attributes to avoid recursion
-                if name in {"__class__", "__dict__"}:
+        if not hasattr(instance.__class__, "__getattribute_patched__"):
+
+            def __getattribute__(_self: Any, name: str) -> Any:
+                # Skip the resolver getter
+                if name in {"__resolver_getter__", "__class__"}:
                     return object.__getattribute__(_self, name)
 
-                # Try to resolve wrapped dependencies
-                if name in wrapped:
-                    _interface = wrapped[name]
-                    return self.resolve(_interface)
+                if hasattr(_self, "__resolver_getter__"):
+                    try:
+                        return _self.__resolver_getter__(name)
+                    except LookupError:
+                        pass
 
-                # Fall back to the original class's attribute access
-                return original_class.__getattribute__(_self, name)
+                # Fall back to default behavior
+                return object.__getattribute__(_self, name)
 
-        # Change only this instance's class to the dynamic subclass
-        instance.__class__ = _ResolverClass
+            # Apply the patched resolver if wrapped attributes exist
+            instance.__class__.__getattribute__ = __getattribute__
+            instance.__class__.__getattribute_patched__ = True
 
         return instance
 

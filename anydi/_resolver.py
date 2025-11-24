@@ -375,7 +375,7 @@ class Resolver:
 
         if wrap_instance:
             create_lines.append(
-                "    inst = container._hook_post_resolve(_provider, inst)"
+                "    inst = container._hook_post_resolve(_interface, inst)"
             )
         create_lines.append("    return inst")
 
