@@ -1325,6 +1325,27 @@ class TestContainer:
         with pytest.raises(TypeError, match="takes no arguments"):
             await container.acreate(Component, param="test")
 
+    async def test_create_async_function_with_defaults(self) -> None:
+        """Test async function provider with parameters and defaults."""
+
+        @singleton
+        class Database:
+            def __init__(self) -> None:
+                self.name = "db"
+
+        container = Container()
+
+        @container.provider(scope="singleton")
+        async def create_service(
+            db: Database, timeout: int = 30, retries: int = 3
+        ) -> str:
+            return f"Service(db={db.name}, timeout={timeout}, retries={retries})"
+
+        # Create with custom defaults overriding the function defaults
+        result = await container.acreate(str, timeout=60, retries=5)
+
+        assert result == "Service(db=db, timeout=60, retries=5)"
+
     def test_override_is_not_supported(self, container: Container) -> None:
         with pytest.raises(RuntimeError, match="not supported"):
             with container.override(str, "other"):
