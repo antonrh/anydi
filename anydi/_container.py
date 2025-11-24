@@ -312,10 +312,17 @@ class Container:
                     f"are not allowed in the provider `{name}`."
                 )
 
+            default = (
+                parameter.default
+                if parameter.default is not inspect.Parameter.empty
+                else NOT_SET
+            )
+            has_default = default is not NOT_SET
+
             try:
                 sub_provider = self._get_or_register_provider(parameter.annotation)
             except LookupError as exc:
-                if self._parameter_has_default(parameter, defaults):
+                if parameter.name in defaults if defaults else False or has_default:
                     continue
                 unresolved_parameter = parameter
                 unresolved_exc = exc
@@ -325,17 +332,12 @@ class Container:
             if sub_provider.scope not in scopes:
                 scopes[sub_provider.scope] = sub_provider
 
-            default = (
-                parameter.default
-                if parameter.default is not inspect.Parameter.empty
-                else NOT_SET
-            )
             parameters.append(
                 ProviderParameter(
                     name=parameter.name,
                     annotation=parameter.annotation,
                     default=default,
-                    has_default=default is not NOT_SET,
+                    has_default=has_default,
                     provider=sub_provider,
                 )
             )
@@ -444,14 +446,6 @@ class Container:
             del self._providers[provider.interface]
         if provider.is_resource:
             self._resources[provider.scope].remove(provider.interface)
-
-    @staticmethod
-    def _parameter_has_default(
-        parameter: inspect.Parameter, defaults: dict[str, Any] | None
-    ) -> bool:
-        has_default_in_kwargs = parameter.name in defaults if defaults else False
-        has_default = parameter.default is not inspect.Parameter.empty
-        return has_default_in_kwargs or has_default
 
     # == Instance Resolution ==
 
