@@ -19,7 +19,7 @@ from ._context import InstanceContext
 from ._decorators import is_provided
 from ._module import ModuleDef, ModuleRegistrar
 from ._provider import Provider, ProviderDef, ProviderKind, ProviderParameter
-from ._resolver import compile_resolver
+from ._resolver import CompiledResolver, compile_resolver
 from ._scanner import PackageOrIterable, Scanner
 from ._types import (
     NOT_SET,
@@ -60,8 +60,8 @@ class Container:
         )
         self._unresolved_interfaces: set[Any] = set()
         self._inject_cache: dict[Callable[..., Any], Callable[..., Any]] = {}
-        self._resolver_cache: dict[Any, tuple[Any, Any]] = {}
-        self._async_resolver_cache: dict[Any, tuple[Any, Any]] = {}
+        self._resolver_cache: dict[Any, CompiledResolver] = {}
+        self._async_resolver_cache: dict[Any, CompiledResolver] = {}
 
         # Components
         self._modules = ModuleRegistrar(self)
@@ -465,11 +465,11 @@ class Container:
         """Resolve an instance by interface using compiled sync resolver."""
         cached = self._resolver_cache.get(interface)
         if cached is not None:
-            return cached[0](self)
+            return cached.resolve(self)
 
         provider = self._get_or_register_provider(interface)
-        compiled_resolve, _ = self._get_or_compile_resolver(provider, is_async=False)
-        return compiled_resolve(self)
+        compiled = self._get_or_compile_resolver(provider, is_async=False)
+        return compiled.resolve(self)
 
     @overload
     async def aresolve(self, interface: type[T]) -> T: ...
@@ -481,35 +481,33 @@ class Container:
         """Resolve an instance by interface asynchronously."""
         cached = self._async_resolver_cache.get(interface)
         if cached is not None:
-            return await cached[0](self)
+            return await cached.resolve(self)
 
         provider = self._get_or_register_provider(interface)
-        compiled_resolve, _ = self._get_or_compile_resolver(provider, is_async=True)
-        return await compiled_resolve(self)
+        compiled = self._get_or_compile_resolver(provider, is_async=True)
+        return await compiled.resolve(self)
 
     def create(self, interface: type[T], /, **defaults: Any) -> T:
         """Create an instance by interface."""
         if not defaults:
             cached = self._resolver_cache.get(interface)
             if cached is not None:
-                return cached[1](self, None)
+                return cached.create(self, None)
 
         provider = self._get_or_register_provider(interface, **defaults)
-        _, compiled_create = self._get_or_compile_resolver(provider, is_async=False)
-        defaults_mapping = defaults or None
-        return compiled_create(self, defaults_mapping)
+        compiled = self._get_or_compile_resolver(provider, is_async=False)
+        return compiled.create(self, defaults or None)
 
     async def acreate(self, interface: type[T], /, **defaults: Any) -> T:
         """Create an instance by interface asynchronously."""
         if not defaults:
             cached = self._async_resolver_cache.get(interface)
             if cached is not None:
-                return await cached[1](self, None)
+                return await cached.create(self, None)
 
         provider = self._get_or_register_provider(interface, **defaults)
-        _, compiled_create = self._get_or_compile_resolver(provider, is_async=True)
-        defaults_mapping = defaults or None
-        return await compiled_create(self, defaults_mapping)
+        compiled = self._get_or_compile_resolver(provider, is_async=True)
+        return await compiled.create(self, defaults or None)
 
     def is_resolved(self, interface: Any) -> bool:
         """Check if an instance by interface exists."""
@@ -707,7 +705,7 @@ class Container:
 
     def _get_or_compile_resolver(
         self, provider: Provider, *, is_async: bool
-    ) -> tuple[Any, Any]:
+    ) -> CompiledResolver:
         """Get or compile resolver for the given provider."""
         cache = self._async_resolver_cache if is_async else self._resolver_cache
         cached = cache.get(provider.interface)
@@ -743,7 +741,7 @@ class Container:
         )
 
         # Compile the resolver and creator functions
-        resolver, creator = compile_resolver(
+        compiled = compile_resolver(
             provider,
             is_async=is_async,
             unresolved_interfaces=self._unresolved_interfaces,
@@ -754,4 +752,4 @@ class Container:
         )
 
         # Store the compiled functions in the container's cache
-        cache[provider.interface] = (resolver, creator)
+        cache[provider.interface] = compiled

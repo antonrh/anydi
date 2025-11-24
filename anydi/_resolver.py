@@ -3,13 +3,18 @@
 from __future__ import annotations
 
 import contextlib
-from typing import Any
+from typing import Any, NamedTuple
 
 import anyio.to_thread
 from typing_extensions import type_repr
 
 from ._provider import Provider
 from ._types import NOT_SET, is_async_context_manager, is_context_manager
+
+
+class CompiledResolver(NamedTuple):
+    resolve: Any
+    create: Any
 
 
 def compile_resolver(  # noqa: C901
@@ -21,7 +26,7 @@ def compile_resolver(  # noqa: C901
     has_override_support: bool = False,
     wrap_dependencies: bool = False,
     wrap_instance: bool = False,
-) -> tuple[Any, Any]:
+) -> CompiledResolver:
     """
     Compile optimized resolver functions for the given provider.
 
@@ -508,4 +513,4 @@ def compile_resolver(  # noqa: C901
     resolver = ns["_resolver"]
     creator = ns["_resolver_create"]
 
-    return resolver, creator
+    return CompiledResolver(resolver, creator)
