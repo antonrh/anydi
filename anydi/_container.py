@@ -745,7 +745,6 @@ class Container:
             provider,
             is_async=is_async,
             unresolved_interfaces=self._unresolved_interfaces,
-            request_context_var=self._request_context_var,
             has_override_support=has_override_support,
             wrap_dependencies=wrap_dependencies,
             wrap_instance=wrap_instance,

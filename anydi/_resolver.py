@@ -22,16 +22,11 @@ def compile_resolver(  # noqa: C901
     *,
     is_async: bool,
     unresolved_interfaces: set[Any],
-    request_context_var: Any,
     has_override_support: bool = False,
     wrap_dependencies: bool = False,
     wrap_instance: bool = False,
 ) -> CompiledResolver:
-    """
-    Compile optimized resolver functions for the given provider.
-
-    Returns a tuple of (compiled_resolve, compiled_create) functions.
-    """
+    """Compile optimized resolver functions for the given provider."""
     num_params = len(provider.parameters)
     param_providers: list[Provider | None] = [None] * num_params
     param_annotations: list[Any] = [None] * num_params
@@ -341,15 +336,7 @@ def compile_resolver(  # noqa: C901
     if scope == "singleton":
         resolver_lines.append("    context = container._singleton_context")
     elif scope == "request":
-        # Inline ContextVar.get() to avoid function call overhead
-        resolver_lines.append("    context = _request_context_var.get()")
-        resolver_lines.append("    if context is None:")
-        resolver_lines.append(
-            "        raise LookupError("
-            '"The request context has not been started. Please ensure that '
-            'the request context is properly initialized before attempting to use it."'
-            ")"
-        )
+        resolver_lines.append("    context = container._get_request_context()")
     else:
         resolver_lines.append("    context = None")
 
@@ -430,14 +417,7 @@ def compile_resolver(  # noqa: C901
     if scope == "singleton":
         create_resolver_lines.append("    context = container._singleton_context")
     elif scope == "request":
-        create_resolver_lines.append("    context = _request_context_var.get()")
-        create_resolver_lines.append("    if context is None:")
-        create_resolver_lines.append(
-            "        raise LookupError("
-            '"The request context has not been started. Please ensure that '
-            'the request context is properly initialized before attempting to use it."'
-            ")"
-        )
+        create_resolver_lines.append("    context = container._get_request_context()")
     else:
         create_resolver_lines.append("    context = None")
 
@@ -496,10 +476,6 @@ def compile_resolver(  # noqa: C901
         "_contextmanager": contextlib.contextmanager,
         "_is_cm": is_context_manager,
     }
-
-    # Add request scope ContextVar for direct access
-    if scope == "request":
-        ns["_request_context_var"] = request_context_var
 
     # Add async-specific namespace entries
     if is_async:
