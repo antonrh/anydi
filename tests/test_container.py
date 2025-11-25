@@ -1017,6 +1017,99 @@ class TestContainer:
 
         assert container.providers[Service].scope == "singleton"
 
+    def test_resolve_singleton_in_scoped_context(self, container: Container) -> None:
+        @singleton
+        class Database:
+            def __init__(self) -> None:
+                self.id = uuid.uuid4()
+
+        @container.provider(scope="request")
+        def provide_connection(db: Database) -> Iterator[str]:
+            # The database instance used here should be the same as resolved directly
+            yield f"conn-{db.id}"
+
+        with container.request_context():
+            # Resolve the singleton directly
+            db1 = container.resolve(Database)
+
+            # Resolve the request-scoped provider which depends on the singleton
+            conn = container.resolve(str)
+
+            # Resolve the singleton again
+            db2 = container.resolve(Database)
+
+            # All should use the same Database instance
+            assert db1 is db2
+            assert conn == f"conn-{db1.id}"
+
+    async def test_async_resolve_singleton_in_scoped_contextr(
+        self, container: Container
+    ) -> None:
+        @singleton
+        class Database:
+            def __init__(self) -> None:
+                self.id = uuid.uuid4()
+
+        @container.provider(scope="request")
+        async def provide_connection(db: Database) -> AsyncIterator[str]:
+            # The database instance used here should be the same as resolved directly
+            yield f"conn-{db.id}"
+
+        async with container.arequest_context():
+            # Resolve the singleton directly
+            db1 = await container.aresolve(Database)
+
+            # Resolve the request-scoped provider which depends on the singleton
+            conn = await container.aresolve(str)
+
+            # Resolve the singleton again
+            db2 = await container.aresolve(Database)
+
+            # All should use the same Database instance
+            assert db1 is db2
+            assert conn == f"conn-{db1.id}"
+
+    def test_resolve_singleton_in_scope_context_from_async_provider(
+        self, container: Container
+    ) -> None:
+        @singleton
+        class Database:
+            def __init__(self) -> None:
+                self.id = uuid.uuid4()
+
+        @container.provider(scope="request")
+        async def provide_connection(db: Database) -> AsyncIterator[str]:
+            yield f"conn-{db.id}"
+
+        with container.request_context():
+            # Resolve the singleton directly in sync mode
+            db = container.resolve(Database)
+
+            # The singleton should have the expected id
+            assert isinstance(db.id, uuid.UUID)
+
+    async def test_async_resolve_singleton_in_async_scope_context_from_sync_provider(
+        self, container: Container
+    ) -> None:
+        @singleton
+        class Database:
+            def __init__(self) -> None:
+                self.id = uuid.uuid4()
+
+        @container.provider(scope="request")
+        def provide_connection(db: Database) -> Iterator[str]:
+            yield f"conn-{db.id}"
+
+        async with container.arequest_context():
+            # Resolve the singleton directly in async mode
+            db = await container.aresolve(Database)
+
+            # Resolve the request-scoped provider which depends on the singleton
+            conn = await container.aresolve(str)
+
+            # The singleton should be reused
+            assert conn == f"conn-{db.id}"
+
     def test_resolve_with_primitive_class(self, container: Container) -> None:
         @singleton
         class Service:
