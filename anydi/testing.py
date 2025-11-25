@@ -24,7 +24,6 @@ class TestContainer(Container):
     ) -> None:
         super().__init__(providers=providers, modules=modules, logger=logger)
         self._override_instances: dict[Any, Any] = {}
-        self._revisions: dict[Any, int] = {}
 
     @classmethod
     def from_container(cls, container: Container) -> Self:
@@ -50,15 +49,10 @@ class TestContainer(Container):
                 f"The provider interface `{type_repr(interface)}` not registered."
             )
         self._override_instances[interface] = instance
-        self._touch_revision(interface)
         try:
             yield
         finally:
             self._override_instances.pop(interface, None)
-            self._touch_revision(interface)
-
-    def _touch_revision(self, interface: Any) -> None:
-        self._revisions[interface] = self._revisions.get(interface, 0) + 1
 
     def _hook_override_for(self, interface: Any) -> Any:
         return self._override_instances.get(interface, NOT_SET)
