@@ -1,28 +1,15 @@
-import logging
-from collections.abc import Iterable, Sequence
 from typing import Any
 
 import wrapt  # type: ignore
 from typing_extensions import Self
 
 from ._container import Container
-from ._module import ModuleDef
 from ._provider import ProviderDef
 from ._types import NOT_SET
 
 
 class TestContainer(Container):
     __test__ = False
-
-    def __init__(
-        self,
-        *,
-        providers: Sequence[ProviderDef] | None = None,
-        modules: Iterable[ModuleDef] | None = None,
-        logger: logging.Logger | None = None,
-    ) -> None:
-        super().__init__(providers=providers, modules=modules, logger=logger)
-        self._override_instances: dict[Any, Any] = {}
 
     @classmethod
     def from_container(cls, container: Container) -> Self:
