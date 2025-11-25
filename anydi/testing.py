@@ -76,36 +76,18 @@ class TestContainer(Container):
         ):
             return instance
 
-        current_revisions = self._revisions
-        wrapped_state = {
-            name: [value.interface, current_revisions.get(value.interface, 0)]
+        wrapped = {
+            name: value.interface
             for name, value in instance.__dict__.items()
             if isinstance(value, InstanceProxy)
         }
 
         def __resolver_getter__(name: str) -> Any:
-            state = wrapped_state.get(name)
-            if state is None:
-                raise LookupError
-
-            interface, revision = state
-            current_revision = current_revisions.get(interface, 0)
-            if revision == current_revision:
-                return object.__getattribute__(instance, name)
-
-            override = self._override_instances.get(interface, NOT_SET)
-            if override is NOT_SET:
-                value = self.resolve(interface)
-            else:
-                value = override
-
-            if isinstance(value, InstanceProxy):
-                wrapped_value = value
-            else:
-                wrapped_value = self._hook_wrap_dependency(interface, value)
-            object.__setattr__(instance, name, wrapped_value)
-            state[1] = current_revision
-            return wrapped_value
+            if name in wrapped:
+                _interface = wrapped[name]
+                # Resolve the dependency if it's wrapped
+                return self.resolve(_interface)
+            raise LookupError
 
         # Attach the resolver getter to the instance
         instance.__resolver_getter__ = __resolver_getter__
