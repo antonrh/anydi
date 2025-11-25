@@ -79,6 +79,9 @@ class Container:
         for module in modules:
             self.register_module(module)
 
+        # Testing
+        self._override_instances: dict[Any, Any] = {}
+
     # == Container Properties ==
 
     @property
@@ -675,9 +678,12 @@ class Container:
 
     @contextlib.contextmanager
     def override(self, interface: Any, instance: Any) -> Iterator[None]:
-        raise RuntimeError(
-            "Dependency overriding is not supported in this container.\n"
-            "Wrap your container with `anydi.testing.Container` instead.\n"
-            "Example:\n\n"
-            "    container = TestContainer.from_container(container)"
-        )
+        if not self.has_provider_for(interface):
+            raise LookupError(
+                f"The provider interface `{type_repr(interface)}` not registered."
+            )
+        self._override_instances[interface] = instance
+        try:
+            yield
+        finally:
+            self._override_instances.pop(interface, None)

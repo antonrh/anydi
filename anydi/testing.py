@@ -1,10 +1,9 @@
-import contextlib
 import logging
-from collections.abc import Iterable, Iterator, Sequence
+from collections.abc import Iterable, Sequence
 from typing import Any
 
 import wrapt  # type: ignore
-from typing_extensions import Self, type_repr
+from typing_extensions import Self
 
 from ._container import Container
 from ._module import ModuleDef
@@ -38,21 +37,6 @@ class TestContainer(Container):
             ],
             logger=container.logger,
         )
-
-    @contextlib.contextmanager
-    def override(self, interface: Any, instance: Any) -> Iterator[None]:
-        """
-        Override the provider for the specified interface with a specific instance.
-        """
-        if not self.has_provider_for(interface):
-            raise LookupError(
-                f"The provider interface `{type_repr(interface)}` not registered."
-            )
-        self._override_instances[interface] = instance
-        try:
-            yield
-        finally:
-            self._override_instances.pop(interface, None)
 
     def _hook_override_for(self, interface: Any) -> Any:
         return self._override_instances.get(interface, NOT_SET)
