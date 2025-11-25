@@ -81,6 +81,7 @@ class Resolver:
         param_defaults: list[Any] = [None] * num_params
         param_has_default: list[bool] = [False] * num_params
         param_names: list[str] = [""] * num_params
+        param_shared_scopes: list[bool] = [False] * num_params
         unresolved_messages: list[str] = [""] * num_params
 
         cache = self._async_cache if is_async else self._cache
@@ -90,6 +91,7 @@ class Resolver:
             param_defaults[idx] = p.default
             param_has_default[idx] = p.has_default
             param_names[idx] = p.name
+            param_shared_scopes[idx] = p.shared_scope
 
             if p.provider is not None:
                 compiled = cache.get(p.provider.interface)
@@ -191,7 +193,8 @@ class Resolver:
                     )
                     create_lines.append(
                         f"                    arg_{idx} = "
-                        f"await compiled[0](container, context)"
+                        f"await compiled[0](container, "
+                        f"context if _param_shared_scopes[{idx}] else None)"
                     )
                 else:
                     create_lines.append(
@@ -212,7 +215,8 @@ class Resolver:
                     )
                     create_lines.append(
                         f"                    arg_{idx} = "
-                        f"compiled[0](container, context)"
+                        f"compiled[0](container, "
+                        f"context if _param_shared_scopes[{idx}] else None)"
                     )
                 create_lines.append("                except LookupError:")
                 create_lines.append(
@@ -227,11 +231,14 @@ class Resolver:
                 if is_async:
                     create_lines.append(
                         f"                arg_{idx} = await resolver("
-                        f"container, context)"
+                        f"container, "
+                        f"context if _param_shared_scopes[{idx}] else None)"
                     )
                 else:
                     create_lines.append(
-                        f"                arg_{idx} = resolver(container, context)"
+                        f"                arg_{idx} = resolver("
+                        f"container, "
+                        f"context if _param_shared_scopes[{idx}] else None)"
                     )
                 create_lines.append("        else:")
                 create_lines.append(f"            arg_{idx} = cached")
@@ -539,6 +546,7 @@ class Resolver:
             "_param_defaults": param_defaults,
             "_param_has_default": param_has_default,
             "_param_resolvers": param_resolvers,
+            "_param_shared_scopes": param_shared_scopes,
             "_unresolved_messages": unresolved_messages,
             "_unresolved_interfaces": self._unresolved_interfaces,
             "_NOT_SET": NOT_SET,

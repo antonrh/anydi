@@ -159,7 +159,7 @@ class TestContainer:
             ValueError,
             match=(
                 "The provider `(.*?)` scope is invalid. Only the following scopes "
-                "are supported: transient, singleton, request. "
+                "are supported: singleton, request, transient. "
                 "Please use one of the supported scopes when registering a provider."
             ),
         ):
