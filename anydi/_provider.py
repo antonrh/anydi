@@ -40,6 +40,7 @@ class ProviderParameter:
     default: Any
     has_default: bool
     provider: Provider | None = None
+    shared_scope: bool = False
 
 
 @dataclass(frozen=True, slots=True)

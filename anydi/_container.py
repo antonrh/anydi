@@ -339,6 +339,7 @@ class Container:
                     default=default,
                     has_default=has_default,
                     provider=sub_provider,
+                    shared_scope=sub_provider.scope == scope and scope != "transient",
                 )
             )
 
@@ -389,10 +390,10 @@ class Container:
     @staticmethod
     def _validate_provider_scope(scope: Scope, name: str, is_resource: bool) -> None:
         """Validate the provider scope."""
-        if scope not in (allowed_scopes := get_args(Scope)):
+        if scope not in ALLOWED_SCOPES:
             raise ValueError(
                 f"The provider `{name}` scope is invalid. Only the following "
-                f"scopes are supported: {', '.join(allowed_scopes)}. "
+                f"scopes are supported: {', '.join(ALLOWED_SCOPES)}. "
                 "Please use one of the supported scopes when registering a provider."
             )
         if scope == "transient" and is_resource:
