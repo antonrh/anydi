@@ -44,7 +44,7 @@ docs = [
 requires-dist = [
     { name = "anyio", specifier = ">=3.7.1" },
     { name = "typing-extensions", specifier = ">=4.15.0,<5" },
-    { name = "wrapt", specifier = ">=1.17.0,<2" },
+    { name = "wrapt", specifier = ">=1.17.0" },
 ]
 
 [package.metadata.requires-dev]

@@ -671,13 +671,17 @@ class Container:
     ) -> None:
         self._scanner.scan(packages=packages, tags=tags)
 
-    # == Testing ==
+    # == Testing / Override Support ==
 
     @contextlib.contextmanager
     def override(self, interface: Any, instance: Any) -> Iterator[None]:
-        raise RuntimeError(
-            "Dependency overriding is not supported in this container.\n"
-            "Wrap your container with `anydi.testing.Container` instead.\n"
-            "Example:\n\n"
-            "    container = TestContainer.from_container(container)"
-        )
+        """Override a dependency with a specific instance for testing."""
+        if not self.has_provider_for(interface):
+            raise LookupError(
+                f"The provider interface `{type_repr(interface)}` not registered."
+            )
+        self._resolver.add_override(interface, instance)
+        try:
+            yield
+        finally:
+            self._resolver.remove_override(interface)

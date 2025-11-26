@@ -6,13 +6,12 @@ from starlette.requests import Request
 from starlette.responses import JSONResponse
 from starlette.routing import Route
 
-from anydi import Inject
+from anydi import Container, Inject
 from anydi.ext.starlette.middleware import RequestScopedMiddleware
-from anydi.testing import TestContainer
 
 from tests.ext.fixtures import MailService, UserService
 
-container = TestContainer()
+container = Container()
 
 
 @container.provider(scope="singleton")
