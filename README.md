@@ -199,7 +199,7 @@ def get_container() -> Container:
     return container
 ```
 
-Configure Django to consume the container (`settings.py`):
+Configure Django (`settings.py`):
 
 ```python
 INSTALLED_APPS = [
@@ -213,7 +213,7 @@ ANYDI = {
 }
 ```
 
-Expose a Ninja API that uses `GreetingService` (`urls.py`):
+Wire Django Ninja (`urls.py`):
 
 ```python
 from typing import Annotated, Any
