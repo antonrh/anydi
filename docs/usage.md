@@ -721,7 +721,7 @@ With `AnyDI`'s Modules, you can keep your code organized and easily manage your 
 
 ## Testing
 
-To use `AnyDI` with your testing framework, use `TestContainer` and call the `.override(interface=..., instance=...)` context manager
+To use `AnyDI` with your testing framework, use the `.override(interface=..., instance=...)` context manager
 to temporarily replace a dependency with an overridden instance during testing. This allows you to isolate the code being tested from its dependencies.
 The with `container.override()` context manager ensures that the overridden instance is used only within the context of the with block.
 Once the block is exited, the original dependency is restored.
@@ -730,8 +730,7 @@ Once the block is exited, the original dependency is restored.
 from dataclasses import dataclass
 from unittest import mock
 
-from anydi import auto
-from anydi.testing import TestContainer
+from anydi import auto, Container
 
 
 @dataclass(kw_only=True)
@@ -755,7 +754,7 @@ class Service:
         return self.repo.all()
 
 
-container = TestContainer()
+container = Container()
 
 
 @container.inject
@@ -771,20 +770,6 @@ def test_handler() -> None:
         assert get_items() == [Item(name="mock1"), Item(name="mock2")]
 ```
 
-To create a `TestContainer` from the original container for testing, use the `.from_container()` method:
-
-```python
-from anydi import Container
-from anydi.testing import TestContainer
-
-
-def init_container(testing: bool = False) -> Container:
-    container = Container()
-    if testing:
-        return TestContainer.from_container(container)
-    return container
-```
-
 ### Pytest Plugin
 
 `AnyDI` offers a pytest plugin that simplifies the testing process. You can annotate a test function with the `@pytest.mark.inject` decorator to automatically inject dependencies into the test function, or you can set the global configuration value `anydi_inject_all` to `True` to inject dependencies into all test functions automatically.
@@ -794,16 +779,18 @@ Additionally, you need to define a `container` fixture to provide a `Container` 
 ```python
 import pytest
 
-from anydi.testing import TestContainer
+from anydi import Container
+
+from myapp import container as myapp_container
 
 
 @pytest.fixture(scope="session")
-def container() -> TestContainer:
-    return TestContainer()
+def container() -> Container:
+    return myapp_container
 
 
 @pytest.mark.inject
-def test_service_get_items(container: TestContainer, service: Service) -> None:
+def test_service_get_items(container: Container, service: Service) -> None:
     repo_mock = mock.Mock(spec=Repository)
     repo_mock.all.return_value = [Item(name="mock1"), Item(name="mock2")]
 
