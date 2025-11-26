@@ -2,7 +2,7 @@ from unittest import mock
 
 from starlette.testclient import TestClient
 
-from anydi.testing import TestContainer
+from anydi import Container
 
 from tests.ext.fixtures import TEST_EMAIL, Mail, MailService, User, UserService
 
@@ -19,9 +19,7 @@ def test_send_mail(client: TestClient) -> None:
     }
 
 
-def test_send_mail_mock_mail_service(
-    client: TestClient, container: TestContainer
-) -> None:
+def test_send_mail_mock_mail_service(client: TestClient, container: Container) -> None:
     mail = Mail(email=TEST_EMAIL, message="mock")
 
     mail_service_mock = mock.MagicMock(spec=MailService)
@@ -37,9 +35,7 @@ def test_send_mail_mock_mail_service(
     }
 
 
-def test_send_mail_mock_user_service(
-    client: TestClient, container: TestContainer
-) -> None:
+def test_send_mail_mock_user_service(client: TestClient, container: Container) -> None:
     user = User(id=999, email="mock1@mail.com")
     message = "hello"
 

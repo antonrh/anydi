@@ -1,90 +1,11 @@
-from typing import Any
-
-import wrapt  # type: ignore
-from typing_extensions import Self
+from __future__ import annotations
 
 from ._container import Container
-from ._provider import ProviderDef
-from ._types import NOT_SET
 
 
 class TestContainer(Container):
     __test__ = False
 
     @classmethod
-    def from_container(cls, container: Container) -> Self:
-        return cls(
-            providers=[
-                ProviderDef(
-                    interface=provider.interface,
-                    call=provider.call,
-                    scope=provider.scope,
-                )
-                for provider in container.providers.values()
-            ],
-            logger=container.logger,
-        )
-
-    def _hook_override_for(self, interface: Any) -> Any:
-        return self._override_instances.get(interface, NOT_SET)
-
-    def _hook_wrap_dependency(self, annotation: Any, value: Any) -> Any:
-        return InstanceProxy(value, interface=annotation)
-
-    def _hook_post_resolve(self, interface: Any, instance: Any) -> Any:  # noqa: C901
-        """Patch the test resolver for the instance."""
-        if interface in self._override_instances:
-            return self._override_instances[interface]
-
-        if not hasattr(instance, "__dict__") or hasattr(
-            instance, "__resolver_getter__"
-        ):
-            return instance
-
-        wrapped = {
-            name: value.interface
-            for name, value in instance.__dict__.items()
-            if isinstance(value, InstanceProxy)
-        }
-
-        def __resolver_getter__(name: str) -> Any:
-            if name in wrapped:
-                _interface = wrapped[name]
-                # Resolve the dependency if it's wrapped
-                return self.resolve(_interface)
-            raise LookupError
-
-        # Attach the resolver getter to the instance
-        instance.__resolver_getter__ = __resolver_getter__
-
-        if not hasattr(instance.__class__, "__getattribute_patched__"):
-
-            def __getattribute__(_self: Any, name: str) -> Any:
-                # Skip the resolver getter
-                if name in {"__resolver_getter__", "__class__"}:
-                    return object.__getattribute__(_self, name)
-
-                if hasattr(_self, "__resolver_getter__"):
-                    try:
-                        return _self.__resolver_getter__(name)
-                    except LookupError:
-                        pass
-
-                # Fall back to default behavior
-                return object.__getattribute__(_self, name)
-
-            # Apply the patched resolver if wrapped attributes exist
-            instance.__class__.__getattribute__ = __getattribute__
-            instance.__class__.__getattribute_patched__ = True
-
-        return instance
-
-
-class InstanceProxy(wrapt.ObjectProxy):  # type: ignore
-    def __init__(self, wrapped: Any, *, interface: type[Any]) -> None:
-        super().__init__(wrapped)  # type: ignore
-        self._self_interface = interface
-
-    @property
-    def interface(self) -> type[Any]:
-        return self._self_interface
+    def from_container(cls, container: Container) -> Container:
+        return container

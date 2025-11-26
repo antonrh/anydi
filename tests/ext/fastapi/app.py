@@ -4,13 +4,14 @@ from fastapi import Body, Depends, FastAPI
 from starlette.middleware import Middleware
 
 import anydi.ext.fastapi
+from anydi import Container
 from anydi.ext.fastapi import Inject
 from anydi.ext.starlette.middleware import RequestScopedMiddleware
-from anydi.testing import TestContainer
 
 from tests.ext.fixtures import Mail, MailService, User, UserService
 
-container = TestContainer()
+container = Container()
+container._override_mode = True  # Enable override mode for testing
 
 
 @container.provider(scope="singleton")

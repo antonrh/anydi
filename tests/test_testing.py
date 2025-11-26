@@ -7,26 +7,17 @@ from unittest import mock
 import pytest
 
 from anydi import Container, auto, singleton
-from anydi.testing import TestContainer
 
 from tests.fixtures import Service
 
 
-class TestTestContainer:
-    def test_from_container(self) -> None:
-        container = Container()
-        container.register(str, lambda: "Hello, world!", scope="singleton")
-
-        test_container = TestContainer.from_container(container)
-
-        assert test_container.providers == container.providers
-        assert test_container.resolve(str) == "Hello, world!"
-
+class TestContainerOverride:
     def test_override_instance(self) -> None:
         origin_name = "origin"
         overridden_name = "overridden"
 
-        container = TestContainer()
+        container = Container()
+        container._override_mode = True  # Enable override mode for testing
 
         @container.provider(scope="singleton")
         def name() -> str:
@@ -38,7 +29,7 @@ class TestTestContainer:
         assert container.resolve(str) == origin_name
 
     def test_override_instance_provider_not_registered_using_strict_mode(self) -> None:
-        container = TestContainer()
+        container = Container()
 
         with pytest.raises(
             LookupError, match="The provider interface `str` not registered."
@@ -49,7 +40,8 @@ class TestTestContainer:
     def test_override_instance_transient_provider(self) -> None:
         overridden_uuid = uuid.uuid4()
 
-        container = TestContainer()
+        container = Container()
+        container._override_mode = True  # Enable override mode for testing
 
         @container.provider(scope="transient")
         def uuid_provider() -> uuid.UUID:
@@ -64,7 +56,8 @@ class TestTestContainer:
         origin = "origin"
         overridden = "overridden"
 
-        container = TestContainer()
+        container = Container()
+        container._override_mode = True  # Enable override mode for testing
 
         @container.provider(scope="singleton")
         def message() -> Iterator[str]:
@@ -79,7 +72,8 @@ class TestTestContainer:
         origin = "origin"
         overridden = "overridden"
 
-        container = TestContainer()
+        container = Container()
+        container._override_mode = True  # Enable override mode for testing
 
         @container.provider(scope="singleton")
         async def message() -> AsyncIterator[str]:
@@ -89,7 +83,8 @@ class TestTestContainer:
             assert (await container.aresolve(str)) == overridden
 
     def test_override_registered_instance(self) -> None:
-        container = TestContainer()
+        container = Container()
+        container._override_mode = True  # Enable override mode for testing
         container.register(Annotated[str, "param"], lambda: "param", scope="singleton")
 
         @singleton
@@ -124,7 +119,8 @@ class TestTestContainer:
             }
 
     async def test_override_instance_async_resolved(self) -> None:
-        container = TestContainer()
+        container = Container()
+        container._override_mode = True  # Enable override mode for testing
         container.register(Annotated[str, "param"], lambda: "param", scope="singleton")
 
         @singleton
@@ -145,7 +141,8 @@ class TestTestContainer:
             }
 
     def test_override_instance_in_strict_mode(self) -> None:
-        container = TestContainer()
+        container = Container()
+        container._override_mode = True  # Enable override mode for testing
 
         class Settings:
             def __init__(self, name: str) -> None:
@@ -164,7 +161,8 @@ class TestTestContainer:
         assert service.ident == "test"
 
     def test_override_instance_first(self) -> None:
-        container = TestContainer()
+        container = Container()
+        container._override_mode = True  # Enable override mode for testing
 
         @dataclass
         class Item:
