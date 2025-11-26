@@ -6,7 +6,7 @@ from anydi import Container
 from tests.scan_app import ScanAppModule
 
 
-class TestContainerScan:
+class TestContainerScanner:
     @pytest.fixture
     def container(self) -> Container:
         return Container()
