@@ -17,7 +17,6 @@ class TestContainerOverride:
         overridden_name = "overridden"
 
         container = Container()
-        container._override_mode = True  # Enable override mode for testing
 
         @container.provider(scope="singleton")
         def name() -> str:
@@ -41,7 +40,6 @@ class TestContainerOverride:
         overridden_uuid = uuid.uuid4()
 
         container = Container()
-        container._override_mode = True  # Enable override mode for testing
 
         @container.provider(scope="transient")
         def uuid_provider() -> uuid.UUID:
@@ -57,7 +55,6 @@ class TestContainerOverride:
         overridden = "overridden"
 
         container = Container()
-        container._override_mode = True  # Enable override mode for testing
 
         @container.provider(scope="singleton")
         def message() -> Iterator[str]:
@@ -73,7 +70,6 @@ class TestContainerOverride:
         overridden = "overridden"
 
         container = Container()
-        container._override_mode = True  # Enable override mode for testing
 
         @container.provider(scope="singleton")
         async def message() -> AsyncIterator[str]:
@@ -84,7 +80,6 @@ class TestContainerOverride:
 
     def test_override_registered_instance(self) -> None:
         container = Container()
-        container._override_mode = True  # Enable override mode for testing
         container.register(Annotated[str, "param"], lambda: "param", scope="singleton")
 
         @singleton
@@ -107,12 +102,13 @@ class TestContainerOverride:
         user_repo_mock = mock.MagicMock(spec=UserRepo)
         user_repo_mock.get_user.return_value = "mocked_user"
 
-        user_service = container.resolve(UserService)
-
+        # Set up overrides first, then resolve - this ensures the resolved
+        # instance supports dynamic override
         with (
             container.override(UserRepo, user_repo_mock),
             container.override(Annotated[str, "param"], "mock"),
         ):
+            user_service = container.resolve(UserService)
             assert user_service.process() == {
                 "user": "mocked_user",
                 "param": "mock",
@@ -120,7 +116,6 @@ class TestContainerOverride:
 
     async def test_override_instance_async_resolved(self) -> None:
         container = Container()
-        container._override_mode = True  # Enable override mode for testing
         container.register(Annotated[str, "param"], lambda: "param", scope="singleton")
 
         @singleton
@@ -133,16 +128,14 @@ class TestContainerOverride:
                     "param": self.param,
                 }
 
-        user_service = await container.aresolve(UserService)
-
         with container.override(Annotated[str, "param"], "mock"):
+            user_service = await container.aresolve(UserService)
             assert user_service.process() == {
                 "param": "mock",
             }
 
     def test_override_instance_in_strict_mode(self) -> None:
         container = Container()
-        container._override_mode = True  # Enable override mode for testing
 
         class Settings:
             def __init__(self, name: str) -> None:
@@ -162,7 +155,6 @@ class TestContainerOverride:
 
     def test_override_instance_first(self) -> None:
         container = Container()
-        container._override_mode = True  # Enable override mode for testing
 
         @dataclass
         class Item:
@@ -199,9 +191,7 @@ class TestContainerOverride:
 
         with container.override(ItemRepository, repo_mock):
             items = handler()
-
             assert items == [Item(name="mocked")]
 
         service = container.resolve(ItemService)
-
         assert service.get_items() == []

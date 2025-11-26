@@ -12,7 +12,6 @@ from anydi.ext.starlette.middleware import RequestScopedMiddleware
 from tests.ext.fixtures import MailService, UserService
 
 container = Container()
-container._override_mode = True  # Enable override mode for testing
 
 
 @container.provider(scope="singleton")
