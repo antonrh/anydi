@@ -447,9 +447,7 @@ class Resolver:
         if scope == "singleton":
             if with_override:
                 # Cache override mode check
-                resolver_lines.append(
-                    "    override_mode = container._resolver.override_mode"
-                )
+                resolver_lines.append("    override_mode = resolver.override_mode")
 
                 # Check for overrides first if in override mode
                 resolver_lines.append("    if override_mode:")
@@ -496,9 +494,7 @@ class Resolver:
         elif scope == "request":
             if with_override:
                 # Cache override mode check
-                resolver_lines.append(
-                    "    override_mode = container._resolver.override_mode"
-                )
+                resolver_lines.append("    override_mode = resolver.override_mode")
 
                 # Check for overrides first if in override mode
                 resolver_lines.append("    if override_mode:")
@@ -539,9 +535,7 @@ class Resolver:
             # Transient scope
             if with_override:
                 # Check overrides first since there's no caching
-                resolver_lines.append(
-                    "    override_mode = container._resolver.override_mode"
-                )
+                resolver_lines.append("    override_mode = resolver.override_mode")
                 resolver_lines.append("    if override_mode:")
                 resolver_lines.append("        NOT_SET_ = _NOT_SET")
                 resolver_lines.append(
@@ -585,9 +579,7 @@ class Resolver:
 
         if with_override:
             # Cache override mode check
-            create_resolver_lines.append(
-                "    override_mode = container._resolver.override_mode"
-            )
+            create_resolver_lines.append("    override_mode = resolver.override_mode")
 
         if scope == "singleton":
             create_resolver_lines.append("    context = container._singleton_context")
