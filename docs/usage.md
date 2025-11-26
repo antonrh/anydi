@@ -721,7 +721,7 @@ With `AnyDI`'s Modules, you can keep your code organized and easily manage your 
 
 ## Testing
 
-To use `AnyDI` with your testing framework, use the `.override(interface=..., instance=...)` context manager
+To use `AnyDI` with your testing framework, call the `.override(interface=..., instance=...)` context manager
 to temporarily replace a dependency with an overridden instance during testing. This allows you to isolate the code being tested from its dependencies.
 The with `container.override()` context manager ensures that the overridden instance is used only within the context of the with block.
 Once the block is exited, the original dependency is restored.
