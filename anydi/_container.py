@@ -13,7 +13,6 @@ from collections.abc import AsyncIterator, Callable, Iterable, Iterator
 from contextvars import ContextVar
 from typing import Annotated, Any, TypeVar, cast, get_args, get_origin, overload
 
-import wrapt  # type: ignore
 from typing_extensions import ParamSpec, Self, type_repr
 
 from ._context import InstanceContext
@@ -79,10 +78,6 @@ class Container:
         modules = modules or []
         for module in modules:
             self.register_module(module)
-
-        # Testing / Override support
-        self._override_instances: dict[Any, Any] = {}
-        self._override_mode: bool = False
 
     # == Container Properties ==
 
@@ -463,17 +458,12 @@ class Container:
 
     def resolve(self, interface: type[T]) -> T:
         """Resolve an instance by interface using compiled sync resolver."""
-        override_mode = self._override_mode
-        cached = self._resolver.get_cached(
-            interface, is_async=False, override_mode=override_mode
-        )
+        cached = self._resolver.get_cached(interface, is_async=False)
         if cached is not None:
             return cached.resolve(self)
 
         provider = self._get_or_register_provider(interface)
-        compiled = self._resolver.compile(
-            provider, is_async=False, with_override=override_mode
-        )
+        compiled = self._resolver.compile(provider, is_async=False)
         return compiled.resolve(self)
 
     @overload
@@ -484,17 +474,12 @@ class Container:
 
     async def aresolve(self, interface: type[T]) -> T:
         """Resolve an instance by interface asynchronously."""
-        override_mode = self._override_mode
-        cached = self._resolver.get_cached(
-            interface, is_async=True, override_mode=override_mode
-        )
+        cached = self._resolver.get_cached(interface, is_async=True)
         if cached is not None:
             return await cached.resolve(self)
 
         provider = self._get_or_register_provider(interface)
-        compiled = self._resolver.compile(
-            provider, is_async=True, with_override=override_mode
-        )
+        compiled = self._resolver.compile(provider, is_async=True)
         return await compiled.resolve(self)
 
     def create(self, interface: type[T], /, **defaults: Any) -> T:
@@ -695,77 +680,8 @@ class Container:
             raise LookupError(
                 f"The provider interface `{type_repr(interface)}` not registered."
             )
-        self._override_instances[interface] = instance
-        prev_mode = self._override_mode
-        self._override_mode = True
+        self._resolver.add_override(interface, instance)
         try:
             yield
         finally:
-            self._override_instances.pop(interface, None)
-            self._override_mode = prev_mode
-
-    def _hook_override_for(self, interface: Any) -> Any:
-        """Hook for checking if an interface has an override."""
-        return self._override_instances.get(interface, NOT_SET)
-
-    def _hook_wrap_dependency(self, annotation: Any, value: Any) -> Any:
-        """Hook for wrapping dependencies to enable override patching."""
-        return InstanceProxy(value, interface=annotation)
-
-    def _hook_post_resolve(self, interface: Any, instance: Any) -> Any:  # noqa: C901
-        """Hook for patching resolved instances to support override."""
-        if interface in self._override_instances:
-            return self._override_instances[interface]
-
-        if not hasattr(instance, "__dict__") or hasattr(
-            instance, "__resolver_getter__"
-        ):
-            return instance
-
-        wrapped = {
-            name: value.interface
-            for name, value in instance.__dict__.items()
-            if isinstance(value, InstanceProxy)
-        }
-
-        def __resolver_getter__(name: str) -> Any:
-            if name in wrapped:
-                _interface = wrapped[name]
-                # Resolve the dependency if it's wrapped
-                return self.resolve(_interface)
-            raise LookupError
-
-        # Attach the resolver getter to the instance
-        instance.__resolver_getter__ = __resolver_getter__
-
-        if not hasattr(instance.__class__, "__getattribute_patched__"):
-
-            def __getattribute__(_self: Any, name: str) -> Any:
-                # Skip the resolver getter
-                if name in {"__resolver_getter__", "__class__"}:
-                    return object.__getattribute__(_self, name)
-
-                if hasattr(_self, "__resolver_getter__"):
-                    try:
-                        return _self.__resolver_getter__(name)
-                    except LookupError:
-                        pass
-
-                # Fall back to default behavior
-                return object.__getattribute__(_self, name)
-
-            # Apply the patched resolver if wrapped attributes exist
-            instance.__class__.__getattribute__ = __getattribute__
-            instance.__class__.__getattribute_patched__ = True
-
-        return instance
-
-
-class InstanceProxy(wrapt.ObjectProxy):  # type: ignore
-    def __init__(self, wrapped: Any, *, interface: type[Any]) -> None:
-        super().__init__(wrapped)  # type: ignore
-        self._self_interface = interface
-
-    @property
-    def interface(self) -> type[Any]:
-        return self._self_interface
+            self._resolver.remove_override(interface)
