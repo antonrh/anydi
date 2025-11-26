@@ -16,16 +16,17 @@ Modern, lightweight Dependency Injection library using type annotations.
 
 The key features are:
 
-* **Type-safe**: Resolves dependencies using type annotations.
-* **Async Support**: Compatible with both synchronous and asynchronous providers and injections.
-* **Scoping**: Supports singleton, transient, and request scopes.
-* **Easy to Use**: Designed for simplicity and minimal boilerplate.
-* **Named Dependencies**: Supports named dependencies using `Annotated` type.
-* **Resource Management**: Manages resources using context managers.
-* **Modular: Facilitates** a modular design with support for multiple modules.
-* **Scanning**: Automatically scans for injectable functions and classes.
-* **Integrations**: Provides easy integration with popular frameworks and libraries.
-* **Testing**: Simplifies testing by allowing provider overrides.
+* **Type-safe**: Dependency resolution is driven by type hints.
+* **Async-ready**: Works the same for sync and async providers or injections.
+* **Scoped**: Built-in singleton, transient, and request lifetimes.
+* **Simple**: Small surface area keeps boilerplate low.
+* **Fast**: Resolver still adds only microseconds of overhead.
+* **Named**: `Annotated[...]` makes multiple bindings per type simple.
+* **Managed**: Providers can open/close resources via context managers.
+* **Modular**: Compose containers or modules for large apps.
+* **Scanning**: Auto-discovers injectable callables.
+* **Integrated**: Extensions for popular frameworks.
+* **Testable**: Override providers directly in tests.
 
 ---
 
@@ -35,89 +36,167 @@ The key features are:
 pip install anydi
 ```
 
-## Quick Example
+## Comprehensive Example
 
-*app.py*
+### Define a Service (`app/services.py`)
 
 ```python
-from anydi import Container, auto
+class GreetingService:
+    def greet(self, name: str) -> str:
+        return f"Hello, {name}!"
+```
+
+### Create the Container and Providers (`app/container.py`)
+
+```python
+from anydi import Container
+
+from app.services import GreetingService
+
 
 container = Container()
 
 
 @container.provider(scope="singleton")
-def message() -> str:
-    return "Hello, world!"
+def service() -> GreetingService:
+    return GreetingService()
+
+
+def get_container() -> Container:
+    return container
+```
+
+### Resolve Dependencies Directly
+
+```python
+from app.container import container
+from app.services import GreetingService
+
+
+service = container.resolve(GreetingService)
+
+if __name__ == "__main__":
+    print(service.greet("World"))
+```
+
+### Inject Into Functions (`app/main.py`)
+
+```python
+from anydi import Inject
+
+from app.container import container
+from app.services import GreetingService
 
 
 @container.inject
-def say_hello(message: str = auto) -> None:
-    print(message)
+def greet(service: GreetingService = Inject()) -> str:
+    return service.greet("World")
 
 
 if __name__ == "__main__":
-    say_hello()
+    print(greet())
 ```
 
-## FastAPI Example
+### Test with Overrides (`tests/test_app.py`)
 
-*app.py*
+```python
+from unittest import mock
+
+from app.container import container
+from app.services import GreetingService
+from app.main import greet
+
+
+def test_greet() -> None:
+    service_mock = mock.Mock(spec=GreetingService)
+    service_mock.greet.return_value = "Mocked"
+
+    with container.override(GreetingService, service_mock):
+        result = greet()
+
+    assert result == "Mocked"
+```
+
+### Integrate with FastAPI (`app/api.py`)
 
 ```python
 from typing import Annotated
 
-from fastapi import FastAPI
-
 import anydi.ext.fastapi
-from anydi import Container
+from fastapi import FastAPI
 from anydi.ext.fastapi import Inject
 
-container = Container()
-
-
-@container.provider(scope="singleton")
-def message() -> str:
-    return "Hello, World!"
+from app.container import container
+from app.services import GreetingService
 
 
 app = FastAPI()
 
 
-@app.get("/hello")
-def say_hello(message: Annotated[str, Inject()]) -> dict[str, str]:
-    return {"message": message}
+@app.get("/greeting")
+async def greet(
+    service: Annotated[GreetingService, Inject()]
+) -> dict[str, str]:
+    return {"greeting": service.greet("World")}
 
 
-# Install the container into the FastAPI app
 anydi.ext.fastapi.install(app, container)
 ```
 
+### Test the FastAPI Integration (`test_api.py`)
 
-## Django Ninja Example
+```python
+from unittest import mock
 
-### Install
+from fastapi.testclient import TestClient
 
-```shell
-pip install `anydi-django[ninja]`
+from app.api import app
+from app.container import container
+from app.services import GreetingService
+
+
+client = TestClient(app)
+
+
+def test_api_greeting() -> None:
+    service_mock = mock.Mock(spec=GreetingService)
+    service_mock.greet.return_value = "Mocked"
+
+    with container.override(GreetingService, service_mock):
+        response = client.get("/greeting")
+
+    assert response.json() == {"greeting": "Mocked"}
 ```
 
-*container.py*
+### Integrate with Django Ninja
+
+Install the Django integration extras:
+
+```shell
+pip install 'anydi-django[ninja]'
+```
+
+Expose the container factory (`app/container.py`):
 
 ```python
 from anydi import Container
 
+from app.services import GreetingService
+
+
+container = Container()
+
+
+@container.provider(scope="singleton")
+def service() -> GreetingService:
+    return GreetingService()
+
 
 def get_container() -> Container:
-    container = Container()
-
-    @container.provider(scope="singleton")
-    def message() -> str:
-        return "Hello, World!"
-
     return container
 ```
 
-*settings.py*
+Configure Django to consume the container (`settings.py`):
 
 ```python
 INSTALLED_APPS = [
@@ -126,26 +205,30 @@ INSTALLED_APPS = [
 ]
 
 ANYDI = {
-    "CONTAINER_FACTORY": "myapp.container.get_container",
+    "CONTAINER_FACTORY": "app.container.get_container",
     "PATCH_NINJA": True,
 }
 ```
 
-*urls.py*
+Expose a Ninja API that uses `GreetingService` (`urls.py`):
 
 ```python
+from typing import Annotated, Any
+
+from anydi import Inject
 from django.http import HttpRequest
 from django.urls import path
 from ninja import NinjaAPI
 
-from anydi import auto
+from app.services import GreetingService
+
 
 api = NinjaAPI()
 
 
-@api.get("/hello")
-def say_hello(request: HttpRequest, message: str = auto) -> dict[str, str]:
-    return {"message": message}
+@api.get("/greeting")
+def greet(request: HttpRequest, service: Annotated[GreetingService, Inject()]) -> Any:
+    return {"greeting": service.greet("World")}
 
 
 urlpatterns = [
