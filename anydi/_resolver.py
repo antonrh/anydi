@@ -6,6 +6,7 @@ import contextlib
 from typing import TYPE_CHECKING, Any, NamedTuple
 
 import anyio.to_thread
+import wrapt  # type: ignore
 from typing_extensions import type_repr
 
 from ._provider import Provider
@@ -13,6 +14,18 @@ from ._types import NOT_SET, is_async_context_manager, is_context_manager
 
 if TYPE_CHECKING:
     from ._container import Container
+
+
+class InstanceProxy(wrapt.ObjectProxy):  # type: ignore
+    """Proxy for dependency instances to enable override support."""
+
+    def __init__(self, wrapped: Any, *, interface: type[Any]) -> None:
+        super().__init__(wrapped)  # type: ignore
+        self._self_interface = interface
+
+    @property
+    def interface(self) -> type[Any]:
+        return self._self_interface
 
 
 class CompiledResolver(NamedTuple):
@@ -30,26 +43,37 @@ class Resolver:
         # Override caches (with override support)
         self._override_cache: dict[Any, CompiledResolver] = {}
         self._async_override_cache: dict[Any, CompiledResolver] = {}
+        # Override instances storage
+        self._override_instances: dict[Any, Any] = {}
+
+    @property
+    def override_mode(self) -> bool:
+        """Check if override mode is enabled."""
+        return bool(self._override_instances)
+
+    def add_override(self, interface: Any, instance: Any) -> None:
+        """Add an override instance for an interface."""
+        self._override_instances[interface] = instance
+
+    def remove_override(self, interface: Any) -> None:
+        """Remove an override instance for an interface."""
+        self._override_instances.pop(interface, None)
 
     def add_unresolved(self, interface: Any) -> None:
         self._unresolved_interfaces.add(interface)
 
-    def get_cached(
-        self, interface: Any, *, is_async: bool, override_mode: bool = False
-    ) -> CompiledResolver | None:
+    def get_cached(self, interface: Any, *, is_async: bool) -> CompiledResolver | None:
         """Get cached resolver if it exists."""
-        if override_mode:
+        if self.override_mode:
             cache = self._async_override_cache if is_async else self._override_cache
         else:
             cache = self._async_cache if is_async else self._cache
         return cache.get(interface)
 
-    def compile(
-        self, provider: Provider, *, is_async: bool, with_override: bool = False
-    ) -> CompiledResolver:
+    def compile(self, provider: Provider, *, is_async: bool) -> CompiledResolver:
         """Compile an optimized resolver function for the given provider."""
         # Select the appropriate cache based on sync/async mode and override mode
-        if with_override:
+        if self.override_mode:
             cache = self._async_override_cache if is_async else self._override_cache
         else:
             cache = self._async_cache if is_async else self._cache
@@ -61,11 +85,11 @@ class Resolver:
         # Recursively compile dependencies first
         for p in provider.parameters:
             if p.provider is not None:
-                self.compile(p.provider, is_async=is_async, with_override=with_override)
+                self.compile(p.provider, is_async=is_async)
 
         # Compile the resolver and creator functions
         compiled = self._compile_resolver(
-            provider, is_async=is_async, with_override=with_override
+            provider, is_async=is_async, with_override=self.override_mode
         )
 
         # Store the compiled functions in the cache
@@ -102,9 +126,7 @@ class Resolver:
             if p.provider is not None:
                 compiled = cache.get(p.provider.interface)
                 if compiled is None:
-                    compiled = self.compile(
-                        p.provider, is_async=is_async, with_override=with_override
-                    )
+                    compiled = self.compile(p.provider, is_async=is_async)
                     cache[p.provider.interface] = compiled
                 param_resolvers[idx] = compiled.resolve
 
@@ -180,8 +202,10 @@ class Resolver:
                 create_lines.append(
                     f"                raise LookupError(_unresolved_messages[{idx}])"
                 )
-                create_lines.append(f"            resolver = _param_resolvers[{idx}]")
-                create_lines.append("            if resolver is None:")
+                create_lines.append(
+                    f"            _dep_resolver = _param_resolvers[{idx}]"
+                )
+                create_lines.append("            if _dep_resolver is None:")
                 create_lines.append("                try:")
                 if is_async:
                     create_lines.append(
@@ -240,13 +264,13 @@ class Resolver:
                 create_lines.append("            else:")
                 if is_async:
                     create_lines.append(
-                        f"                arg_{idx} = await resolver("
+                        f"                arg_{idx} = await _dep_resolver("
                         f"container, "
                         f"context if _param_shared_scopes[{idx}] else None)"
                     )
                 else:
                     create_lines.append(
-                        f"                arg_{idx} = resolver("
+                        f"                arg_{idx} = _dep_resolver("
                         f"container, "
                         f"context if _param_shared_scopes[{idx}] else None)"
                     )
@@ -256,7 +280,7 @@ class Resolver:
                 if with_override:
                     create_lines.append("    if override_mode:")
                     create_lines.append(
-                        f"        arg_{idx} = container._hook_wrap_dependency("
+                        f"        arg_{idx} = resolver.hook_wrap_dependency("
                         f"_param_annotations[{idx}], arg_{idx})"
                     )
 
@@ -396,7 +420,7 @@ class Resolver:
         if with_override:
             create_lines.append("    if override_mode:")
             create_lines.append(
-                "        inst = container._hook_post_resolve(_interface, inst)"
+                "        inst = resolver.hook_post_resolve(_interface, inst)"
             )
         create_lines.append("    return inst")
 
@@ -423,12 +447,14 @@ class Resolver:
         if scope == "singleton":
             if with_override:
                 # Cache override mode check
-                resolver_lines.append("    override_mode = container._override_mode")
+                resolver_lines.append(
+                    "    override_mode = container._resolver.override_mode"
+                )
 
                 # Check for overrides first if in override mode
                 resolver_lines.append("    if override_mode:")
                 resolver_lines.append(
-                    "        override = container._hook_override_for(_interface)"
+                    "        override = resolver.hook_override_for(_interface)"
                 )
                 resolver_lines.append("        if override is not NOT_SET_:")
                 resolver_lines.append("            return override")
@@ -470,12 +496,14 @@ class Resolver:
         elif scope == "request":
             if with_override:
                 # Cache override mode check
-                resolver_lines.append("    override_mode = container._override_mode")
+                resolver_lines.append(
+                    "    override_mode = container._resolver.override_mode"
+                )
 
                 # Check for overrides first if in override mode
                 resolver_lines.append("    if override_mode:")
                 resolver_lines.append(
-                    "        override = container._hook_override_for(_interface)"
+                    "        override = resolver.hook_override_for(_interface)"
                 )
                 resolver_lines.append("        if override is not NOT_SET_:")
                 resolver_lines.append("            return override")
@@ -511,11 +539,13 @@ class Resolver:
             # Transient scope
             if with_override:
                 # Check overrides first since there's no caching
-                resolver_lines.append("    override_mode = container._override_mode")
+                resolver_lines.append(
+                    "    override_mode = container._resolver.override_mode"
+                )
                 resolver_lines.append("    if override_mode:")
                 resolver_lines.append("        NOT_SET_ = _NOT_SET")
                 resolver_lines.append(
-                    "        override = container._hook_override_for(_interface)"
+                    "        override = resolver.hook_override_for(_interface)"
                 )
                 resolver_lines.append("        if override is not NOT_SET_:")
                 resolver_lines.append("            return override")
@@ -555,7 +585,9 @@ class Resolver:
 
         if with_override:
             # Cache override mode check
-            create_resolver_lines.append("    override_mode = container._override_mode")
+            create_resolver_lines.append(
+                "    override_mode = container._resolver.override_mode"
+            )
 
         if scope == "singleton":
             create_resolver_lines.append("    context = container._singleton_context")
@@ -571,7 +603,7 @@ class Resolver:
             create_resolver_lines.append("    if override_mode:")
             create_resolver_lines.append("        NOT_SET_ = _NOT_SET")
             create_resolver_lines.append(
-                "        override = container._hook_override_for(_interface)"
+                "        override = resolver.hook_override_for(_interface)"
             )
             create_resolver_lines.append("        if override is not NOT_SET_:")
             create_resolver_lines.append("            return override")
@@ -666,8 +698,13 @@ class Resolver:
             "_NOT_SET": NOT_SET,
             "_contextmanager": contextlib.contextmanager,
             "_is_cm": is_context_manager,
-            "_cache": self._async_cache if is_async else self._cache,
+            "_cache": (
+                (self._async_override_cache if is_async else self._override_cache)
+                if with_override
+                else (self._async_cache if is_async else self._cache)
+            ),
             "_compile": self._compile_resolver,
+            "resolver": self,
         }
 
         # Add async-specific namespace entries
@@ -683,3 +720,59 @@ class Resolver:
         creator = ns["_resolver_create"]
 
         return CompiledResolver(resolver, creator)
+
+    def hook_override_for(self, interface: Any) -> Any:
+        """Hook for checking if an interface has an override."""
+        return self._override_instances.get(interface, NOT_SET)
+
+    def hook_wrap_dependency(self, annotation: Any, value: Any) -> Any:
+        """Hook for wrapping dependencies to enable override patching."""
+        return InstanceProxy(value, interface=annotation)
+
+    def hook_post_resolve(self, interface: Any, instance: Any) -> Any:  # noqa: C901
+        """Hook for patching resolved instances to support override."""
+        if interface in self._override_instances:
+            return self._override_instances[interface]
+
+        if not hasattr(instance, "__dict__") or hasattr(
+            instance, "__resolver_getter__"
+        ):
+            return instance
+
+        wrapped = {
+            name: value.interface
+            for name, value in instance.__dict__.items()
+            if isinstance(value, InstanceProxy)
+        }
+
+        def __resolver_getter__(name: str) -> Any:
+            if name in wrapped:
+                _interface = wrapped[name]
+                # Resolve the dependency if it's wrapped
+                return self._container.resolve(_interface)
+            raise LookupError
+
+        # Attach the resolver getter to the instance
+        instance.__resolver_getter__ = __resolver_getter__
+
+        if not hasattr(instance.__class__, "__getattribute_patched__"):
+
+            def __getattribute__(_self: Any, name: str) -> Any:
+                # Skip the resolver getter
+                if name in {"__resolver_getter__", "__class__"}:
+                    return object.__getattribute__(_self, name)
+
+                if hasattr(_self, "__resolver_getter__"):
+                    try:
+                        return _self.__resolver_getter__(name)
+                    except LookupError:
+                        pass
+
+                # Fall back to default behavior
+                return object.__getattribute__(_self, name)
+
+            # Apply the patched resolver if wrapped attributes exist
+            instance.__class__.__getattribute__ = __getattribute__
+            instance.__class__.__getattribute_patched__ = True
+
+        return instance
