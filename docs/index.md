@@ -60,10 +60,6 @@ container = Container()
 @container.provider(scope="singleton")
 def service() -> GreetingService:
     return GreetingService()
-
-
-def get_container() -> Container:
-    return container
 ```
 
 ### Resolve Dependencies Directly
@@ -190,10 +186,6 @@ container = Container()
 @container.provider(scope="singleton")
 def service() -> GreetingService:
     return GreetingService()
-
-
-def get_container() -> Container:
-    return container
 ```
 
 Configure Django (`settings.py`):
@@ -205,7 +197,7 @@ INSTALLED_APPS = [
 ]
 
 ANYDI = {
-    "CONTAINER_FACTORY": "app.container.get_container",
+    "CONTAINER_FACTORY": "app.container.container",
     "PATCH_NINJA": True,
 }
 ```
