@@ -5,16 +5,18 @@ from __future__ import annotations
 import inspect
 from collections.abc import AsyncIterator, Iterator
 from types import NoneType
-from typing import Any, Literal
+from typing import TYPE_CHECKING, Annotated, Any, Literal, TypeVar, get_args, get_origin
 
 from typing_extensions import Sentinel
+
+T = TypeVar("T")
 
 Scope = Literal["transient", "singleton", "request"]
 
 NOT_SET = Sentinel("NOT_SET")
 
 
-class InjectMarker:
+class ProvideMarker:
     """A marker object for declaring injectable dependencies."""
 
     __slots__ = ("_interface",)
@@ -32,13 +34,22 @@ class InjectMarker:
     def interface(self, interface: Any) -> None:
         self._interface = interface
 
+    def __class_getitem__(cls, interface: Any) -> Any:
+        return Annotated[interface, cls()]
 
-def is_inject_marker(obj: Any) -> bool:
-    return isinstance(obj, InjectMarker)
+
+if TYPE_CHECKING:
+    Provide = Annotated[T, ProvideMarker()]
+else:
+    Provide = ProvideMarker
+
+
+def is_provide_marker(obj: Any) -> bool:
+    return isinstance(obj, ProvideMarker)
 
 
 def Inject() -> Any:
-    return InjectMarker()
+    return ProvideMarker()
 
 
 class Event:
@@ -70,3 +81,33 @@ def is_none_type(tp: Any) -> bool:
 def is_iterator_type(tp: Any) -> bool:
     """Check if the given object is an iterator type."""
     return tp in (Iterator, AsyncIterator)
+
+
+def unwrap_parameter(parameter: inspect.Parameter) -> inspect.Parameter:
+    if get_origin(parameter.annotation) is not Annotated:
+        return parameter
+
+    origin, *metadata = get_args(parameter.annotation)
+
+    if not metadata or not is_provide_marker(metadata[-1]):
+        return parameter
+
+    if is_provide_marker(parameter.default):
+        raise TypeError(
+            "Cannot specify `Inject` in `Annotated` and "
+            f"default value together for '{parameter.name}'"
+        )
+
+    if parameter.default is not inspect.Parameter.empty:
+        return parameter
+
+    marker = metadata[-1]
+    new_metadata = metadata[:-1]
+    if new_metadata:
+        if hasattr(Annotated, "__getitem__"):
+            new_annotation = Annotated.__getitem__((origin, *new_metadata))  # type: ignore
+        else:
+            new_annotation = Annotated.__class_getitem__((origin, *new_metadata))  # type: ignore
+    else:
+        new_annotation = origin
+    return parameter.replace(annotation=new_annotation, default=marker)

@@ -24,8 +24,8 @@ class TestContainerScanner:
 
         from .scan_app.a.a3.handlers import a_a3_handler_1, a_a3_handler_2
 
-        assert a_a3_handler_1() == "a.a1.str_provider"
-        assert a_a3_handler_2().ident == "a.a1.str_provider"
+        assert container.run(a_a3_handler_1) == "a.a1.str_provider"
+        assert container.run(a_a3_handler_2).ident == "a.a1.str_provider"
 
     def test_scan_single_module_registers_limited_dependencies(
         self, container: Container, mocker: MockerFixture
@@ -40,7 +40,7 @@ class TestContainerScanner:
 
         from .scan_app.a.a3.handlers import a_a3_handler_1
 
-        assert a_a3_handler_1() == "a.a1.str_provider"
+        assert container.run(a_a3_handler_1) == "a.a1.str_provider"
 
     def test_scan_with_unknown_tag_registers_nothing(
         self, container: Container, mocker: MockerFixture
@@ -65,4 +65,4 @@ class TestContainerScanner:
 
         from .scan_app.a.a3.handlers import a_a3_handler_1
 
-        assert a_a3_handler_1() == "a.a1.str_provider"
+        assert container.run(a_a3_handler_1) == "a.a1.str_provider"

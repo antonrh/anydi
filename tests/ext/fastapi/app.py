@@ -5,7 +5,7 @@ from starlette.middleware import Middleware
 
 import anydi.ext.fastapi
 from anydi import Container
-from anydi.ext.fastapi import Inject
+from anydi.ext.fastapi import Inject, Provide
 from anydi.ext.starlette.middleware import RequestScopedMiddleware
 
 from tests.ext.fixtures import Mail, MailService, User, UserService
@@ -43,7 +43,7 @@ def mail_service() -> MailService:
     return MailService()
 
 
-async def get_user(user_service: UserService = Inject()) -> User:
+async def get_user(user_service: Provide[UserService]) -> User:
     return await user_service.get_user()
 
 
@@ -62,7 +62,7 @@ async def send_email(
 @app.post("/send-mail-annotated", response_model=Mail)
 async def send_email_annotated(
     user: Annotated[User, Depends(get_user)],
-    mail_service: Annotated[MailService, Inject()],
+    mail_service: Provide[MailService],
     message: Annotated[str, Body(embed=True)],
 ) -> Any:
     return await mail_service.send_mail(email=user.email, message=message)
@@ -70,10 +70,10 @@ async def send_email_annotated(
 
 @app.get("/annotated-mixed")
 def annotated_mixed(
-    message1: Annotated[Annotated[str, "message1"], Inject()],
-    message1_a: Annotated[Annotated[str, "message1", "a"], Inject()],
-    message1_a_b: Annotated[Annotated[str, "message1", "a", "b"], Inject()],
-    message2: Annotated[str, "message2"] = Inject(),
+    message1: Provide[Annotated[str, "message1"]],
+    message1_a: Provide[Annotated[str, "message1", "a"]],
+    message1_a_b: Provide[Annotated[str, "message1", "a", "b"]],
+    message2: Provide[Annotated[str, "message2"]],
 ) -> Any:
     return [
         message1,

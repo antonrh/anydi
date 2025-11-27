@@ -11,7 +11,7 @@ import uuid
 from collections import defaultdict
 from collections.abc import AsyncIterator, Callable, Iterable, Iterator
 from contextvars import ContextVar
-from typing import Annotated, Any, TypeVar, cast, get_args, get_origin, overload
+from typing import Any, TypeVar, cast, get_args, get_origin, overload
 
 from typing_extensions import ParamSpec, Self, type_repr
 
@@ -26,9 +26,10 @@ from ._types import (
     Event,
     Scope,
     is_event_type,
-    is_inject_marker,
     is_iterator_type,
     is_none_type,
+    is_provide_marker,
+    unwrap_parameter,
 )
 
 T = TypeVar("T", bound=Any)
@@ -554,7 +555,7 @@ class Container:
             return decorator
         return decorator(func)
 
-    def run(self, func: Callable[P, T], /, *args: P.args, **kwargs: P.kwargs) -> T:
+    def run(self, func: Callable[..., T], /, *args: Any, **kwargs: Any) -> T:
         """Run the given function with injected dependencies."""
         return self._inject(func)(*args, **kwargs)
 
@@ -601,44 +602,14 @@ class Container:
                 injected_params[parameter.name] = interface
         return injected_params
 
-    @staticmethod
-    def _unwrap_injected_parameter(parameter: inspect.Parameter) -> inspect.Parameter:
-        if get_origin(parameter.annotation) is not Annotated:
-            return parameter
-
-        origin, *metadata = get_args(parameter.annotation)
-
-        if not metadata or not is_inject_marker(metadata[-1]):
-            return parameter
-
-        if is_inject_marker(parameter.default):
-            raise TypeError(
-                "Cannot specify `Inject` in `Annotated` and "
-                f"default value together for '{parameter.name}'"
-            )
-
-        if parameter.default is not inspect.Parameter.empty:
-            return parameter
-
-        marker = metadata[-1]
-        new_metadata = metadata[:-1]
-        if new_metadata:
-            if hasattr(Annotated, "__getitem__"):
-                new_annotation = Annotated.__getitem__((origin, *new_metadata))  # type: ignore
-            else:
-                new_annotation = Annotated.__class_getitem__((origin, *new_metadata))  # type: ignore
-        else:
-            new_annotation = origin
-        return parameter.replace(annotation=new_annotation, default=marker)
-
     def validate_injected_parameter(
         self, parameter: inspect.Parameter, *, call: Callable[..., Any]
     ) -> tuple[Any, bool]:
         """Validate an injected parameter."""
-        parameter = self._unwrap_injected_parameter(parameter)
+        parameter = unwrap_parameter(parameter)
         interface = parameter.annotation
 
-        if not is_inject_marker(parameter.default):
+        if not is_provide_marker(parameter.default):
             return interface, False
 
         if interface is inspect.Parameter.empty:

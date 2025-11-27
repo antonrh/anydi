@@ -9,7 +9,7 @@ from types import ModuleType
 from typing import TYPE_CHECKING, Any
 
 from ._decorators import is_injectable
-from ._types import is_inject_marker
+from ._types import is_provide_marker, unwrap_parameter
 
 if TYPE_CHECKING:
     from ._container import Container
@@ -88,9 +88,8 @@ class Scanner:
 
         return dependencies
 
-    @staticmethod
     def _should_include_member(
-        member: Callable[..., Any], *, tags: Iterable[str]
+        self, member: Callable[..., Any], *, tags: Iterable[str]
     ) -> bool:
         """Determine if a member should be included based on tags or marker defaults."""
 
@@ -103,8 +102,11 @@ class Scanner:
         # If no tags are passed and not explicitly injectable,
         # check for parameter markers
         if not tags:
-            for parameter in inspect.signature(member).parameters.values():
-                if is_inject_marker(parameter.default):
+            for parameter in inspect.signature(
+                member, eval_str=True
+            ).parameters.values():
+                parameter = unwrap_parameter(parameter)
+                if is_provide_marker(parameter.default):
                     return True
 
         return False

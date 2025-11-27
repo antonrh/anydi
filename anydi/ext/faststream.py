@@ -3,14 +3,19 @@
 from __future__ import annotations
 
 import inspect
-from typing import Any, cast
+from typing import TYPE_CHECKING, Annotated, Any, TypeVar, cast
 
 from fast_depends.dependencies import Depends
 from faststream import ContextRepo
 from faststream.broker.core.usecase import BrokerUsecase
 
 from anydi import Container
-from anydi._types import InjectMarker
+from anydi._types import ProvideMarker
+
+__all__ = ["install", "get_container", "Inject", "Provide"]
+
+
+T = TypeVar("T")
 
 
 def install(broker: BrokerUsecase[Any, Any], container: Container) -> None:
@@ -42,17 +47,23 @@ def get_container(broker: BrokerUsecase[Any, Any]) -> Container:
     return cast(Container, getattr(broker, "_container"))  # noqa
 
 
-class _Inject(Depends, InjectMarker):
+class DependsProvide(Depends, ProvideMarker):
     """Parameter dependency class for injecting dependencies using AnyDI."""
 
     def __init__(self) -> None:
         super().__init__(dependency=self._dependency, use_cache=True, cast=True)
-        InjectMarker.__init__(self)
+        ProvideMarker.__init__(self)
 
     async def _dependency(self, context: ContextRepo) -> Any:
         container = get_container(context.get("broker"))
         return await container.aresolve(self.interface)
 
 
+if TYPE_CHECKING:
+    Provide = Annotated[T, DependsProvide()]
+else:
+    Provide = DependsProvide
+
+
 def Inject() -> Any:
-    return _Inject()
+    return DependsProvide()
