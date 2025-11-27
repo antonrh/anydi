@@ -65,3 +65,45 @@ class TestContainerScanner:
         from .scan_app.a.a3.handlers import a_a3_handler_1
 
         assert a_a3_handler_1() == "a.a1.str_provider"
+
+    def test_scan_registers_provided_classes(
+        self, container: Container, mocker: MockerFixture
+    ) -> None:
+        register_spy = mocker.spy(container, "register")
+
+        container.scan(["tests.scan_app.c"])
+
+        # Should register 2 @provided classes (SingletonService and TransientService)
+        assert register_spy.call_count == 2
+
+        from .scan_app.c.services import SingletonService, TransientService
+
+        # Verify classes are registered
+        assert container.is_registered(SingletonService)
+        assert container.is_registered(TransientService)
+
+        # Verify they can be resolved
+        singleton_service = container.resolve(SingletonService)
+        assert singleton_service.name == "singleton_service"
+
+        transient_service = container.resolve(TransientService)
+        assert transient_service.name == "transient_service"
+        assert transient_service.singleton_service is singleton_service
+
+    def test_scan_skips_already_registered_provided_classes(
+        self, container: Container, mocker: MockerFixture
+    ) -> None:
+        from .scan_app.c.services import SingletonService
+
+        # Manually register the class first
+        container.register(SingletonService, SingletonService, scope="singleton")
+
+        register_spy = mocker.spy(container, "register")
+
+        container.scan(["tests.scan_app.c"])
+
+        # Should only register TransientService (SingletonService already registered)
+        assert register_spy.call_count == 1
+
+        # Verify both classes are registered
+        assert container.is_registered(SingletonService)
