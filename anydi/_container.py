@@ -194,12 +194,14 @@ class Container:
     def register(
         self,
         interface: Any,
-        call: Callable[..., Any],
+        call: Callable[..., Any] = NOT_SET,
         *,
-        scope: Scope,
+        scope: Scope = "singleton",
         override: bool = False,
     ) -> Provider:
         """Register a provider for the specified interface."""
+        if call is NOT_SET:
+            call = interface
         return self._register_provider(call, scope, interface, override)
 
     def is_registered(self, interface: Any) -> bool:
