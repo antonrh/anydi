@@ -96,7 +96,7 @@ class TestContainerScanner:
         from .scan_app.c.services import SingletonService
 
         # Manually register the class first
-        container.register(SingletonService, SingletonService, scope="singleton")
+        container.register(SingletonService)
 
         register_spy = mocker.spy(container, "register")
 

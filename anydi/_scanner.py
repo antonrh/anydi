@@ -54,7 +54,7 @@ class Scanner:
         for cls in provided_classes:
             if not self._container.is_registered(cls):
                 scope = cls.__provided__["scope"]
-                self._container.register(cls, cls, scope=scope)
+                self._container.register(cls, scope=scope)
 
         # Second: inject @injectable functions
         for dependency in injectable_dependencies:
@@ -80,7 +80,7 @@ class Scanner:
 
     def _scan_module_for_provided(self, module: ModuleType) -> list[type[Provided]]:
         """Scan a module for @provided classes."""
-        provided_classes: list[Provided] = []
+        provided_classes: list[type[Provided]] = []
 
         for _, member in inspect.getmembers(module, predicate=inspect.isclass):
             if getattr(member, "__module__", None) != module.__name__:
