@@ -9,7 +9,6 @@ from types import ModuleType
 from typing import TYPE_CHECKING, Any
 
 from ._decorators import is_injectable
-from ._types import is_inject_marker
 
 if TYPE_CHECKING:
     from ._container import Container
@@ -99,12 +98,5 @@ class Scanner:
             if tags:
                 return bool(set(tags) & member_tags)
             return True  # No tags passed → include all injectables
-
-        # If no tags are passed and not explicitly injectable,
-        # check for parameter markers
-        if not tags:
-            for parameter in inspect.signature(member).parameters.values():
-                if is_inject_marker(parameter.default):
-                    return True
 
         return False

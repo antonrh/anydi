@@ -19,13 +19,12 @@ class TestContainerScanner:
         container.register_module(ScanAppModule)
         container.scan(["tests.scan_app"])
 
-        # Expecting 7 total inject calls from all eligible @injectable functions
-        assert inject_spy.call_count == 7
+        # Expecting 4 total inject calls from all eligible @injectable functions
+        assert inject_spy.call_count == 4
 
-        from .scan_app.a.a3.handlers import a_a3_handler_1, a_a3_handler_2
+        from .scan_app.a.a3.handlers import a_a3_handler_1
 
         assert a_a3_handler_1() == "a.a1.str_provider"
-        assert a_a3_handler_2().ident == "a.a1.str_provider"
 
     def test_scan_single_module_registers_limited_dependencies(
         self, container: Container, mocker: MockerFixture
@@ -35,8 +34,8 @@ class TestContainerScanner:
         container.register_module(ScanAppModule)
         container.scan("tests.scan_app.a.a3.handlers")
 
-        # Expecting only 2 handlers to be registered from this specific module
-        assert inject_spy.call_count == 2
+        # Expecting only 1 handler to be registered from this specific module
+        assert inject_spy.call_count == 1
 
         from .scan_app.a.a3.handlers import a_a3_handler_1
 

@@ -1643,7 +1643,7 @@ class TestContainerInjector:
         _ = container.run(handler)
         _ = container.run(handler)
 
-        assert handler in container._inject_cache
+        assert handler in container._injector._cache
 
 
 class TestContainerOverride:
