@@ -22,7 +22,8 @@ def install(
         prefix += "."
 
     def _register_settings(_settings: BaseSettings) -> None:
-        all_fields = {**_settings.model_fields, **_settings.model_computed_fields}
+        settings_cls = type(_settings)
+        all_fields = {**settings_cls.model_fields, **settings_cls.model_computed_fields}
         for setting_name, field_info in all_fields.items():
             if isinstance(field_info, ComputedFieldInfo):
                 interface = field_info.return_type
