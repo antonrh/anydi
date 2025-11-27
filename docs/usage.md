@@ -13,16 +13,23 @@ three arguments: the type of the object to be provided, the provider function or
 ```python
 from anydi import Container
 
+
+class EmailService:
+    def send(self, to: str, subject: str) -> None:
+        print(f"Sending email to {to}: {subject}")
+
+
 container = Container()
 
 
-def message() -> str:
-    return "Hello, World!"
+def email_service() -> EmailService:
+    return EmailService()
 
 
-container.register(str, message, scope="singleton")
+container.register(EmailService, email_service, scope="singleton")
 
-assert container.resolve(str) == "Hello, World!"
+service = container.resolve(EmailService)
+service.send("user@example.com", "Welcome!")
 ```
 
 Alternatively, you can use the `@provider` decorator to register a provider function. The decorator takes care of registering the provider with `Container`.
@@ -30,44 +37,64 @@ Alternatively, you can use the `@provider` decorator to register a provider func
 ```python
 from anydi import Container
 
+
+class NotificationService:
+    def notify(self, user_id: str, message: str) -> None:
+        print(f"Notifying {user_id}: {message}")
+
+
 container = Container()
 
 
 @container.provider(scope="singleton")
-def message() -> str:
-    return "Hello, World!"
+def notification_service() -> NotificationService:
+    return NotificationService()
 
 
-assert container.resolve(str) == "Hello, World!"
+service = container.resolve(NotificationService)
+service.notify("user-123", "Hello!")
 ```
 
 ### Annotated Providers
 
-Sometimes, it's useful to register multiple providers for the same type. For example, you might want to register a provider for a string that returns a different message depending on the name of the provider. This can be achieved by using the `Annotated` type hint with the string argument:
+Sometimes, it's useful to register multiple providers for the same type. For example, you might want to register multiple database connections. This can be achieved by using the `Annotated` type hint with the string argument:
 
 ```python
 from typing import Annotated
 
 from anydi import Container
 
+
+class DatabaseConnection:
+    def __init__(self, host: str, port: int) -> None:
+        self.host = host
+        self.port = port
+
+    def query(self, sql: str) -> list:
+        return []
+
+
 container = Container()
 
 
 @container.provider(scope="singleton")
-def message1() -> Annotated[str, "message1"]:
-    return "Message1"
+def primary_db() -> Annotated[DatabaseConnection, "primary"]:
+    return DatabaseConnection(host="db-primary.local", port=5432)
 
 
 @container.provider(scope="singleton")
-def message2() -> Annotated[str, "message2"]:
-    return "Message2"
+def replica_db() -> Annotated[DatabaseConnection, "replica"]:
+    return DatabaseConnection(host="db-replica.local", port=5432)
 
 
-assert container.resolve(Annotated[str, "message1"]) == "Message1"
-assert container.resolve(Annotated[str, "message2"]) == "Message2"
+primary = container.resolve(Annotated[DatabaseConnection, "primary"])
+replica = container.resolve(Annotated[DatabaseConnection, "replica"])
+
+assert primary.host == "db-primary.local"
+assert replica.host == "db-replica.local"
 ```
 
-In this code example, we define two providers, `message1` and `message2`, each returning a different message. The Annotated type hint with string argument allows you to specify which provider to retrieve based on the name provided within the annotation.
+In this code example, we define two providers for different database connections. The Annotated type hint with string argument allows you to specify which provider to retrieve based on the name provided within the annotation.
 
 ### Unregistering Providers
 
@@ -77,19 +104,26 @@ interface of the dependency to be unregistered.
 ```python
 from anydi import Container
 
+
+class PaymentService:
+    def process_payment(self, amount: float, currency: str) -> bool:
+        print(f"Processing {amount} {currency}")
+        return True
+
+
 container = Container()
 
 
 @container.provider(scope="singleton")
-def message() -> str:
-    return "Hello, World!"
+def payment_service() -> PaymentService:
+    return PaymentService()
 
 
-assert container.is_registered(str)
+assert container.is_registered(PaymentService)
 
-container.unregister(str)
+container.unregister(PaymentService)
 
-assert not container.is_registered(str)
+assert not container.is_registered(PaymentService)
 ```
 
 ### Resolved Providers
@@ -100,24 +134,37 @@ This method takes the interface of the dependency to be checked.
 ```python
 from anydi import Container
 
+
+class CacheService:
+    def __init__(self) -> None:
+        self.data: dict[str, str] = {}
+
+    def get(self, key: str) -> str | None:
+        return self.data.get(key)
+
+    def set(self, key: str, value: str) -> None:
+        self.data[key] = value
+
+
 container = Container()
 
 
 @container.provider(scope="singleton")
-def message() -> str:
-    return "Hello, World!"
+def cache_service() -> CacheService:
+    return CacheService()
 
 
 # Check if an instance is resolved
-assert not container.is_resolved(str)
+assert not container.is_resolved(CacheService)
 
-assert container.resolve(str) == "Hello, World!"
+cache = container.resolve(CacheService)
+cache.set("name", "Alice")
 
-assert container.is_resolved(str)
+assert container.is_resolved(CacheService)
 
-container.release(str)
+container.release(CacheService)
 
-assert not container.is_resolved(str)
+assert not container.is_resolved(CacheService)
 ```
 
 To release a provider instance, you can use the `release` method of the `Container` instance. This method takes the interface of the dependency to be reset. Alternatively, you can reset all instances with the `reset` method.
@@ -125,20 +172,31 @@ To release a provider instance, you can use the `release` method of the `Contain
 ```python
 from anydi import Container
 
+
+class LoggerService:
+    def log(self, message: str) -> None:
+        print(f"[LOG] {message}")
+
+
+class MetricsService:
+    def record(self, metric: str, value: float) -> None:
+        print(f"[METRIC] {metric}: {value}")
+
+
 container = Container()
-container.register(str, lambda: "Hello, World!", scope="singleton")
-container.register(int, lambda: 100, scope="singleton")
+container.register(LoggerService, lambda: LoggerService(), scope="singleton")
+container.register(MetricsService, lambda: MetricsService(), scope="singleton")
 
-container.resolve(str)
-container.resolve(int)
+container.resolve(LoggerService)
+container.resolve(MetricsService)
 
-assert container.is_resolved(str)
-assert container.is_resolved(int)
+assert container.is_resolved(LoggerService)
+assert container.is_resolved(MetricsService)
 
 container.reset()
 
-assert not container.is_resolved(str)
-assert not container.is_resolved(int)
+assert not container.is_resolved(LoggerService)
+assert not container.is_resolved(MetricsService)
 ```
 
 !!! note
@@ -158,19 +216,29 @@ assert not container.is_resolved(int)
 Providers with transient scope create a new instance of the object each time it's requested. You can set the scope when registering a provider.
 
 ```python
-import random
+import uuid
 
 from anydi import Container
+
+
+class RequestTracker:
+    def __init__(self) -> None:
+        self.request_id = str(uuid.uuid4())
+
 
 container = Container()
 
 
 @container.provider(scope="transient")
-def message() -> str:
-    return random.choice(["hello", "hola", "ciao"])
+def request_tracker() -> RequestTracker:
+    return RequestTracker()
 
 
-print(container.resolve(str))  # will print random message
+# Each resolve creates a new instance with a different request ID
+tracker1 = container.resolve(RequestTracker)
+tracker2 = container.resolve(RequestTracker)
+
+assert tracker1.request_id != tracker2.request_id
 ```
 
 ### `singleton` scope
@@ -255,18 +323,27 @@ from typing import Annotated
 
 from anydi import Container
 
+
+class UserContext:
+    def __init__(self, user_id: str, tenant_id: str) -> None:
+        self.user_id = user_id
+        self.tenant_id = tenant_id
+
+
 container = Container()
 
 
 @container.provider(scope="request")
-def request_param(request: Request) -> Annotated[str, "request.param"]:
-    return request.param
+def user_context(request: Request) -> Annotated[UserContext, "current_user"]:
+    return UserContext(user_id=request.param, tenant_id="tenant-1")
 
 
 with container.request_context() as ctx:
-    ctx.set(Request, Request(param="param1"))
+    ctx.set(Request, Request(param="user-456"))
 
-    assert container.resolve(Annotated[str, "request.param"]) == "param1"
+    user = container.resolve(Annotated[UserContext, "current_user"])
+    assert user.user_id == "user-456"
+    assert user.tenant_id == "tenant-1"
 ```
 
 ## Resource Providers
@@ -510,33 +587,43 @@ assert connection.disconnected
 
 Sometimes it's necessary to override a provider with a different implementation. To do this, you can register the provider with the override=True property set.
 
-For example, suppose you have registered a singleton provider for a string:
+For example, suppose you have registered a singleton provider for a storage service:
 
 ```python
 from anydi import Container
+
+
+class StorageService:
+    def __init__(self, backend: str) -> None:
+        self.backend = backend
+
+    def save(self, key: str, data: bytes) -> None:
+        print(f"Saving to {self.backend}: {key}")
+
 
 container = Container()
 
 
 @container.provider(scope="singleton")
-def hello_message() -> str:
-    return "Hello, world!"
+def local_storage() -> StorageService:
+    return StorageService(backend="local")
 
 
 @container.provider(scope="singleton", override=True)
-def goodbye_message() -> str:
-    return "Goodbye!"
+def cloud_storage() -> StorageService:
+    return StorageService(backend="s3")
 
 
-assert container.resolve(str) == "Goodbye!"
+service = container.resolve(StorageService)
+assert service.backend == "s3"
 ```
 
 Note that if you try to register the provider without passing the override parameter as True, it will raise an error:
 
 ```python
 @container.provider(scope="singleton")  # will raise an error
-def goodbye_message() -> str:
-    return "Good-bye!"
+def azure_storage() -> StorageService:
+    return StorageService(backend="azure")
 ```
 
 
