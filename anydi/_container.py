@@ -556,7 +556,7 @@ class Container:
             return decorator
         return decorator(func)
 
-    def run(self, func: Callable[P, T], /, *args: P.args, **kwargs: P.kwargs) -> T:
+    def run(self, func: Callable[..., T], /, *args: Any, **kwargs: Any) -> T:
         """Run the given function with injected dependencies."""
         return self._injector.inject(func)(*args, **kwargs)
 
