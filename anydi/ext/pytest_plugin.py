@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import importlib.util
 import inspect
 import logging
 from collections.abc import Callable, Iterator
@@ -48,7 +49,7 @@ def pytest_addoption(parser: pytest.Parser) -> None:
 @pytest.fixture(scope="session")
 def container(request: pytest.FixtureRequest) -> Container:
     """Container fixture."""
-    return _get_container(request)
+    return _find_container(request)
 
 
 @pytest.fixture
@@ -162,17 +163,24 @@ def _anydi_ainject(
         runner.run_fixture(_awrapper, {})
 
 
-def _get_container(request: pytest.FixtureRequest) -> Container:
-    """Get container from fixture or config."""
+def _find_container(request: pytest.FixtureRequest) -> Container:
+    """Find container."""
+
+    # Look for 'anydi_container' defined in pytest.ini (highest priority)
     container_path = cast(str | None, request.config.getini("anydi_container"))
     if container_path:
         try:
             return import_container(container_path)
-        except Exception as exc:
+        except ImportError as exc:
             raise RuntimeError(
                 f"Failed to load container from config "
                 f"'anydi_container={container_path}': {exc}"
             ) from exc
+
+    # Detect pytest-django + anydi_django availability
+    pluginmanager = request.config.pluginmanager
+    if pluginmanager.hasplugin("django") and importlib.util.find_spec("anydi_django"):
+        return import_container("anydi_django.container")
 
     # Neither fixture nor config found
     raise pytest.FixtureLookupError(
