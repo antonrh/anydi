@@ -3,8 +3,8 @@ from typing import Any
 import pytest
 from faststream.redis import RedisBroker
 
-from anydi import Container
-from anydi.ext.faststream import Inject, install
+from anydi import Container, Inject
+from anydi.ext.faststream import install
 
 
 def test_inject_param_missing_interface() -> None:

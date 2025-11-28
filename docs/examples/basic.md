@@ -19,9 +19,9 @@ app/
 Defines the data model used in the application, in this case just a simple User model.
 
 ```python
-from typing import NewType
 import uuid
 from dataclasses import dataclass, field
+from typing import NewType
 
 UserId = NewType("UserId", uuid.UUID)
 
@@ -38,14 +38,13 @@ Defines the interface for a UserRepository, which is responsible for accessing a
 
 ```python
 import abc
-from typing import Dict, List, Optional
 
 from app.models import User, UserId
 
 
 class UserRepository(abc.ABC):
     @abc.abstractmethod
-    def all(self) -> List[User]:
+    def all(self) -> list[User]:
         pass
 
     @abc.abstractmethod
@@ -53,21 +52,21 @@ class UserRepository(abc.ABC):
         pass
 
     @abc.abstractmethod
-    def get_by_email(self, email: str) -> Optional[User]:
+    def get_by_email(self, email: str) -> User | None:
         pass
 
 
 class InMemoryUserRepository(UserRepository):
     def __init__(self) -> None:
-        self.data: Dict[UserId, User] = {}
+        self.data: dict[UserId, User] = {}
 
-    def all(self) -> List[User]:
+    def all(self) -> list[User]:
         return list(self.data.values())
 
     def add(self, user: User) -> None:
         self.data[user.id] = user
 
-    def get_by_email(self, email: str) -> Optional[User]:
+    def get_by_email(self, email: str) -> User | None:
         try:
             return [user for user in self.data.values() if user.email == email][0]
         except IndexError:
@@ -79,9 +78,6 @@ class InMemoryUserRepository(UserRepository):
 Defines a UserService class that provides higher-level operations on the User data, such as retrieving all users, creating new users, and retrieving a user by their email address.
 
 ```python
-from dataclasses import dataclass
-from typing import List, Optional
-
 from app.models import User
 from app.repositories import UserRepository
 
@@ -90,7 +86,7 @@ class UserService:
     def __init__(self, user_repository: UserRepository) -> None:
         self.user_repository = user_repository
 
-    def get_users(self) -> List[User]:
+    def get_users(self) -> list[User]:
         return self.user_repository.all()
 
     def create_user(self, email: str) -> User:
@@ -98,7 +94,7 @@ class UserService:
         self.user_repository.add(user)
         return user
 
-    def get_user(self, email: str) -> Optional[User]:
+    def get_user(self, email: str) -> User | None:
         return self.user_repository.get_by_email(email)
 ```
 
@@ -128,21 +124,19 @@ class AppModule(Module):
 Defines several handlers that use the UserService instance to perform operations on the User data, such as retrieving all users, creating a new user, and retrieving a user by their email address.
 
 ```python
-from typing import List
-
-from anydi import auto, injectable
+from anydi import Inject, injectable
 
 from app.models import User
 from app.services import UserService
 
 
 @injectable
-def get_users(user_service: UserService = auto) -> List[User]:
+def get_users(user_service: UserService = Inject()) -> list[User]:
     return user_service.get_users()
 
 
 @injectable
-def get_user(email: str, user_service: UserService = auto) -> User:
+def get_user(email: str, user_service: UserService = Inject()) -> User:
     user = user_service.get_user(email)
     if not user:
         raise Exception("User not found.")
@@ -150,7 +144,7 @@ def get_user(email: str, user_service: UserService = auto) -> User:
 
 
 @injectable
-def create_user(email: str, user_service: UserService = auto) -> User:
+def create_user(email: str, user_service: UserService = Inject()) -> User:
     return user_service.create_user(email=email)
 ```
 

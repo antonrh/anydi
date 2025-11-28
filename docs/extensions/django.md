@@ -38,11 +38,11 @@ class HelloService:
 You can now use this service in your views as follows:
 
 ```python
-import anydi
+from anydi import Provide
 from django.http import HttpRequest, HttpResponse
 
 
-def hello(request, hello_service: HelloService = anydi.auto) -> HttpResponse:
+def hello(request, hello_service: Provide[HelloService]) -> HttpResponse:
     return HttpResponse(hello_service.get_message())
 ```
 
@@ -58,7 +58,7 @@ urlpatterns = [
 ]
 ```
 
-The `HelloService` will be automatically injected into the hello view through the provided marker `anydi.auto`.
+The `HelloService` will be automatically injected into the hello view through the provided marker `Provide[HelloService]`.
 
 ## Settings
 
@@ -268,7 +268,7 @@ This setting will modify the `Django Ninja framework` to support dependency inje
 ```python
 from typing import Any
 
-import anydi
+from anydi import Provide
 from django.http import HttpRequest
 from ninja import Router
 
@@ -278,13 +278,13 @@ from your_module import HelloService
 router = Router()
 
 @router.get("/hello")
-def hello(request: HttpRequest, hello_service: HelloService = anydi.auto) -> dict[str, Any]:
+def hello(request: HttpRequest, hello_service: Provide[HelloService]) -> dict[str, Any]:
     return {
         "message": hello_service.get_message(),
     }
 ```
 
-The `HelloService` will be automatically injected into the hello endpoint using the provided marker `anydi.auto`.
+The `HelloService` will be automatically injected into the hello endpoint using the provided marker `Provide[HelloService]`.
 
 ### Testing Django Ninja endpoints
 

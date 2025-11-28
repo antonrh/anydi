@@ -628,7 +628,7 @@ In order to use the dependencies that have been provided to the `Container`, the
 Here's an example of how to use the `@container.inject` decorator:
 
 ```python
-from anydi import auto, Container
+from anydi import Container, Inject
 
 
 class Service:
@@ -645,11 +645,11 @@ def service() -> Service:
 
 
 @container.inject
-def handler(service: Service = auto) -> None:
+def handler(service: Service = Inject()) -> None:
     print(f"Hello, from service `{service.name}`")
 ```
 
-Note that the service argument in the handler function has been given a default value of `auto` mark. This is done so that `AnyDI` knows which dependency to inject when the handler function is called.
+Note that the service argument in the handler function has been given a default value of the `Inject()` marker. This lets `AnyDI` know which dependency to inject when the handler function is called.
 
 Once the dependencies have been injected, the function can be called as usual, like so:
 
@@ -660,7 +660,7 @@ handler()
 You can also call the callable object with injected dependencies using the `run` method of the `Container` instance:
 
 ```python
-from anydi import auto, Container
+from anydi import Container, Provide
 
 
 class Service:
@@ -676,7 +676,7 @@ def service() -> Service:
     return Service(name="demo")
 
 
-def handler(service: Service = auto) -> None:
+def handler(service: Provide[Service]) -> None:
     print(f"Hello, from service `{service.name}`")
 
 
@@ -684,6 +684,18 @@ container.run(handler)
 ```
 
 In this case, the `run` method will automatically inject the dependencies and call the handler function. Using `@container.inject` is not necessary in this case.
+
+#### Annotation Equivalents
+
+AnyDI recognizes the following forms as equivalent ways to declare an injected dependency:
+
+```python
+dependency: MyType = Inject()
+dependency: Annotated[MyType, Inject()]
+dependency: Provide[MyType]
+```
+
+Choose whichever aligns with the framework or style you are using; they all resolve to the same provider lookup.
 
 
 ### Scanning Injections
@@ -710,13 +722,13 @@ class Service:
 `handlers.py` uses the Service class:
 
 ```python
-from anydi import auto, injectable
+from anydi import Inject, injectable
 
 from app.services import Service
 
 
 @injectable
-def my_handler(service: Service = auto) -> None:
+def my_handler(service: Service = Inject()) -> None:
     print(f"Hello, from service `{service.name}`")
 ```
 
@@ -811,7 +823,7 @@ Once the block is exited, the original dependency is restored.
 from dataclasses import dataclass
 from unittest import mock
 
-from anydi import auto, Container
+from anydi import Container, Inject
 
 
 @dataclass(kw_only=True)
@@ -839,7 +851,7 @@ container = Container()
 
 
 @container.inject
-def get_items(service: Service = auto) -> list[Item]:
+def get_items(service: Service = Inject()) -> list[Item]:
     return service.get_items()
 
 

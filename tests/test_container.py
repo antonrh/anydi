@@ -10,7 +10,16 @@ from unittest import mock
 import pytest
 from typing_extensions import Self
 
-from anydi import Container, Inject, Provider, Scope, request, singleton, transient
+from anydi import (
+    Container,
+    Inject,
+    Provide,
+    Provider,
+    Scope,
+    request,
+    singleton,
+    transient,
+)
 from anydi._types import Event
 
 from tests.fixtures import (
@@ -1507,6 +1516,19 @@ class TestContainerInjector:
             return message
 
         result = func()
+
+        assert result == "test"
+
+    def test_inject_using_provide_annotation(self, container: Container) -> None:
+        @container.provider(scope="singleton")
+        def message() -> str:
+            return "test"
+
+        @container.inject
+        def func(message: Provide[str]) -> str:
+            return message
+
+        result = container.run(func)
 
         assert result == "test"
 

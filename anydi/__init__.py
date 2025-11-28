@@ -4,7 +4,7 @@ from ._container import Container, import_container
 from ._decorators import injectable, provided, provider, request, singleton, transient
 from ._module import Module
 from ._provider import ProviderDef as Provider
-from ._types import Inject, Scope
+from ._types import Inject, Provide, Scope
 
 # Alias for dependency auto marker
 # TODO: deprecate it
@@ -15,6 +15,7 @@ __all__ = [
     "Container",
     "Inject",
     "Module",
+    "Provide",
     "Provider",
     "Scope",
     "auto",
