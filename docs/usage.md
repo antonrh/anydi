@@ -861,22 +861,7 @@ def test_handler() -> None:
 
 There are two ways to provide a container for your tests:
 
-**Option 1: Define a `container` fixture**
-
-```python
-import pytest
-
-from anydi import Container
-
-from myapp import container as myapp_container
-
-
-@pytest.fixture(scope="session")
-def container() -> Container:
-    return myapp_container
-```
-
-**Option 2: Use the `anydi_container` configuration**
+**Option 1: Use the `anydi_container` configuration**
 
 Set the `anydi_container` option in your `pytest.ini` or `pyproject.toml`:
 
@@ -902,6 +887,23 @@ def create_container() -> Container:
     container = Container()
     # ... register providers
     return container
+```
+
+**Option 2: Define a `container` fixture**
+
+Alternatively, override a `container` fixture in your test suite (e.g., in `conftest.py`):
+
+```python
+import pytest
+
+from anydi import Container
+
+from myapp import container as myapp_container
+
+
+@pytest.fixture(scope="session")
+def container() -> Container:
+    return myapp_container
 ```
 
 **Note:** The fixture approach takes priority over the configuration if both are defined.

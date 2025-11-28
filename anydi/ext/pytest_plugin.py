@@ -45,37 +45,10 @@ def pytest_addoption(parser: pytest.Parser) -> None:
     )
 
 
-CONTAINER_FIXTURE_NAME = "container"
-
-
-@pytest.fixture
-def anydi_setup_container(request: pytest.FixtureRequest) -> Container:
-    # First, try to get the container from a fixture
-    try:
-        return cast(Container, request.getfixturevalue(CONTAINER_FIXTURE_NAME))
-    except pytest.FixtureLookupError:
-        pass
-
-    # Fall back to the config option
-    container_path = cast(str | None, request.config.getini("anydi_container"))
-    if container_path:
-        try:
-            return import_container(container_path)
-        except Exception as exc:
-            raise RuntimeError(
-                f"Failed to load container from config "
-                f"'anydi_container={container_path}': {exc}"
-            ) from exc
-
-    # Neither fixture nor config found
-    raise pytest.FixtureLookupError(
-        None,
-        request,
-        "`container` fixture is not found and 'anydi_container' config is not set. "
-        "Either define a `container` fixture in your test module, "
-        "set 'anydi_container' in pytest.ini, "
-        "or override `anydi_setup_container` fixture.",
-    )
+@pytest.fixture(scope="session")
+def container(request: pytest.FixtureRequest) -> Container:
+    """Container fixture."""
+    return _get_container(request)
 
 
 @pytest.fixture
@@ -128,8 +101,7 @@ def _anydi_inject(
     if inspect.iscoroutinefunction(request.function) or not _anydi_should_inject:
         return
 
-    # Setup the container
-    container = cast(Container, request.getfixturevalue("anydi_setup_container"))
+    container = cast(Container, request.getfixturevalue("container"))
 
     for argname, interface in _anydi_injected_parameter_iterator():
         # Skip if the interface has no provider
@@ -167,10 +139,9 @@ def _anydi_ainject(
         )
         pytest.fail(msg, pytrace=False)
 
-    async def _awrapper() -> None:
-        # Setup the container
-        container = cast(Container, request.getfixturevalue("anydi_setup_container"))
+    container = cast(Container, request.getfixturevalue("container"))
 
+    async def _awrapper() -> None:
         for argname, interface in _anydi_injected_parameter_iterator():
             # Skip if the interface has no provider
             if not container.has_provider_for(interface):
@@ -189,3 +160,25 @@ def _anydi_ainject(
 
     with get_runner(backend_name, backend_options) as runner:
         runner.run_fixture(_awrapper, {})
+
+
+def _get_container(request: pytest.FixtureRequest) -> Container:
+    """Get container from fixture or config."""
+    container_path = cast(str | None, request.config.getini("anydi_container"))
+    if container_path:
+        try:
+            return import_container(container_path)
+        except Exception as exc:
+            raise RuntimeError(
+                f"Failed to load container from config "
+                f"'anydi_container={container_path}': {exc}"
+            ) from exc
+
+    # Neither fixture nor config found
+    raise pytest.FixtureLookupError(
+        None,
+        request,
+        "`container` fixture is not found and 'anydi_container' config is not set. "
+        "Either define a `container` fixture in your test module "
+        "or set 'anydi_container' in pytest.ini.",
+    )
