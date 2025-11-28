@@ -5,13 +5,7 @@ from __future__ import annotations
 import inspect
 from collections.abc import AsyncIterator, Callable, Iterator
 from types import NoneType
-from typing import (
-    TYPE_CHECKING,
-    Annotated,
-    Any,
-    Literal,
-    TypeVar,
-)
+from typing import TYPE_CHECKING, Annotated, Any, Literal, TypeVar
 
 from typing_extensions import Sentinel
 
