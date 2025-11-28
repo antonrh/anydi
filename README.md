@@ -93,19 +93,6 @@ def greet(service: Provide[GreetingService]) -> str:
 
 if __name__ == "__main__":
     print(container.run(greet))
-
-
-### Picking an Annotation Style
-
-All three syntaxes are interchangeable when annotating an AnyDI dependency:
-
-```python
-service: GreetingService = Inject()
-service: Annotated[GreetingService, Inject()]
-service: Provide[GreetingService]
-```
-
-Use whichever fits the calling style or framework requirements; AnyDI treats them the same.
 ```
 
 ### Test with Overrides (`tests/test_app.py`)

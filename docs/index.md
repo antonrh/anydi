@@ -92,16 +92,6 @@ if __name__ == "__main__":
     print(container.run(greet))
 ```
 
-#### Annotation Equivalents
-
-AnyDI treats these signatures identically, so pick whichever best matches your framework or style:
-
-```python
-service: GreetingService = Inject()
-service: Annotated[GreetingService, Inject()]
-service: Provide[GreetingService]
-```
-
 ### Test with Overrides (`tests/test_app.py`)
 
 ```python
