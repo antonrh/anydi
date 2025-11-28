@@ -1,4 +1,4 @@
-from typing import Any
+from typing import Any, AsyncIterator, Iterator
 
 import pytest
 
@@ -173,6 +173,35 @@ def test_inject_into_fixture(injected_fixture: str) -> None:
     assert injected_fixture == "service"
 
 
-def test_anydi_inject_fixtures_default(request: pytest.FixtureRequest) -> None:
-    """Test that anydi_inject_fixtures is enabled by default in this project."""
-    assert request.config.getini("anydi_inject_fixtures") is True
+@pytest.fixture
+@pytest.mark.inject
+def injected_generator_fixture(service: Service) -> Iterator[str]:
+    yield service.name
+
+
+def test_inject_into_generator_fixture(injected_generator_fixture: str) -> None:
+    assert injected_generator_fixture == "service"
+
+
+@pytest.fixture
+@pytest.mark.inject
+async def injected_async_fixture(service: Service) -> str:
+    return service.name
+
+
+async def test_inject_into_async_fixture(injected_async_fixture: str) -> None:
+    assert injected_async_fixture == "service"
+
+
+@pytest.fixture
+@pytest.mark.inject
+async def injected_async_generator_fixture(
+    service: Service,
+) -> AsyncIterator[str]:
+    yield service.name
+
+
+async def test_inject_into_async_generator_fixture(
+    injected_async_generator_fixture: str,
+) -> None:
+    assert injected_async_generator_fixture == "service"

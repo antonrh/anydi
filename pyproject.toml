@@ -112,6 +112,7 @@ addopts = [
 ]
 xfail_strict = true
 junit_family = "xunit2"
+anydi_inject_fixtures = true
 
 [tool.coverage.report]
 exclude_also = [

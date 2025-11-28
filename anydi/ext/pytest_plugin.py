@@ -46,7 +46,7 @@ def pytest_addoption(parser: pytest.Parser) -> None:
             "Enable dependency injection into fixtures marked with @pytest.mark.inject"
         ),
         type="bool",
-        default=False,
+        default=True,
     )
 
 
@@ -65,7 +65,7 @@ def pytest_configure(config: pytest.Config) -> None:
 
 @pytest.hookimpl(hookwrapper=True)
 def pytest_fixture_setup(
-    fixturedef: pytest.FixtureDef[Any], request: pytest.FixtureRequest
+    fixturedef: pytest.FixtureDef[Any], request: pytest.FixtureRequest,
 ) -> Iterator[None]:
     """Inject dependencies into fixtures marked with @pytest.mark.inject."""
     # Check if this fixture has injection metadata
@@ -112,15 +112,62 @@ def pytest_fixture_setup(
         yield
         return
 
-    # Replace the fixture function with one that calls the original with injected deps
+    def _prepare_call_kwargs(kwargs: dict[str, Any]) -> dict[str, Any]:
+        combined_kwargs = dict(kwargs)
+        combined_kwargs.update(injected_kwargs)
+        return combined_kwargs
+
+    def _ensure_anyio_backend() -> tuple[str, dict[str, Any]]:
+        try:
+            backend = request.getfixturevalue("anyio_backend")
+        except pytest.FixtureLookupError as exc:  # pragma: no cover - defensive
+            msg = (
+                "To run async fixtures with AnyDI, please configure the `anyio` pytest "
+                "plugin (provide the `anyio_backend` fixture)."
+            )
+            pytest.fail(msg, pytrace=False)
+            raise RuntimeError from exc  # Unreachable but satisfies type checkers
+
+        return extract_backend_and_options(backend)
+
+    # Replace the fixture function with one that mirrors the original's type and
+    # injects dependencies before delegating to the user-defined function.
     original_fixture_func = fixturedef.func
 
-    def wrapper(*args: Any, **kwargs: Any) -> Any:
-        # The wrapper receives 'request' if the original fixture had it
-        # Call the original function with injected kwargs
-        return original_func(**injected_kwargs)
+    if inspect.isasyncgenfunction(original_func):
 
-    fixturedef.func = wrapper  # type: ignore[misc]
+        def asyncgen_wrapper(*args: Any, **kwargs: Any) -> Iterator[Any]:
+            backend_name, backend_options = _ensure_anyio_backend()
+            call_kwargs = _prepare_call_kwargs(kwargs)
+
+            with get_runner(backend_name, backend_options) as runner:
+                yield from runner.run_asyncgen_fixture(original_func, call_kwargs)
+
+        fixturedef.func = asyncgen_wrapper  # type: ignore[misc]
+    elif inspect.iscoroutinefunction(original_func):
+
+        def async_wrapper(*args: Any, **kwargs: Any) -> Any:
+            backend_name, backend_options = _ensure_anyio_backend()
+            call_kwargs = _prepare_call_kwargs(kwargs)
+
+            with get_runner(backend_name, backend_options) as runner:
+                return runner.run_fixture(original_func, call_kwargs)
+
+        fixturedef.func = async_wrapper  # type: ignore[misc]
+    elif inspect.isgeneratorfunction(original_func):
+
+        def generator_wrapper(*args: Any, **kwargs: Any) -> Iterator[Any]:
+            call_kwargs = _prepare_call_kwargs(kwargs)
+            yield from original_func(**call_kwargs)
+
+        fixturedef.func = generator_wrapper  # type: ignore[misc]
+    else:
+
+        def sync_wrapper(*args: Any, **kwargs: Any) -> Any:
+            call_kwargs = _prepare_call_kwargs(kwargs)
+            return original_func(**call_kwargs)
+
+        fixturedef.func = sync_wrapper  # type: ignore[misc]
 
     # Let pytest execute the modified fixture
     yield
