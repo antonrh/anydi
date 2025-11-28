@@ -45,7 +45,7 @@ def test_no_container_setup(
     monkeypatch.setattr(request.config, "getini", mock_getini)
 
     with pytest.raises(pytest.FixtureLookupError) as exc_info:
-        pytest_plugin._get_container(request)
+        pytest_plugin._find_container(request)
 
     assert exc_info.value.msg is not None
     assert (
@@ -98,7 +98,7 @@ def test_get_container_from_config(
 
     monkeypatch.setattr(request.config, "getini", mock_getini)
 
-    container = pytest_plugin._get_container(request)
+    container = pytest_plugin._find_container(request)
     assert isinstance(container, Container)
 
 
@@ -118,7 +118,7 @@ def test_get_container_from_config_dot_format(
 
     monkeypatch.setattr(request.config, "getini", mock_getini)
 
-    _container = pytest_plugin._get_container(request)
+    _container = pytest_plugin._find_container(request)
     assert isinstance(_container, Container)
 
 
@@ -138,7 +138,7 @@ def test_get_container_fixture_priority(
     monkeypatch.setattr(request.config, "getini", mock_getini)
 
     # Should use the fixture, not the config
-    _container = pytest_plugin._get_container(request)
+    _container = pytest_plugin._find_container(request)
     assert isinstance(_container, Container)
 
 
@@ -160,4 +160,4 @@ def test_get_container_no_fixture_no_config(
     with pytest.raises(
         pytest.FixtureLookupError, match="container.*fixture is not found"
     ):
-        pytest_plugin._get_container(request)
+        pytest_plugin._find_container(request)
