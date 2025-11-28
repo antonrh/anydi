@@ -7,7 +7,7 @@ from anydi.ext import pytest_plugin
 
 
 class Service:
-    pass
+    name = "service"
 
 
 class UnknownService:
@@ -161,3 +161,18 @@ def test_get_container_no_fixture_no_config(
         pytest.FixtureLookupError, match="container.*fixture is not found"
     ):
         pytest_plugin._find_container(request)
+
+
+@pytest.fixture
+@pytest.mark.inject
+def injected_fixture(service: Service) -> str:
+    return service.name
+
+
+def test_inject_into_fixture(injected_fixture: str) -> None:
+    assert injected_fixture == "service"
+
+
+def test_anydi_inject_fixtures_default(request: pytest.FixtureRequest) -> None:
+    """Test that anydi_inject_fixtures is enabled by default in this project."""
+    assert request.config.getini("anydi_inject_fixtures") is True

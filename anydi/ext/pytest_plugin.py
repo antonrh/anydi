@@ -14,12 +14,8 @@ from anydi import Container, import_container
 
 logger = logging.getLogger(__name__)
 
-
-def pytest_configure(config: pytest.Config) -> None:
-    config.addinivalue_line(
-        "markers",
-        "inject: mark test as needing dependency injection",
-    )
+# Storage for fixtures with inject markers
+_INJECTED_FIXTURES: dict[str, dict[str, Any]] = {}
 
 
 def pytest_addoption(parser: pytest.Parser) -> None:
@@ -44,6 +40,93 @@ def pytest_addoption(parser: pytest.Parser) -> None:
         type="string",
         default=None,
     )
+    parser.addini(
+        "anydi_inject_fixtures",
+        help=(
+            "Enable dependency injection into fixtures marked with @pytest.mark.inject"
+        ),
+        type="bool",
+        default=False,
+    )
+
+
+def pytest_configure(config: pytest.Config) -> None:
+    config.addinivalue_line(
+        "markers",
+        "inject: mark test as needing dependency injection",
+    )
+
+    # Enable fixture injection if configured
+    inject_fixtures_enabled = cast(bool, config.getini("anydi_inject_fixtures"))
+    if inject_fixtures_enabled:
+        _patch_pytest_fixtures()
+        logger.debug("Fixture injection enabled via anydi_inject_fixtures config")
+
+
+@pytest.hookimpl(hookwrapper=True)
+def pytest_fixture_setup(
+    fixturedef: pytest.FixtureDef[Any], request: pytest.FixtureRequest
+) -> Iterator[None]:
+    """Inject dependencies into fixtures marked with @pytest.mark.inject."""
+    # Check if this fixture has injection metadata
+    fixture_name = fixturedef.argname
+    if fixture_name not in _INJECTED_FIXTURES:
+        yield
+        return
+
+    # Get the metadata
+    fixture_info = _INJECTED_FIXTURES[fixture_name]
+    original_func = fixture_info["func"]
+    injected_params = fixture_info["injected_params"]
+    annotations = fixture_info["annotations"]
+
+    # Get the container
+    try:
+        container = cast(Container, request.getfixturevalue("container"))
+    except pytest.FixtureLookupError:
+        yield
+        return
+
+    # Prepare injected arguments
+    injected_kwargs: dict[str, Any] = {}
+    for param_name in injected_params:
+        annotation = annotations.get(param_name)
+        if annotation is None:
+            continue
+
+        # Try to resolve from container
+        if container.has_provider_for(annotation):
+            try:
+                injected_kwargs[param_name] = container.resolve(annotation)
+                logger.debug(
+                    f"Resolved {param_name}={annotation} for fixture {fixture_name}"
+                )
+            except Exception as exc:
+                logger.warning(
+                    f"Failed to resolve dependency for fixture "
+                    f"parameter '{param_name}'.",
+                    exc_info=exc,
+                )
+
+    if not injected_kwargs:
+        yield
+        return
+
+    # Replace the fixture function with one that calls the original with injected deps
+    original_fixture_func = fixturedef.func
+
+    def wrapper(*args: Any, **kwargs: Any) -> Any:
+        # The wrapper receives 'request' if the original fixture had it
+        # Call the original function with injected kwargs
+        return original_func(**injected_kwargs)
+
+    fixturedef.func = wrapper  # type: ignore[misc]
+
+    # Let pytest execute the modified fixture
+    yield
+
+    # Restore the original function
+    fixturedef.func = original_fixture_func  # type: ignore[misc]
 
 
 @pytest.fixture(scope="session")
@@ -190,3 +273,170 @@ def _find_container(request: pytest.FixtureRequest) -> Container:
         "Either define a `container` fixture in your test module "
         "or set 'anydi_container' in pytest.ini.",
     )
+
+
+def _patch_pytest_fixtures() -> None:  # noqa: C901
+    """Patch pytest.fixture decorator to intercept fixtures with inject markers."""
+    from _pytest.fixtures import fixture as original_fixture_decorator
+
+    def patched_fixture(*args: Any, **kwargs: Any) -> Any:  # noqa: C901
+        """Patched fixture decorator that handles inject markers."""
+
+        # Handle both @pytest.fixture and @pytest.fixture() usage
+        if len(args) == 1 and callable(args[0]) and not kwargs:
+            # @pytest.fixture without parentheses
+            func = args[0]
+
+            # Check if this fixture has inject marker
+            has_inject_marker = False
+            if hasattr(func, "pytestmark"):
+                markers = getattr(func, "pytestmark", [])
+                if not isinstance(markers, list):
+                    markers = [markers]
+
+                has_inject_marker = any(
+                    marker.name == "inject"
+                    for marker in markers
+                    if hasattr(marker, "name")
+                )
+
+            if has_inject_marker:
+                # Get annotations and signature
+                annotations = get_annotations(func, eval_str=True)
+                sig = inspect.signature(func)
+
+                injected_params = [
+                    param_name
+                    for param_name in sig.parameters.keys()
+                    if param_name != "request" and param_name in annotations
+                ]
+
+                if injected_params:
+                    # Create a wrapper function with no parameters (except request)
+                    # This ensures pytest doesn't try to resolve the injected
+                    # params as fixtures
+                    request_param = sig.parameters.get("request")
+
+                    if request_param:
+
+                        def wrapper_with_request(request: Any) -> Any:
+                            # Return the original func, we'll handle injection later
+                            return func
+
+                        wrapper_func = wrapper_with_request
+                        wrapper_func.__name__ = func.__name__
+                        wrapper_func.__annotations__ = {}  # Clear annotations
+                    else:
+
+                        def wrapper_no_request() -> Any:
+                            return func
+
+                        wrapper_func = wrapper_no_request
+                        wrapper_func.__name__ = func.__name__
+                        wrapper_func.__annotations__ = {}
+
+                    # Store metadata
+                    fixture_name = func.__name__
+                    _INJECTED_FIXTURES[fixture_name] = {
+                        "func": func,
+                        "injected_params": injected_params,
+                        "annotations": annotations,
+                    }
+                    logger.debug(
+                        f"Registered injectable fixture '{fixture_name}' "
+                        f"with params: {injected_params}"
+                    )
+
+                    # Call original decorator with the wrapper
+                    result = original_fixture_decorator(wrapper_func)
+                    # Store original func on the result
+                    result._anydi_original_func = func  # type: ignore[attr-defined]
+                    result._anydi_injected_params = injected_params  # type: ignore[attr-defined]
+                    result._anydi_annotations = annotations  # type: ignore[attr-defined]
+                    return result
+
+            # No inject marker - proceed normally
+            result = original_fixture_decorator(func)
+            return result
+        else:
+            # @pytest.fixture() with parentheses - return decorator
+            def decorator(func: Callable[..., Any]) -> Any:
+                # Check if this fixture has inject marker
+                has_inject_marker = False
+                if hasattr(func, "pytestmark"):
+                    markers = getattr(func, "pytestmark", [])
+                    if not isinstance(markers, list):
+                        markers = [markers]
+
+                    has_inject_marker = any(
+                        marker.name == "inject"
+                        for marker in markers
+                        if hasattr(marker, "name")
+                    )
+
+                if has_inject_marker:
+                    # Get annotations and signature
+                    annotations = get_annotations(func, eval_str=True)
+                    sig = inspect.signature(func)
+
+                    injected_params = [
+                        param_name
+                        for param_name in sig.parameters.keys()
+                        if param_name != "request" and param_name in annotations
+                    ]
+
+                    if injected_params:
+                        # Create a wrapper function with no parameters (except request)
+                        request_param = sig.parameters.get("request")
+
+                        if request_param:
+
+                            def wrapper_with_request(request: Any) -> Any:
+                                return func
+
+                            wrapper_func = wrapper_with_request
+                            wrapper_func.__name__ = func.__name__
+                            wrapper_func.__annotations__ = {}
+                        else:
+
+                            def wrapper_no_request() -> Any:
+                                return func
+
+                            wrapper_func = wrapper_no_request
+                            wrapper_func.__name__ = func.__name__
+                            wrapper_func.__annotations__ = {}
+
+                        # Store metadata
+                        fixture_name = func.__name__
+                        _INJECTED_FIXTURES[fixture_name] = {
+                            "func": func,
+                            "injected_params": injected_params,
+                            "annotations": annotations,
+                        }
+                        logger.debug(
+                            f"Registered injectable fixture '{fixture_name}' "
+                            f"with params: {injected_params}"
+                        )
+
+                        # Call original decorator with the wrapper
+                        result = original_fixture_decorator(*args, **kwargs)(
+                            wrapper_func
+                        )
+                        # Store original func on the result
+                        result._anydi_original_func = func  # type: ignore[attr-defined]
+                        result._anydi_injected_params = injected_params  # type: ignore[attr-defined]
+                        result._anydi_annotations = annotations  # type: ignore[attr-defined]
+                        return result
+
+                # No inject marker - proceed normally
+                result = original_fixture_decorator(*args, **kwargs)(func)
+                return result
+
+            return decorator
+
+    # Replace pytest.fixture
+    pytest.fixture = patched_fixture  # type: ignore[assignment]
+    # Also patch _pytest.fixtures.fixture
+    import _pytest.fixtures
+
+    _pytest.fixtures.fixture = patched_fixture  # type: ignore[assignment]
