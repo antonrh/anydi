@@ -59,7 +59,9 @@ def pytest_configure(config: pytest.Config) -> None:
     # Enable fixture injection if configured
     inject_fixtures_enabled = cast(bool, config.getini("anydi_inject_fixtures"))
     if inject_fixtures_enabled:
-        _patch_pytest_fixtures()
+        autoinject = cast(bool, config.getini("anydi_autoinject"))
+        inject_all = cast(bool, config.getini("anydi_inject_all"))
+        _patch_pytest_fixtures(autoinject=autoinject or inject_all)
         logger.debug("Fixture injection enabled via anydi_inject_fixtures config")
 
 
@@ -76,6 +78,10 @@ def pytest_fixture_setup(
 
     # Get the metadata
     fixture_info = _INJECTED_FIXTURES[fixture_name]
+    should_inject = fixture_info.get("should_inject", True)
+    if not should_inject:
+        yield
+        return
     original_func = fixture_info["func"]
     injected_params = fixture_info["injected_params"]
     annotations = fixture_info["annotations"]
@@ -87,34 +93,65 @@ def pytest_fixture_setup(
         yield
         return
 
-    # Prepare injected arguments
-    injected_kwargs: dict[str, Any] = {}
+    resolvable_params: list[tuple[str, Any]] = []
     for param_name in injected_params:
         annotation = annotations.get(param_name)
         if annotation is None:
             continue
+        if not container.has_provider_for(annotation):
+            continue
+        resolvable_params.append((param_name, annotation))
 
-        # Try to resolve from container
-        if container.has_provider_for(annotation):
-            try:
-                injected_kwargs[param_name] = container.resolve(annotation)
-                logger.debug(
-                    f"Resolved {param_name}={annotation} for fixture {fixture_name}"
-                )
-            except Exception as exc:
-                logger.warning(
-                    f"Failed to resolve dependency for fixture "
-                    f"parameter '{param_name}'.",
-                    exc_info=exc,
-                )
-
-    if not injected_kwargs:
+    if not resolvable_params:
         yield
         return
 
-    def _prepare_call_kwargs(kwargs: dict[str, Any]) -> dict[str, Any]:
+    def _resolve_sync_kwargs() -> dict[str, Any]:
+        resolved: dict[str, Any] = {}
+        for param_name, annotation in resolvable_params:
+            try:
+                resolved[param_name] = container.resolve(annotation)
+                logger.debug(
+                    "Resolved %s=%s for fixture %s",
+                    param_name,
+                    annotation,
+                    fixture_name,
+                )
+            except Exception as exc:
+                logger.warning(
+                    "Failed to resolve dependency for fixture parameter '%s'.",
+                    param_name,
+                    exc_info=exc,
+                )
+        return resolved
+
+    async def _resolve_async_kwargs() -> dict[str, Any]:
+        resolved: dict[str, Any] = {}
+        for param_name, annotation in resolvable_params:
+            try:
+                resolved[param_name] = await container.aresolve(annotation)
+                logger.debug(
+                    "Resolved %s=%s for async fixture %s",
+                    param_name,
+                    annotation,
+                    fixture_name,
+                )
+            except Exception as exc:
+                logger.warning(
+                    "Failed to resolve dependency for async fixture parameter '%s'.",
+                    param_name,
+                    exc_info=exc,
+                )
+        return resolved
+
+    def _prepare_sync_call_kwargs(kwargs: dict[str, Any]) -> dict[str, Any]:
         combined_kwargs = dict(kwargs)
-        combined_kwargs.update(injected_kwargs)
+        combined_kwargs.update(_resolve_sync_kwargs())
+        return combined_kwargs
+
+    async def _prepare_async_call_kwargs(kwargs: dict[str, Any]) -> dict[str, Any]:
+        combined_kwargs = dict(kwargs)
+        combined_kwargs.update(await _resolve_async_kwargs())
         return combined_kwargs
 
     def _ensure_anyio_backend() -> tuple[str, dict[str, Any]]:
@@ -138,33 +175,40 @@ def pytest_fixture_setup(
 
         def asyncgen_wrapper(*args: Any, **kwargs: Any) -> Iterator[Any]:
             backend_name, backend_options = _ensure_anyio_backend()
-            call_kwargs = _prepare_call_kwargs(kwargs)
+
+            async def _fixture() -> Any:
+                call_kwargs = await _prepare_async_call_kwargs(kwargs)
+                async for value in original_func(**call_kwargs):
+                    yield value
 
             with get_runner(backend_name, backend_options) as runner:
-                yield from runner.run_asyncgen_fixture(original_func, call_kwargs)
+                yield from runner.run_asyncgen_fixture(_fixture, {})
 
         fixturedef.func = asyncgen_wrapper  # type: ignore[misc]
     elif inspect.iscoroutinefunction(original_func):
 
         def async_wrapper(*args: Any, **kwargs: Any) -> Any:
             backend_name, backend_options = _ensure_anyio_backend()
-            call_kwargs = _prepare_call_kwargs(kwargs)
+
+            async def _fixture() -> Any:
+                call_kwargs = await _prepare_async_call_kwargs(kwargs)
+                return await original_func(**call_kwargs)
 
             with get_runner(backend_name, backend_options) as runner:
-                return runner.run_fixture(original_func, call_kwargs)
+                return runner.run_fixture(_fixture, {})
 
         fixturedef.func = async_wrapper  # type: ignore[misc]
     elif inspect.isgeneratorfunction(original_func):
 
         def generator_wrapper(*args: Any, **kwargs: Any) -> Iterator[Any]:
-            call_kwargs = _prepare_call_kwargs(kwargs)
+            call_kwargs = _prepare_sync_call_kwargs(kwargs)
             yield from original_func(**call_kwargs)
 
         fixturedef.func = generator_wrapper  # type: ignore[misc]
     else:
 
         def sync_wrapper(*args: Any, **kwargs: Any) -> Any:
-            call_kwargs = _prepare_call_kwargs(kwargs)
+            call_kwargs = _prepare_sync_call_kwargs(kwargs)
             return original_func(**call_kwargs)
 
         fixturedef.func = sync_wrapper  # type: ignore[misc]
@@ -322,19 +366,14 @@ def _find_container(request: pytest.FixtureRequest) -> Container:
     )
 
 
-def _patch_pytest_fixtures() -> None:  # noqa: C901
+def _patch_pytest_fixtures(*, autoinject: bool) -> None:  # noqa: C901
     """Patch pytest.fixture decorator to intercept fixtures with inject markers."""
     from _pytest.fixtures import fixture as original_fixture_decorator
 
     def patched_fixture(*args: Any, **kwargs: Any) -> Any:  # noqa: C901
         """Patched fixture decorator that handles inject markers."""
 
-        # Handle both @pytest.fixture and @pytest.fixture() usage
-        if len(args) == 1 and callable(args[0]) and not kwargs:
-            # @pytest.fixture without parentheses
-            func = args[0]
-
-            # Check if this fixture has inject marker
+        def should_process(func: Callable[..., Any]) -> tuple[bool, bool]:
             has_inject_marker = False
             if hasattr(func, "pytestmark"):
                 markers = getattr(func, "pytestmark", [])
@@ -347,137 +386,87 @@ def _patch_pytest_fixtures() -> None:  # noqa: C901
                     if hasattr(marker, "name")
                 )
 
-            if has_inject_marker:
-                # Get annotations and signature
-                annotations = get_annotations(func, eval_str=True)
-                sig = inspect.signature(func)
+            should_inject = autoinject or has_inject_marker
+            return should_inject, has_inject_marker
 
-                injected_params = [
-                    param_name
-                    for param_name in sig.parameters.keys()
-                    if param_name != "request" and param_name in annotations
-                ]
+        def register_fixture(func: Callable[..., Any]) -> Callable[..., Any] | None:
+            should_inject, _ = should_process(func)
+            if not should_inject:
+                return None
 
-                if injected_params:
-                    # Create a wrapper function with no parameters (except request)
-                    # This ensures pytest doesn't try to resolve the injected
-                    # params as fixtures
-                    request_param = sig.parameters.get("request")
+            annotations = get_annotations(func, eval_str=True)
+            sig = inspect.signature(func)
 
-                    if request_param:
+            injected_params = [
+                name
+                for name, param in sig.parameters.items()
+                if name != "request"
+                and name in annotations
+                and param.kind
+                in (inspect.Parameter.POSITIONAL_OR_KEYWORD, inspect.Parameter.KEYWORD_ONLY)
+                and param.default is inspect._empty
+            ]
 
-                        def wrapper_with_request(request: Any) -> Any:
-                            # Return the original func, we'll handle injection later
-                            return func
+            if not injected_params:
+                return None
 
-                        wrapper_func = wrapper_with_request
-                        wrapper_func.__name__ = func.__name__
-                        wrapper_func.__annotations__ = {}  # Clear annotations
-                    else:
+            request_param = sig.parameters.get("request")
 
-                        def wrapper_no_request() -> Any:
-                            return func
+            if request_param:
 
-                        wrapper_func = wrapper_no_request
-                        wrapper_func.__name__ = func.__name__
-                        wrapper_func.__annotations__ = {}
+                def wrapper_with_request(request: Any) -> Any:
+                    return func
 
-                    # Store metadata
-                    fixture_name = func.__name__
-                    _INJECTED_FIXTURES[fixture_name] = {
-                        "func": func,
-                        "injected_params": injected_params,
-                        "annotations": annotations,
-                    }
-                    logger.debug(
-                        f"Registered injectable fixture '{fixture_name}' "
-                        f"with params: {injected_params}"
-                    )
+                wrapper_func = wrapper_with_request
+            else:
 
-                    # Call original decorator with the wrapper
-                    result = original_fixture_decorator(wrapper_func)
-                    # Store original func on the result
+                def wrapper_no_request() -> Any:
+                    return func
+
+                wrapper_func = wrapper_no_request
+
+            wrapper_func.__name__ = func.__name__
+            wrapper_func.__annotations__ = {}
+
+            fixture_name = func.__name__
+            _INJECTED_FIXTURES[fixture_name] = {
+                "func": func,
+                "injected_params": injected_params,
+                "annotations": annotations,
+                "should_inject": should_inject,
+            }
+            logger.debug(
+                f"Registered injectable fixture '{fixture_name}' with params: {injected_params}"
+            )
+
+            return wrapper_func
+
+        # Handle both @pytest.fixture and @pytest.fixture() usage
+        if len(args) == 1 and callable(args[0]) and not kwargs:
+            func = args[0]
+            wrapper_func = register_fixture(func)
+            if wrapper_func:
+                result = original_fixture_decorator(wrapper_func)
+                result._anydi_original_func = func  # type: ignore[attr-defined]
+                result._anydi_injected_params = _INJECTED_FIXTURES[func.__name__][
+                    "injected_params"
+                ]  # type: ignore[attr-defined]
+                return result
+
+            return original_fixture_decorator(func)
+        else:
+
+            def decorator(func: Callable[..., Any]) -> Any:
+                wrapper_func = register_fixture(func)
+                if wrapper_func:
+                    result = original_fixture_decorator(*args, **kwargs)(wrapper_func)
                     result._anydi_original_func = func  # type: ignore[attr-defined]
-                    result._anydi_injected_params = injected_params  # type: ignore[attr-defined]
-                    result._anydi_annotations = annotations  # type: ignore[attr-defined]
+                    result._anydi_injected_params = _INJECTED_FIXTURES[func.__name__][
+                        "injected_params"
+                    ]  # type: ignore[attr-defined]
                     return result
 
-            # No inject marker - proceed normally
-            result = original_fixture_decorator(func)
-            return result
-        else:
-            # @pytest.fixture() with parentheses - return decorator
-            def decorator(func: Callable[..., Any]) -> Any:
-                # Check if this fixture has inject marker
-                has_inject_marker = False
-                if hasattr(func, "pytestmark"):
-                    markers = getattr(func, "pytestmark", [])
-                    if not isinstance(markers, list):
-                        markers = [markers]
-
-                    has_inject_marker = any(
-                        marker.name == "inject"
-                        for marker in markers
-                        if hasattr(marker, "name")
-                    )
-
-                if has_inject_marker:
-                    # Get annotations and signature
-                    annotations = get_annotations(func, eval_str=True)
-                    sig = inspect.signature(func)
-
-                    injected_params = [
-                        param_name
-                        for param_name in sig.parameters.keys()
-                        if param_name != "request" and param_name in annotations
-                    ]
-
-                    if injected_params:
-                        # Create a wrapper function with no parameters (except request)
-                        request_param = sig.parameters.get("request")
-
-                        if request_param:
-
-                            def wrapper_with_request(request: Any) -> Any:
-                                return func
-
-                            wrapper_func = wrapper_with_request
-                            wrapper_func.__name__ = func.__name__
-                            wrapper_func.__annotations__ = {}
-                        else:
-
-                            def wrapper_no_request() -> Any:
-                                return func
-
-                            wrapper_func = wrapper_no_request
-                            wrapper_func.__name__ = func.__name__
-                            wrapper_func.__annotations__ = {}
-
-                        # Store metadata
-                        fixture_name = func.__name__
-                        _INJECTED_FIXTURES[fixture_name] = {
-                            "func": func,
-                            "injected_params": injected_params,
-                            "annotations": annotations,
-                        }
-                        logger.debug(
-                            f"Registered injectable fixture '{fixture_name}' "
-                            f"with params: {injected_params}"
-                        )
-
-                        # Call original decorator with the wrapper
-                        result = original_fixture_decorator(*args, **kwargs)(
-                            wrapper_func
-                        )
-                        # Store original func on the result
-                        result._anydi_original_func = func  # type: ignore[attr-defined]
-                        result._anydi_injected_params = injected_params  # type: ignore[attr-defined]
-                        result._anydi_annotations = annotations  # type: ignore[attr-defined]
-                        return result
-
-                # No inject marker - proceed normally
-                result = original_fixture_decorator(*args, **kwargs)(func)
-                return result
+                return original_fixture_decorator(*args, **kwargs)(func)
 
             return decorator
 
