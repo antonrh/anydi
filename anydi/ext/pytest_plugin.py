@@ -394,25 +394,23 @@ def _patch_pytest_fixtures(*, autoinject: bool) -> None:  # noqa: C901
             if not should_inject:
                 return None
 
-            annotations = get_annotations(func, eval_str=True)
-            sig = inspect.signature(func)
+            sig = inspect.signature(func, eval_str=True)
+            annotations = {
+                name: param.annotation
+                for name, param in sig.parameters.items()
+                if param.annotation is not inspect._empty
+            }
 
             injected_params = [
-                name
-                for name, param in sig.parameters.items()
-                if name != "request"
-                and name in annotations
-                and param.kind
-                in (inspect.Parameter.POSITIONAL_OR_KEYWORD, inspect.Parameter.KEYWORD_ONLY)
-                and param.default is inspect._empty
+                name for name in annotations.keys() if name != "request"
             ]
 
             if not injected_params:
                 return None
 
-            request_param = sig.parameters.get("request")
+            has_request_param = "request" in sig.parameters
 
-            if request_param:
+            if has_request_param:
 
                 def wrapper_with_request(request: Any) -> Any:
                     return func
@@ -446,12 +444,7 @@ def _patch_pytest_fixtures(*, autoinject: bool) -> None:  # noqa: C901
             func = args[0]
             wrapper_func = register_fixture(func)
             if wrapper_func:
-                result = original_fixture_decorator(wrapper_func)
-                result._anydi_original_func = func  # type: ignore[attr-defined]
-                result._anydi_injected_params = _INJECTED_FIXTURES[func.__name__][
-                    "injected_params"
-                ]  # type: ignore[attr-defined]
-                return result
+                return original_fixture_decorator(wrapper_func)
 
             return original_fixture_decorator(func)
         else:
@@ -459,12 +452,7 @@ def _patch_pytest_fixtures(*, autoinject: bool) -> None:  # noqa: C901
             def decorator(func: Callable[..., Any]) -> Any:
                 wrapper_func = register_fixture(func)
                 if wrapper_func:
-                    result = original_fixture_decorator(*args, **kwargs)(wrapper_func)
-                    result._anydi_original_func = func  # type: ignore[attr-defined]
-                    result._anydi_injected_params = _INJECTED_FIXTURES[func.__name__][
-                        "injected_params"
-                    ]  # type: ignore[attr-defined]
-                    return result
+                    return original_fixture_decorator(*args, **kwargs)(wrapper_func)
 
                 return original_fixture_decorator(*args, **kwargs)(func)
 
