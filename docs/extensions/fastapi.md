@@ -1,16 +1,16 @@
 # FastAPI Extension
 
 Integrating `AnyDI` with `FastAPI` is straightforward. Since `FastAPI` comes with its own internal dependency injection
-mechanism, there is a simple workaround for using the two together using custom `Inject` parameter instead of standard `Depends`.
-
-Here's an example of how to make them work together:
+mechanism, there is a simple workaround for using the two together using `Provide` annotation or `Inject` marker instead of standard `Depends`.
 
 
 ```python
+from typing import Annotated
+
 from fastapi import FastAPI, Path
 
 import anydi.ext.fastapi
-from anydi import Container, Inject
+from anydi import Container, Provide
 
 
 class HelloService:
@@ -19,20 +19,15 @@ class HelloService:
 
 
 container = Container()
-
-
-@container.provider(scope="singleton")
-def hello_service() -> HelloService:
-    return HelloService()
-
+container.register(HelloService)
 
 app = FastAPI()
 
 
 @app.get("/hello/{name}")
 async def say_hello(
-    name: str = Path(),
-    hello_service: HelloService = Inject(),
+    name: Annotated[str, Path()],
+    hello_service: Provide[HelloService],
 ) -> str:
     return await hello_service.say_hello(name=name)
 
@@ -44,42 +39,17 @@ anydi.ext.fastapi.install(app, container)
 
     To detect a dependency interface, provide a valid type annotation.
 
-`AnyDI` also supports `Annotated` type hints, so you can use `Annotated[...]` instead of `... = Inject()` using `FastAPI` version `0.95.0` or higher:
+    `Provide[Service]` is equivalent to `Annotated[Service, Inject()]`.
+
+You can also use `Inject()` marker:
 
 ```python
-from typing import Annotated
-
-from fastapi import FastAPI, Path
-
-import anydi.ext.fastapi
-from anydi import Container, Inject
-
-
-class HelloService:
-    async def say_hello(self, name: str) -> str:
-        return f"Hello, {name}"
-
-
-container = Container()
-
-
-@container.provider(scope="singleton")
-def hello_service() -> HelloService:
-    return HelloService()
-
-
-app = FastAPI()
-
-
 @app.get("/hello/{name}")
 async def say_hello(
-    name: Annotated[str, Path()],
-    hello_service: Annotated[HelloService, Inject()],
+    name: str = Path(),
+    hello_service: HelloService = Inject(),
 ) -> str:
     return await hello_service.say_hello(name=name)
-
-
-anydi.ext.fastapi.install(app, container)
 ```
 
 
