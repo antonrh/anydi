@@ -12,6 +12,12 @@ Modern, lightweight Dependency Injection library using type annotations.
 
 ---
 
+Documentation
+
+http://anydi.readthedocs.io/
+
+---
+
 `AnyDI` is a modern, lightweight Dependency Injection library suitable for any synchronous or asynchronous applications with Python 3.10+, based on type annotations ([PEP 484](https://peps.python.org/pep-0484/)).
 
 The key features are:
@@ -78,19 +84,18 @@ if __name__ == "__main__":
 ### Inject Into Functions (`app/main.py`)
 
 ```python
-from anydi import Inject
+from anydi import Provide
 
 from app.container import container
 from app.services import GreetingService
 
 
-@container.inject
-def greet(service: GreetingService = Inject()) -> str:
+def greet(service: Provide[GreetingService]) -> str:
     return service.greet("World")
 
 
 if __name__ == "__main__":
-    print(greet())
+    print(container.run(greet))
 ```
 
 ### Test with Overrides (`tests/test_app.py`)
@@ -108,7 +113,7 @@ def test_greet() -> None:
     service_mock.greet.return_value = "Mocked"
 
     with container.override(GreetingService, service_mock):
-        result = greet()
+        result = container.run(greet)
 
     assert result == "Mocked"
 ```
@@ -116,12 +121,10 @@ def test_greet() -> None:
 ### Integrate with FastAPI (`app/api.py`)
 
 ```python
-from typing import Annotated
-
 import anydi.ext.fastapi
 from fastapi import FastAPI
 
-from anydi import Inject
+from anydi import Provide
 from app.container import container
 from app.services import GreetingService
 
@@ -131,7 +134,7 @@ app = FastAPI()
 
 @app.get("/greeting")
 async def greet(
-    service: Annotated[GreetingService, Inject()]
+    service: Provide[GreetingService]
 ) -> dict[str, str]:
     return {"greeting": service.greet("World")}
 
@@ -205,9 +208,9 @@ ANYDI = {
 Wire Django Ninja (`urls.py`):
 
 ```python
-from typing import Annotated, Any
+from typing import Any
 
-from anydi import Inject
+from anydi import Provide
 from django.http import HttpRequest
 from django.urls import path
 from ninja import NinjaAPI
@@ -219,7 +222,7 @@ api = NinjaAPI()
 
 
 @api.get("/greeting")
-def greet(request: HttpRequest, service: Annotated[GreetingService, Inject()]) -> Any:
+def greet(request: HttpRequest, service: Provide[GreetingService]) -> Any:
     return {"greeting": service.greet("World")}
 
 
