@@ -9,8 +9,7 @@ Here's an example of how to make them work together:
 from faststream.redis import RedisBroker
 
 import anydi.ext.faststream
-from anydi import Container
-from anydi.ext.faststream import Inject
+from anydi import Container, Inject
 
 
 class HelloService:

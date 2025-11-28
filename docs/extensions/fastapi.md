@@ -10,8 +10,7 @@ Here's an example of how to make them work together:
 from fastapi import FastAPI, Path
 
 import anydi.ext.fastapi
-from anydi import Container
-from anydi.ext.fastapi import Inject
+from anydi import Container, Inject
 
 
 class HelloService:
@@ -53,8 +52,7 @@ from typing import Annotated
 from fastapi import FastAPI, Path
 
 import anydi.ext.fastapi
-from anydi import Container
-from anydi.ext.fastapi import Inject
+from anydi import Container, Inject
 
 
 class HelloService:
@@ -140,8 +138,8 @@ from fastapi import FastAPI, Path, Request
 from starlette.middleware import Middleware
 
 import anydi.ext.fastapi
-from anydi import Container
-from anydi.ext.fastapi import Inject, RequestScopedMiddleware
+from anydi import Container, Inject
+from anydi.ext.fastapi import RequestScopedMiddleware
 
 
 @dataclass(kw_only=True)

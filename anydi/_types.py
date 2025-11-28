@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import inspect
-from collections.abc import AsyncIterator, Iterator
+from collections.abc import AsyncIterator, Callable, Iterator
 from types import NoneType
 from typing import (
     TYPE_CHECKING,
@@ -44,18 +44,44 @@ class ProvideMarker:
         return Annotated[item, cls()]
 
 
+_provide_factory: Callable[[], Any] = ProvideMarker
+
+
+def set_provide_factory(factory: Callable[[], Any]) -> Callable[[], Any]:
+    """Set the global factory used by Inject() and Provide."""
+    global _provide_factory
+    previous = _provide_factory
+    _provide_factory = factory
+    return previous
+
+
 def is_provide_marker(obj: Any) -> bool:
     return isinstance(obj, ProvideMarker)
 
 
+class _ProvideMeta(type):
+    """Metaclass for Provide that delegates __class_getitem__ to the current factory."""
+
+    def __getitem__(cls, item: Any) -> Any:
+        # Use the current factory's __class_getitem__ if available
+        factory = _provide_factory
+        if hasattr(factory, "__class_getitem__"):
+            return factory.__class_getitem__(item)  # type: ignore[attr-defined]
+        # Fallback to creating Annotated with factory instance
+        return Annotated[item, factory()]
+
+
 if TYPE_CHECKING:
     Provide = Annotated[T, ProvideMarker()]
+
 else:
-    Provide = ProvideMarker
+
+    class Provide(metaclass=_ProvideMeta):
+        pass
 
 
 def Inject() -> Any:
-    return ProvideMarker()
+    return _provide_factory()
 
 
 # Alias from backward compatibility

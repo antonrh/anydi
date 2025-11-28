@@ -120,8 +120,8 @@ from typing import Annotated
 
 import anydi.ext.fastapi
 from fastapi import FastAPI
-from anydi.ext.fastapi import Inject
 
+from anydi import Inject
 from app.container import container
 from app.services import GreetingService
 

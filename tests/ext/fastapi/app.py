@@ -4,8 +4,7 @@ from fastapi import Body, Depends, FastAPI
 from starlette.middleware import Middleware
 
 import anydi.ext.fastapi
-from anydi import Container
-from anydi.ext.fastapi import Inject
+from anydi import Container, Inject, Provide
 from anydi.ext.starlette.middleware import RequestScopedMiddleware
 
 from tests.ext.fixtures import Mail, MailService, User, UserService
@@ -63,6 +62,15 @@ async def send_email(
 async def send_email_annotated(
     user: Annotated[User, Depends(get_user)],
     mail_service: Annotated[MailService, Inject()],
+    message: Annotated[str, Body(embed=True)],
+) -> Any:
+    return await mail_service.send_mail(email=user.email, message=message)
+
+
+@app.post("/send-mail-provide", response_model=Mail)
+async def send_email_provide(
+    user: Annotated[User, Depends(get_user)],
+    mail_service: Provide[MailService],
     message: Annotated[str, Body(embed=True)],
 ) -> Any:
     return await mail_service.send_mail(email=user.email, message=message)
