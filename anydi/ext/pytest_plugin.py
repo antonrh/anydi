@@ -9,7 +9,7 @@ import pytest
 from anyio.pytest_plugin import extract_backend_and_options, get_runner
 from typing_extensions import get_annotations
 
-from anydi import Container
+from anydi import Container, import_container
 
 logger = logging.getLogger(__name__)
 
@@ -23,10 +23,25 @@ def pytest_configure(config: pytest.Config) -> None:
 
 def pytest_addoption(parser: pytest.Parser) -> None:
     parser.addini(
-        "anydi_inject_all",
-        help="Inject all dependencies",
+        "anydi_autoinject",
+        help="Automatically inject dependencies into all test functions",
         type="bool",
         default=False,
+    )
+    parser.addini(
+        "anydi_inject_all",
+        help="Deprecated: use 'anydi_autoinject' instead",
+        type="bool",
+        default=False,
+    )
+    parser.addini(
+        "anydi_container",
+        help=(
+            "Path to container instance or factory "
+            "(e.g., 'myapp.container:container' or 'myapp.container.container')"
+        ),
+        type="string",
+        default=None,
     )
 
 
@@ -35,21 +50,50 @@ CONTAINER_FIXTURE_NAME = "container"
 
 @pytest.fixture
 def anydi_setup_container(request: pytest.FixtureRequest) -> Container:
+    # First, try to get the container from a fixture
     try:
         return cast(Container, request.getfixturevalue(CONTAINER_FIXTURE_NAME))
-    except pytest.FixtureLookupError as exc:
-        exc.msg = (
-            "`container` fixture is not found. Make sure to define it in your test "
-            "module or override `anydi_setup_container` fixture."
-        )
-        raise exc
+    except pytest.FixtureLookupError:
+        pass
+
+    # Fall back to the config option
+    container_path = cast(str | None, request.config.getini("anydi_container"))
+    if container_path:
+        try:
+            return import_container(container_path)
+        except Exception as exc:
+            raise RuntimeError(
+                f"Failed to load container from config "
+                f"'anydi_container={container_path}': {exc}"
+            ) from exc
+
+    # Neither fixture nor config found
+    raise pytest.FixtureLookupError(
+        None,
+        request,
+        "`container` fixture is not found and 'anydi_container' config is not set. "
+        "Either define a `container` fixture in your test module, "
+        "set 'anydi_container' in pytest.ini, "
+        "or override `anydi_setup_container` fixture.",
+    )
 
 
 @pytest.fixture
 def _anydi_should_inject(request: pytest.FixtureRequest) -> bool:
     marker = request.node.get_closest_marker("inject")
+
+    # Check new config option first
+    autoinject = cast(bool, request.config.getini("anydi_autoinject"))
+
+    # Check deprecated option for backward compatibility
     inject_all = cast(bool, request.config.getini("anydi_inject_all"))
-    return marker is not None or inject_all
+    if inject_all:
+        logger.warning(
+            "Configuration option 'anydi_inject_all' is deprecated. "
+            "Please use 'anydi_autoinject' instead."
+        )
+
+    return marker is not None or autoinject or inject_all
 
 
 @pytest.fixture

@@ -20,13 +20,7 @@ class EmailService:
 
 
 container = Container()
-
-
-def email_service() -> EmailService:
-    return EmailService()
-
-
-container.register(EmailService, email_service, scope="singleton")
+container.register(EmailService, scope="singleton")
 
 service = container.resolve(EmailService)
 service.send("user@example.com", "Welcome!")
@@ -184,8 +178,8 @@ class MetricsService:
 
 
 container = Container()
-container.register(LoggerService, lambda: LoggerService(), scope="singleton")
-container.register(MetricsService, lambda: MetricsService(), scope="singleton")
+container.register(LoggerService)
+container.register(MetricsService)
 
 container.resolve(LoggerService)
 container.resolve(MetricsService)
@@ -787,7 +781,7 @@ class Service:
 
 class AppModule(Module):
     def configure(self, container: Container) -> None:
-        container.register(Repository, lambda: Repository(), scope="singleton")
+        container.register(Repository)
 
     @provider(scope="singleton")
     def service(self, repo: Repository) -> Service:
@@ -859,9 +853,15 @@ def test_handler() -> None:
 
 ### Pytest Plugin
 
-`AnyDI` offers a pytest plugin that simplifies the testing process. You can annotate a test function with the `@pytest.mark.inject` decorator to automatically inject dependencies into the test function, or you can set the global configuration value `anydi_inject_all` to `True` to inject dependencies into all test functions automatically.
+`AnyDI` provides a pytest plugin that automatically injects dependencies into test functions, eliminating boilerplate code and making tests cleaner.
 
-Additionally, you need to define a `container` fixture to provide a `Container` instance for the test function, or use the `anydi_setup_container` fixture.
+#### Configuration
+
+##### Container Setup
+
+There are two ways to provide a container for your tests:
+
+**Option 1: Define a `container` fixture**
 
 ```python
 import pytest
@@ -874,6 +874,64 @@ from myapp import container as myapp_container
 @pytest.fixture(scope="session")
 def container() -> Container:
     return myapp_container
+```
+
+**Option 2: Use the `anydi_container` configuration**
+
+Set the `anydi_container` option in your `pytest.ini` or `pyproject.toml`:
+
+```ini
+# pytest.ini
+[pytest]
+anydi_container = myapp.container:container
+```
+
+```toml
+# pyproject.toml
+[tool.pytest.ini_options]
+anydi_container = "myapp.container:container"
+```
+
+The configuration accepts:
+- Container instances: `myapp.container:container` or `myapp.container.container`
+- Factory functions: `myapp.container:create_container`
+
+```python
+# myapp/container.py
+def create_container() -> Container:
+    container = Container()
+    # ... register providers
+    return container
+```
+
+**Note:** The fixture approach takes priority over the configuration if both are defined.
+
+##### Auto-Injection Mode
+
+By default, you need to mark tests with `@pytest.mark.inject` to enable dependency injection. To automatically inject dependencies into all test functions, set `anydi_autoinject` to `True`:
+
+```ini
+# pytest.ini
+[pytest]
+anydi_autoinject = true
+```
+
+```toml
+# pyproject.toml
+[tool.pytest.ini_options]
+anydi_autoinject = true
+```
+
+#### Usage
+
+##### Basic Injection
+
+Use the `@pytest.mark.inject` decorator to inject dependencies into specific test functions:
+
+```python
+import pytest
+
+from anydi import Container
 
 
 @pytest.mark.inject
@@ -885,16 +943,18 @@ def test_service_get_items(container: Container, service: Service) -> None:
         assert service.get_items() == [Item(name="mock1"), Item(name="mock2")]
 ```
 
-The message argument is injected into the test function thanks to the `@pytest.mark.inject` decorator.
+Dependencies are automatically resolved from the container based on type annotations.
 
-PS! `Pytest` fixtures will always have higher priority than the `@pytest.mark.inject` decorator. This means that if
-both a pytest fixture and the `@pytest.mark.inject` decorator attempt to provide a value for the same name, the value
-from the pytest fixture will be used.
+##### Fixture Priority
 
-Using `.create` method you can create a new instance with overridden dependencies for testing:
+Pytest fixtures always take priority over dependency injection. If a pytest fixture and the `@pytest.mark.inject` decorator both provide a value for the same parameter name, the fixture value will be used.
+
+##### Testing with `.create()`
+
+For more control over dependency injection in tests, use the `.create()` method to instantiate classes with overridden dependencies:
 
 ```python
-def test_handler() -> None:
+def test_handler(container: Container) -> None:
     repo_mock = mock.Mock(spec=Repository)
     repo_mock.all.return_value = [Item(name="mock1"), Item(name="mock2")]
 

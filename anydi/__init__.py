@@ -1,6 +1,6 @@
 """AnyDI public objects and functions."""
 
-from ._container import Container
+from ._container import Container, import_container
 from ._decorators import injectable, provided, provider, request, singleton, transient
 from ._module import Module
 from ._provider import ProviderDef as Provider
@@ -18,6 +18,7 @@ __all__ = [
     "Provider",
     "Scope",
     "auto",
+    "import_container",
     "injectable",
     "provided",
     "provider",

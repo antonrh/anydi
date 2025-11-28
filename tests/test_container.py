@@ -1849,3 +1849,83 @@ class TestContainerOverride:
 
         with container.override(Service, service_mock):
             assert initialized is False
+
+
+# Test data for import_container tests
+class _TestService:
+    pass
+
+
+_container_instance = Container()
+_container_instance.register(_TestService, lambda: _TestService(), scope="singleton")
+
+
+def _container_factory() -> Container:
+    """Factory function that returns a container."""
+    container = Container()
+    container.register(_TestService, lambda: _TestService(), scope="singleton")
+    return container
+
+
+class TestImportContainer:
+    """Tests for the import_container function."""
+
+    def test_import_container_instance_colon_format(self) -> None:
+        """Test importing a container instance from a string path (colon format)."""
+        from anydi import import_container
+
+        container = import_container("tests.test_container:_container_instance")
+        assert isinstance(container, Container)
+        assert container.has_provider_for(_TestService)
+
+    def test_import_container_instance_dot_format(self) -> None:
+        """Test importing a container instance (dot format, backward compatible)."""
+        from anydi import import_container
+
+        container = import_container("tests.test_container._container_instance")
+        assert isinstance(container, Container)
+        assert container.has_provider_for(_TestService)
+
+    def test_import_container_factory_colon_format(self) -> None:
+        """Test importing a container from a factory function (colon format)."""
+        from anydi import import_container
+
+        container = import_container("tests.test_container:_container_factory")
+        assert isinstance(container, Container)
+        assert container.has_provider_for(_TestService)
+
+    def test_import_container_factory_dot_format(self) -> None:
+        """Test importing container from factory (dot format, backward compatible)."""
+        from anydi import import_container
+
+        container = import_container("tests.test_container._container_factory")
+        assert isinstance(container, Container)
+        assert container.has_provider_for(_TestService)
+
+    def test_import_container_invalid_path(self) -> None:
+        """Test that invalid path raises ImportError."""
+        from anydi import import_container
+
+        with pytest.raises(ImportError, match="Invalid container path"):
+            import_container("invalid_path")
+
+    def test_import_container_missing_module(self) -> None:
+        """Test that missing module raises ImportError."""
+        from anydi import import_container
+
+        with pytest.raises(ImportError, match="Failed to import module"):
+            import_container("nonexistent.module:container")
+
+    def test_import_container_missing_attribute(self) -> None:
+        """Test that missing attribute raises ImportError."""
+        from anydi import import_container
+
+        with pytest.raises(ImportError, match="has no attribute"):
+            import_container("tests.test_container:nonexistent")
+
+    def test_import_container_wrong_type(self) -> None:
+        """Test that wrong type raises ImportError."""
+        from anydi import import_container
+
+        with pytest.raises(ImportError, match="Expected Container instance"):
+            import_container("tests.test_container:_TestService")

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import contextlib
+import importlib
 import inspect
 import logging
 import types
@@ -592,3 +593,48 @@ class Container:
             yield
         finally:
             self._resolver.remove_override(interface)
+
+
+def import_container(container_path: str) -> Container:
+    """Import container from a string path."""
+    # Replace colon with dot for unified processing
+    container_path = container_path.replace(":", ".")
+
+    try:
+        module_path, attr_name = container_path.rsplit(".", 1)
+    except ValueError as exc:
+        raise ImportError(
+            f"Invalid container path '{container_path}'. "
+            "Expected format: 'module.path:attribute' or 'module.path.attribute'"
+        ) from exc
+
+    try:
+        module = importlib.import_module(module_path)
+    except ImportError as exc:
+        raise ImportError(
+            f"Failed to import module '{module_path}' "
+            f"from container path '{container_path}'"
+        ) from exc
+
+    try:
+        container_or_factory = getattr(module, attr_name)
+    except AttributeError as exc:
+        raise ImportError(
+            f"Module '{module_path}' has no attribute '{attr_name}'"
+        ) from exc
+
+    # If it's a callable (factory), call it
+    if callable(container_or_factory) and not isinstance(
+        container_or_factory, Container
+    ):
+        container = container_or_factory()
+    else:
+        container = container_or_factory
+
+    if not isinstance(container, Container):
+        raise ImportError(
+            f"Expected Container instance, got {type(container).__name__} "
+            f"from '{container_path}'"
+        )
+
+    return container
