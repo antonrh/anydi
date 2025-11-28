@@ -953,18 +953,18 @@ Pytest fixtures always take priority over dependency injection. If a pytest fixt
 
 ##### Fixture Injection
 
-`anydi_inject_fixtures` toggles dependency injection for fixtures annotated with `@pytest.mark.inject`. It is **disabled** by default, so you need to opt in explicitly if you want fixtures to benefit from container injection:
+`anydi_fixture_inject_enabled` toggles dependency injection for fixtures annotated with `@pytest.mark.inject`. It is **disabled** by default, so you need to opt in explicitly if you want fixtures to benefit from container injection. This option performs heavy monkey patching of `pytest.fixture` and is considered experimental, so enable it only if you understand the trade-offs:
 
 ```ini
 # pytest.ini
 [pytest]
-anydi_inject_fixtures = true
+anydi_fixture_inject_enabled = true
 ```
 
 ```toml
 # pyproject.toml
 [tool.pytest.ini_options]
-anydi_inject_fixtures = true
+anydi_fixture_inject_enabled = true
 ```
 
 With fixture injection enabled, use the marker on any fixture and annotate the parameters you want resolved from the container. This works for synchronous, generator, and async fixtures (async fixtures still require the `anyio` plugin, just like async tests):

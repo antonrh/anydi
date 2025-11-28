@@ -41,12 +41,12 @@ def pytest_addoption(parser: pytest.Parser) -> None:
         default=None,
     )
     parser.addini(
-        "anydi_inject_fixtures",
+        "anydi_fixture_inject_enabled",
         help=(
             "Enable dependency injection into fixtures marked with @pytest.mark.inject"
         ),
         type="bool",
-        default=True,
+        default=False,
     )
 
 
@@ -57,12 +57,14 @@ def pytest_configure(config: pytest.Config) -> None:
     )
 
     # Enable fixture injection if configured
-    inject_fixtures_enabled = cast(bool, config.getini("anydi_inject_fixtures"))
+    inject_fixtures_enabled = cast(bool, config.getini("anydi_fixture_inject_enabled"))
     if inject_fixtures_enabled:
         autoinject = cast(bool, config.getini("anydi_autoinject"))
         inject_all = cast(bool, config.getini("anydi_inject_all"))
         _patch_pytest_fixtures(autoinject=autoinject or inject_all)
-        logger.debug("Fixture injection enabled via anydi_inject_fixtures config")
+        logger.debug(
+            "Fixture injection enabled via anydi_fixture_inject_enabled config"
+        )
 
 
 @pytest.hookimpl(hookwrapper=True)
