@@ -66,8 +66,9 @@ def pytest_configure(config: pytest.Config) -> None:
 
 
 @pytest.hookimpl(hookwrapper=True)
-def pytest_fixture_setup(
-    fixturedef: pytest.FixtureDef[Any], request: pytest.FixtureRequest,
+def pytest_fixture_setup(  # noqa: C901
+    fixturedef: pytest.FixtureDef[Any],
+    request: pytest.FixtureRequest,
 ) -> Iterator[None]:
     """Inject dependencies into fixtures marked with @pytest.mark.inject."""
     # Check if this fixture has injection metadata
@@ -78,13 +79,8 @@ def pytest_fixture_setup(
 
     # Get the metadata
     fixture_info = _INJECTED_FIXTURES[fixture_name]
-    should_inject = fixture_info.get("should_inject", True)
-    if not should_inject:
-        yield
-        return
     original_func = fixture_info["func"]
-    injected_params = fixture_info["injected_params"]
-    annotations = fixture_info["annotations"]
+    parameters: list[tuple[str, Any]] = fixture_info["parameters"]
 
     # Get the container
     try:
@@ -93,65 +89,28 @@ def pytest_fixture_setup(
         yield
         return
 
-    resolvable_params: list[tuple[str, Any]] = []
-    for param_name in injected_params:
-        annotation = annotations.get(param_name)
-        if annotation is None:
-            continue
-        if not container.has_provider_for(annotation):
-            continue
-        resolvable_params.append((param_name, annotation))
+    resolvable_params = _select_resolvable_parameters(container, parameters)
 
     if not resolvable_params:
         yield
         return
 
-    def _resolve_sync_kwargs() -> dict[str, Any]:
-        resolved: dict[str, Any] = {}
-        for param_name, annotation in resolvable_params:
-            try:
-                resolved[param_name] = container.resolve(annotation)
-                logger.debug(
-                    "Resolved %s=%s for fixture %s",
-                    param_name,
-                    annotation,
-                    fixture_name,
-                )
-            except Exception as exc:
-                logger.warning(
-                    "Failed to resolve dependency for fixture parameter '%s'.",
-                    param_name,
-                    exc_info=exc,
-                )
-        return resolved
-
-    async def _resolve_async_kwargs() -> dict[str, Any]:
-        resolved: dict[str, Any] = {}
-        for param_name, annotation in resolvable_params:
-            try:
-                resolved[param_name] = await container.aresolve(annotation)
-                logger.debug(
-                    "Resolved %s=%s for async fixture %s",
-                    param_name,
-                    annotation,
-                    fixture_name,
-                )
-            except Exception as exc:
-                logger.warning(
-                    "Failed to resolve dependency for async fixture parameter '%s'.",
-                    param_name,
-                    exc_info=exc,
-                )
-        return resolved
+    target_name = f"fixture '{fixture_name}'"
 
     def _prepare_sync_call_kwargs(kwargs: dict[str, Any]) -> dict[str, Any]:
         combined_kwargs = dict(kwargs)
-        combined_kwargs.update(_resolve_sync_kwargs())
+        combined_kwargs.update(
+            _resolve_dependencies_sync(container, resolvable_params, target=target_name)
+        )
         return combined_kwargs
 
     async def _prepare_async_call_kwargs(kwargs: dict[str, Any]) -> dict[str, Any]:
         combined_kwargs = dict(kwargs)
-        combined_kwargs.update(await _resolve_async_kwargs())
+        combined_kwargs.update(
+            await _resolve_dependencies_async(
+                container, resolvable_params, target=target_name
+            )
+        )
         return combined_kwargs
 
     def _ensure_anyio_backend() -> tuple[str, dict[str, Any]]:
@@ -182,7 +141,7 @@ def pytest_fixture_setup(
                     yield value
 
             with get_runner(backend_name, backend_options) as runner:
-                yield from runner.run_asyncgen_fixture(_fixture, {})
+                yield from runner.run_asyncgen_fixture(_fixture, {})  # type: ignore
 
         fixturedef.func = asyncgen_wrapper  # type: ignore[misc]
     elif inspect.iscoroutinefunction(original_func):
@@ -252,12 +211,8 @@ def _anydi_injected_parameter_iterator(
         request.node._fixtureinfo.name2fixturedefs.keys()
     )
 
-    def _iterator() -> Iterator[tuple[str, inspect.Parameter]]:
-        for name, annotation in get_annotations(
-            request.function, eval_str=True
-        ).items():
-            if name == "return":
-                continue
+    def _iterator() -> Iterator[tuple[str, Any]]:
+        for name, annotation in _iter_injectable_parameters(request.function):
             if name not in fixturenames:
                 continue
             yield name, annotation
@@ -276,19 +231,20 @@ def _anydi_inject(
     if inspect.iscoroutinefunction(request.function) or not _anydi_should_inject:
         return
 
+    parameters = list(_anydi_injected_parameter_iterator())
+    if not parameters:
+        return
+
     container = cast(Container, request.getfixturevalue("container"))
+    resolvable = _select_resolvable_parameters(container, parameters)
+    if not resolvable:
+        return
 
-    for argname, interface in _anydi_injected_parameter_iterator():
-        # Skip if the interface has no provider
-        if not container.has_provider_for(interface):
-            continue
-
-        try:
-            request.node.funcargs[argname] = container.resolve(interface)
-        except Exception as exc:
-            logger.warning(
-                f"Failed to resolve dependency for argument '{argname}'.", exc_info=exc
-            )
+    resolved = _resolve_dependencies_sync(
+        container, resolvable, target=request.node.nodeid
+    )
+    for argname, value in resolved.items():
+        request.node.funcargs[argname] = value
 
 
 @pytest.fixture(autouse=True)
@@ -314,21 +270,21 @@ def _anydi_ainject(
         )
         pytest.fail(msg, pytrace=False)
 
+    parameters = list(_anydi_injected_parameter_iterator())
+    if not parameters:
+        return
+
     container = cast(Container, request.getfixturevalue("container"))
+    resolvable = _select_resolvable_parameters(container, parameters)
+    if not resolvable:
+        return
 
     async def _awrapper() -> None:
-        for argname, interface in _anydi_injected_parameter_iterator():
-            # Skip if the interface has no provider
-            if not container.has_provider_for(interface):
-                continue
-
-            try:
-                request.node.funcargs[argname] = await container.aresolve(interface)
-            except Exception as exc:
-                logger.warning(
-                    f"Failed to resolve dependency for argument '{argname}'.",
-                    exc_info=exc,
-                )
+        resolved = await _resolve_dependencies_async(
+            container, resolvable, target=request.node.nodeid
+        )
+        for argname, value in resolved.items():
+            request.node.funcargs[argname] = value
 
     anyio_backend = request.getfixturevalue("anyio_backend")
     backend_name, backend_options = extract_backend_and_options(anyio_backend)
@@ -373,7 +329,7 @@ def _patch_pytest_fixtures(*, autoinject: bool) -> None:  # noqa: C901
     def patched_fixture(*args: Any, **kwargs: Any) -> Any:  # noqa: C901
         """Patched fixture decorator that handles inject markers."""
 
-        def should_process(func: Callable[..., Any]) -> tuple[bool, bool]:
+        def should_process(func: Callable[..., Any]) -> bool:
             has_inject_marker = False
             if hasattr(func, "pytestmark"):
                 markers = getattr(func, "pytestmark", [])
@@ -386,28 +342,17 @@ def _patch_pytest_fixtures(*, autoinject: bool) -> None:  # noqa: C901
                     if hasattr(marker, "name")
                 )
 
-            should_inject = autoinject or has_inject_marker
-            return should_inject, has_inject_marker
+            return autoinject or has_inject_marker
 
         def register_fixture(func: Callable[..., Any]) -> Callable[..., Any] | None:
-            should_inject, _ = should_process(func)
-            if not should_inject:
+            if not should_process(func):
+                return None
+
+            parameters = list(_iter_injectable_parameters(func))
+            if not parameters:
                 return None
 
             sig = inspect.signature(func, eval_str=True)
-            annotations = {
-                name: param.annotation
-                for name, param in sig.parameters.items()
-                if param.annotation is not inspect._empty
-            }
-
-            injected_params = [
-                name for name in annotations.keys() if name != "request"
-            ]
-
-            if not injected_params:
-                return None
-
             has_request_param = "request" in sig.parameters
 
             if has_request_param:
@@ -429,12 +374,12 @@ def _patch_pytest_fixtures(*, autoinject: bool) -> None:  # noqa: C901
             fixture_name = func.__name__
             _INJECTED_FIXTURES[fixture_name] = {
                 "func": func,
-                "injected_params": injected_params,
-                "annotations": annotations,
-                "should_inject": should_inject,
+                "parameters": parameters,
             }
             logger.debug(
-                f"Registered injectable fixture '{fixture_name}' with params: {injected_params}"
+                "Registered injectable fixture '%s' with params: %s",
+                fixture_name,
+                [name for name, _ in parameters],
             )
 
             return wrapper_func
@@ -464,3 +409,67 @@ def _patch_pytest_fixtures(*, autoinject: bool) -> None:  # noqa: C901
     import _pytest.fixtures
 
     _pytest.fixtures.fixture = patched_fixture  # type: ignore[assignment]
+
+
+def _iter_injectable_parameters(
+    func: Callable[..., Any], *, skip: tuple[str, ...] = ("request",)
+) -> Iterator[tuple[str, Any]]:
+    annotations = get_annotations(func, eval_str=True)
+    skip_names = set(skip)
+    for name, annotation in annotations.items():
+        if name in skip_names or name == "return":
+            continue
+        yield name, annotation
+
+
+def _select_resolvable_parameters(
+    container: Container,
+    parameters: Iterator[tuple[str, Any]] | list[tuple[str, Any]],
+) -> list[tuple[str, Any]]:
+    return [
+        (name, annotation)
+        for name, annotation in parameters
+        if container.has_provider_for(annotation)
+    ]
+
+
+def _resolve_dependencies_sync(
+    container: Container,
+    parameters: list[tuple[str, Any]],
+    *,
+    target: str,
+) -> dict[str, Any]:
+    resolved: dict[str, Any] = {}
+    for param_name, annotation in parameters:
+        try:
+            resolved[param_name] = container.resolve(annotation)
+            logger.debug("Resolved %s=%s for %s", param_name, annotation, target)
+        except Exception as exc:  # pragma: no cover - defensive logging
+            logger.warning(
+                "Failed to resolve dependency for '%s' on %s.",
+                param_name,
+                target,
+                exc_info=exc,
+            )
+    return resolved
+
+
+async def _resolve_dependencies_async(
+    container: Container,
+    parameters: list[tuple[str, Any]],
+    *,
+    target: str,
+) -> dict[str, Any]:
+    resolved: dict[str, Any] = {}
+    for param_name, annotation in parameters:
+        try:
+            resolved[param_name] = await container.aresolve(annotation)
+            logger.debug("Resolved %s=%s for async %s", param_name, annotation, target)
+        except Exception as exc:  # pragma: no cover - defensive logging
+            logger.warning(
+                "Failed to resolve async dependency for '%s' on %s.",
+                param_name,
+                target,
+                exc_info=exc,
+            )
+    return resolved

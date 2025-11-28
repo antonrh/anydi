@@ -1,4 +1,5 @@
-from typing import Any, AsyncIterator, Iterator
+from collections.abc import AsyncIterator, Iterator
+from typing import Any
 
 import pytest
 
@@ -176,7 +177,7 @@ def test_inject_into_fixture(injected_fixture: str) -> None:
 @pytest.fixture
 @pytest.mark.inject
 def injected_generator_fixture(service: Service) -> Iterator[str]:
-    yield service.name
+    yield service.name  # noqa: PT022
 
 
 def test_inject_into_generator_fixture(injected_generator_fixture: str) -> None:
@@ -195,10 +196,8 @@ async def test_inject_into_async_fixture(injected_async_fixture: str) -> None:
 
 @pytest.fixture
 @pytest.mark.inject
-async def injected_async_generator_fixture(
-    service: Service,
-) -> AsyncIterator[str]:
-    yield service.name
+async def injected_async_generator_fixture(service: Service) -> AsyncIterator[str]:
+    yield service.name  # noqa: PT022
 
 
 async def test_inject_into_async_generator_fixture(
