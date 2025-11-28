@@ -113,6 +113,11 @@ addopts = [
 xfail_strict = true
 junit_family = "xunit2"
 
+[tool.coverage.run]
+omit = [
+    "anydi/ext/pytest_plugin.py",
+]
+
 [tool.coverage.report]
 exclude_also = [
     "pragma: no cover",

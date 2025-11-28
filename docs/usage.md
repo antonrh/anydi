@@ -951,6 +951,61 @@ Dependencies are automatically resolved from the container based on type annotat
 
 Pytest fixtures always take priority over dependency injection. If a pytest fixture and the `@pytest.mark.inject` decorator both provide a value for the same parameter name, the fixture value will be used.
 
+##### Fixture Injection
+
+`anydi_fixture_inject_enabled` toggles dependency injection for fixtures annotated with `@pytest.mark.inject`. It is **disabled** by default, so you need to opt in explicitly if you want fixtures to benefit from container injection. This option performs heavy monkey patching of `pytest.fixture` and is considered experimental, so enable it only if you understand the trade-offs:
+
+```ini
+# pytest.ini
+[pytest]
+anydi_fixture_inject_enabled = true
+```
+
+```toml
+# pyproject.toml
+[tool.pytest.ini_options]
+anydi_fixture_inject_enabled = true
+```
+
+With fixture injection enabled, use the marker on any fixture and annotate the parameters you want resolved from the container. This works for synchronous, generator, and async fixtures (async fixtures still require the `anyio` plugin, just like async tests):
+
+```python
+import pytest
+
+from anydi import Container
+
+
+class UserRepository:
+    def get_name(self, user_id: int) -> str:
+        return "Alice" if user_id == 1 else "Unknown"
+
+
+class UserService:
+    def __init__(self, repo: UserRepository) -> None:
+        self.repo = repo
+
+    def get_user_name(self, user_id: int) -> str:
+        return self.repo.get_name(user_id)
+
+
+@pytest.fixture(scope="session")
+def container() -> Container:
+    container = Container()
+    container.register(UserRepository)
+    container.register(UserService)
+    return container
+
+
+@pytest.fixture
+@pytest.mark.inject
+def user_service(service: UserService) -> UserService:
+    return service
+
+
+def test_uses_injected_fixture(user_service: UserService) -> None:
+    assert user_service.get_user_name(1) == "Alice"
+```
+
 ##### Testing with `.create()`
 
 For more control over dependency injection in tests, use the `.create()` method to instantiate classes with overridden dependencies:

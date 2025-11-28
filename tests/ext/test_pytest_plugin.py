@@ -1,3 +1,4 @@
+from collections.abc import AsyncIterator, Iterator
 from typing import Any
 
 import pytest
@@ -7,7 +8,7 @@ from anydi.ext import pytest_plugin
 
 
 class Service:
-    pass
+    name = "service"
 
 
 class UnknownService:
@@ -161,3 +162,45 @@ def test_get_container_no_fixture_no_config(
         pytest.FixtureLookupError, match="container.*fixture is not found"
     ):
         pytest_plugin._find_container(request)
+
+
+@pytest.fixture
+@pytest.mark.inject
+def injected_fixture(service: Service) -> str:
+    return service.name
+
+
+def test_inject_into_fixture(injected_fixture: str) -> None:
+    assert injected_fixture == "service"
+
+
+@pytest.fixture
+@pytest.mark.inject
+def injected_generator_fixture(service: Service) -> Iterator[str]:
+    yield service.name  # noqa: PT022
+
+
+def test_inject_into_generator_fixture(injected_generator_fixture: str) -> None:
+    assert injected_generator_fixture == "service"
+
+
+@pytest.fixture
+@pytest.mark.inject
+async def injected_async_fixture(service: Service) -> str:
+    return service.name
+
+
+async def test_inject_into_async_fixture(injected_async_fixture: str) -> None:
+    assert injected_async_fixture == "service"
+
+
+@pytest.fixture
+@pytest.mark.inject
+async def injected_async_generator_fixture(service: Service) -> AsyncIterator[str]:
+    yield service.name  # noqa: PT022
+
+
+async def test_inject_into_async_generator_fixture(
+    injected_async_generator_fixture: str,
+) -> None:
+    assert injected_async_generator_fixture == "service"
