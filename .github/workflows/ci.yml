@@ -55,7 +55,7 @@ jobs:
       - name: Run tests
         run: |
           uv run pytest -vv tests --ignore=tests/ext/test_pytest_plugin.py --cov=anydi -p no:anydi
-          uv run pytest -vv tests/ext/test_pytest_plugin.py --cov=anydi --cov-append --cov-report=xml
+          uv run pytest -vv tests/ext/test_pytest_plugin.py --cov=anydi --cov-append --cov-report=xml -o anydi_fixture_inject_enabled=true
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v3
         if: matrix.python == '3.10'
