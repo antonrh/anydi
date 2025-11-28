@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import inspect
 from collections.abc import Iterator
-from typing import Annotated, Any, cast
+from typing import TYPE_CHECKING, Annotated, Any, TypeVar, cast
 
 from fastapi import Depends, FastAPI, params
 from fastapi.dependencies.models import Dependant
@@ -12,11 +12,13 @@ from fastapi.routing import APIRoute
 from starlette.requests import Request
 
 from anydi._container import Container
-from anydi._types import InjectMarker
+from anydi._types import ProvideMarker
 
 from .starlette.middleware import RequestScopedMiddleware
 
-__all__ = ["RequestScopedMiddleware", "install", "get_container", "Inject"]
+__all__ = ["RequestScopedMiddleware", "install", "get_container", "Inject", "Provide"]
+
+T = TypeVar("T")
 
 
 def install(app: FastAPI, container: Container) -> None:
@@ -49,10 +51,10 @@ def get_container(request: Request) -> Container:
     return cast(Container, request.app.state.container)
 
 
-class _Inject(params.Depends, InjectMarker):
+class _ProvideMarker(params.Depends, ProvideMarker):
     def __init__(self) -> None:
         super().__init__(dependency=self._dependency, use_cache=True)
-        InjectMarker.__init__(self)
+        ProvideMarker.__init__(self)
 
     async def _dependency(
         self, container: Annotated[Container, Depends(get_container)]
@@ -60,8 +62,14 @@ class _Inject(params.Depends, InjectMarker):
         return await container.aresolve(self.interface)
 
 
+if TYPE_CHECKING:
+    Provide = Annotated[T, _ProvideMarker()]
+else:
+    Provide = ProvideMarker
+
+
 def Inject() -> Any:
-    return _Inject()
+    return _ProvideMarker()
 
 
 def _iter_dependencies(dependant: Dependant) -> Iterator[Dependant]:

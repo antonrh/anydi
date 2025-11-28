@@ -17,7 +17,7 @@ from typing import (
 
 from typing_extensions import ParamSpec, type_repr
 
-from ._types import is_inject_marker
+from ._types import is_provide_marker
 
 if TYPE_CHECKING:
     from ._container import Container
@@ -81,7 +81,7 @@ class Injector:
         parameter = self.unwrap_parameter(parameter)
         interface = parameter.annotation
 
-        if not is_inject_marker(parameter.default):
+        if not is_provide_marker(parameter.default):
             return interface, False
 
         if interface is inspect.Parameter.empty:
@@ -108,10 +108,10 @@ class Injector:
 
         origin, *metadata = get_args(parameter.annotation)
 
-        if not metadata or not is_inject_marker(metadata[-1]):
+        if not metadata or not is_provide_marker(metadata[-1]):
             return parameter
 
-        if is_inject_marker(parameter.default):
+        if is_provide_marker(parameter.default):
             raise TypeError(
                 "Cannot specify `Inject` in `Annotated` and "
                 f"default value together for '{parameter.name}'"

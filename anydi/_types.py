@@ -5,17 +5,25 @@ from __future__ import annotations
 import inspect
 from collections.abc import AsyncIterator, Iterator
 from types import NoneType
-from typing import Any, Literal
+from typing import (
+    TYPE_CHECKING,
+    Annotated,
+    Any,
+    Literal,
+    TypeVar,
+)
 
 from typing_extensions import Sentinel
+
+T = TypeVar("T")
 
 Scope = Literal["transient", "singleton", "request"]
 
 NOT_SET = Sentinel("NOT_SET")
 
 
-class InjectMarker:
-    """A marker object for declaring injectable dependencies."""
+class ProvideMarker:
+    """A marker object for declaring dependency."""
 
     __slots__ = ("_interface",)
 
@@ -32,13 +40,26 @@ class InjectMarker:
     def interface(self, interface: Any) -> None:
         self._interface = interface
 
+    def __class_getitem__(cls, item: Any) -> Any:
+        return Annotated[item, cls()]
 
-def is_inject_marker(obj: Any) -> bool:
-    return isinstance(obj, InjectMarker)
+
+def is_provide_marker(obj: Any) -> bool:
+    return isinstance(obj, ProvideMarker)
+
+
+if TYPE_CHECKING:
+    Provide = Annotated[T, ProvideMarker()]
+else:
+    Provide = ProvideMarker
 
 
 def Inject() -> Any:
-    return InjectMarker()
+    return ProvideMarker()
+
+
+# Alias from backward compatibility
+is_inject_marker = is_provide_marker
 
 
 class Event:
