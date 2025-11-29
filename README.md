@@ -25,7 +25,7 @@ The key features are:
 * **Async-ready**: Works the same for sync and async providers or injections.
 * **Scoped**: Built-in singleton, transient, and request lifetimes.
 * **Simple**: Small surface area keeps boilerplate low.
-* **Fast**: Resolver still adds only microseconds of overhead.
+* **Fast**: Has minimal overhead and resolves dependencies quickly.
 * **Named**: `Annotated[...]` makes multiple bindings per type simple.
 * **Managed**: Providers can open/close resources via context managers.
 * **Modular**: Compose containers or modules for large apps.

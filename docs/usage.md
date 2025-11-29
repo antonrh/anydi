@@ -369,7 +369,7 @@ container = Container()
 
 
 @container.provider(scope="singleton")
-def resource_provider() -> t.Iterator[Resource]:
+def resource_provider() -> Iterator[Resource]:
     resource = Resource(name="demo")
     resource.start()
     yield resource
@@ -462,7 +462,7 @@ def client_provider() -> Client:
 
 
 @container.provider(scope="singleton")
-def client_lifespan(client: Client) -> t.Iterator[None]:
+def client_lifespan(client: Client) -> Iterator[None]:
     client.start()
     yield
     client.close()
