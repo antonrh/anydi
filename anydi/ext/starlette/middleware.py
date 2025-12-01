@@ -5,7 +5,7 @@ from starlette.requests import Request
 from starlette.responses import Response
 from starlette.types import ASGIApp
 
-from anydi._container import Container
+from anydi import Container
 
 
 class RequestScopedMiddleware(BaseHTTPMiddleware):

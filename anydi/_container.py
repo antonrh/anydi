@@ -22,15 +22,7 @@ from ._module import ModuleDef, ModuleRegistrar
 from ._provider import Provider, ProviderDef, ProviderKind, ProviderParameter
 from ._resolver import Resolver
 from ._scanner import PackageOrIterable, Scanner
-from ._types import (
-    NOT_SET,
-    Event,
-    Scope,
-    ScopeOrStr,
-    is_event_type,
-    is_iterator_type,
-    is_none_type,
-)
+from ._types import NOT_SET, Event, Scope, is_event_type, is_iterator_type, is_none_type
 
 T = TypeVar("T", bound=Any)
 P = ParamSpec("P")
@@ -48,8 +40,7 @@ class Container:
     ) -> None:
         self._providers: dict[Any, Provider] = {}
         self._logger = logger or logging.getLogger(__name__)
-
-        self._scopes: dict[ScopeOrStr, Sequence[ScopeOrStr]] = {
+        self._scopes: dict[str, Sequence[str]] = {
             "transient": ("transient", "singleton"),
             "singleton": ("singleton",),
         }
@@ -65,7 +56,7 @@ class Container:
         self._scanner = Scanner(self)
 
         # Register default scopes
-        self.register_scope("request", parents=["singleton"])
+        self.register_scope("request")
 
         # Register providers
         providers = providers or []
@@ -143,10 +134,10 @@ class Container:
         await self._singleton_context.aclose()
 
     @contextlib.contextmanager
-    def scoped_context(self, scope: ScopeOrStr) -> Iterator[InstanceContext]:
+    def scoped_context(self, scope: str) -> Iterator[InstanceContext]:
         """Obtain a context manager for the request-scoped context."""
-        context = InstanceContext()
         scoped_context_var = self._get_scoped_context_var(scope)
+        context = InstanceContext()
         token = scoped_context_var.set(context)
 
         # Resolve all request resources
@@ -162,8 +153,8 @@ class Container:
     @contextlib.asynccontextmanager
     async def ascoped_context(self, scope: str) -> AsyncIterator[InstanceContext]:
         """Obtain a context manager for the specified scoped context."""
-        context = InstanceContext()
         scoped_context_var = self._get_scoped_context_var(scope)
+        context = InstanceContext()
         token = scoped_context_var.set(context)
 
         # Resolve all request resources
@@ -202,6 +193,17 @@ class Container:
 
     def _get_scoped_context_var(self, scope: str) -> ContextVar[InstanceContext]:
         """Get the context variable for the specified scope."""
+        # Validate that scope is registered and not reserved
+        if scope in ("transient", "singleton"):
+            raise ValueError(
+                f"Cannot get context variable for reserved scope `{scope}`."
+            )
+        if scope not in self._scopes:
+            raise ValueError(
+                f"Cannot get context variable for not registered scope `{scope}`. "
+                f"Please register the scope first using register_scope()."
+            )
+
         if scope not in self._scoped_context:
             self._scoped_context[scope] = ContextVar(f"{scope}_context")
         return self._scoped_context[scope]

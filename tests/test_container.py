@@ -1505,6 +1505,406 @@ class TestContainer:
         assert instance1.db is instance2.db
 
 
+class TestContainerCustomScopes:
+    """Tests for custom scope registration and resolution."""
+
+    def test_register_custom_scope(self, container: Container) -> None:
+        """Test registering a custom scope with parent scopes."""
+        container.register_scope("task", parents=["singleton"])
+
+        assert "task" in container._scopes
+        assert "task" in container._scopes["task"]
+        assert "singleton" in container._scopes["task"]
+
+    def test_register_custom_scope_with_multiple_parents(
+        self, container: Container
+    ) -> None:
+        """Test registering a custom scope with multiple parent scopes."""
+        container.register_scope("task", parents=["singleton"])
+        container.register_scope("workflow", parents=["task"])
+
+        assert "workflow" in container._scopes
+        assert "workflow" in container._scopes["workflow"]
+        assert "singleton" in container._scopes["workflow"]
+        assert "task" in container._scopes["workflow"]
+
+    def test_register_custom_scope_no_parents(self, container: Container) -> None:
+        """Test registering a custom scope without parent scopes."""
+        container.register_scope("session")
+
+        assert "session" in container._scopes
+        assert "session" in container._scopes["session"]
+        assert "singleton" in container._scopes["session"]
+
+    def test_register_custom_scope_already_registered(
+        self, container: Container
+    ) -> None:
+        """Test registering an already registered custom scope raises error."""
+        container.register_scope("task")
+
+        with pytest.raises(
+            ValueError,
+            match="The scope `task` is already registered.",
+        ):
+            container.register_scope("task")
+
+    def test_register_reserved_scope_singleton(self, container: Container) -> None:
+        """Test registering a reserved scope 'singleton' raises error."""
+        with pytest.raises(
+            ValueError,
+            match="The scope `singleton` is reserved and cannot be overridden.",
+        ):
+            container.register_scope("singleton")
+
+    def test_register_reserved_scope_transient(self, container: Container) -> None:
+        """Test registering a reserved scope 'transient' raises error."""
+        with pytest.raises(
+            ValueError,
+            match="The scope `transient` is reserved and cannot be overridden.",
+        ):
+            container.register_scope("transient")
+
+    def test_register_custom_scope_with_nonexistent_parent(
+        self, container: Container
+    ) -> None:
+        """Test registering a custom scope with non-existent parent raises error."""
+        with pytest.raises(
+            ValueError,
+            match="The parent scope `nonexistent` is not registered.",
+        ):
+            container.register_scope("task", parents=["nonexistent"])
+
+    def test_resolve_custom_scoped(self, container: Container) -> None:
+        """Test resolving a provider with custom scope."""
+        instance = "task_value"
+
+        container.register_scope("task")
+        container.register(str, lambda: instance, scope="task")  # type: ignore[arg-type]
+
+        with container.scoped_context("task"):
+            assert container.resolve(str) == instance
+
+    def test_resolve_custom_scoped_not_started(self, container: Container) -> None:
+        """Test resolving custom scope without context raises error."""
+        container.register_scope("task")
+        container.register(str, lambda: "test", scope="task")  # type: ignore[arg-type]
+
+        with pytest.raises(
+            LookupError,
+            match=(
+                "The task context has not been started. "
+                "Please ensure that the task context is properly initialized "
+                "before attempting to use it."
+            ),
+        ):
+            container.resolve(str)
+
+    def test_resolve_custom_scope_with_singleton_dependency(
+        self, container: Container
+    ) -> None:
+        """Test resolving custom scope provider that depends on singleton."""
+        container.register_scope("task")
+
+        def singleton_dep() -> int:
+            return 42
+
+        def task_dep(x: int) -> str:
+            return f"value: {x}"
+
+        container.register(int, singleton_dep, scope="singleton")
+        container.register(str, task_dep, scope="task")  # type: ignore[arg-type]
+
+        with container:
+            with container.scoped_context("task"):
+                result = container.resolve(str)
+                assert result == "value: 42"
+
+    def test_resolve_custom_scope_with_parent_dependency(
+        self, container: Container
+    ) -> None:
+        """Test resolving custom scope provider that depends on parent scope."""
+        container.register_scope("task", parents=["singleton"])
+        container.register_scope("workflow", parents=["task"])
+
+        def singleton_dep() -> int:
+            return 10
+
+        def task_dep(x: int) -> float:
+            return x * 2.5
+
+        def workflow_dep(y: float) -> str:
+            return f"result: {y}"
+
+        container.register(int, singleton_dep, scope="singleton")
+        container.register(float, task_dep, scope="task")  # type: ignore[arg-type]
+        container.register(str, workflow_dep, scope="workflow")  # type: ignore[arg-type]
+
+        with container:
+            with container.scoped_context("task"):
+                with container.scoped_context("workflow"):
+                    result = container.resolve(str)
+                    assert result == "result: 25.0"
+
+    def test_resolve_custom_scope_instance_caching(self, container: Container) -> None:
+        """Test that instances are cached within custom scope context."""
+        container.register_scope("task")
+        container.register(UniqueId, scope="task")  # type: ignore[arg-type]
+
+        with container.scoped_context("task"):
+            instance1 = container.resolve(UniqueId)
+            instance2 = container.resolve(UniqueId)
+            assert instance1 is instance2
+
+    def test_resolve_custom_scope_isolation(self, container: Container) -> None:
+        """Test that custom scope instances are isolated across contexts."""
+        container.register_scope("task")
+        container.register(UniqueId, scope="task")  # type: ignore[arg-type]
+
+        with container.scoped_context("task"):
+            instance1 = container.resolve(UniqueId)
+
+        with container.scoped_context("task"):
+            instance2 = container.resolve(UniqueId)
+
+        assert instance1 is not instance2
+
+    def test_resolve_custom_scope_with_resource(self, container: Container) -> None:
+        """Test resolving custom scope with resource provider."""
+        container.register_scope("task")
+
+        @container.provider(scope="task")  # type: ignore[arg-type]
+        def provide() -> Iterator[str]:
+            yield "resource_value"
+
+        with container.scoped_context("task"):
+            result = container.resolve(str)
+            assert result == "resource_value"
+
+    async def test_resolve_custom_scope_async(self, container: Container) -> None:
+        """Test async resolution with custom scope."""
+        container.register_scope("task")
+
+        async def async_provider() -> str:
+            return "async_value"
+
+        container.register(str, async_provider, scope="task")  # type: ignore[arg-type]
+
+        async with container.ascoped_context("task"):
+            result = await container.aresolve(str)
+            assert result == "async_value"
+
+    async def test_resolve_custom_scope_async_resource(
+        self, container: Container
+    ) -> None:
+        """Test async resolution with custom scope async resource."""
+        container.register_scope("task")
+
+        @container.provider(scope="task")  # type: ignore[arg-type]
+        async def provide() -> AsyncIterator[str]:
+            yield "async_resource"
+
+        async with container.ascoped_context("task"):
+            result = await container.aresolve(str)
+            assert result == "async_resource"
+
+    def test_resolve_custom_scope_thread_safe(self, container: Container) -> None:
+        """Test that custom scope resolution is thread-safe."""
+        container.register_scope("task")
+        container.register(UniqueId, scope="task")  # type: ignore[arg-type]
+
+        results: list[tuple[UniqueId, UniqueId]] = []
+
+        def worker() -> None:
+            with container.scoped_context("task"):
+                id1 = container.resolve(UniqueId)
+                id2 = container.resolve(UniqueId)
+                results.append((id1, id2))
+
+        threads = [threading.Thread(target=worker) for _ in range(5)]
+        for thread in threads:
+            thread.start()
+        for thread in threads:
+            thread.join()
+
+        # Each thread should get the same instance within its context
+        for id1, id2 in results:
+            assert id1 is id2
+
+        # But different threads should get different instances
+        unique_ids = {id(pair[0]) for pair in results}
+        assert len(unique_ids) == 5
+
+    def test_custom_scope_dependency_validation(self, container: Container) -> None:
+        """Test that custom scope cannot depend on disallowed scopes."""
+        container.register_scope("task", parents=["singleton"])
+
+        def transient_dep() -> int:
+            return 42
+
+        def task_dep(x: int) -> str:
+            return f"value: {x}"
+
+        container.register(int, transient_dep, scope="transient")
+
+        with pytest.raises(
+            ValueError,
+            match=(
+                "The provider .* with a `task` scope "
+                "cannot depend on .* with a `transient` scope"
+            ),
+        ):
+            container.register(str, task_dep, scope="task")  # type: ignore[arg-type]
+
+    def test_custom_scope_allows_transient_dependencies_from_transient(
+        self, container: Container
+    ) -> None:
+        """Test that transient scope can depend on custom scopes."""
+        container.register_scope("task")
+
+        def task_dep() -> int:
+            return 42
+
+        def transient_dep(x: int) -> str:
+            return f"value: {x}"
+
+        container.register(int, task_dep, scope="task")  # type: ignore[arg-type]
+        container.register(str, transient_dep, scope="transient")
+
+        with container.scoped_context("task"):
+            result = container.resolve(str)
+            assert result == "value: 42"
+
+    def test_custom_scope_multiple_providers(self, container: Container) -> None:
+        """Test multiple providers registered with custom scope."""
+        container.register_scope("task")
+
+        container.register(int, lambda: 10, scope="task")  # type: ignore[arg-type]
+        container.register(str, lambda: "test", scope="task")  # type: ignore[arg-type]
+        container.register(float, lambda: 3.14, scope="task")  # type: ignore[arg-type]
+
+        with container.scoped_context("task"):
+            assert container.resolve(int) == 10
+            assert container.resolve(str) == "test"
+            assert container.resolve(float) == 3.14
+
+    def test_unregister_custom_scoped_provider(self, container: Container) -> None:
+        """Test unregistering a provider with custom scope."""
+        container.register_scope("task")
+        container.register(str, lambda: "test", scope="task")  # type: ignore[arg-type]
+
+        with container.scoped_context("task"):
+            container.resolve(str)
+
+        container.unregister(str)
+
+        assert not container.is_registered(str)
+
+    def test_get_scoped_context_var_for_reserved_scope_singleton(
+        self, container: Container
+    ) -> None:
+        """Test that getting context var for singleton scope raises error."""
+        with pytest.raises(
+            ValueError,
+            match="Cannot get context variable for reserved scope `singleton`.",
+        ):
+            container._get_scoped_context_var("singleton")
+
+    def test_get_scoped_context_var_for_reserved_scope_transient(
+        self, container: Container
+    ) -> None:
+        """Test that getting context var for transient scope raises error."""
+        with pytest.raises(
+            ValueError,
+            match="Cannot get context variable for reserved scope `transient`.",
+        ):
+            container._get_scoped_context_var("transient")
+
+    def test_get_scoped_context_var_for_not_registered_scope(
+        self, container: Container
+    ) -> None:
+        """Test that getting context var for unregistered scope raises error."""
+        with pytest.raises(
+            ValueError,
+            match=(
+                "Cannot get context variable for not registered scope `unregistered`. "
+                "Please register the scope first using register_scope()."
+            ),
+        ):
+            container._get_scoped_context_var("unregistered")
+
+    def test_scoped_context_with_reserved_scope_singleton(
+        self, container: Container
+    ) -> None:
+        """Test that scoped_context with singleton scope raises error."""
+        with pytest.raises(
+            ValueError,
+            match="Cannot get context variable for reserved scope `singleton`.",
+        ):
+            with container.scoped_context("singleton"):
+                pass
+
+    def test_scoped_context_with_reserved_scope_transient(
+        self, container: Container
+    ) -> None:
+        """Test that scoped_context with transient scope raises error."""
+        with pytest.raises(
+            ValueError,
+            match="Cannot get context variable for reserved scope `transient`.",
+        ):
+            with container.scoped_context("transient"):
+                pass
+
+    def test_scoped_context_with_not_registered_scope(
+        self, container: Container
+    ) -> None:
+        """Test that scoped_context with unregistered scope raises error."""
+        with pytest.raises(
+            ValueError,
+            match=(
+                "Cannot get context variable for not registered scope `unknown`. "
+                "Please register the scope first using register_scope()."
+            ),
+        ):
+            with container.scoped_context("unknown"):
+                pass
+
+    async def test_ascoped_context_with_reserved_scope_singleton(
+        self, container: Container
+    ) -> None:
+        """Test that ascoped_context with singleton scope raises error."""
+        with pytest.raises(
+            ValueError,
+            match="Cannot get context variable for reserved scope `singleton`.",
+        ):
+            async with container.ascoped_context("singleton"):
+                pass
+
+    async def test_ascoped_context_with_reserved_scope_transient(
+        self, container: Container
+    ) -> None:
+        """Test that ascoped_context with transient scope raises error."""
+        with pytest.raises(
+            ValueError,
+            match="Cannot get context variable for reserved scope `transient`.",
+        ):
+            async with container.ascoped_context("transient"):
+                pass
+
+    async def test_ascoped_context_with_not_registered_scope(
+        self, container: Container
+    ) -> None:
+        """Test that ascoped_context with unregistered scope raises error."""
+        with pytest.raises(
+            ValueError,
+            match=(
+                "Cannot get context variable for not registered scope `unknown`. "
+                "Please register the scope first using register_scope()."
+            ),
+        ):
+            async with container.ascoped_context("unknown"):
+                pass
+
+
 class TestContainerInjector:
     def test_inject_using_inject_marker(self, container: Container) -> None:
         @container.provider(scope="singleton")
