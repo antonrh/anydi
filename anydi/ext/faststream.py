@@ -3,23 +3,48 @@
 from __future__ import annotations
 
 import inspect
+from functools import cached_property
 from typing import TYPE_CHECKING, Any, cast
 
 from fast_depends.dependencies import Dependant
-from faststream import ContextRepo
+from faststream import BaseMiddleware, ContextRepo, StreamMessage
 
 from anydi import Container
 from anydi._types import Inject, ProvideMarker, set_provide_factory
 
 if TYPE_CHECKING:
+    from faststream._internal.basic_types import AsyncFuncAny
     from faststream._internal.broker import BrokerUsecase
+    from faststream._internal.types import AnyMsg
 
-__all__ = ["install", "get_container", "Inject"]
+__all__ = [
+    "install",
+    "get_container",
+    "get_container_from_context",
+    "Inject",
+    "RequestScopedMiddleware",
+]
 
 
 def get_container(broker: BrokerUsecase[Any, Any]) -> Container:
     """Get the AnyDI container from a FastStream broker."""
     return cast(Container, getattr(broker, "_container"))  # noqa
+
+
+def get_container_from_context(context: ContextRepo) -> Container:
+    return get_container(context.broker)
+
+
+class RequestScopedMiddleware(BaseMiddleware):
+    @cached_property
+    def container(self) -> Container:
+        return get_container_from_context(self.context)
+
+    async def consume_scope(
+        self, call_next: AsyncFuncAny, msg: StreamMessage[AnyMsg]
+    ) -> Any:
+        async with self.container.arequest_context():
+            return await call_next(msg)
 
 
 class _ProvideMarker(Dependant, ProvideMarker):
@@ -28,7 +53,7 @@ class _ProvideMarker(Dependant, ProvideMarker):
         ProvideMarker.__init__(self)
 
     async def _dependency(self, context: ContextRepo) -> Any:
-        container = get_container(context.get("broker"))
+        container = get_container_from_context(context)
         return await container.aresolve(self.interface)
 
 
