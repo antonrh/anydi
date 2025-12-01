@@ -20,11 +20,17 @@ repo_url: https://github.com/antonrh/anydi
 edit_uri: ""
 
 nav:
-  - Introduction: index.md
-  - Usage:
-    - Providers: usage/providers.md
+  - Home: index.md
+  - Core Concepts: concepts.md
+  - Usage Guide:
+    - Providers:
+      - Overview: usage/providers/index.md
+      - Basics: usage/providers/basics.md
+      - Named Providers: usage/providers/annotated.md
+      - Resource Management: usage/providers/resources.md
+      - Auto-Registration: usage/providers/auto-registration.md
     - Scopes: usage/scopes.md
-    - Injection: usage/injection.md
+    - Dependency Injection: usage/injection.md
     - Modules: usage/modules.md
     - Testing: usage/testing.md
   - Extensions:
@@ -33,7 +39,7 @@ nav:
     - Pydantic Settings: extensions/pydantic_settings.md
     - Django: extensions/django.md
   - Examples:
-    - Basic: examples/basic.md
+    - Basic Application: examples/basic.md
 
 markdown_extensions:
   - admonition

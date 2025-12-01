@@ -1,4 +1,4 @@
-# Injection
+# Dependency Injection
 
 In order to use the dependencies that have been provided to the `Container`, they need to be injected into the functions or classes that require them. This can be done by using the `@container.inject` decorator.
 

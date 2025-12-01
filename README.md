@@ -39,7 +39,7 @@ The key features are:
 pip install anydi
 ```
 
-## Comprehensive Example
+## Quick Example
 
 ### Define a Service (`app/services.py`)
 
@@ -229,3 +229,23 @@ urlpatterns = [
     path("api/", api.urls),
 ]
 ```
+
+## What's Next?
+
+Ready to learn more? Check out these resources:
+
+**Core Documentation:**
+- [Core Concepts](https://anydi.readthedocs.io/en/latest/concepts/) - Understand containers, providers, scopes, and dependency injection
+- [Providers](https://anydi.readthedocs.io/en/latest/usage/providers/) - Learn about registration, named providers, and resource management
+- [Scopes](https://anydi.readthedocs.io/en/latest/usage/scopes/) - Master lifecycle management with built-in and custom scopes
+- [Dependency Injection](https://anydi.readthedocs.io/en/latest/usage/injection/) - Explore injection patterns and techniques
+- [Testing](https://anydi.readthedocs.io/en/latest/usage/testing/) - Write testable code with provider overrides
+
+**Framework Integrations:**
+- [FastAPI](https://anydi.readthedocs.io/en/latest/extensions/fastapi/) - Build modern APIs with automatic dependency injection
+- [Django](https://anydi.readthedocs.io/en/latest/extensions/django/) - Integrate with Django and Django Ninja
+- [FastStream](https://anydi.readthedocs.io/en/latest/extensions/faststream/) - Message broker applications
+- [Pydantic Settings](https://anydi.readthedocs.io/en/latest/extensions/pydantic_settings/) - Configuration management
+
+**Full Documentation:**
+- [Read the Docs](https://anydi.readthedocs.io/) - Complete documentation with examples and guides

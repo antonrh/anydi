@@ -38,7 +38,7 @@ The key features are:
 pip install anydi
 ```
 
-## Comprehensive Example
+## Quick Example
 
 ### Define a Service (`app/services.py`)
 
