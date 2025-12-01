@@ -21,7 +21,12 @@ edit_uri: ""
 
 nav:
   - Introduction: index.md
-  - Usage: usage.md
+  - Usage:
+    - Providers: usage/providers.md
+    - Scopes: usage/scopes.md
+    - Injection: usage/injection.md
+    - Modules: usage/modules.md
+    - Testing: usage/testing.md
   - Extensions:
     - FastAPI: extensions/fastapi.md
     - FastStream: extensions/faststream.md
