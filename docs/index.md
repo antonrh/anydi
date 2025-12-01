@@ -20,7 +20,7 @@ The key features are:
 
 * **Type-safe**: Dependency resolution is driven by type hints.
 * **Async-ready**: Works the same for sync and async providers or injections.
-* **Scoped**: Built-in singleton, transient, and request lifetimes.
+* **Scoped**: Built-in singleton, transient, and request scopes, plus custom scopes.
 * **Simple**: Small surface area keeps boilerplate low.
 * **Fast**: Has minimal overhead and resolves dependencies quickly.
 * **Named**: `Annotated[...]` makes multiple bindings per type simple.
