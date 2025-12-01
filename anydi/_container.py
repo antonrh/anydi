@@ -57,9 +57,6 @@ class Container:
         self._resources: dict[str, list[Any]] = defaultdict(list)
         self._singleton_context = InstanceContext()
         self._scoped_context: dict[str, ContextVar[InstanceContext]] = {}
-        self._request_context_var: ContextVar[InstanceContext | None] = ContextVar(
-            "request_context", default=None
-        )
 
         # Components
         self._resolver = Resolver(self)
@@ -238,7 +235,7 @@ class Container:
                 raise ValueError(f"The parent scope `{parent}` is not registered.")
 
         # Register the scope
-        self._scopes[scope] = {scope, "singleton"} | set(parents)
+        self._scopes[scope] = tuple({scope, "singleton"} | set(parents))
 
     # == Provider Registry ==
 
@@ -350,7 +347,7 @@ class Container:
         unresolved_parameter = None
         unresolved_exc: LookupError | None = None
         parameters: list[ProviderParameter] = []
-        scopes: dict[Scope, Provider] = {}
+        scope_provider: dict[Scope, Provider] = {}
 
         for parameter in signature.parameters.values():
             if parameter.annotation is inspect.Parameter.empty:
@@ -381,8 +378,8 @@ class Container:
                 continue
 
             # Store first provider for each scope
-            if sub_provider.scope not in scopes:
-                scopes[sub_provider.scope] = sub_provider
+            if sub_provider.scope not in scope_provider:
+                scope_provider[sub_provider.scope] = sub_provider
 
             parameters.append(
                 ProviderParameter(
@@ -394,6 +391,18 @@ class Container:
                     shared_scope=sub_provider.scope == scope and scope != "transient",
                 )
             )
+
+        # Check scope compatibility
+        # Transient scope can use any scoped dependencies
+        if scope != "transient":
+            for sub_provider in scope_provider.values():
+                if sub_provider.scope not in self._scopes.get(scope, []):
+                    raise ValueError(
+                        f"The provider `{name}` with a `{scope}` scope "
+                        f"cannot depend on `{sub_provider}` with a "
+                        f"`{sub_provider.scope}` scope. Please ensure all "
+                        "providers are registered with matching scopes."
+                    )
 
         # Check for unresolved parameters
         if unresolved_parameter:
@@ -407,15 +416,6 @@ class Container:
                     f"that `{unresolved_parameter.name}` is registered before "
                     f"attempting to use it."
                 ) from unresolved_exc
-
-        # Check scope compatibility
-        for sub_provider in scopes.values():
-            if sub_provider.scope not in self._scopes.get(scope, []):
-                raise ValueError(
-                    f"The provider `{name}` with a `{scope}` scope cannot "
-                    f"depend on `{sub_provider}` with a `{sub_provider.scope}` scope. "
-                    "Please ensure all providers are registered with matching scopes."
-                )
 
         is_coroutine = kind == ProviderKind.COROUTINE
         is_generator = kind == ProviderKind.GENERATOR
