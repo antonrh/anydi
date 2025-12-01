@@ -1904,6 +1904,86 @@ class TestContainerCustomScopes:
             async with container.ascoped_context("unknown"):
                 pass
 
+    def test_scoped_context_reentry_same_scope(self, container: Container) -> None:
+        """Test that re-entering the same scoped context reuses existing context."""
+        container.register_scope("task")
+        container.register(UniqueId, scope="task")  # type: ignore[arg-type]
+
+        with container.scoped_context("task") as ctx1:
+            instance1 = container.resolve(UniqueId)
+
+            # Re-enter the same scope
+            with container.scoped_context("task") as ctx2:
+                instance2 = container.resolve(UniqueId)
+
+                # Should be the same context
+                assert ctx1 is ctx2
+                # Should be the same instance
+                assert instance1 is instance2
+
+    async def test_ascoped_context_reentry_same_scope(
+        self, container: Container
+    ) -> None:
+        """Test re-entering same async scoped context reuses existing context."""
+        container.register_scope("task")
+        container.register(UniqueId, scope="task")  # type: ignore[arg-type]
+
+        async with container.ascoped_context("task") as ctx1:
+            instance1 = await container.aresolve(UniqueId)
+
+            # Re-enter the same scope
+            async with container.ascoped_context("task") as ctx2:
+                instance2 = await container.aresolve(UniqueId)
+
+                # Should be the same context
+                assert ctx1 is ctx2
+                # Should be the same instance
+                assert instance1 is instance2
+
+    def test_singleton_context_reentry(self, container: Container) -> None:
+        """Test that re-entering the singleton context works correctly."""
+        container.register(UniqueId, scope="singleton")
+
+        with container:
+            instance1 = container.resolve(UniqueId)
+
+            # Re-enter the singleton context
+            with container:
+                instance2 = container.resolve(UniqueId)
+
+                # Should be the same instance
+                assert instance1 is instance2
+
+    async def test_singleton_context_async_reentry(self, container: Container) -> None:
+        """Test that re-entering the async singleton context works correctly."""
+        container.register(UniqueId, scope="singleton")
+
+        async with container:
+            instance1 = await container.aresolve(UniqueId)
+
+            # Re-enter the singleton context
+            async with container:
+                instance2 = await container.aresolve(UniqueId)
+
+                # Should be the same instance
+                assert instance1 is instance2
+
+    def test_request_context_reentry(self, container: Container) -> None:
+        """Test that re-entering the request context reuses existing context."""
+        container.register(UniqueId, scope="request")
+
+        with container.request_context() as ctx1:
+            instance1 = container.resolve(UniqueId)
+
+            # Re-enter the request context
+            with container.request_context() as ctx2:
+                instance2 = container.resolve(UniqueId)
+
+                # Should be the same context (request_context calls scoped_context)
+                assert ctx1 is ctx2
+                # Should be the same instance
+                assert instance1 is instance2
+
 
 class TestContainerInjector:
     def test_inject_using_inject_marker(self, container: Container) -> None:

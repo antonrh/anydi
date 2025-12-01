@@ -136,9 +136,18 @@ class Container:
     @contextlib.contextmanager
     def scoped_context(self, scope: str) -> Iterator[InstanceContext]:
         """Obtain a context manager for the request-scoped context."""
-        scoped_context_var = self._get_scoped_context_var(scope)
+        context_var = self._get_scoped_context_var(scope)
+
+        # Check if context already exists (re-entering same scope)
+        context = context_var.get(None)
+        if context is not None:
+            # Reuse existing context, don't create a new one
+            yield context
+            return
+
+        # Create new context
         context = InstanceContext()
-        token = scoped_context_var.set(context)
+        token = context_var.set(context)
 
         # Resolve all request resources
         for interface in self._resources.get(scope, []):
@@ -148,14 +157,23 @@ class Container:
 
         with context:
             yield context
-            scoped_context_var.reset(token)
+            context_var.reset(token)
 
     @contextlib.asynccontextmanager
     async def ascoped_context(self, scope: str) -> AsyncIterator[InstanceContext]:
         """Obtain a context manager for the specified scoped context."""
-        scoped_context_var = self._get_scoped_context_var(scope)
+        context_var = self._get_scoped_context_var(scope)
+
+        # Check if context already exists (re-entering same scope)
+        context = context_var.get(None)
+        if context is not None:
+            # Reuse existing context, don't create a new one
+            yield context
+            return
+
+        # Create new context
         context = InstanceContext()
-        token = scoped_context_var.set(context)
+        token = context_var.set(context)
 
         # Resolve all request resources
         for interface in self._resources.get(scope, []):
@@ -165,7 +183,7 @@ class Container:
 
         async with context:
             yield context
-            scoped_context_var.reset(token)
+            context_var.reset(token)
 
     @contextlib.contextmanager
     def request_context(self) -> Iterator[InstanceContext]:
