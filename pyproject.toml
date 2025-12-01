@@ -58,7 +58,7 @@ dev = [
     "starlette>=0.37.2",
     "fastapi>=0.100.0",
     "httpx>=0.26.0",
-    "faststream>=0.5.10,<0.6",
+    "faststream>=0.6,<0.7",
     "redis>=5.0.4,<6",
     "pydantic-settings>=2.4.0,<3",
 ]

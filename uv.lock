@@ -50,7 +50,7 @@ requires-dist = [
 [package.metadata.requires-dev]
 dev = [
     { name = "fastapi", specifier = ">=0.100.0" },
-    { name = "faststream", specifier = ">=0.5.10,<0.6" },
+    { name = "faststream", specifier = ">=0.6,<0.7" },
     { name = "httpx", specifier = ">=0.26.0" },
     { name = "pydantic-settings", specifier = ">=2.4.0,<3" },
     { name = "pyright", specifier = ">=1.1.407" },
@@ -350,15 +350,20 @@ wheels = [
 
 [[package]]
 name = "fast-depends"
-version = "2.4.12"
+version = "3.0.5"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "anyio" },
-    { name = "pydantic" },
+    { name = "typing-extensions" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/85/f5/8b42b7588a67ad78991e5e7ca0e0c6a1ded535a69a725e4e48d3346a20c1/fast_depends-2.4.12.tar.gz", hash = "sha256:9393e6de827f7afa0141e54fa9553b737396aaf06bd0040e159d1f790487b16d", size = 16682, upload-time = "2024-10-16T17:44:35.963Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/07/f3/41e955f5f0811de6ef9f00f8462f2ade7bc4a99b93714c9b134646baa831/fast_depends-3.0.5.tar.gz", hash = "sha256:c915a54d6e0d0f0393686d37c14d54d9ec7c43d7b9def3f3fc4f7b4d52f67f2a", size = 18235, upload-time = "2025-11-30T20:26:12.92Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/1d/08/4adb160d8394053289fdf3b276e93b53271fd463e54fff8911b23c1db4ed/fast_depends-2.4.12-py3-none-any.whl", hash = "sha256:9e5d110ddc962329e46c9b35e5fe65655984247a13ee3ca5a33186db7d2d75c2", size = 17651, upload-time = "2024-10-16T17:44:34.759Z" },
+    { url = "https://files.pythonhosted.org/packages/0a/dd/76697228ae63dcbaf0a0a1b20fc996433a33f184ac4f578382b681dcf5ea/fast_depends-3.0.5-py3-none-any.whl", hash = "sha256:38a3d7044d3d6d0b1bed703691275c870316426e8a9bfa6b1c89e979b15659e2", size = 25362, upload-time = "2025-11-30T20:26:10.96Z" },
+]
+
+[package.optional-dependencies]
+pydantic = [
+    { name = "pydantic" },
 ]
 
 [[package]]
@@ -377,16 +382,16 @@ wheels = [
 
 [[package]]
 name = "faststream"
-version = "0.5.48"
+version = "0.6.3"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "anyio" },
-    { name = "fast-depends" },
+    { name = "fast-depends", extra = ["pydantic"] },
     { name = "typing-extensions" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/9e/05/5edd840d3b5bfa1713985665b11c0ba9e918bc84539a69e8888b8485f48c/faststream-0.5.48.tar.gz", hash = "sha256:b7082552e626afd832410752da5d26714f893148fd9f3d2ce431117b3ba5cdb1", size = 303368, upload-time = "2025-07-21T18:53:29.522Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/4e/d1/ce3d0354be79d8e18fafd2c6cfd32b75521bd4d45ac79be386f1967c7155/faststream-0.6.3.tar.gz", hash = "sha256:f94d9790d61fe02fe9a274ce6dc030a59b4aa662ca8eda1c8505676fa3f79125", size = 299146, upload-time = "2025-11-03T19:59:31.864Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/89/cc/0d558289e944b8708add28e7e532a7bf7ad41639866e7635ab54fe4a7992/faststream-0.5.48-py3-none-any.whl", hash = "sha256:ee48956405019f82847ba5e1ef5a90ad648338d86bcc377eb8938edd1615c928", size = 404492, upload-time = "2025-07-21T18:53:27.727Z" },
+    { url = "https://files.pythonhosted.org/packages/d0/b9/1e18ac5ae26ccf6a9fc726a98e7cf9b917565671f1e721bdcbf8c8550422/faststream-0.6.3-py3-none-any.whl", hash = "sha256:77abe68377210b3f728285ae035682a49178feff3c7b5733731eebe9e2efa710", size = 503396, upload-time = "2025-11-03T19:59:29.907Z" },
 ]
 
 [[package]]
