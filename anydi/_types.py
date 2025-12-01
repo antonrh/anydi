@@ -12,6 +12,7 @@ from typing_extensions import Sentinel
 T = TypeVar("T")
 
 Scope = Literal["transient", "singleton", "request"]
+ScopeOrStr = Scope | str
 
 NOT_SET = Sentinel("NOT_SET")
 

@@ -9,7 +9,7 @@ import logging
 import types
 import uuid
 from collections import defaultdict
-from collections.abc import AsyncIterator, Callable, Iterable, Iterator
+from collections.abc import AsyncIterator, Callable, Iterable, Iterator, Sequence
 from contextvars import ContextVar
 from typing import Any, TypeVar, get_args, get_origin, overload
 
@@ -26,6 +26,7 @@ from ._types import (
     NOT_SET,
     Event,
     Scope,
+    ScopeOrStr,
     is_event_type,
     is_iterator_type,
     is_none_type,
@@ -33,12 +34,6 @@ from ._types import (
 
 T = TypeVar("T", bound=Any)
 P = ParamSpec("P")
-
-ALLOWED_SCOPES: dict[Scope, list[Scope]] = {
-    "singleton": ["singleton"],
-    "request": ["request", "singleton"],
-    "transient": ["transient", "request", "singleton"],
-}
 
 
 class Container:
@@ -53,8 +48,15 @@ class Container:
     ) -> None:
         self._providers: dict[Any, Provider] = {}
         self._logger = logger or logging.getLogger(__name__)
+
+        self._scopes: dict[ScopeOrStr, Sequence[ScopeOrStr]] = {
+            "transient": ("transient", "singleton"),
+            "singleton": ("singleton",),
+        }
+
         self._resources: dict[str, list[Any]] = defaultdict(list)
         self._singleton_context = InstanceContext()
+        self._scoped_context: dict[str, ContextVar[InstanceContext]] = {}
         self._request_context_var: ContextVar[InstanceContext | None] = ContextVar(
             "request_context", default=None
         )
@@ -64,6 +66,9 @@ class Container:
         self._injector = Injector(self)
         self._modules = ModuleRegistrar(self)
         self._scanner = Scanner(self)
+
+        # Register default scopes
+        self.register_scope("request", parents=["singleton"])
 
         # Register providers
         providers = providers or []
@@ -141,54 +146,99 @@ class Container:
         await self._singleton_context.aclose()
 
     @contextlib.contextmanager
-    def request_context(self) -> Iterator[InstanceContext]:
+    def scoped_context(self, scope: ScopeOrStr) -> Iterator[InstanceContext]:
         """Obtain a context manager for the request-scoped context."""
         context = InstanceContext()
-
-        token = self._request_context_var.set(context)
+        scoped_context_var = self._get_scoped_context_var(scope)
+        token = scoped_context_var.set(context)
 
         # Resolve all request resources
-        for interface in self._resources.get("request", []):
+        for interface in self._resources.get(scope, []):
             if not is_event_type(interface):
                 continue
             self.resolve(interface)
 
         with context:
             yield context
-            self._request_context_var.reset(token)
+            scoped_context_var.reset(token)
 
     @contextlib.asynccontextmanager
-    async def arequest_context(self) -> AsyncIterator[InstanceContext]:
-        """Obtain an async context manager for the request-scoped context."""
+    async def ascoped_context(self, scope: str) -> AsyncIterator[InstanceContext]:
+        """Obtain a context manager for the specified scoped context."""
         context = InstanceContext()
+        scoped_context_var = self._get_scoped_context_var(scope)
+        token = scoped_context_var.set(context)
 
-        token = self._request_context_var.set(context)
-
-        for interface in self._resources.get("request", []):
+        # Resolve all request resources
+        for interface in self._resources.get(scope, []):
             if not is_event_type(interface):
                 continue
             await self.aresolve(interface)
 
         async with context:
             yield context
-            self._request_context_var.reset(token)
+            scoped_context_var.reset(token)
 
-    def _get_request_context(self) -> InstanceContext:
-        """Get the current request context."""
-        request_context = self._request_context_var.get()
-        if request_context is None:
+    @contextlib.contextmanager
+    def request_context(self) -> Iterator[InstanceContext]:
+        """Obtain a context manager for the request-scoped context."""
+        with self.scoped_context("request") as context:
+            yield context
+
+    @contextlib.asynccontextmanager
+    async def arequest_context(self) -> AsyncIterator[InstanceContext]:
+        """Obtain an async context manager for the request-scoped context."""
+        async with self.ascoped_context("request") as context:
+            yield context
+
+    def _get_scoped_context(self, scope: str) -> InstanceContext:
+        scoped_context_var = self._get_scoped_context_var(scope)
+        try:
+            scoped_context = scoped_context_var.get()
+        except LookupError as exc:
             raise LookupError(
-                "The request context has not been started. Please ensure that "
-                "the request context is properly initialized before attempting "
+                f"The {scope} context has not been started. Please ensure that "
+                f"the {scope} context is properly initialized before attempting "
                 "to use it."
-            )
-        return request_context
+            ) from exc
+        return scoped_context
+
+    def _get_scoped_context_var(self, scope: str) -> ContextVar[InstanceContext]:
+        """Get the context variable for the specified scope."""
+        if scope not in self._scoped_context:
+            self._scoped_context[scope] = ContextVar(f"{scope}_context")
+        return self._scoped_context[scope]
 
     def _get_instance_context(self, scope: Scope) -> InstanceContext:
         """Get the instance context for the specified scope."""
         if scope == "singleton":
             return self._singleton_context
-        return self._get_request_context()
+        return self._get_scoped_context(scope)
+
+    # == Scopes == #
+
+    def register_scope(
+        self, scope: str, *, parents: Sequence[str] | None = None
+    ) -> None:
+        """Register a new scope with the specified parents."""
+        # Check if the scope is reserved
+        if scope in ("transient", "singleton"):
+            raise ValueError(
+                f"The scope `{scope}` is reserved and cannot be overridden."
+            )
+
+        # Check if the scope is already registered
+        if scope in self._scopes:
+            raise ValueError(f"The scope `{scope}` is already registered.")
+
+        # Validate parents
+        parents = parents or []
+        for parent in parents:
+            if parent not in self._scopes:
+                raise ValueError(f"The parent scope `{parent}` is not registered.")
+
+        # Register the scope
+        self._scopes[scope] = {scope, "singleton"} | set(parents)
 
     # == Provider Registry ==
 
@@ -360,7 +410,7 @@ class Container:
 
         # Check scope compatibility
         for sub_provider in scopes.values():
-            if sub_provider.scope not in ALLOWED_SCOPES.get(scope, []):
+            if sub_provider.scope not in self._scopes.get(scope, []):
                 raise ValueError(
                     f"The provider `{name}` with a `{scope}` scope cannot "
                     f"depend on `{sub_provider}` with a `{sub_provider.scope}` scope. "
@@ -389,13 +439,14 @@ class Container:
         self._set_provider(provider)
         return provider
 
-    @staticmethod
-    def _validate_provider_scope(scope: Scope, name: str, is_resource: bool) -> None:
+    def _validate_provider_scope(
+        self, scope: Scope, name: str, is_resource: bool
+    ) -> None:
         """Validate the provider scope."""
-        if scope not in ALLOWED_SCOPES:
+        if scope not in self._scopes:
             raise ValueError(
                 f"The provider `{name}` scope is invalid. Only the following "
-                f"scopes are supported: {', '.join(ALLOWED_SCOPES)}. "
+                f"scopes are supported: {', '.join(self._scopes.keys())}. "
                 "Please use one of the supported scopes when registering a provider."
             )
         if scope == "transient" and is_resource:
