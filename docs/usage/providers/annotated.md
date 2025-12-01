@@ -133,5 +133,5 @@ cloud = container.resolve(Annotated[StorageBackend, "s3"])
 
 **Related Topics:**
 - [Provider Basics](basics.md) - Learn basic provider registration
-- [Overriding Providers](../../advanced/overriding.md) - Learn how to override providers for testing
+- [Testing](../testing.md) - Learn how to override providers for testing
 - [Dependency Injection](../injection.md) - Learn how to inject named providers
