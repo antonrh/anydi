@@ -151,7 +151,7 @@ class TestContainer:
             TypeError,
             match="The provider `Test` is invalid because it is not a callable object.",
         ):
-            container._register_provider("Test", "singleton")  # type: ignore[arg-type]
+            container._register_provider("Test", "singleton")  # type: ignore
 
     def test_register_provider_iterator_no_arg_not_allowed(
         self, container: Container
@@ -174,7 +174,7 @@ class TestContainer:
                 "Please use one of the supported scopes when registering a provider."
             ),
         ):
-            container._register_provider(generator, "other")  # type: ignore[arg-type]
+            container._register_provider(generator, "other")  # type: ignore
 
     def test_register_provider_transient_resource_not_allowed(
         self, container: Container
@@ -1579,7 +1579,7 @@ class TestContainerCustomScopes:
         instance = "task_value"
 
         container.register_scope("task")
-        container.register(str, lambda: instance, scope="task")  # type: ignore[arg-type]
+        container.register(str, lambda: instance, scope="task")
 
         with container.scoped_context("task"):
             assert container.resolve(str) == instance
@@ -1587,7 +1587,7 @@ class TestContainerCustomScopes:
     def test_resolve_custom_scoped_not_started(self, container: Container) -> None:
         """Test resolving custom scope without context raises error."""
         container.register_scope("task")
-        container.register(str, lambda: "test", scope="task")  # type: ignore[arg-type]
+        container.register(str, lambda: "test", scope="task")
 
         with pytest.raises(
             LookupError,
@@ -1612,7 +1612,7 @@ class TestContainerCustomScopes:
             return f"value: {x}"
 
         container.register(int, singleton_dep, scope="singleton")
-        container.register(str, task_dep, scope="task")  # type: ignore[arg-type]
+        container.register(str, task_dep, scope="task")
 
         with container:
             with container.scoped_context("task"):
@@ -1636,8 +1636,8 @@ class TestContainerCustomScopes:
             return f"result: {y}"
 
         container.register(int, singleton_dep, scope="singleton")
-        container.register(float, task_dep, scope="task")  # type: ignore[arg-type]
-        container.register(str, workflow_dep, scope="workflow")  # type: ignore[arg-type]
+        container.register(float, task_dep, scope="task")
+        container.register(str, workflow_dep, scope="workflow")
 
         with container:
             with container.scoped_context("task"):
@@ -1648,7 +1648,7 @@ class TestContainerCustomScopes:
     def test_resolve_custom_scope_instance_caching(self, container: Container) -> None:
         """Test that instances are cached within custom scope context."""
         container.register_scope("task")
-        container.register(UniqueId, scope="task")  # type: ignore[arg-type]
+        container.register(UniqueId, scope="task")
 
         with container.scoped_context("task"):
             instance1 = container.resolve(UniqueId)
@@ -1658,7 +1658,7 @@ class TestContainerCustomScopes:
     def test_resolve_custom_scope_isolation(self, container: Container) -> None:
         """Test that custom scope instances are isolated across contexts."""
         container.register_scope("task")
-        container.register(UniqueId, scope="task")  # type: ignore[arg-type]
+        container.register(UniqueId, scope="task")
 
         with container.scoped_context("task"):
             instance1 = container.resolve(UniqueId)
@@ -1672,7 +1672,7 @@ class TestContainerCustomScopes:
         """Test resolving custom scope with resource provider."""
         container.register_scope("task")
 
-        @container.provider(scope="task")  # type: ignore[arg-type]
+        @container.provider(scope="task")
         def provide() -> Iterator[str]:
             yield "resource_value"
 
@@ -1687,7 +1687,7 @@ class TestContainerCustomScopes:
         async def async_provider() -> str:
             return "async_value"
 
-        container.register(str, async_provider, scope="task")  # type: ignore[arg-type]
+        container.register(str, async_provider, scope="task")
 
         async with container.ascoped_context("task"):
             result = await container.aresolve(str)
@@ -1699,7 +1699,7 @@ class TestContainerCustomScopes:
         """Test async resolution with custom scope async resource."""
         container.register_scope("task")
 
-        @container.provider(scope="task")  # type: ignore[arg-type]
+        @container.provider(scope="task")
         async def provide() -> AsyncIterator[str]:
             yield "async_resource"
 
@@ -1710,7 +1710,7 @@ class TestContainerCustomScopes:
     def test_resolve_custom_scope_thread_safe(self, container: Container) -> None:
         """Test that custom scope resolution is thread-safe."""
         container.register_scope("task")
-        container.register(UniqueId, scope="task")  # type: ignore[arg-type]
+        container.register(UniqueId, scope="task")
 
         results: list[tuple[UniqueId, UniqueId]] = []
 
@@ -1753,7 +1753,7 @@ class TestContainerCustomScopes:
                 "cannot depend on .* with a `transient` scope"
             ),
         ):
-            container.register(str, task_dep, scope="task")  # type: ignore[arg-type]
+            container.register(str, task_dep, scope="task")
 
     def test_custom_scope_allows_transient_dependencies_from_transient(
         self, container: Container
@@ -1767,7 +1767,7 @@ class TestContainerCustomScopes:
         def transient_dep(x: int) -> str:
             return f"value: {x}"
 
-        container.register(int, task_dep, scope="task")  # type: ignore[arg-type]
+        container.register(int, task_dep, scope="task")
         container.register(str, transient_dep, scope="transient")
 
         with container.scoped_context("task"):
@@ -1778,9 +1778,9 @@ class TestContainerCustomScopes:
         """Test multiple providers registered with custom scope."""
         container.register_scope("task")
 
-        container.register(int, lambda: 10, scope="task")  # type: ignore[arg-type]
-        container.register(str, lambda: "test", scope="task")  # type: ignore[arg-type]
-        container.register(float, lambda: 3.14, scope="task")  # type: ignore[arg-type]
+        container.register(int, lambda: 10, scope="task")
+        container.register(str, lambda: "test", scope="task")
+        container.register(float, lambda: 3.14, scope="task")
 
         with container.scoped_context("task"):
             assert container.resolve(int) == 10
@@ -1790,7 +1790,7 @@ class TestContainerCustomScopes:
     def test_unregister_custom_scoped_provider(self, container: Container) -> None:
         """Test unregistering a provider with custom scope."""
         container.register_scope("task")
-        container.register(str, lambda: "test", scope="task")  # type: ignore[arg-type]
+        container.register(str, lambda: "test", scope="task")
 
         with container.scoped_context("task"):
             container.resolve(str)
