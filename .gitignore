@@ -79,5 +79,5 @@ target/
 # dotenv file
 .env
 
-
-/app
+# Benchmark files
+bench*.py
