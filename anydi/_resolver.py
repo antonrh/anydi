@@ -453,7 +453,7 @@ class Resolver:
                 create_lines.append("        context.enter(inst)")
 
         create_lines.append("    if context is not None and store:")
-        create_lines.append("        context.set(_interface, inst)")
+        create_lines.append("        context._instances[_interface] = inst")
 
         # Wrap instance if in override mode (only for override version)
         if with_override:
@@ -470,18 +470,28 @@ class Resolver:
             resolver_lines.append("def _resolver(container, context=None):")
 
         # Only define NOT_SET_ if we actually need it
-        needs_not_set = scope in ("singleton", "request")
+        needs_not_set = scope != "transient"
         if needs_not_set:
             resolver_lines.append("    NOT_SET_ = _NOT_SET")
 
         if scope == "singleton":
             resolver_lines.append("    if context is None:")
             resolver_lines.append("        context = container._singleton_context")
-        elif scope == "request":
-            resolver_lines.append("    if context is None:")
-            resolver_lines.append("        context = container._get_request_context()")
-        else:
+        elif scope == "transient":
             resolver_lines.append("    context = None")
+        else:
+            # Custom scopes (including "request")
+            # Inline context retrieval to avoid method call overhead
+            resolver_lines.append("    if context is None:")
+            resolver_lines.append("        try:")
+            resolver_lines.append("            context = _scoped_context_var.get()")
+            resolver_lines.append("        except LookupError:")
+            resolver_lines.append(
+                f"            raise LookupError("
+                f"'The {scope} context has not been started. "
+                f"Please ensure that the {scope} context is properly initialized "
+                f"before attempting to use it.')"
+            )
 
         if scope == "singleton":
             if with_override:
@@ -507,23 +517,7 @@ class Resolver:
                 store=True,
                 indent="        ",
             )
-        elif scope == "request":
-            if with_override:
-                self._add_override_check(resolver_lines)
-
-            # Fast path: check cached instance
-            resolver_lines.append("    inst = context.get(_interface)")
-            resolver_lines.append("    if inst is not NOT_SET_:")
-            resolver_lines.append("        return inst")
-
-            self._add_create_call(
-                resolver_lines,
-                is_async=is_async,
-                with_override=with_override,
-                context="context",
-                store=True,
-            )
-        else:
+        elif scope == "transient":
             # Transient scope
             if with_override:
                 self._add_override_check(resolver_lines, include_not_set=True)
@@ -534,6 +528,25 @@ class Resolver:
                 with_override=with_override,
                 context="",
                 store=False,
+            )
+        else:
+            # Custom scopes (including "request")
+            if with_override:
+                self._add_override_check(resolver_lines)
+
+            # Fast path: check cached instance (inline dict access for speed)
+            resolver_lines.append(
+                "    inst = context._instances.get(_interface, NOT_SET_)"
+            )
+            resolver_lines.append("    if inst is not NOT_SET_:")
+            resolver_lines.append("        return inst")
+
+            self._add_create_call(
+                resolver_lines,
+                is_async=is_async,
+                with_override=with_override,
+                context="context",
+                store=True,
             )
 
         create_resolver_lines: list[str] = []
@@ -552,18 +565,26 @@ class Resolver:
 
         if scope == "singleton":
             create_resolver_lines.append("    context = container._singleton_context")
-        elif scope == "request":
-            create_resolver_lines.append(
-                "    context = container._get_request_context()"
-            )
-        else:
+        elif scope == "transient":
             create_resolver_lines.append("    context = None")
+        else:
+            # Custom scopes (including "request")
+            # Inline context retrieval to avoid method call overhead
+            create_resolver_lines.append("    try:")
+            create_resolver_lines.append("        context = _scoped_context_var.get()")
+            create_resolver_lines.append("    except LookupError:")
+            create_resolver_lines.append(
+                f"        raise LookupError("
+                f"'The {scope} context has not been started. "
+                f"Please ensure that the {scope} context is properly initialized "
+                f"before attempting to use it.')"
+            )
 
         if with_override:
             self._add_override_check(create_resolver_lines, include_not_set=True)
 
         # Determine context for create call
-        context_arg = "context" if scope in ("singleton", "request") else ""
+        context_arg = "context" if scope != "transient" else ""
 
         self._add_create_call(
             create_resolver_lines,
@@ -602,6 +623,12 @@ class Resolver:
             "_compile": self._compile_resolver,
             "resolver": self,
         }
+
+        # For custom scopes, cache the ContextVar to avoid dictionary lookups
+        if scope not in ("singleton", "transient"):
+            ns["_scoped_context_var"] = self._container._get_scoped_context_var(  # type: ignore[reportPrivateUsage]
+                scope
+            )
 
         # Add async-specific namespace entries
         if is_async:

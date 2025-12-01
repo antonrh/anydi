@@ -11,8 +11,8 @@ from fastapi.dependencies.models import Dependant
 from fastapi.routing import APIRoute
 from starlette.requests import Request
 
-from anydi import Container
-from anydi._types import Inject, ProvideMarker, set_provide_factory
+from anydi import Container, Inject
+from anydi._types import ProvideMarker, set_provide_factory
 
 from .starlette.middleware import RequestScopedMiddleware
 
