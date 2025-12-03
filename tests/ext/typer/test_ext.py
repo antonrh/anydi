@@ -3,15 +3,8 @@ from typing import Any
 import pytest
 import typer
 
-from anydi import Container, Inject
+from anydi import Container, Inject, Provide, singleton
 from anydi.ext.typer import install
-
-
-def test_inject_param_missing_interface() -> None:
-    param = Inject()
-
-    with pytest.raises(TypeError, match="Interface is not set."):
-        _ = param.interface
 
 
 def test_install_without_annotation() -> None:
@@ -50,3 +43,19 @@ def test_install_unknown_annotation() -> None:
         ),
     ):
         install(app, container)
+
+
+def test_install_auto_provided() -> None:
+    container = Container()
+
+    @singleton
+    class GreetingService:
+        pass
+
+    app = typer.Typer()
+
+    @app.command()
+    def say_hello(message: Provide[GreetingService]) -> Any:
+        typer.echo(message)
+
+    install(app, container)
