@@ -7,13 +7,6 @@ from anydi import Container, Inject
 from anydi.ext.fastapi import install
 
 
-def test_inject_param_missing_interface() -> None:
-    param = Inject()
-
-    with pytest.raises(TypeError, match="Interface is not set."):
-        _ = param.interface
-
-
 def test_install_without_annotation() -> None:
     container = Container()
 

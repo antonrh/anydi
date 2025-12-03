@@ -15,6 +15,8 @@ from anydi import Container, Scope
 
 __all__ = ["install"]
 
+from anydi._decorators import is_provided
+
 
 def _wrap_async_callback_no_injection(callback: Callable[..., Any]) -> Any:
     """Wrap async callback without injection in anyio.run()."""
@@ -60,7 +62,7 @@ def _wrap_async_callback_with_injection(
     return async_wrapper
 
 
-def _process_callback(callback: Callable[..., Any], container: Container) -> Any:
+def _process_callback(callback: Callable[..., Any], container: Container) -> Any:  # noqa: C901
     """Validate and wrap a callback for dependency injection."""
     sig = inspect.signature(callback, eval_str=True)
     injected_param_names: set[str] = set()
@@ -74,7 +76,11 @@ def _process_callback(callback: Callable[..., Any], container: Container) -> Any
         )
         if should_inject:
             injected_param_names.add(parameter.name)
-            scopes.add(container.providers[interface].scope)
+            try:
+                scopes.add(container.providers[interface].scope)
+            except KeyError:
+                if inspect.isclass(interface) and is_provided(interface):
+                    scopes.add(interface.__provided__["scope"])
         else:
             non_injected_params.add(parameter)
 
