@@ -82,5 +82,30 @@ def sub_hello(greeting_msg: str = Inject()) -> None:
 app.add_typer(sub_app, name="sub")
 
 
+# Async commands
+@app.command()
+async def async_hello(greeting_msg: str = Inject()) -> None:
+    """Simple async command with dependency injection."""
+    typer.echo(f"{greeting_msg}, async stranger!")
+
+
+@app.command()
+async def async_greet(
+    greeting_msg: str = Inject(),
+    name_value: Annotated[str, "name"] = Inject(),
+) -> None:
+    """Async command with multiple injected dependencies."""
+    typer.echo(f"{greeting_msg}, async {name_value}!")
+
+
+@app.command()
+async def async_greet_with_provide(
+    greeting_msg: Provide[str],
+    name_value: Provide[Annotated[str, "name"]],
+) -> None:
+    """Async command using Provide[] syntax."""
+    typer.echo(f"{greeting_msg}, async provide {name_value}!")
+
+
 # Install anydi
 install(app, container)

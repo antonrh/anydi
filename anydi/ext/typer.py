@@ -4,8 +4,10 @@ from __future__ import annotations
 
 import functools
 import inspect
+from collections.abc import Awaitable, Callable
 from typing import Any
 
+import anyio
 from typer import Typer
 
 from anydi import Container
@@ -13,11 +15,39 @@ from anydi import Container
 __all__ = ["install"]
 
 
-def _process_callback(callback: Any, container: Container) -> Any:
-    """Validate and wrap a callback for dependency injection."""
-    if not callable(callback):
-        return callback
+def _wrap_async_callback_no_injection(callback: Callable[..., Any]) -> Any:
+    """Wrap async callback without injection in anyio.run()."""
 
+    @functools.wraps(callback)
+    def async_no_injection_wrapper(*args: Any, **kwargs: Any) -> Any:
+        return anyio.run(callback, *args, **kwargs)
+
+    return async_no_injection_wrapper
+
+
+def _wrap_async_callback_with_injection(
+    callback: Callable[..., Awaitable[Any]],
+    container: Container,
+    sig: inspect.Signature,
+    non_injected_params: set[inspect.Parameter],
+) -> Any:
+    """Wrap async callback with injection in anyio.run()."""
+
+    @functools.wraps(callback)
+    def async_wrapper(*args: Any, **kwargs: Any) -> Any:
+        async def _run() -> Any:
+            return await container.run(callback, *args, **kwargs)
+
+        return anyio.run(_run)
+
+    # Update the wrapper's signature to only show non-injected parameters to Typer
+    async_wrapper.__signature__ = sig.replace(parameters=non_injected_params)  # type: ignore
+
+    return async_wrapper
+
+
+def _process_callback(callback: Callable[..., Any], container: Container) -> Any:
+    """Validate and wrap a callback for dependency injection."""
     sig = inspect.signature(callback, eval_str=True)
     injected_param_names: set[str] = set()
     non_injected_params: set[inspect.Parameter] = set()
@@ -32,9 +62,19 @@ def _process_callback(callback: Any, container: Container) -> Any:
         else:
             non_injected_params.add(parameter)
 
-    # If no parameters need injection, return the original callback
-    if not injected_param_names:
+    # If no parameters need injection and callback is not async, return original
+    if not injected_param_names and not inspect.iscoroutinefunction(callback):
         return callback
+
+    # If async callback with no injection, just wrap in anyio.run()
+    if not injected_param_names and inspect.iscoroutinefunction(callback):
+        return _wrap_async_callback_no_injection(callback)
+
+    # Handle async callbacks - wrap them in anyio.run() for Typer
+    if inspect.iscoroutinefunction(callback):
+        return _wrap_async_callback_with_injection(
+            callback, container, sig, non_injected_params
+        )
 
     @functools.wraps(callback)
     def wrapper(*args: Any, **kwargs: Any) -> Any:
