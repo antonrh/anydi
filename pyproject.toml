@@ -61,6 +61,7 @@ dev = [
     "faststream>=0.6,<0.7",
     "redis>=5.0.4,<6",
     "pydantic-settings>=2.4.0,<3",
+    "typer>=0.20.0",
 ]
 docs = [
     "mkdocs>=1.4.2,<2",
