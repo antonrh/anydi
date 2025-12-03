@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import contextlib
 import functools
 import inspect
 from collections.abc import Awaitable, Callable
@@ -10,7 +11,7 @@ from typing import Any
 import anyio
 from typer import Typer
 
-from anydi import Container
+from anydi import Container, Scope
 
 __all__ = ["install"]
 
@@ -30,13 +31,26 @@ def _wrap_async_callback_with_injection(
     container: Container,
     sig: inspect.Signature,
     non_injected_params: set[inspect.Parameter],
+    scopes: set[Scope],
 ) -> Any:
     """Wrap async callback with injection in anyio.run()."""
 
     @functools.wraps(callback)
     def async_wrapper(*args: Any, **kwargs: Any) -> Any:
         async def _run() -> Any:
-            return await container.run(callback, *args, **kwargs)
+            ordered_scopes = container.get_ordered_scopes(scopes)
+
+            async with contextlib.AsyncExitStack() as stack:
+                # Start scoped contexts in dependency order
+                for scope in ordered_scopes:
+                    if scope == "singleton":
+                        await stack.enter_async_context(container)
+                    else:
+                        await stack.enter_async_context(
+                            container.ascoped_context(scope)
+                        )
+
+                return await container.run(callback, *args, **kwargs)
 
         return anyio.run(_run)
 
@@ -51,14 +65,16 @@ def _process_callback(callback: Callable[..., Any], container: Container) -> Any
     sig = inspect.signature(callback, eval_str=True)
     injected_param_names: set[str] = set()
     non_injected_params: set[inspect.Parameter] = set()
+    scopes: set[Scope] = set()
 
     # Validate parameters and collect which ones need injection
     for parameter in sig.parameters.values():
-        _, should_inject = container.validate_injected_parameter(
+        interface, should_inject = container.validate_injected_parameter(
             parameter, call=callback
         )
         if should_inject:
             injected_param_names.add(parameter.name)
+            scopes.add(container.providers[interface].scope)
         else:
             non_injected_params.add(parameter)
 
@@ -73,12 +89,22 @@ def _process_callback(callback: Callable[..., Any], container: Container) -> Any
     # Handle async callbacks - wrap them in anyio.run() for Typer
     if inspect.iscoroutinefunction(callback):
         return _wrap_async_callback_with_injection(
-            callback, container, sig, non_injected_params
+            callback, container, sig, non_injected_params, scopes
         )
 
     @functools.wraps(callback)
     def wrapper(*args: Any, **kwargs: Any) -> Any:
-        return container.run(callback, *args, **kwargs)
+        ordered_scopes = container.get_ordered_scopes(scopes)
+
+        with contextlib.ExitStack() as stack:
+            # Start scoped contexts in dependency order
+            for scope in ordered_scopes:
+                if scope == "singleton":
+                    stack.enter_context(container)
+                else:
+                    stack.enter_context(container.scoped_context(scope))
+
+            return container.run(callback, *args, **kwargs)
 
     # Update the wrapper's signature to only show non-injected parameters to Typer
     wrapper.__signature__ = sig.replace(parameters=non_injected_params)  # type: ignore

@@ -251,6 +251,74 @@ python app.py user create Alice
 python app.py user delete 123
 ```
 
+## Automatic Scope Context Management
+
+The Typer extension automatically manages scope contexts for your commands. When you use dependencies with different scopes (singleton, request, or custom), the appropriate contexts are automatically started and cleaned up.
+
+```python
+from typing import Annotated
+from collections.abc import Iterator
+
+import anydi.ext.typer
+import typer
+
+from anydi import Container, Provide
+
+
+class DatabaseConnection:
+    def __init__(self) -> None:
+        print("Database connected")
+
+    def close(self) -> None:
+        print("Database disconnected")
+
+
+container = Container()
+container.register_scope("batch")
+
+
+# Singleton with lifecycle management
+@container.provider(scope="singleton")
+def db_connection() -> Iterator[DatabaseConnection]:
+    conn = DatabaseConnection()
+    yield conn
+    conn.close()
+
+
+# Request-scoped (fresh per invocation)
+@container.provider(scope="request")
+def request_id() -> int:
+    return 1
+
+
+# Custom scope
+@container.provider(scope="batch")
+def batch_id() -> Annotated[str, "batch"]:
+    return "batch-1"
+
+
+app = typer.Typer()
+
+
+@app.command()
+def process(
+    db: Provide[DatabaseConnection],
+    req: Provide[int],
+    batch: Provide[Annotated[str, "batch"]],
+) -> None:
+    """Command with mixed scopes."""
+    typer.echo(f"Request: {req}, Batch: {batch}")
+
+
+anydi.ext.typer.install(app, container)
+```
+
+When you run this command:
+- The singleton container context is started (database connection is created)
+- The request and batch scope contexts are started
+- Your command executes with all dependencies
+- All contexts are properly cleaned up (database connection is closed)
+
 ## Testing
 
 Testing Typer commands with `AnyDI` is straightforward using the `CliRunner` and container overrides:
