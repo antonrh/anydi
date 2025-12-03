@@ -36,6 +36,7 @@ nav:
   - Extensions:
     - FastAPI: extensions/fastapi.md
     - FastStream: extensions/faststream.md
+    - Typer: extensions/typer.md
     - Pydantic Settings: extensions/pydantic_settings.md
     - Django: extensions/django.md
   - Examples:

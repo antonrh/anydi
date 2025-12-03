@@ -245,6 +245,7 @@ Ready to learn more? Check out these resources:
 - [FastAPI](https://anydi.readthedocs.io/en/latest/extensions/fastapi/) - Build modern APIs with automatic dependency injection
 - [Django](https://anydi.readthedocs.io/en/latest/extensions/django/) - Integrate with Django and Django Ninja
 - [FastStream](https://anydi.readthedocs.io/en/latest/extensions/faststream/) - Message broker applications
+- [Typer](https://anydi.readthedocs.io/en/latest/extensions/typer/) - CLI applications with async support
 - [Pydantic Settings](https://anydi.readthedocs.io/en/latest/extensions/pydantic_settings/) - Configuration management
 
 **Full Documentation:**
