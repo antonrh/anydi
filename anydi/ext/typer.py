@@ -11,11 +11,9 @@ from typing import Any
 import anyio
 from typer import Typer
 
-from anydi import Container, Scope
+from anydi import Container
 
 __all__ = ["install"]
-
-from anydi._decorators import is_provided
 
 
 def _wrap_async_callback_no_injection(callback: Callable[..., Any]) -> Any:
@@ -33,19 +31,18 @@ def _wrap_async_callback_with_injection(
     container: Container,
     sig: inspect.Signature,
     non_injected_params: set[inspect.Parameter],
-    scopes: set[Scope],
 ) -> Any:
     """Wrap async callback with injection in anyio.run()."""
 
     @functools.wraps(callback)
     def async_wrapper(*args: Any, **kwargs: Any) -> Any:
         async def _run() -> Any:
-            ordered_scopes = container.get_ordered_scopes(scopes)
-
             async with contextlib.AsyncExitStack() as stack:
                 # Start scoped contexts in dependency order
-                for scope in ordered_scopes:
-                    if scope == "singleton":
+                for scope in container.ordered_scopes:
+                    if scope == "transient":
+                        continue
+                    elif scope == "singleton":
                         await stack.enter_async_context(container)
                     else:
                         await stack.enter_async_context(
@@ -67,7 +64,6 @@ def _process_callback(callback: Callable[..., Any], container: Container) -> Any
     sig = inspect.signature(callback, eval_str=True)
     injected_param_names: set[str] = set()
     non_injected_params: set[inspect.Parameter] = set()
-    scopes: set[Scope] = set()
 
     # Validate parameters and collect which ones need injection
     for parameter in sig.parameters.values():
@@ -76,11 +72,6 @@ def _process_callback(callback: Callable[..., Any], container: Container) -> Any
         )
         if should_inject:
             injected_param_names.add(parameter.name)
-            try:
-                scopes.add(container.providers[interface].scope)
-            except KeyError:
-                if inspect.isclass(interface) and is_provided(interface):
-                    scopes.add(interface.__provided__["scope"])
         else:
             non_injected_params.add(parameter)
 
@@ -95,17 +86,17 @@ def _process_callback(callback: Callable[..., Any], container: Container) -> Any
     # Handle async callbacks - wrap them in anyio.run() for Typer
     if inspect.iscoroutinefunction(callback):
         return _wrap_async_callback_with_injection(
-            callback, container, sig, non_injected_params, scopes
+            callback, container, sig, non_injected_params
         )
 
     @functools.wraps(callback)
     def wrapper(*args: Any, **kwargs: Any) -> Any:
-        ordered_scopes = container.get_ordered_scopes(scopes)
-
         with contextlib.ExitStack() as stack:
             # Start scoped contexts in dependency order
-            for scope in ordered_scopes:
-                if scope == "singleton":
+            for scope in container.ordered_scopes:
+                if scope == "transient":
+                    continue
+                elif scope == "singleton":
                     stack.enter_context(container)
                 else:
                     stack.enter_context(container.scoped_context(scope))

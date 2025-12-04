@@ -257,31 +257,33 @@ class Container:
         # Register the scope
         self._scopes[scope] = tuple({scope, "singleton"} | set(parents))
 
-    def get_ordered_scopes(self, scopes: set[Scope]) -> list[str]:
-        """Get ordered list of scopes to enter."""
-        # Expand scopes to include all parent scopes
-        expanded_scopes: set[str] = set()
-        for scope in scopes:
-            if scope == "transient":
-                continue
-            elif scope == "singleton":
-                expanded_scopes.add("singleton")
-            else:
-                # Add the scope and all its parents from container._scopes
-                expanded_scopes.update(self._scopes[scope])
+    @property
+    def ordered_scopes(self) -> list[str]:
+        """Get all scopes in execution order."""
+        # Start with singleton
+        ordered = ["singleton"]
 
-        # Separate singleton from other scopes
-        has_singleton = "singleton" in expanded_scopes
-        other_scopes = expanded_scopes - {"singleton"}
+        # Add request if registered
+        if "request" in self._scopes:
+            ordered.append("request")
 
-        # Sort other scopes by dependency depth (parents before children)
+        # Get all custom scopes (excluding singleton, request, and transient)
+        custom_scopes = [
+            scope
+            for scope in self._scopes
+            if scope not in ("singleton", "request", "transient")
+        ]
+
+        # Sort custom scopes by dependency depth (parents before children)
         # Scopes with fewer parents come first
-        ordered_scopes = sorted(
-            other_scopes, key=lambda scope: len(self._scopes[scope])
-        )
+        custom_scopes.sort(key=lambda scope: len(self._scopes[scope]))
 
-        # Return with singleton first if needed
-        return ["singleton", *ordered_scopes] if has_singleton else ordered_scopes
+        ordered.extend(custom_scopes)
+
+        # Add transient at the end (no dependencies, no context)
+        ordered.append("transient")
+
+        return ordered
 
     # == Provider Registry ==
 
