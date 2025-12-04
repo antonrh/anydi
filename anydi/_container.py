@@ -58,6 +58,13 @@ class Container:
         # Register default scopes
         self.register_scope("request")
 
+        # Register self as provider
+        self._register_provider(
+            lambda: self,
+            "singleton",
+            Container,
+        )
+
         # Register providers
         providers = providers or []
         for provider in providers:

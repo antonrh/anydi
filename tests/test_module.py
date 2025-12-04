@@ -60,11 +60,17 @@ class TestContainerModuleRegistrator:
 
         container.register_module(OrderedModule)
 
-        assert list(container.providers.keys()) == [
+        expected_providers = [
             Annotated[str, "dep3"],
             Annotated[str, "dep1"],
             Annotated[str, "dep2"],
         ]
+
+        assert set(expected_providers).issubset(container.providers.keys())
+
+        filtered = [k for k in container.providers.keys() if k in expected_providers]
+
+        assert filtered == expected_providers
 
     def test_register_module_invalid_path(self, container: Container) -> None:
         with pytest.raises(

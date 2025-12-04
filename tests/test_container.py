@@ -80,6 +80,16 @@ class TestContainer:
         assert provider.is_async_generator
         assert provider.interface is str
 
+    def test_container_available_as_dependency(self, container: Container) -> None:
+        assert container.has_provider_for(Container)
+        assert container.resolve(Container) is container
+
+        @container.inject
+        def dependent(current: Container = Inject()) -> Container:
+            return current
+
+        assert dependent() is container
+
     def test_register_provider_is_coro(self, container: Container) -> None:
         provider = container._register_provider(coro, "singleton")
 
