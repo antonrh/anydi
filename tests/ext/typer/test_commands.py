@@ -492,3 +492,58 @@ def test_nested_scopes_auto_context() -> None:
     # Verify both scopes created instances
     assert len(request_created) == 1
     assert len(tenant_created) == 1
+
+
+def test_resource_provider_runs_without_injection() -> None:
+    """Test that resource providers run even when not directly injected."""
+    from collections.abc import Iterator
+
+    container = Container()
+
+    # Track session lifecycle
+    session_started = []
+    session_ended = []
+
+    class Database:
+        def start_session(self) -> None:
+            session_started.append(True)
+
+        def end_session(self) -> None:
+            session_ended.append(True)
+
+        def execute(self, query: str) -> str:
+            return f"Executed: {query}"
+
+    @container.provider(scope="singleton")
+    def database() -> Database:
+        return Database()
+
+    # Request-scoped resource that manages session lifecycle
+    @container.provider(scope="request")
+    def session_manager(db: Database) -> Iterator[None]:
+        """Session manager - runs automatically even if not injected!"""
+        db.start_session()
+        yield
+        db.end_session()
+
+    app = typer.Typer()
+
+    @app.command()
+    def query(db: Provide[Database]) -> None:
+        """Command that only injects Database, not session_manager."""
+        result = db.execute("SELECT * FROM users")
+        typer.echo(result)
+
+    import anydi.ext.typer
+
+    anydi.ext.typer.install(app, container)
+
+    runner = CliRunner()
+
+    result = runner.invoke(app, [])
+    assert result.exit_code == 0
+    assert "Executed: SELECT * FROM users" in result.stdout
+
+    # Verify session lifecycle ran even though session_manager wasn't injected
+    assert len(session_started) == 1, "Session should have started"
+    assert len(session_ended) == 1, "Session should have ended"

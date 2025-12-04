@@ -44,6 +44,7 @@ class Container:
             "transient": ("transient", "singleton"),
             "singleton": ("singleton",),
         }
+        self._scope_execution_order: tuple[str, ...] | None = None
 
         self._resources: dict[str, list[Any]] = defaultdict(list)
         self._singleton_context = InstanceContext()
@@ -232,6 +233,26 @@ class Container:
             return self._singleton_context
         return self._get_scoped_context(scope)
 
+    def _get_scope_execution_order(self) -> tuple[str, ...]:
+        """Return the cached scope execution order (without transient)."""
+        if self._scope_execution_order is None:
+            ordered = ["singleton"]
+
+            if "request" in self._scopes:
+                ordered.append("request")
+
+            custom_scopes = [
+                scope
+                for scope in self._scopes
+                if scope not in ("singleton", "request", "transient")
+            ]
+            custom_scopes.sort(key=lambda scope: len(self._scopes[scope]))
+
+            ordered.extend(custom_scopes)
+            self._scope_execution_order = tuple(ordered)
+
+        return self._scope_execution_order
+
     # == Scopes == #
 
     def register_scope(
@@ -256,34 +277,56 @@ class Container:
 
         # Register the scope
         self._scopes[scope] = tuple({scope, "singleton"} | set(parents))
+        self._scope_execution_order = None
 
-    @property
-    def ordered_scopes(self) -> list[str]:
-        """Get all scopes in execution order."""
-        # Start with singleton
+    def get_execution_scopes(self, scopes: set[Scope] | None = None) -> list[str]:
+        """Get scopes for execution.
+
+        Args:
+            scopes: Optional set of scopes used by injected dependencies.
+                   If None, returns all registered scopes in execution order.
+                   If provided, returns only needed scopes (injected OR with
+                   resource providers) in execution order.
+
+        Returns:
+            List of scopes in execution order.
+        """
+        # Build execution order: singleton -> request -> custom (by depth)
         ordered = ["singleton"]
 
-        # Add request if registered
         if "request" in self._scopes:
             ordered.append("request")
 
-        # Get all custom scopes (excluding singleton, request, and transient)
+        # Add custom scopes sorted by dependency depth (parents before children)
         custom_scopes = [
-            scope
-            for scope in self._scopes
-            if scope not in ("singleton", "request", "transient")
+            s for s in self._scopes if s not in ("singleton", "request", "transient")
         ]
-
-        # Sort custom scopes by dependency depth (parents before children)
-        # Scopes with fewer parents come first
-        custom_scopes.sort(key=lambda scope: len(self._scopes[scope]))
-
+        custom_scopes.sort(key=lambda s: len(self._scopes[s]))
         ordered.extend(custom_scopes)
 
-        # Add transient at the end (no dependencies, no context)
-        ordered.append("transient")
+        # If no filter, return all scopes (including transient for introspection)
+        if scopes is None:
+            return ordered + ["transient"]
 
-        return ordered
+        # Helper to add scope with its parents to needed set
+        def add_scope_tree(needed: set[str], scope: str) -> None:
+            if scope == "singleton":
+                needed.add("singleton")
+            elif scope != "transient":
+                needed.update(self._scopes[scope])
+
+        needed_scopes: set[str] = set()
+
+        # Add injected scopes and their parents
+        for scope in scopes:
+            add_scope_tree(needed_scopes, scope)
+
+        # Add scopes with resource providers and their parents
+        for scope in ordered:
+            if self._resources.get(scope):
+                add_scope_tree(needed_scopes, scope)
+
+        return [s for s in ordered if s in needed_scopes]
 
     # == Provider Registry ==
 

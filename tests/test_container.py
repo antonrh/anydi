@@ -1984,20 +1984,22 @@ class TestContainerCustomScopes:
                 # Should be the same instance
                 assert instance1 is instance2
 
-    def test_ordered_scopes_default(self, container: Container) -> None:
-        """Test ordered_scopes property with default scopes."""
+    def test_get_execution_scopes_default(self, container: Container) -> None:
+        """Test get_execution_scopes with default scopes."""
         # Default: singleton, request, and transient
-        ordered = container.ordered_scopes
+        ordered = container.get_execution_scopes()
 
         assert ordered == ["singleton", "request", "transient"]
 
-    def test_ordered_scopes_with_custom_scopes(self, container: Container) -> None:
-        """Test ordered_scopes property with custom scopes."""
+    def test_get_execution_scopes_with_custom_scopes(
+        self, container: Container
+    ) -> None:
+        """Test get_execution_scopes with custom scopes."""
         # Register custom scopes
         container.register_scope("batch")
         container.register_scope("session")
 
-        ordered = container.ordered_scopes
+        ordered = container.get_execution_scopes()
 
         # Should have singleton, request, custom scopes, then transient
         assert ordered[0] == "singleton"
@@ -2008,13 +2010,15 @@ class TestContainerCustomScopes:
         # transient should be last
         assert ordered[-1] == "transient"
 
-    def test_ordered_scopes_with_nested_scopes(self, container: Container) -> None:
-        """Test ordered_scopes property with nested scope hierarchies."""
+    def test_get_execution_scopes_with_nested_scopes(
+        self, container: Container
+    ) -> None:
+        """Test get_execution_scopes with nested scope hierarchies."""
         # Register nested scopes: tenant -> request
         container.register_scope("tenant", parents=["request"])
         container.register_scope("organization", parents=["tenant"])
 
-        ordered = container.ordered_scopes
+        ordered = container.get_execution_scopes()
 
         # Should be: singleton, request, tenant, organization, transient
         assert ordered == [
@@ -2025,16 +2029,16 @@ class TestContainerCustomScopes:
             "transient",
         ]
 
-    def test_ordered_scopes_respects_dependency_order(
+    def test_get_execution_scopes_respects_dependency_order(
         self, container: Container
     ) -> None:
-        """Test that ordered_scopes respects dependency order."""
+        """Test that get_execution_scopes respects dependency order."""
         # Create a complex hierarchy
         container.register_scope("level1")
         container.register_scope("level2", parents=["level1"])
         container.register_scope("level3", parents=["level2"])
 
-        ordered = container.ordered_scopes
+        ordered = container.get_execution_scopes()
 
         # Should be ordered by depth: singleton, request, custom by depth, transient
         assert ordered[0] == "singleton"
