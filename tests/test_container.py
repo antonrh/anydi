@@ -1984,71 +1984,61 @@ class TestContainerCustomScopes:
                 # Should be the same instance
                 assert instance1 is instance2
 
-    def test_get_execution_scopes_default(self, container: Container) -> None:
-        """Test get_execution_scopes with default scopes."""
-        # Default: singleton, request, and transient
-        ordered = container.get_execution_scopes()
+    def test_get_context_scopes_default(self, container: Container) -> None:
+        """Test get_context_scopes with default scopes."""
+        # Default context scopes: singleton and request
+        ordered = container.get_context_scopes()
 
-        assert ordered == ["singleton", "request", "transient"]
+        assert ordered == ["singleton", "request"]
 
-    def test_get_execution_scopes_with_custom_scopes(
-        self, container: Container
-    ) -> None:
-        """Test get_execution_scopes with custom scopes."""
+    def test_get_context_scopes_with_custom_scopes(self, container: Container) -> None:
+        """Test get_context_scopes with custom scopes."""
         # Register custom scopes
         container.register_scope("batch")
         container.register_scope("session")
 
-        ordered = container.get_execution_scopes()
+        ordered = container.get_context_scopes()
 
-        # Should have singleton, request, custom scopes, then transient
+        # Should have singleton, request, then custom scopes
         assert ordered[0] == "singleton"
         assert ordered[1] == "request"
-        # batch and session should be after request, before transient
+        # batch and session should be after request
         assert "batch" in ordered
         assert "session" in ordered
-        # transient should be last
-        assert ordered[-1] == "transient"
 
-    def test_get_execution_scopes_with_nested_scopes(
-        self, container: Container
-    ) -> None:
-        """Test get_execution_scopes with nested scope hierarchies."""
+    def test_get_context_scopes_with_nested_scopes(self, container: Container) -> None:
+        """Test get_context_scopes with nested scope hierarchies."""
         # Register nested scopes: tenant -> request
         container.register_scope("tenant", parents=["request"])
         container.register_scope("organization", parents=["tenant"])
 
-        ordered = container.get_execution_scopes()
+        ordered = container.get_context_scopes()
 
-        # Should be: singleton, request, tenant, organization, transient
+        # Should be: singleton, request, tenant, organization
         assert ordered == [
             "singleton",
             "request",
             "tenant",
             "organization",
-            "transient",
         ]
 
-    def test_get_execution_scopes_respects_dependency_order(
+    def test_get_context_scopes_respects_dependency_order(
         self, container: Container
     ) -> None:
-        """Test that get_execution_scopes respects dependency order."""
+        """Test that get_context_scopes respects dependency order."""
         # Create a complex hierarchy
         container.register_scope("level1")
         container.register_scope("level2", parents=["level1"])
         container.register_scope("level3", parents=["level2"])
 
-        ordered = container.get_execution_scopes()
+        ordered = container.get_context_scopes()
 
-        # Should be ordered by depth: singleton, request, custom by depth, transient
+        # Should be ordered by depth: singleton, request, custom by depth
         assert ordered[0] == "singleton"
         assert ordered[1] == "request"
-        assert ordered[-1] == "transient"
         # level1 has 2 items (itself + singleton), level2 has 3, level3 has 4
         assert ordered.index("level1") < ordered.index("level2")
         assert ordered.index("level2") < ordered.index("level3")
-        # All custom scopes should be before transient
-        assert ordered.index("level3") < ordered.index("transient")
 
 
 class TestContainerInjector:

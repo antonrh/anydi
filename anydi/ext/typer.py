@@ -40,7 +40,7 @@ def _wrap_async_callback_with_injection(
     def async_wrapper(*args: Any, **kwargs: Any) -> Any:
         async def _run() -> Any:
             # Get scopes for execution (injected OR have resources)
-            needed_scopes = container.get_execution_scopes(scopes)
+            needed_scopes = container.get_context_scopes(scopes)
 
             async with contextlib.AsyncExitStack() as stack:
                 # Start scoped contexts in dependency order
@@ -101,7 +101,7 @@ def _process_callback(callback: Callable[..., Any], container: Container) -> Any
     @functools.wraps(callback)
     def wrapper(*args: Any, **kwargs: Any) -> Any:
         # Get scopes for execution (injected OR have resources)
-        needed_scopes = container.get_execution_scopes(scopes)
+        needed_scopes = container.get_context_scopes(scopes)
 
         with contextlib.ExitStack() as stack:
             # Start scoped contexts in dependency order
