@@ -40,6 +40,12 @@ _email_results: list[tuple[str, str]] = []
 
 @pytest.fixture(scope="session")
 def broker() -> RedisBroker:
+    # Ensure FastStream's provide factory is set for this test
+    from anydi._types import set_provide_factory
+    from anydi.ext.faststream import _ProvideMarker
+
+    set_provide_factory(_ProvideMarker)
+
     broker = RedisBroker(middlewares=(RequestScopedMiddleware,))
 
     # Subscriber with Inject() marker

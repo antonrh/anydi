@@ -264,6 +264,10 @@ class Container:
         # Register the scope
         self._scopes[scope] = tuple({scope, "singleton"} | set(parents))
 
+    def has_scope(self, scope: str) -> bool:
+        """Check if a scope is registered."""
+        return scope in self._scopes
+
     def get_context_scopes(self, scopes: set[Scope] | None = None) -> list[str]:  # noqa: C901
         """Return scopes that require context management in dependency order."""
         # Build execution order: singleton -> request -> custom (by depth)

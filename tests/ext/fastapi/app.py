@@ -1,11 +1,12 @@
 from typing import Annotated, Any
 
-from fastapi import Body, Depends, FastAPI
+from fastapi import Body, Depends, FastAPI, WebSocket
 from starlette.middleware import Middleware
 
 import anydi.ext.fastapi
 from anydi import Container, Inject, Provide
 from anydi.ext.starlette.middleware import RequestScopedMiddleware
+from anydi.ext.starlette.websocket_middleware import WebSocketScopedMiddleware
 
 from tests.ext.fixtures import Mail, MailService, User, UserService
 
@@ -46,7 +47,12 @@ async def get_user(user_service: UserService = Inject()) -> User:
     return await user_service.get_user()
 
 
-app = FastAPI(middleware=[Middleware(RequestScopedMiddleware, container=container)])
+app = FastAPI(
+    middleware=[
+        Middleware(RequestScopedMiddleware, container=container),
+        Middleware(WebSocketScopedMiddleware, container=container),
+    ]
+)
 
 
 @app.post("/send-mail", response_model=Mail)
@@ -89,6 +95,25 @@ def annotated_mixed(
         message1_a_b,
         message2,
     ]
+
+
+@app.websocket("/ws/echo")
+async def websocket_echo(
+    websocket: WebSocket,
+    user_service: UserService = Inject(),
+) -> None:
+    """WebSocket endpoint that echoes messages using injected service."""
+    await websocket.accept()
+    try:
+        while True:
+            data = await websocket.receive_text()
+            if data == "quit":
+                break
+            # Use injected singleton service
+            user = await user_service.get_user()
+            await websocket.send_json({"message": data, "user_email": user.email})
+    finally:
+        await websocket.close()
 
 
 anydi.ext.fastapi.install(app, container)
