@@ -67,7 +67,7 @@ def test_install_registers_websocket_scope() -> None:
 def test_install_websocket_resource_cleanup() -> None:
     """Test that websocket-scoped resources are properly cleaned up."""
     container = Container()
-    container.register_scope("websocket")
+    container.register_scope("websocket", parents=["request"])
     cleanup_called: list[str] = []
 
     @container.provider(scope="websocket")

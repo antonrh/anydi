@@ -168,12 +168,16 @@ connection-specific state. The `websocket` scope is automatically registered whe
 
 ### WebSocket Scope
 
+The `websocket` scope is registered with `request` as its parent scope, creating the hierarchy: `singleton` → `request` → `websocket`.
+This means websocket-scoped dependencies can access both request-scoped and singleton dependencies.
+
 The `websocket` scope allows you to create dependencies that:
 
 - Are created once per WebSocket connection
 - Persist across all messages within a connection
 - Are automatically cleaned up when the connection closes
 - Are isolated between different concurrent connections
+- Can depend on request-scoped and singleton dependencies
 
 ### Basic WebSocket Example
 
@@ -201,9 +205,9 @@ class ConnectionState:
 
 container = Container()
 
-# WebSocket scope is automatically registered by install()
+# WebSocket scope is automatically registered by install() with request as parent
 # but you can also register it manually if needed:
-# container.register_scope("websocket")
+# container.register_scope("websocket", parents=["request"])
 
 
 @container.provider(scope="websocket")
@@ -407,7 +411,18 @@ async def websocket_concurrent(
         await websocket.send_text(response)
 ```
 
-!!! note
+### Scope Hierarchy
 
-    The `RequestScopedMiddleware` handles both HTTP requests and WebSocket connections.
-    It automatically creates both `request` and `websocket` scoped contexts for WebSocket connections.
+Since `websocket` inherits from `request` scope, websocket-scoped providers can inject request-scoped dependencies:
+
+```python
+@container.provider(scope="request")
+def request_id() -> str:
+    import uuid
+    return str(uuid.uuid4())
+
+
+@container.provider(scope="websocket")
+def connection_tracker(request_id: str) -> ConnectionTracker:
+    return ConnectionTracker(connection_id=request_id)
+```

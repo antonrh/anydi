@@ -25,15 +25,17 @@ class RequestScopedMiddleware:
             return
 
         async with AsyncExitStack() as stack:
+            # Create request context first (parent scope)
+            request_context = await stack.enter_async_context(
+                self.container.arequest_context()
+            )
+
+            # For WebSocket connections, create websocket context (child scope)
             websocket_context = None
             if scope["type"] == "websocket" and self.container.has_scope("websocket"):
                 websocket_context = await stack.enter_async_context(
                     self.container.ascoped_context("websocket")
                 )
-
-            request_context = await stack.enter_async_context(
-                self.container.arequest_context()
-            )
 
             if scope["type"] == "http":
                 request = Request(scope, receive=receive, send=send)

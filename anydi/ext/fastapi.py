@@ -75,9 +75,9 @@ def install(app: FastAPI, container: Container) -> None:
     """Install AnyDI into a FastAPI application."""
     app.state.container = container  # noqa
 
-    # Register websocket scope if not already registered
+    # Register websocket scope with request as parent if not already registered
     if not container.has_scope("websocket"):
-        container.register_scope("websocket")
+        container.register_scope("websocket", parents=["request"])
 
     # Validate routes (both HTTP and WebSocket)
     patched: set[tuple[Any, ...]] = set()

@@ -41,8 +41,9 @@ class WebSocketLogger:
 container = Container()
 
 
-# Register websocket scope
-container.register_scope("websocket")
+# Register websocket scope with request as parent
+# This creates a scope hierarchy: singleton -> request -> websocket
+container.register_scope("websocket", parents=["request"])
 
 
 @container.provider(scope="singleton")
