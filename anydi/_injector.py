@@ -17,7 +17,7 @@ from typing import (
 
 from typing_extensions import ParamSpec, type_repr
 
-from ._types import ProvideMarker, is_provide_marker
+from ._marker import Marker, is_marker
 
 if TYPE_CHECKING:
     from ._container import Container
@@ -76,13 +76,13 @@ class Injector:
 
     def validate_parameter(
         self, parameter: inspect.Parameter, *, call: Callable[..., Any]
-    ) -> tuple[Any, bool, ProvideMarker | None]:
+    ) -> tuple[Any, bool, Marker | None]:
         """Validate an injected parameter."""
         parameter = self.unwrap_parameter(parameter)
         interface = parameter.annotation
 
         marker = parameter.default
-        if not is_provide_marker(marker):
+        if not is_marker(marker):
             return interface, False, None
 
         if interface is inspect.Parameter.empty:
@@ -109,10 +109,10 @@ class Injector:
 
         origin, *metadata = get_args(parameter.annotation)
 
-        if not metadata or not is_provide_marker(metadata[-1]):
+        if not metadata or not is_marker(metadata[-1]):
             return parameter
 
-        if is_provide_marker(parameter.default):
+        if is_marker(parameter.default):
             raise TypeError(
                 "Cannot specify `Inject` in `Annotated` and "
                 f"default value together for '{parameter.name}'"
