@@ -10,7 +10,7 @@ from fast_depends.dependencies import Dependant
 from faststream import BaseMiddleware, ContextRepo, StreamMessage
 
 from anydi import Container
-from anydi._types import Inject, ProvideMarker, set_provide_factory
+from anydi._marker import Inject, Marker, extend_marker
 
 if TYPE_CHECKING:
     from faststream._internal.basic_types import AsyncFuncAny
@@ -47,18 +47,26 @@ class RequestScopedMiddleware(BaseMiddleware):
             return await call_next(msg)
 
 
-class _ProvideMarker(Dependant, ProvideMarker):
+class FastStreamMarker(Dependant, Marker):
     def __init__(self) -> None:
-        super().__init__(self._dependency, use_cache=True, cast=True, cast_result=True)
-        ProvideMarker.__init__(self)
+        Marker.__init__(self)
+        self._current_owner = "faststream"
+        Dependant.__init__(
+            self,
+            self._faststream_dependency,
+            use_cache=True,
+            cast=True,
+            cast_result=True,
+        )
+        self._current_owner = None
 
-    async def _dependency(self, context: ContextRepo) -> Any:
+    async def _faststream_dependency(self, context: ContextRepo) -> Any:
         container = get_container_from_context(context)
         return await container.aresolve(self.interface)
 
 
 # Configure Inject() and Provide[T] to use FastStream-specific marker
-set_provide_factory(_ProvideMarker)
+extend_marker(FastStreamMarker)
 
 
 def _get_broker_handlers(broker: BrokerUsecase[Any, Any]) -> list[Any]:
@@ -71,4 +79,8 @@ def install(broker: BrokerUsecase[Any, Any], container: Container) -> None:
     for handler in _get_broker_handlers(broker):
         call = handler._original_call  # noqa
         for parameter in inspect.signature(call, eval_str=True).parameters.values():
-            container.validate_injected_parameter(parameter, call=call)
+            _, should_inject, marker = container.validate_injected_parameter(
+                parameter, call=call
+            )
+            if should_inject and marker:
+                marker.set_owner("faststream")
