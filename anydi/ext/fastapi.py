@@ -12,7 +12,7 @@ from fastapi.routing import APIRoute, APIWebSocketRoute
 from starlette.requests import HTTPConnection
 
 from anydi import Container, Inject
-from anydi._types import ProvideMarker, extend_provide_marker
+from anydi._marker import Marker, extend_marker
 
 from .starlette.middleware import RequestScopedMiddleware, WebSocketScopedMiddleware
 
@@ -29,9 +29,9 @@ def get_container(connection: HTTPConnection) -> Container:
     return cast(Container, connection.app.state.container)
 
 
-class _ProvideMarker(params.Depends, ProvideMarker):
+class FastAPIMarker(params.Depends, Marker):
     def __init__(self) -> None:
-        ProvideMarker.__init__(self)
+        Marker.__init__(self)
         self._current_owner = "fastapi"
         params.Depends.__init__(
             self, dependency=self._fastapi_dependency, use_cache=True
@@ -47,7 +47,7 @@ class _ProvideMarker(params.Depends, ProvideMarker):
 # Configure Inject() and Provide[T] to use FastAPI-specific marker at import time
 # This is also called in install() to ensure it's set correctly even if other
 # extensions have overwritten it
-extend_provide_marker(_ProvideMarker)
+extend_marker(FastAPIMarker)
 
 
 def _iter_dependencies(dependant: Dependant) -> Iterator[Dependant]:

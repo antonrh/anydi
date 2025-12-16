@@ -2,9 +2,10 @@
 
 from ._container import Container, import_container
 from ._decorators import injectable, provided, provider, request, singleton, transient
+from ._marker import Inject, Provide
 from ._module import Module
 from ._provider import ProviderDef as Provider
-from ._types import Inject, Provide, Scope
+from ._types import Scope
 
 # Alias for dependency auto marker
 # TODO: deprecate it

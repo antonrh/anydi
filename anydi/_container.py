@@ -18,6 +18,7 @@ from typing_extensions import ParamSpec, Self, type_repr
 from ._context import InstanceContext
 from ._decorators import is_provided
 from ._injector import Injector
+from ._marker import Marker
 from ._module import ModuleDef, ModuleRegistrar
 from ._provider import Provider, ProviderDef, ProviderKind, ProviderParameter
 from ._resolver import Resolver
@@ -25,7 +26,6 @@ from ._scanner import PackageOrIterable, Scanner
 from ._types import (
     NOT_SET,
     Event,
-    ProvideMarker,
     Scope,
     is_event_type,
     is_iterator_type,
@@ -699,7 +699,7 @@ class Container:
 
     def validate_injected_parameter(
         self, parameter: inspect.Parameter, *, call: Callable[..., Any]
-    ) -> tuple[Any, bool, ProvideMarker | None]:
+    ) -> tuple[Any, bool, Marker | None]:
         """Validate an injected parameter."""
         return self._injector.validate_parameter(parameter, call=call)
 
