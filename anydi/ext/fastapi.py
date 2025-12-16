@@ -16,12 +16,7 @@ from anydi._marker import Marker, extend_marker
 
 from .starlette.middleware import RequestScopedMiddleware
 
-__all__ = [
-    "install",
-    "get_container",
-    "Inject",
-    "RequestScopedMiddleware",
-]
+__all__ = ["install", "get_container", "Inject", "RequestScopedMiddleware"]
 
 
 def get_container(connection: HTTPConnection) -> Container:
