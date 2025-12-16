@@ -78,10 +78,6 @@ def Inject() -> Any:
     return _provide_factory()
 
 
-# Alias from backward compatibility
-is_inject_marker = is_provide_marker
-
-
 class Event:
     """Represents an event object."""
 
