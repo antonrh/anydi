@@ -1,10 +1,14 @@
-from typing import Any
+from collections.abc import Iterator
+from typing import Annotated, Any
 
 import pytest
-from fastapi import FastAPI
+from fastapi import FastAPI, WebSocket
+from starlette.middleware import Middleware
+from starlette.testclient import TestClient
 
+import anydi.ext.fastapi
 from anydi import Container, Inject
-from anydi.ext.fastapi import install
+from anydi.ext.starlette.middleware import WebSocketScopedMiddleware
 
 
 def test_install_without_annotation() -> None:
@@ -23,7 +27,7 @@ def test_install_without_annotation() -> None:
     with pytest.raises(
         TypeError, match="Missing `(.*?).say_hello` parameter `message` annotation."
     ):
-        install(app, container)
+        anydi.ext.fastapi.install(app, container)
 
 
 def test_install_unknown_annotation() -> None:
@@ -42,4 +46,70 @@ def test_install_unknown_annotation() -> None:
             "with an annotation of `str`."
         ),
     ):
-        install(app, container)
+        anydi.ext.fastapi.install(app, container)
+
+
+def test_install_registers_websocket_scope() -> None:
+    """Test that websocket scope is automatically registered during install."""
+    # Create a fresh container without websocket scope
+    container = Container()
+    app = FastAPI()
+
+    # Verify scope doesn't exist before install
+    assert "websocket" not in container._scopes
+
+    anydi.ext.fastapi.install(app, container)
+
+    # Verify scope exists after install
+    assert "websocket" in container._scopes
+
+
+def test_install_websocket_resource_cleanup() -> None:
+    """Test that websocket-scoped resources are properly cleaned up."""
+    # Reset provide factory in case other tests changed it
+    from anydi._types import set_provide_factory
+
+    set_provide_factory(anydi.ext.fastapi._ProvideMarker)
+
+    container = Container()
+    container.register_scope("websocket")
+    cleanup_called: list[str] = []
+
+    @container.provider(scope="websocket")
+    def cleanup_resource() -> Iterator[str]:
+        cleanup_called.append("setup")
+        yield "resource"
+        cleanup_called.append("cleanup")
+
+    app = FastAPI(
+        middleware=[
+            Middleware(WebSocketScopedMiddleware, container=container),
+        ]
+    )
+
+    @app.websocket("/ws/resource")
+    async def websocket_resource(
+        websocket: WebSocket,
+        resource: Annotated[str, Inject()],
+    ) -> None:
+        await websocket.accept()
+        await websocket.send_text(f"Got: {resource}")
+        await websocket.close()
+
+    # Install after defining routes so it can validate them
+    anydi.ext.fastapi.install(app, container)
+
+    client = TestClient(app)
+
+    # Before connection
+    assert cleanup_called == []
+
+    # During connection
+    with client.websocket_connect("/ws/resource") as websocket:
+        response = websocket.receive_text()
+        assert response == "Got: resource"
+        # Setup called
+        assert "setup" in cleanup_called
+
+    # After connection closed
+    assert cleanup_called == ["setup", "cleanup"]

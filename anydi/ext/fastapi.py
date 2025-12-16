@@ -14,8 +14,7 @@ from starlette.requests import HTTPConnection
 from anydi import Container, Inject
 from anydi._types import ProvideMarker, set_provide_factory
 
-from .starlette.middleware import RequestScopedMiddleware
-from .starlette.websocket_middleware import WebSocketScopedMiddleware
+from .starlette.middleware import RequestScopedMiddleware, WebSocketScopedMiddleware
 
 __all__ = [
     "install",
