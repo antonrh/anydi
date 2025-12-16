@@ -1,5 +1,5 @@
 """AnyDI Starlette extension."""
 
-from .middleware import RequestScopedMiddleware, WebSocketScopedMiddleware
+from .middleware import RequestScopedMiddleware
 
-__all__ = ["RequestScopedMiddleware", "WebSocketScopedMiddleware"]
+__all__ = ["RequestScopedMiddleware"]

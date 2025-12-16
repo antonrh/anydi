@@ -82,15 +82,17 @@ def test_send_mail_with_provide(client: TestClient) -> None:
 
 
 def test_route_annotated_mixed_markers(client: TestClient) -> None:
-    response = client.get("/annotated-mixed")
+    first_response = client.get("/annotated-mixed")
 
-    assert response.status_code == 200
-    assert response.json() == [
-        "message1",
-        "message1_a",
-        "message1_a_b",
-        "message2",
-    ]
+    assert first_response.status_code == 200
+    first_json = first_response.json()
+    assert first_json["default"] == "Hello from the default message!"
+    assert first_json["vip"] == "Hello VIP!"
+    assert first_json["request"].startswith("Request scoped message #")
+
+    second_json = client.get("/annotated-mixed").json()
+    assert second_json["request"].startswith("Request scoped message #")
+    assert second_json["request"] != first_json["request"]
 
 
 def test_websocket_basic_injection(client: TestClient) -> None:
@@ -174,6 +176,19 @@ def test_websocket_singleton_service(client: TestClient) -> None:
             "email": "ws@example.com",
             "message": "Hello via WebSocket",
         }
+
+
+def test_websocket_request_scoped_dependency(client: TestClient) -> None:
+    """Ensure request-scoped dependencies are available to WebSocket handlers."""
+    with client.websocket_connect("/ws/request-message") as websocket:
+        first_message = websocket.receive_text()
+        assert first_message.startswith("Request scoped message #")
+
+    with client.websocket_connect("/ws/request-message") as websocket:
+        second_message = websocket.receive_text()
+        assert second_message.startswith("Request scoped message #")
+
+    assert first_message != second_message
 
 
 def test_websocket_concurrent_connections(client: TestClient) -> None:

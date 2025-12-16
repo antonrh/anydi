@@ -8,7 +8,7 @@ from starlette.testclient import TestClient
 
 import anydi.ext.fastapi
 from anydi import Container, Inject
-from anydi.ext.starlette.middleware import WebSocketScopedMiddleware
+from anydi.ext.starlette.middleware import RequestScopedMiddleware
 
 
 def test_install_without_annotation() -> None:
@@ -78,7 +78,7 @@ def test_install_websocket_resource_cleanup() -> None:
 
     app = FastAPI(
         middleware=[
-            Middleware(WebSocketScopedMiddleware, container=container),
+            Middleware(RequestScopedMiddleware, container=container),
         ]
     )
 

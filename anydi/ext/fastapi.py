@@ -14,14 +14,13 @@ from starlette.requests import HTTPConnection
 from anydi import Container, Inject
 from anydi._marker import Marker, extend_marker
 
-from .starlette.middleware import RequestScopedMiddleware, WebSocketScopedMiddleware
+from .starlette.middleware import RequestScopedMiddleware
 
 __all__ = [
     "install",
     "get_container",
     "Inject",
     "RequestScopedMiddleware",
-    "WebSocketScopedMiddleware",
 ]
 
 

@@ -1,3 +1,5 @@
+from dataclasses import dataclass
+from itertools import count
 from typing import Annotated, Any
 
 from fastapi import Body, Depends, FastAPI, WebSocket
@@ -5,12 +7,14 @@ from starlette.middleware import Middleware
 
 import anydi.ext.fastapi
 from anydi import Container, Inject, Provide
-from anydi.ext.starlette.middleware import (
-    RequestScopedMiddleware,
-    WebSocketScopedMiddleware,
-)
+from anydi.ext.starlette.middleware import RequestScopedMiddleware
 
 from tests.ext.fixtures import Mail, MailService, User, UserService
+
+
+@dataclass
+class Message:
+    content: str
 
 
 class ConnectionState:
@@ -36,28 +40,28 @@ class WebSocketLogger:
 
 container = Container()
 
+
 # Register websocket scope
 container.register_scope("websocket")
 
 
 @container.provider(scope="singleton")
-def message1() -> Annotated[str, "message1"]:
-    return "message1"
+def welcome_message() -> Annotated[Message, "message"]:
+    return Message(content="Hello from the default message!")
 
 
 @container.provider(scope="singleton")
-def message1_a() -> Annotated[str, "message1", "a"]:
-    return "message1_a"
+def vip_message() -> Annotated[Message, "message", "vip"]:
+    return Message(content="Hello VIP!")
 
 
-@container.provider(scope="singleton")
-def message1_a_b() -> Annotated[str, "message1", "a", "b"]:
-    return "message1_a_b"
+_request_message_counter = count(1)
 
 
-@container.provider(scope="singleton")
-def message2() -> Annotated[str, "message2"]:
-    return "message2"
+@container.provider(scope="request")
+def request_message() -> Annotated[Message, "message", "request"]:
+    number = next(_request_message_counter)
+    return Message(content=f"Request scoped message #{number}")
 
 
 @container.provider(scope="singleton")
@@ -87,7 +91,6 @@ async def get_user(user_service: UserService = Inject()) -> User:
 app = FastAPI(
     middleware=[
         Middleware(RequestScopedMiddleware, container=container),
-        Middleware(WebSocketScopedMiddleware, container=container),
     ]
 )
 
@@ -121,24 +124,28 @@ async def send_email_provide(
 
 @app.get("/annotated-mixed")
 def annotated_mixed(
-    message1: Annotated[Annotated[str, "message1"], Inject()],
-    message1_a: Annotated[Annotated[str, "message1", "a"], Inject()],
-    message1_a_b: Annotated[Annotated[str, "message1", "a", "b"], Inject()],
-    message2: Annotated[str, "message2"] = Inject(),
+    base_message: Annotated[
+        Annotated[Message, "message"],
+        Inject(),
+    ],
+    vip_message: Annotated[
+        Annotated[Message, "message", "vip"],
+        Inject(),
+    ],
+    request_message: Annotated[
+        Annotated[Message, "message", "request"],
+        Inject(),
+    ],
 ) -> Any:
-    return [
-        message1,
-        message1_a,
-        message1_a_b,
-        message2,
-    ]
+    return {
+        "default": base_message.content,
+        "vip": vip_message.content,
+        "request": request_message.content,
+    }
 
 
 @app.websocket("/ws/echo")
-async def websocket_echo(
-    websocket: WebSocket,
-    state: Annotated[ConnectionState, Inject()],
-) -> None:
+async def websocket_echo(websocket: WebSocket, state: Provide[ConnectionState]) -> None:
     await websocket.accept()
     try:
         while True:
@@ -153,8 +160,7 @@ async def websocket_echo(
 
 @app.websocket("/ws/logger")
 async def websocket_logger_endpoint(
-    websocket: WebSocket,
-    logger: Annotated[WebSocketLogger, Inject()],
+    websocket: WebSocket, logger: Provide[WebSocketLogger]
 ) -> None:
     await websocket.accept()
     client_id = await websocket.receive_text()
@@ -165,13 +171,22 @@ async def websocket_logger_endpoint(
 
 @app.websocket("/ws/mail")
 async def websocket_mail(
-    websocket: WebSocket,
-    mail_service: Annotated[MailService, Inject()],
+    websocket: WebSocket, mail_service: Provide[MailService]
 ) -> None:
     await websocket.accept()
     message = await websocket.receive_text()
     mail = await mail_service.send_mail("ws@example.com", message)
     await websocket.send_json({"email": mail.email, "message": mail.message})
+    await websocket.close()
+
+
+@app.websocket("/ws/request-message")
+async def websocket_request_message(
+    websocket: WebSocket,
+    message: Annotated[Message, "message", "request"] = Inject(),
+) -> None:
+    await websocket.accept()
+    await websocket.send_text(message.content)
     await websocket.close()
 
 
