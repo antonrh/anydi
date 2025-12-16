@@ -12,7 +12,7 @@ from fastapi.routing import APIRoute
 from starlette.requests import Request
 
 from anydi import Container, Inject
-from anydi._types import ProvideMarker, extend_provide_marker
+from anydi._types import ProvideMarker, register_provide_marker
 
 from .starlette.middleware import RequestScopedMiddleware
 
@@ -24,7 +24,7 @@ def get_container(request: Request) -> Container:
     return cast(Container, request.app.state.container)
 
 
-class _ProvideMarker(params.Depends, ProvideMarker):
+class FastAPIProvideMarker(params.Depends, ProvideMarker):
     def __init__(self) -> None:
         ProvideMarker.__init__(self)
         self._current_owner = "fastapi"
@@ -40,7 +40,7 @@ class _ProvideMarker(params.Depends, ProvideMarker):
 
 
 # Configure Inject() and Provide[T] to use FastAPI-specific marker
-extend_provide_marker(_ProvideMarker)
+register_provide_marker(FastAPIProvideMarker)
 
 
 def _iter_dependencies(dependant: Dependant) -> Iterator[Dependant]:

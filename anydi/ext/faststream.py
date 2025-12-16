@@ -10,7 +10,7 @@ from fast_depends.dependencies import Dependant
 from faststream import BaseMiddleware, ContextRepo, StreamMessage
 
 from anydi import Container
-from anydi._types import Inject, ProvideMarker, extend_provide_marker
+from anydi._types import Inject, ProvideMarker, register_provide_marker
 
 if TYPE_CHECKING:
     from faststream._internal.basic_types import AsyncFuncAny
@@ -47,7 +47,7 @@ class RequestScopedMiddleware(BaseMiddleware):
             return await call_next(msg)
 
 
-class _ProvideMarker(Dependant, ProvideMarker):
+class FastStreamProvideMarker(Dependant, ProvideMarker):
     def __init__(self) -> None:
         ProvideMarker.__init__(self)
         self._current_owner = "faststream"
@@ -66,7 +66,7 @@ class _ProvideMarker(Dependant, ProvideMarker):
 
 
 # Configure Inject() and Provide[T] to use FastStream-specific marker
-extend_provide_marker(_ProvideMarker)
+register_provide_marker(FastStreamProvideMarker)
 
 
 def _get_broker_handlers(broker: BrokerUsecase[Any, Any]) -> list[Any]:

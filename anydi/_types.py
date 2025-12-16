@@ -73,28 +73,28 @@ class ProvideMarker:
         return Annotated[item, cls()]
 
 
-_provider_marker_type: type[ProvideMarker] = ProvideMarker
+_provider_marker: type[ProvideMarker] = ProvideMarker
 
 
-def extend_provide_marker(provider_marker_type: type[ProvideMarker]) -> None:
+def register_provide_marker(provider_marker: type[ProvideMarker]) -> None:
     """Register an additional framework-specific provide marker."""
 
-    global _provider_marker_type
-    previous = _provider_marker_type
+    global _provider_marker
+    previous = _provider_marker
 
     if previous is ProvideMarker:
-        _provider_marker_type = provider_marker_type
+        _provider_marker = provider_marker
     else:
-        name = f"ProvideMarker_{provider_marker_type.__name__}_{previous.__name__}"
+        name = f"ProvideMarker_{provider_marker.__name__}_{previous.__name__}"
 
-        def __init__(self: ProvideMarker) -> None:  # type: ignore[override]
-            provider_marker_type.__init__(self)
+        def __init__(self: ProvideMarker) -> None:
+            provider_marker.__init__(self)
             previous.__init__(self)
 
         combined: type[ProvideMarker] = type(
-            name, (provider_marker_type, previous), {"__init__": __init__}
+            name, (provider_marker, previous), {"__init__": __init__}
         )
-        _provider_marker_type = combined
+        _provider_marker = combined
 
 
 def is_provide_marker(obj: Any) -> bool:
@@ -106,10 +106,10 @@ class _ProvideMeta(type):
 
     def __getitem__(cls, item: Any) -> Any:
         # Use the current _provider_marker_type's __class_getitem__ if available
-        if hasattr(_provider_marker_type, "__class_getitem__"):
-            return _provider_marker_type.__class_getitem__(item)  # type: ignore
+        if hasattr(_provider_marker, "__class_getitem__"):
+            return _provider_marker.__class_getitem__(item)  # type: ignore
         # Fallback to creating Annotated with factory instance
-        return Annotated[item, _provider_marker_type.__class_getitem__(item)]
+        return Annotated[item, _provider_marker.__class_getitem__(item)]
 
 
 if TYPE_CHECKING:
@@ -122,7 +122,7 @@ else:
 
 
 def Inject() -> Any:
-    return _provider_marker_type()
+    return _provider_marker()
 
 
 class Event:
