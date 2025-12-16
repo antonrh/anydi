@@ -71,9 +71,10 @@ def _process_callback(callback: Callable[..., Any], container: Container) -> Any
 
     # Validate parameters and collect which ones need injection
     for parameter in sig.parameters.values():
-        interface, should_inject = container.validate_injected_parameter(
+        interface, should_inject, _ = container.validate_injected_parameter(
             parameter, call=callback
         )
+        processed_parameter = container._injector.unwrap_parameter(parameter)
         if should_inject:
             injected_param_names.add(parameter.name)
             try:
@@ -82,7 +83,7 @@ def _process_callback(callback: Callable[..., Any], container: Container) -> Any
                 if inspect.isclass(interface) and is_provided(interface):
                     scopes.add(interface.__provided__["scope"])
         else:
-            non_injected_params.add(parameter)
+            non_injected_params.add(processed_parameter)
 
     # If no parameters need injection and callback is not async, return original
     if not injected_param_names and not inspect.iscoroutinefunction(callback):

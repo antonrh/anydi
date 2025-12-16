@@ -12,7 +12,7 @@ from fastapi.routing import APIRoute
 from starlette.requests import Request
 
 from anydi import Container, Inject
-from anydi._types import ProvideMarker, set_provide_factory
+from anydi._types import ProvideMarker, extend_provide_marker
 
 from .starlette.middleware import RequestScopedMiddleware
 
@@ -26,17 +26,21 @@ def get_container(request: Request) -> Container:
 
 class _ProvideMarker(params.Depends, ProvideMarker):
     def __init__(self) -> None:
-        super().__init__(dependency=self._dependency, use_cache=True)
         ProvideMarker.__init__(self)
+        self._current_owner = "fastapi"
+        params.Depends.__init__(
+            self, dependency=self._fastapi_dependency, use_cache=True
+        )
+        self._current_owner = None
 
-    async def _dependency(
+    async def _fastapi_dependency(
         self, container: Annotated[Container, Depends(get_container)]
     ) -> Any:
         return await container.aresolve(self.interface)
 
 
 # Configure Inject() and Provide[T] to use FastAPI-specific marker
-set_provide_factory(_ProvideMarker)
+extend_provide_marker(_ProvideMarker)
 
 
 def _iter_dependencies(dependant: Dependant) -> Iterator[Dependant]:
@@ -57,7 +61,11 @@ def _validate_route_dependencies(
         if not call:
             continue  # pragma: no cover
         for parameter in inspect.signature(call, eval_str=True).parameters.values():
-            container.validate_injected_parameter(parameter, call=call)
+            _, should_inject, marker = container.validate_injected_parameter(
+                parameter, call=call
+            )
+            if should_inject and marker:
+                marker.set_owner("fastapi")
 
 
 def install(app: FastAPI, container: Container) -> None:
