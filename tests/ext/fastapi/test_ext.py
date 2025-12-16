@@ -66,11 +66,6 @@ def test_install_registers_websocket_scope() -> None:
 
 def test_install_websocket_resource_cleanup() -> None:
     """Test that websocket-scoped resources are properly cleaned up."""
-    # Reset provide factory in case other tests changed it
-    from anydi._types import set_provide_factory
-
-    set_provide_factory(anydi.ext.fastapi._ProvideMarker)
-
     container = Container()
     container.register_scope("websocket")
     cleanup_called: list[str] = []
