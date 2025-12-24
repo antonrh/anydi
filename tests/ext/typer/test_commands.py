@@ -1,7 +1,8 @@
 import typer
 from typer.testing import CliRunner
 
-from anydi import Container, Provide
+import anydi.ext.typer
+from anydi import Container, Inject, Provide
 
 
 def test_hello_command(app: typer.Typer, runner: CliRunner) -> None:
@@ -132,8 +133,6 @@ def test_async_command_no_injection() -> None:
         """Async command without DI or parameters."""
         typer.echo("Async command executed!")
 
-    import anydi.ext.typer
-
     anydi.ext.typer.install(app, container)
 
     runner = CliRunner()
@@ -165,8 +164,6 @@ def test_request_scoped_dependency() -> None:
     def show_request(req_id: Provide[str]) -> None:
         """Show request ID."""
         typer.echo(f"Request ID: {req_id}")
-
-    import anydi.ext.typer
 
     anydi.ext.typer.install(app, container)
 
@@ -205,8 +202,6 @@ def test_async_request_scoped_dependency() -> None:
         """Show request counter."""
         typer.echo(f"Counter: {counter}")
 
-    import anydi.ext.typer
-
     anydi.ext.typer.install(app, container)
 
     runner = CliRunner()
@@ -242,8 +237,6 @@ def test_custom_scoped_dependency() -> None:
         """Process batch."""
         typer.echo(f"Processing: {batch}")
 
-    import anydi.ext.typer
-
     anydi.ext.typer.install(app, container)
 
     runner = CliRunner()
@@ -277,8 +270,6 @@ def test_async_custom_scoped_dependency() -> None:
     async def run_task(tid: Provide[str]) -> None:
         """Run task."""
         typer.echo(f"Task: {tid}")
-
-    import anydi.ext.typer
 
     anydi.ext.typer.install(app, container)
 
@@ -317,8 +308,6 @@ def test_singleton_dependency_auto_context() -> None:
     def query(db: Provide[DatabaseConnection]) -> None:
         """Run query."""
         typer.echo("Query executed")
-
-    import anydi.ext.typer
 
     anydi.ext.typer.install(app, container)
 
@@ -362,8 +351,6 @@ def test_async_singleton_dependency_auto_context() -> None:
     async def query(db: Provide[AsyncDatabase]) -> None:
         """Run async query."""
         typer.echo("Async query executed")
-
-    import anydi.ext.typer
 
     anydi.ext.typer.install(app, container)
 
@@ -417,8 +404,6 @@ def test_mixed_scopes_auto_context() -> None:
     ) -> None:
         """Process with mixed scopes."""
         typer.echo(f"Config: {cfg}, Request: {req}, Batch: {batch}")
-
-    import anydi.ext.typer
 
     anydi.ext.typer.install(app, container)
 
@@ -478,8 +463,6 @@ def test_nested_scopes_auto_context() -> None:
         """Show IDs."""
         typer.echo(f"Request: {req}, Tenant: {tenant}")
 
-    import anydi.ext.typer
-
     anydi.ext.typer.install(app, container)
 
     runner = CliRunner()
@@ -534,8 +517,6 @@ def test_resource_provider_runs_without_injection() -> None:
         result = db.execute("SELECT * FROM users")
         typer.echo(result)
 
-    import anydi.ext.typer
-
     anydi.ext.typer.install(app, container)
 
     runner = CliRunner()
@@ -547,3 +528,55 @@ def test_resource_provider_runs_without_injection() -> None:
     # Verify session lifecycle ran even though session_manager wasn't injected
     assert len(session_started) == 1, "Session should have started"
     assert len(session_ended) == 1, "Session should have ended"
+
+
+# Standalone async command tests
+
+
+def test_async_command_with_injection_standalone() -> None:
+    """Test async command with dependency injection in standalone app."""
+    container = Container()
+
+    @container.provider(scope="singleton")
+    def message() -> str:
+        return "Async command test"
+
+    app = typer.Typer()
+
+    @app.command()
+    async def async_cmd(msg: str = Inject()) -> None:
+        """Async command with DI."""
+        typer.echo(f"Message: {msg}")
+
+    anydi.ext.typer.install(app, container)
+
+    runner = CliRunner()
+
+    # The extension handles async commands transparently
+    result = runner.invoke(app, [])
+    assert result.exit_code == 0
+    assert "Message: Async command test" in result.stdout
+
+
+def test_sync_command_with_injection_standalone() -> None:
+    """Test sync command with dependency injection in standalone app."""
+    container = Container()
+
+    @container.provider(scope="singleton")
+    def message() -> str:
+        return "Sync command test"
+
+    app = typer.Typer()
+
+    @app.command()
+    def sync_cmd(msg: str = Inject()) -> None:
+        """Sync command with DI."""
+        typer.echo(f"Message: {msg}")
+
+    anydi.ext.typer.install(app, container)
+
+    runner = CliRunner()
+
+    result = runner.invoke(app, [])
+    assert result.exit_code == 0
+    assert "Message: Sync command test" in result.stdout

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import concurrent.futures
 import contextlib
 import functools
 import inspect
@@ -9,6 +10,7 @@ from collections.abc import Awaitable, Callable
 from typing import Any
 
 import anyio
+import sniffio
 from typer import Typer
 
 from anydi import Container, Scope
@@ -22,7 +24,16 @@ def _wrap_async_callback_no_injection(callback: Callable[..., Any]) -> Any:
 
     @functools.wraps(callback)
     def async_no_injection_wrapper(*args: Any, **kwargs: Any) -> Any:
-        return anyio.run(callback, *args, **kwargs)
+        # Check if we're already in an async context
+        try:
+            sniffio.current_async_library()
+            # We're in an async context, run anyio.run() in a separate thread
+            with concurrent.futures.ThreadPoolExecutor() as executor:
+                future = executor.submit(anyio.run, callback, *args, **kwargs)
+                return future.result()
+        except sniffio.AsyncLibraryNotFoundError:
+            # Not in an async context, can use anyio.run directly
+            return anyio.run(callback, *args, **kwargs)
 
     return async_no_injection_wrapper
 
@@ -54,7 +65,16 @@ def _wrap_async_callback_with_injection(
 
                 return await container.run(callback, *args, **kwargs)
 
-        return anyio.run(_run)
+        # Check if we're already in an async context
+        try:
+            sniffio.current_async_library()
+            # We're in an async context, run anyio.run() in a separate thread
+            with concurrent.futures.ThreadPoolExecutor() as executor:
+                future = executor.submit(anyio.run, _run)
+                return future.result()
+        except sniffio.AsyncLibraryNotFoundError:
+            # Not in an async context, can use anyio.run directly
+            return anyio.run(_run)
 
     # Update the wrapper's signature to only show non-injected parameters to Typer
     async_wrapper.__signature__ = sig.replace(parameters=non_injected_params)  # type: ignore
