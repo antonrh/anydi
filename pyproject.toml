@@ -55,6 +55,7 @@ dev = [
     "pytest>=8.4.0,<9",
     "pytest-cov>=7.0.0",
     "pytest-mock>=3.14.1",
+    "pytest-codspeed>=4.2.0",
     "starlette>=0.37.2",
     "fastapi>=0.100.0",
     "httpx>=0.26.0",
