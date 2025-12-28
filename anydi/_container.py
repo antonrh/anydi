@@ -431,6 +431,10 @@ class Container:
         parameters: list[ProviderParameter] = []
         scope_provider: dict[Scope, Provider] = {}
 
+        # Precompute constant checks
+        is_scoped = scope not in ("singleton", "transient")
+        has_defaults = defaults is not None
+
         for parameter in signature.parameters.values():
             if parameter.annotation is inspect.Parameter.empty:
                 raise TypeError(
@@ -450,10 +454,32 @@ class Container:
             )
             has_default = default is not NOT_SET
 
+            # Check if provider exists before attempting to register (for scoped only)
+            was_auto_registered = (
+                is_scoped and parameter.annotation not in self._providers
+            )
+
             try:
                 sub_provider = self._get_or_register_provider(parameter.annotation)
             except LookupError as exc:
-                if parameter.name in defaults if defaults else False or has_default:
+                if (has_defaults and parameter.name in defaults) or has_default:
+                    continue
+                # For request/custom scopes, allow unregistered dependencies
+                # They might be provided via context.set()
+                if is_scoped:
+                    # Add to unresolved list to provide better error messages
+                    # and prevent infinite recursion
+                    self._resolver.add_unresolved(parameter.annotation)
+                    parameters.append(
+                        ProviderParameter(
+                            name=parameter.name,
+                            annotation=parameter.annotation,
+                            default=default,
+                            has_default=has_default,
+                            provider=None,  # Will check context at runtime
+                            shared_scope=True,  # Same scope, check context
+                        )
+                    )
                     continue
                 unresolved_parameter = parameter
                 unresolved_exc = exc
@@ -462,6 +488,10 @@ class Container:
             # Store first provider for each scope
             if sub_provider.scope not in scope_provider:
                 scope_provider[sub_provider.scope] = sub_provider
+
+            # If provider was auto-registered and has same scope, mark as unresolved
+            if was_auto_registered and sub_provider.scope == scope:
+                self._resolver.add_unresolved(parameter.annotation)
 
             parameters.append(
                 ProviderParameter(

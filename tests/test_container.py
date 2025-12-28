@@ -915,6 +915,28 @@ class TestContainer:
         ):
             container.resolve(str)
 
+    def test_resolve_request_scoped_context_set_unregistered(
+        self, container: Container
+    ) -> None:
+        class ExternalRequest:
+            def __init__(self, rid: str) -> None:
+                self.rid = rid
+
+        class RequestContext:
+            def __init__(self, *, request: ExternalRequest) -> None:
+                self.request = request
+
+        @container.provider(scope="request")
+        def request_context(request: ExternalRequest) -> RequestContext:
+            return RequestContext(request=request)
+
+        with container.request_context() as ctx:
+            req = ExternalRequest(rid="req-1")
+            ctx.set(ExternalRequest, req)
+
+            result = container.resolve(RequestContext)
+            assert result.request.rid == "req-1"
+
     def test_resolve_scoped_thread_safe(self, container: Container) -> None:
         @container.provider(scope="request")
         def provide_unique_id() -> UniqueId:
