@@ -7,6 +7,7 @@ Modern, lightweight Dependency Injection library using type annotations.
 [![CI](https://github.com/antonrh/anydi/actions/workflows/ci.yml/badge.svg)](https://github.com/antonrh/anydi/actions/workflows/ci.yml)
 [![Coverage](https://codecov.io/gh/antonrh/anydi/branch/main/graph/badge.svg)](https://codecov.io/gh/antonrh/anydi)
 [![Documentation](https://readthedocs.org/projects/anydi/badge/?version=latest)](https://anydi.readthedocs.io/en/latest/)
+[![CodSpeed](https://img.shields.io/endpoint?url=https://codspeed.io/badge.json)](https://codspeed.io/antonrh/anydi?utm_source=badge)
 
 </div>
 
@@ -194,7 +195,7 @@ Configure Django (`settings.py`):
 
 ```python
 INSTALLED_APPS = [
-    ...
+    ...,
     "anydi_django",
 ]
 
