@@ -228,11 +228,15 @@ class Resolver:
                 )
                 create_lines.append(f"        arg_{idx} = defaults['{name}']")
                 create_lines.append("    else:")
-                create_lines.append("        cached = NOT_SET_")
-                create_lines.append("        if context is not None:")
-                create_lines.append(
-                    f"            cached = context.get(_param_annotations[{idx}])"
-                )
+                # Direct dict access for shared scope params (avoids method call)
+                if param_shared_scopes[idx]:
+                    create_lines.append(
+                        f"        cached = (context._instances.get("
+                        f"_param_annotations[{idx}], NOT_SET_) "
+                        f"if context is not None else NOT_SET_)"
+                    )
+                else:
+                    create_lines.append("        cached = NOT_SET_")
                 create_lines.append("        if cached is NOT_SET_:")
                 create_lines.append(
                     f"            if _param_annotations[{idx}] in "
