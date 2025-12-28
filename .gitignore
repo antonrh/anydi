@@ -80,4 +80,5 @@ target/
 .env
 
 # Benchmark files
+.codspeed
 bench*.py
