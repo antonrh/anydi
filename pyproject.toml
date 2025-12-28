@@ -63,7 +63,6 @@ dev = [
     "redis>=5.0.4,<6",
     "pydantic-settings>=2.4.0,<3",
     "typer>=0.20.0",
-    "pytest-codspeed>=4.2.0",
 ]
 docs = [
     "mkdocs>=1.4.2,<2",
