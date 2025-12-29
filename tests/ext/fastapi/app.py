@@ -1,6 +1,8 @@
+from dataclasses import dataclass
+from itertools import count
 from typing import Annotated, Any
 
-from fastapi import Body, Depends, FastAPI
+from fastapi import Body, Depends, FastAPI, WebSocket
 from starlette.middleware import Middleware
 
 import anydi.ext.fastapi
@@ -9,27 +11,58 @@ from anydi.ext.starlette.middleware import RequestScopedMiddleware
 
 from tests.ext.fixtures import Mail, MailService, User, UserService
 
+
+@dataclass
+class Message:
+    content: str
+
+
+class ConnectionState:
+    """WebSocket-scoped connection state."""
+
+    def __init__(self) -> None:
+        self.message_count = 0
+
+    def process(self, message: str) -> str:
+        self.message_count += 1
+        return f"Message #{self.message_count}: {message}"
+
+
+class WebSocketLogger:
+    """Singleton logger shared across all connections."""
+
+    def __init__(self) -> None:
+        self.connections: list[str] = []
+
+    def log_connection(self, client_id: str) -> None:
+        self.connections.append(client_id)
+
+
 container = Container()
 
 
-@container.provider(scope="singleton")
-def message1() -> Annotated[str, "message1"]:
-    return "message1"
+# Register websocket scope with request as parent
+# This creates a scope hierarchy: singleton -> request -> websocket
+container.register_scope("websocket", parents=["request"])
 
 
 @container.provider(scope="singleton")
-def message1_a() -> Annotated[str, "message1", "a"]:
-    return "message1_a"
+def welcome_message() -> Annotated[Message, "message"]:
+    return Message(content="Hello from the default message!")
 
 
 @container.provider(scope="singleton")
-def message1_a_b() -> Annotated[str, "message1", "a", "b"]:
-    return "message1_a_b"
+def vip_message() -> Annotated[Message, "message", "vip"]:
+    return Message(content="Hello VIP!")
 
 
-@container.provider(scope="singleton")
-def message2() -> Annotated[str, "message2"]:
-    return "message2"
+_request_message_counter = count(1)
+
+
+@container.provider(scope="request")
+def request_message() -> Annotated[Message, "message", "request"]:
+    number = next(_request_message_counter)
+    return Message(content=f"Request scoped message #{number}")
 
 
 @container.provider(scope="singleton")
@@ -37,16 +70,30 @@ def user_service() -> UserService:
     return UserService()
 
 
-@container.provider(scope="request")
+@container.provider(scope="singleton")
 def mail_service() -> MailService:
     return MailService()
+
+
+@container.provider(scope="websocket")
+def connection_state() -> ConnectionState:
+    return ConnectionState()
+
+
+@container.provider(scope="singleton")
+def websocket_logger() -> WebSocketLogger:
+    return WebSocketLogger()
 
 
 async def get_user(user_service: UserService = Inject()) -> User:
     return await user_service.get_user()
 
 
-app = FastAPI(middleware=[Middleware(RequestScopedMiddleware, container=container)])
+app = FastAPI(
+    middleware=[
+        Middleware(RequestScopedMiddleware, container=container),
+    ]
+)
 
 
 @app.post("/send-mail", response_model=Mail)
@@ -78,17 +125,70 @@ async def send_email_provide(
 
 @app.get("/annotated-mixed")
 def annotated_mixed(
-    message1: Annotated[Annotated[str, "message1"], Inject()],
-    message1_a: Annotated[Annotated[str, "message1", "a"], Inject()],
-    message1_a_b: Annotated[Annotated[str, "message1", "a", "b"], Inject()],
-    message2: Annotated[str, "message2"] = Inject(),
+    base_message: Annotated[
+        Annotated[Message, "message"],
+        Inject(),
+    ],
+    vip_message: Annotated[
+        Annotated[Message, "message", "vip"],
+        Inject(),
+    ],
+    request_message: Annotated[
+        Annotated[Message, "message", "request"],
+        Inject(),
+    ],
 ) -> Any:
-    return [
-        message1,
-        message1_a,
-        message1_a_b,
-        message2,
-    ]
+    return {
+        "default": base_message.content,
+        "vip": vip_message.content,
+        "request": request_message.content,
+    }
+
+
+@app.websocket("/ws/echo")
+async def websocket_echo(websocket: WebSocket, state: Provide[ConnectionState]) -> None:
+    await websocket.accept()
+    try:
+        while True:
+            data = await websocket.receive_text()
+            if data == "quit":
+                break
+            response = state.process(data)
+            await websocket.send_text(response)
+    finally:
+        await websocket.close()
+
+
+@app.websocket("/ws/logger")
+async def websocket_logger_endpoint(
+    websocket: WebSocket, logger: Provide[WebSocketLogger]
+) -> None:
+    await websocket.accept()
+    client_id = await websocket.receive_text()
+    logger.log_connection(client_id)
+    await websocket.send_text(f"Logged: {client_id}")
+    await websocket.close()
+
+
+@app.websocket("/ws/mail")
+async def websocket_mail(
+    websocket: WebSocket, mail_service: Provide[MailService]
+) -> None:
+    await websocket.accept()
+    message = await websocket.receive_text()
+    mail = await mail_service.send_mail("ws@example.com", message)
+    await websocket.send_json({"email": mail.email, "message": mail.message})
+    await websocket.close()
+
+
+@app.websocket("/ws/request-message")
+async def websocket_request_message(
+    websocket: WebSocket,
+    message: Annotated[Message, "message", "request"] = Inject(),
+) -> None:
+    await websocket.accept()
+    await websocket.send_text(message.content)
+    await websocket.close()
 
 
 anydi.ext.fastapi.install(app, container)
