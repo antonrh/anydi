@@ -553,6 +553,11 @@ class Container:
         )
 
         self._set_provider(provider)
+
+        # Clear cached resolvers when overriding
+        if override:
+            self._resolver.clear_caches()
+
         return provider
 
     def _validate_provider_scope(
