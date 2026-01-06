@@ -62,6 +62,13 @@ class Resolver:
     def add_unresolved(self, interface: Any) -> None:
         self._unresolved_interfaces.add(interface)
 
+    def clear_caches(self) -> None:
+        """Clear all cached resolvers."""
+        self._cache.clear()
+        self._async_cache.clear()
+        self._override_cache.clear()
+        self._async_override_cache.clear()
+
     def get_cached(self, interface: Any, *, is_async: bool) -> CompiledResolver | None:
         """Get cached resolver if it exists."""
         if self.override_mode:
@@ -85,7 +92,12 @@ class Resolver:
         # Recursively compile dependencies first
         for p in provider.parameters:
             if p.provider is not None:
-                self.compile(p.provider, is_async=is_async)
+                # Look up the current provider to handle overrides
+                current_provider = self._container.providers.get(p.annotation)
+                if current_provider is not None:
+                    self.compile(current_provider, is_async=is_async)
+                else:
+                    self.compile(p.provider, is_async=is_async)
 
         # Compile the resolver and creator functions
         compiled = self._compile_resolver(
@@ -155,23 +167,29 @@ class Resolver:
             else (self._async_cache if is_async else self._cache)
         )
 
-        for idx, p in enumerate(provider.parameters):
-            param_annotations[idx] = p.annotation
-            param_defaults[idx] = p.default
-            param_has_default[idx] = p.has_default
-            param_names[idx] = p.name
-            param_shared_scopes[idx] = p.shared_scope
+        for idx, param in enumerate(provider.parameters):
+            param_annotations[idx] = param.annotation
+            param_defaults[idx] = param.default
+            param_has_default[idx] = param.has_default
+            param_names[idx] = param.name
+            param_shared_scopes[idx] = param.shared_scope
 
-            if p.provider is not None:
-                compiled = cache.get(p.provider.interface)
+            if param.provider is not None:
+                # Look up the current provider from the container to handle overrides
+                current_provider = self._container.providers.get(param.annotation)
+                if current_provider is not None:
+                    compiled = cache.get(current_provider.interface)
+                else:
+                    # Fallback to the original provider if not in container
+                    compiled = cache.get(param.provider.interface)
                 if compiled is None:
-                    compiled = self.compile(p.provider, is_async=is_async)
-                    cache[p.provider.interface] = compiled
+                    compiled = self.compile(param.provider, is_async=is_async)
+                    cache[param.provider.interface] = compiled
                 param_resolvers[idx] = compiled.resolve
 
             unresolved_message = (
-                f"You are attempting to get the parameter `{p.name}` with the "
-                f"annotation `{type_repr(p.annotation)}` as a dependency into "
+                f"You are attempting to get the parameter `{param.name}` with the "
+                f"annotation `{type_repr(param.annotation)}` as a dependency into "
                 f"`{type_repr(provider.call)}` which is not registered or set in the "
                 "scoped context."
             )
