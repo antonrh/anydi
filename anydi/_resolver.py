@@ -90,14 +90,14 @@ class Resolver:
             return cache[provider.interface]
 
         # Recursively compile dependencies first
-        for p in provider.parameters:
-            if p.provider is not None:
+        for param in provider.parameters:
+            if param.provider is not None:
                 # Look up the current provider to handle overrides
-                current_provider = self._container.providers.get(p.annotation)
+                current_provider = self._container.providers.get(param.annotation)
                 if current_provider is not None:
                     self.compile(current_provider, is_async=is_async)
                 else:
-                    self.compile(p.provider, is_async=is_async)
+                    self.compile(param.provider, is_async=is_async)
 
         # Compile the resolver and creator functions
         compiled = self._compile_resolver(
