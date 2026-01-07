@@ -1,6 +1,6 @@
 # Named Providers
 
-Sometimes, it's useful to register multiple providers for the same type. For example, you might want to register multiple database connections or different implementations of the same interface. This can be achieved by using the `Annotated` type hint with a string argument to distinguish between providers.
+Sometimes you need to register multiple providers for the same type. For example, you might want multiple database connections or different implementations of the same interface. You can do this with the `Annotated` type hint and a string name to tell providers apart.
 
 ## Basic Usage
 
@@ -40,7 +40,7 @@ assert primary.host == "db-primary.local"
 assert replica.host == "db-replica.local"
 ```
 
-In this code example, we define two providers for different database connections. The `Annotated` type hint with string argument allows you to specify which provider to retrieve based on the name provided within the annotation.
+In this example, we define two providers for different database connections. The `Annotated` type hint with a string lets you choose which provider to use by the name in the annotation.
 
 ## Use Cases
 
@@ -122,12 +122,6 @@ def s3_storage() -> Annotated[StorageBackend, "s3"]:
 local = container.resolve(Annotated[StorageBackend, "local"])
 cloud = container.resolve(Annotated[StorageBackend, "s3"])
 ```
-
-## Best Practices
-
-1. **Use descriptive names**: Choose clear, meaningful names that indicate the purpose or configuration of each provider
-2. **Document naming conventions**: Make it clear to other developers which names are available and what they represent
-3. **Avoid over-complication**: If you find yourself registering many named variants, consider whether a different design pattern might be more appropriate
 
 ---
 

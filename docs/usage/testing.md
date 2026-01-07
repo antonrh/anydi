@@ -1,9 +1,7 @@
 # Testing
 
-To use `AnyDI` with your testing framework, call the `.override(interface=..., instance=...)` context manager
-to temporarily replace a dependency with an overridden instance during testing. This allows you to isolate the code being tested from its dependencies.
-The `container.override()` context manager ensures that the overridden instance is used only within the context of the `with` block.
-Once the block is exited, the original dependency is restored.
+To test with `AnyDI`, use the `.override(interface=..., instance=...)` context manager. This replaces a dependency temporarily during testing. It helps you isolate code from its dependencies.
+The `container.override()` works only inside the `with` block. When the block ends, the original dependency comes back.
 
 ```python
 from dataclasses import dataclass
@@ -49,15 +47,65 @@ def test_handler() -> None:
         assert get_items() == [Item(name="mock1"), Item(name="mock2")]
 ```
 
+## Testing with Modules
+
+You can create a testing module that overrides providers from your application modules. Use `@provider(scope="...", override=True)` to replace specific providers:
+
+```python
+from anydi import Container, Module, provider
+
+
+class Database:
+    def __init__(self, url: str) -> None:
+        self.url = url
+
+
+class UserService:
+    def __init__(self, db: Database) -> None:
+        self.db = db
+
+
+class AppModule(Module):
+    @provider(scope="singleton")
+    def database(self) -> Database:
+        return Database(url="postgresql://prod-server/db")
+
+    @provider(scope="singleton")
+    def user_service(self, db: Database) -> UserService:
+        return UserService(db=db)
+
+
+class TestingModule(Module):
+    @provider(scope="singleton", override=True)
+    def database(self) -> Database:
+        return Database(url="sqlite:///:memory:")
+
+
+# Setup container with both modules
+container = Container()
+container.register_module(AppModule())
+container.register_module(TestingModule())
+
+# UserService will use the overridden database from TestingModule
+service = container.resolve(UserService)
+assert service.db.url == "sqlite:///:memory:"
+```
+
+This approach is useful when you want to:
+
+- Replace production dependencies with test doubles (e.g., in-memory databases)
+- Override multiple providers in one place
+- Share testing configuration across multiple test files
+
 ## Pytest Plugin
 
-`AnyDI` provides a pytest plugin that automatically injects dependencies into test functions, eliminating boilerplate code and making tests cleaner.
+`AnyDI` has a pytest plugin that injects dependencies into test functions automatically. This makes tests simpler and cleaner.
 
 ### Configuration
 
-#### Container Setup
+#### Container setup
 
-There are two ways to provide a container for your tests:
+You can provide a container for tests in two ways:
 
 **Option 1: Use the `anydi_container` configuration**
 
@@ -89,7 +137,7 @@ def create_container() -> Container:
 
 **Option 2: Define a `container` fixture**
 
-Alternatively, override a `container` fixture in your test suite (e.g., in `conftest.py`):
+Or you can override a `container` fixture in your test suite (e.g., in `conftest.py`):
 
 ```python
 import pytest
@@ -106,9 +154,9 @@ def container() -> Container:
 
 **Note:** The fixture approach takes priority over the configuration if both are defined.
 
-### Auto-Injection Mode
+### Auto-injection mode
 
-By default, you need to mark tests with `@pytest.mark.inject` to enable dependency injection. To automatically inject dependencies into all test functions, set `anydi_autoinject` to `True`:
+By default, you need to mark tests with `@pytest.mark.inject` for dependency injection. To inject dependencies into all test functions automatically, set `anydi_autoinject` to `True`:
 
 ```ini
 # pytest.ini
@@ -124,9 +172,9 @@ anydi_autoinject = true
 
 ### Usage
 
-#### Basic Injection
+#### Basic injection
 
-Use the `@pytest.mark.inject` decorator to inject dependencies into specific test functions:
+Use the `@pytest.mark.inject` decorator to inject dependencies into test functions:
 
 ```python
 import pytest
@@ -143,15 +191,15 @@ def test_service_get_items(container: Container, service: Service) -> None:
         assert service.get_items() == [Item(name="mock1"), Item(name="mock2")]
 ```
 
-Dependencies are automatically resolved from the container based on type annotations.
+Dependencies are resolved from the container automatically based on type annotations.
 
-#### Fixture Priority
+#### Fixture priority
 
-Pytest fixtures always take priority over dependency injection. If a pytest fixture and the `@pytest.mark.inject` decorator both provide a value for the same parameter name, the fixture value will be used.
+Pytest fixtures always have higher priority than dependency injection. If a pytest fixture and `@pytest.mark.inject` both provide the same parameter, the fixture value is used.
 
-#### Fixture Injection
+#### Fixture injection
 
-`anydi_fixture_inject_enabled` toggles dependency injection for fixtures annotated with `@pytest.mark.inject`. It is **disabled** by default, so you need to opt in explicitly if you want fixtures to benefit from container injection. This option performs heavy monkey patching of `pytest.fixture` and is considered experimental, so enable it only if you understand the trade-offs:
+`anydi_fixture_inject_enabled` enables dependency injection for fixtures with `@pytest.mark.inject`. It is **disabled** by default. You need to enable it if you want fixtures to use container injection. This option does heavy monkey patching of `pytest.fixture` and is experimental, so use it only if you understand the risks:
 
 ```ini
 # pytest.ini
@@ -165,7 +213,7 @@ anydi_fixture_inject_enabled = true
 anydi_fixture_inject_enabled = true
 ```
 
-With fixture injection enabled, use the marker on any fixture and annotate the parameters you want resolved from the container. This works for synchronous, generator, and async fixtures (async fixtures still require the `anyio` plugin, just like async tests):
+When fixture injection is enabled, use the marker on any fixture and annotate parameters you want from the container. This works for sync, generator, and async fixtures (async fixtures still need the `anyio` plugin, like async tests):
 
 ```python
 import pytest

@@ -1,6 +1,6 @@
 # Typer Extension
 
-Integrating `AnyDI` with [`Typer`](https://typer.tiangolo.com/) allows you to use dependency injection in your CLI applications. This extension supports both synchronous and asynchronous commands, making it easy to build modern CLI tools with clean dependency management.
+You can use `AnyDI` with [`Typer`](https://typer.tiangolo.com/) to add dependency injection to CLI applications. This extension supports both sync and async commands for building modern CLI tools with clean dependency management.
 
 ```python
 import anydi.ext.typer
@@ -56,9 +56,9 @@ def hello(
     typer.echo(greeting)
 ```
 
-## Async Commands
+## Async commands
 
-The extension fully supports async commands. Simply define your command as an `async` function, and `AnyDI` will automatically handle the async execution using `anyio`:
+The extension supports async commands fully. Define your command as `async` function and `AnyDI` will handle async execution with `anyio` automatically:
 
 ```python
 import anydi.ext.typer
@@ -92,11 +92,11 @@ async def get_user(
 anydi.ext.typer.install(app, container)
 ```
 
-Async commands work seamlessly with dependency injection, and you can mix both sync and async commands in the same application.
+Async commands work with dependency injection seamlessly. You can mix both sync and async commands in the same application.
 
-## Multiple Dependencies
+## Multiple dependencies
 
-You can inject multiple dependencies into a single command:
+You can inject multiple dependencies into one command:
 
 ```python
 from typing import Annotated
@@ -189,9 +189,9 @@ def process(
 anydi.ext.typer.install(app, container)
 ```
 
-## Nested Apps
+## Nested apps
 
-The extension automatically supports nested Typer apps (command groups):
+The extension supports nested Typer apps (command groups) automatically:
 
 ```python
 import anydi.ext.typer
@@ -251,9 +251,9 @@ python app.py user create Alice
 python app.py user delete 123
 ```
 
-## Automatic Scope Context Management
+## Automatic scope context management
 
-The Typer extension automatically manages scope contexts for your commands. When you use dependencies with different scopes (singleton, request, or custom), the appropriate contexts are automatically started and cleaned up.
+The Typer extension manages scope contexts for commands automatically. When you use dependencies with different scopes (singleton, request, or custom), the contexts are started and cleaned up automatically.
 
 ```python
 from typing import Annotated
@@ -321,9 +321,9 @@ When you run this command:
 
 ## Testing
 
-Testing Typer commands with `AnyDI` is straightforward using the `CliRunner` and container overrides:
+Testing Typer commands with `AnyDI` is simple using `CliRunner` and container overrides:
 
-### Basic Testing
+### Basic testing
 
 ```python
 from unittest import mock
@@ -367,7 +367,7 @@ def test_hello_command() -> None:
     assert "Hello, World!" in result.stdout
 ```
 
-### Testing with Mocked Dependencies
+### Testing with mocked dependencies
 
 Use `container.override()` to replace dependencies with mocks:
 

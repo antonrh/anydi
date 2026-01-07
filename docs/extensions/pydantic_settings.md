@@ -1,10 +1,10 @@
 # Pydantic Settings Extension
 
-The Pydantic Settings extension allows you to load settings from a Pydantic model into an AnyDI container.
+The Pydantic Settings extension loads settings from a Pydantic model into an AnyDI container.
 
 ## Quick Start
 
-Suppose you have a Pydantic `BaseSettings` model for your application settings:
+If you have a Pydantic `BaseSettings` model for application settings:
 
 ```python
 from pydantic_settings import BaseSettings
@@ -22,11 +22,11 @@ container = Container()
 anydi.ext.pydantic_settings.install(Settings(), container)
 ```
 
-`anydi.ext.pydantic_settings.install` will load the settings from the `Settings` model into the container as singletons.
+`anydi.ext.pydantic_settings.install` loads the settings from `Settings` model into the container as singletons.
 
-## Accessing Settings
+## Accessing settings
 
-You can access the settings values from the container like this:
+Access settings values from the container:
 
 ```python
 app_name = container.resolve(Annotated[str, "settings.app_name"])
@@ -34,9 +34,9 @@ app_name = container.resolve(Annotated[str, "settings.app_name"])
 assert app_name == "My App"
 ```
 
-## Custom Prefix
+## Custom prefix
 
-You can also specify a custom prefix for the settings:
+You can specify a custom prefix for settings:
 
 ```python
 anydi.ext.pydantic_settings.install(Settings(), container, prefix="my_settings")

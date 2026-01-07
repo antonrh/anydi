@@ -25,9 +25,9 @@ ANYDI = {
 }
 ```
 
-This configuration will inject dependencies into your Django views located in the specified URL configuration (URLconf).
+This configuration injects dependencies into your Django views in the specified URLconf.
 
-Assume you have a service class that you want to inject into your views:
+Let's say you have a service class you want to inject into your views:
 
 ```python
 class HelloService:
@@ -58,19 +58,19 @@ urlpatterns = [
 ]
 ```
 
-The `HelloService` will be automatically injected into the hello view through the provided marker `Provide[HelloService]`.
+The `HelloService` is injected automatically into the hello view with the `Provide[HelloService]` marker.
 
 ## Settings
 
 `ANYDI` supports the following settings:
 
-* `CONTAINER_FACTORY: str | None` (default: `None`) - Specifies the factory function used to create the container. If not provided, the default container factory will be utilized.
-* `REGISTER_SETTINGS: bool` (default: `False`) - If `True`, the container will register the Django settings within it.
-* `REGISTER_COMPONENTS: bool` (default: `False`) - If `True`, the container will register Django components such as the database and cache.
-* `INJECT_URLCONF: str | Sequence[str] | None` (default: `None`) - Specifies the URL configuration where dependencies should be injected.
-* `MODULES: Sequence[str]` (default: `[]`) - Lists the modules to be scanned for dependencies.
-* `SCAN_PACKAGES: Sequence[str]` (default: `[]`) - Designates the packages to be scanned for dependencies.
-* `PATCH_NINJA: bool` (default: `False`) - If `True`, the container will modify the `ninja` framework to support dependency injection.
+* `CONTAINER_FACTORY: str | None` (default: `None`) - Factory function to create the container. If not provided, uses default container factory.
+* `REGISTER_SETTINGS: bool` (default: `False`) - If `True`, registers Django settings in the container.
+* `REGISTER_COMPONENTS: bool` (default: `False`) - If `True`, registers Django components like database and cache.
+* `INJECT_URLCONF: str | Sequence[str] | None` (default: `None`) - URL configuration where dependencies should be injected.
+* `MODULES: Sequence[str]` (default: `[]`) - Modules to scan for dependencies.
+* `SCAN_PACKAGES: Sequence[str]` (default: `[]`) - Packages to scan for dependencies.
+* `PATCH_NINJA: bool` (default: `False`) - If `True`, modifies the `ninja` framework to support dependency injection.
 
 ## Modules
 
@@ -126,8 +126,7 @@ def get_container() -> Container:
 
 ## Request Scope
 
-To use `request`-scoped dependencies in your Django application with `AnyDI`, include the `request_scoped_middleware`.
-This middleware creates request-specific dependency instances at the start of each request, which remain available for the request’s duration.
+To use `request`-scoped dependencies in your Django application, add the `request_scoped_middleware`. This middleware creates request-specific dependency instances at the start of each request. They stay available for the request duration.
 
 Add the middleware to your `settings.py`:
 
@@ -138,17 +137,15 @@ MIDDLEWARE = [
 ]
 ```
 
-With this setup, you can define and utilize `request`-scoped dependencies throughout your application.
-Additionally, `HttpRequest` dependencies are automatically available in request-scoped providers,
-allowing convenient access to the request object and its data in these dependencies.
+With this setup, you can use `request`-scoped dependencies in your application. `HttpRequest` is automatically available in request-scoped providers, so you can access the request object and its data.
 
 ## Testing
 
-When writing tests for your Django application, you may need to mock or override services to isolate the code under test. `AnyDI` provides two approaches for mocking dependencies in your tests.
+When you write tests for your Django application, you may need to mock or override services. `AnyDI` has two ways to mock dependencies in tests.
 
 ### Using `container.override`
 
-You can use `container.override` as a context manager to temporarily replace a service with a mock. This approach is useful for functional tests where you want to override dependencies for specific test scenarios.
+You can use `container.override` as a context manager to replace a service temporarily with a mock. This is useful for functional tests where you want to override dependencies for specific tests.
 
 ```python
 from unittest import mock
@@ -176,7 +173,7 @@ def test_hello_view() -> None:
 
 ### Using the `container` fixture with pytest
 
-If you're using pytest, you can use the `container` fixture provided by the `anydi` pytest plugin. This approach is more convenient for test isolation and allows you to override dependencies for the entire test function or test class.
+If you use pytest, you can use the `container` fixture from the `anydi` pytest plugin. This is more convenient for test isolation and lets you override dependencies for the entire test function or test class.
 
 First, install `pytest-django`:
 
@@ -245,7 +242,7 @@ def test_hello_view(client: Client, hello_service_mock: mock.MagicMock) -> None:
     hello_service_mock.get_message.assert_called_once()
 ```
 
-Both approaches provide flexible ways to mock dependencies in your tests, allowing you to test your Django views and business logic in isolation.
+Both ways let you mock dependencies flexibly in your tests, so you can test your Django views and business logic separately.
 
 ## Django Ninja
 
@@ -255,7 +252,7 @@ Install `anydi` with `Django Ninja` support:
 pip install 'anydi-django[ninja]'
 ```
 
-If you are using the [Django Ninja](https://django-ninja.dev/) framework, you can enable dependency injection by setting the `PATCH_NINJA` to `True`.
+If you use the [Django Ninja](https://django-ninja.dev/) framework, you can enable dependency injection by setting `PATCH_NINJA` to `True`.
 
 ```python
 ANYDI = {
@@ -263,7 +260,7 @@ ANYDI = {
 }
 ```
 
-This setting will modify the `Django Ninja framework` to support dependency injection.
+This setting modifies the `Django Ninja framework` to support dependency injection.
 
 ```python
 from typing import Any
@@ -284,7 +281,7 @@ def hello(request: HttpRequest, hello_service: Provide[HelloService]) -> dict[st
     }
 ```
 
-The `HelloService` will be automatically injected into the hello endpoint using the provided marker `Provide[HelloService]`.
+The `HelloService` is injected automatically into the hello endpoint with the `Provide[HelloService]` marker.
 
 ### Testing Django Ninja endpoints
 

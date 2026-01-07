@@ -1,12 +1,11 @@
 # Provider Basics
 
-Providers are the backbone of `AnyDI`. A provider is a function or a class that returns an instance of a specific type.
-Once a provider is registered with `Container`, it can be used to resolve dependencies throughout the application.
+Providers are the main part of `AnyDI`. A provider is a function or class that returns an instance of a specific type.
+After you register a provider with `Container`, you can use it to resolve dependencies in your application.
 
-## Registering Providers
+## Registering providers
 
-To register a provider, you can use the `register` method of the `Container` instance. The method takes
-three arguments: the type of the object to be provided, the provider function or class, and a scope.
+To register a provider, use the `register` method of the `Container`. The method takes the type of the object, the provider function or class, and a scope.
 
 ```python
 from anydi import Container
@@ -24,7 +23,7 @@ service = container.resolve(EmailService)
 service.send("user@example.com", "Welcome!")
 ```
 
-Alternatively, you can use the `@provider` decorator to register a provider function. The decorator takes care of registering the provider with `Container`.
+You can also use the `@provider` decorator to register a provider function. The decorator registers the provider with `Container` automatically.
 
 ```python
 from anydi import Container
@@ -47,10 +46,9 @@ service = container.resolve(NotificationService)
 service.notify("user-123", "Hello!")
 ```
 
-## Unregistering Providers
+## Unregistering providers
 
-To unregister a provider, you can use the `unregister` method of the `Container` instance. The method takes
-interface of the dependency to be unregistered.
+To unregister a provider, use the `unregister` method of the `Container`. The method takes the interface of the dependency you want to remove.
 
 ```python
 from anydi import Container
@@ -77,9 +75,9 @@ container.unregister(PaymentService)
 assert not container.is_registered(PaymentService)
 ```
 
-## Checking Provider Status
+## Checking provider status
 
-### Checking Registration
+### Checking registration
 
 To check if a provider is registered, use the `is_registered` method:
 
@@ -104,10 +102,9 @@ container.register(LoggerService, scope="singleton")
 assert container.is_registered(LoggerService)
 ```
 
-### Checking Resolution
+### Checking resolution
 
-To check if a registered provider has a resolved instance, you can use the `is_resolved` method of the `Container` instance.
-This method takes the interface of the dependency to be checked.
+To check if a provider has a resolved instance, use the `is_resolved` method of the `Container`. This method takes the interface of the dependency.
 
 ```python
 from anydi import Container
@@ -145,9 +142,9 @@ container.release(CacheService)
 assert not container.is_resolved(CacheService)
 ```
 
-## Releasing Instances
+## Releasing instances
 
-To release a provider instance, you can use the `release` method of the `Container` instance. This method takes the interface of the dependency to be reset. Alternatively, you can reset all instances with the `reset` method.
+To release a provider instance, use the `release` method of the `Container`. This method takes the interface of the dependency. You can also reset all instances with the `reset` method.
 
 ```python
 from anydi import Container

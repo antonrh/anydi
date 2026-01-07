@@ -1,10 +1,10 @@
 # Core Concepts
 
-Understanding these core concepts will help you make the most of AnyDI.
+Learn these basic concepts to use AnyDI better.
 
 ## Container
 
-The `Container` is the central registry for all your dependencies. It stores providers and resolves dependencies when needed.
+The `Container` is the main place where all your dependencies are stored. It keeps providers and creates dependencies when you need them.
 
 ```python
 from anydi import Container
@@ -12,17 +12,17 @@ from anydi import Container
 container = Container()
 ```
 
-Think of the container as a "registry" or "service locator" that knows how to create and manage all your application's services.
+You can think of container as a registry that knows how to create and manage all your services.
 
-### Key Responsibilities:
+### What container does:
 - Stores provider registrations
-- Resolves dependencies
-- Manages lifecycles (singleton, transient, request)
-- Handles dependency injection
+- Resolves dependencies on demand
+- Manages object lifecycles (singleton, transient, request)
+- Performs dependency injection
 
 ## Provider
 
-A provider is a callable (function or class) that creates an instance of a specific type. It tells the container *how* to create a dependency.
+A provider is a function or class that creates an object of a specific type. It tells the container how to create a dependency.
 
 ```python
 from anydi import Container
@@ -58,7 +58,7 @@ class NotificationService:
 
 ## Scope
 
-A scope determines the lifecycle of a dependency - how long an instance lives and when it's created.
+A scope controls the lifecycle of a dependency. It decides how long an instance lives and when it is created.
 
 ```python
 # Singleton: One instance for the entire application
@@ -77,17 +77,17 @@ def user_context() -> UserContext:
     return UserContext()
 ```
 
-### Built-in Scopes:
-- **singleton**: Created once, shared everywhere
-- **transient**: Created every time it's requested
-- **request**: Created once per request context
+### Built-in scopes:
+- **singleton**: Created one time and used everywhere
+- **transient**: New instance created every time you need it
+- **request**: Created one time per request context
 
-### Custom Scopes:
-You can define your own scopes for specialized use cases like background jobs, user sessions, or multi-tenancy.
+### Custom scopes:
+You can create your own scopes for special cases like background jobs, user sessions, or multi-tenancy.
 
 ## Dependency Injection
 
-Dependency injection is the process of automatically providing dependencies to a function or class, rather than requiring them to create or find dependencies themselves.
+Dependency injection means that dependencies are given to a function or class automatically. You don't need to create them manually.
 
 ```python
 from anydi import Provide
@@ -109,15 +109,15 @@ def process_order(service: Provide[OrderService]) -> None:
 container.run(process_order)
 ```
 
-### Benefits:
-- **Testability**: Easy to substitute mocks in tests
-- **Flexibility**: Change implementations without changing code
-- **Maintainability**: Clear dependencies make code easier to understand
-- **Decoupling**: Services don't need to know how to create their dependencies
+### Why use dependency injection:
+- **Testability**: Easy to substitute mocks and test doubles
+- **Flexibility**: Can swap implementations without modifying code
+- **Maintainability**: Explicit dependencies make code easier to understand
+- **Decoupling**: Services don't need to know dependency instantiation logic
 
 ## Interface
 
-An interface is the type annotation used to identify a dependency. It's typically a class, but can be any type.
+An interface is a type annotation that identifies a dependency. Usually it is a class, but it can be any type.
 
 ```python
 from typing import Protocol
@@ -142,8 +142,8 @@ class LocalStorage:
 container.register(StorageBackend, lambda: LocalStorage(), scope="singleton")
 ```
 
-### Named Interfaces:
-Use `Annotated` to register multiple providers for the same type:
+### Named interfaces:
+You can use `Annotated` to register multiple providers for the same type:
 
 ```python
 from typing import Annotated
@@ -161,32 +161,19 @@ def replica_db() -> Annotated[Database, "replica"]:
 
 ## Resolution
 
-Resolution is the process of creating an instance along with all its dependencies.
+Resolution is the process when container creates an instance with all its dependencies.
 
 ```python
 # Resolve a service
 service = container.resolve(EmailService)
-
-# Resolution process:
-# 1. Container looks up the provider for EmailService
-# 2. Checks if dependencies are needed (from type hints)
-# 3. Recursively resolves each dependency
-# 4. Creates the instance
-# 5. Caches it (if scope requires)
-# 6. Returns the instance
 ```
 
-### Automatic vs Manual Resolution:
+### Automatic vs manual resolution:
 ```python
 # Manual resolution
 service = container.resolve(EmailService)
 
-# Automatic resolution (via injection)
-@container.inject
-def send_email(service: EmailService = Inject()):
-    service.send("user@example.com", "Hello")
-
-# Automatic resolution (via Provide)
+# Automatic resolution
 def send_welcome(service: Provide[EmailService]):
     service.send("user@example.com", "Welcome")
 
@@ -195,7 +182,7 @@ container.run(send_welcome)
 
 ## Lifecycle Management
 
-Lifecycle management refers to controlling when resources are created, used, and cleaned up.
+Lifecycle management controls when resources are created, used, and cleaned up.
 
 ```python
 from typing import Iterator
@@ -224,8 +211,8 @@ db = container.resolve(Database)
 container.close()
 ```
 
-### Context Managers:
-AnyDI integrates with Python's context manager protocol:
+### Context managers:
+AnyDI works with Python's context managers:
 
 ```python
 # Singleton context
@@ -241,9 +228,9 @@ with container.request_context():
     # Request-scoped resources are cleaned up on exit
 ```
 
-## Putting It All Together
+## How it all works together
 
-Here's how all these concepts work together:
+Here is an example that shows how all concepts work together:
 
 ```python
 from typing import Iterator
