@@ -16,6 +16,7 @@ from anydi import (
     Provide,
     Provider,
     Scope,
+    provided,
     request,
     singleton,
     transient,
@@ -937,6 +938,42 @@ class TestContainer:
             result = container.resolve(RequestContext)
             assert result.request.rid == "req-1"
 
+    def test_resolve_request_scoped_auto_nested_dependencies(
+        self, container: Container
+    ) -> None:
+        @request
+        class Repository:
+            pass
+
+        @request
+        class Service:
+            def __init__(self, repository: Repository) -> None:
+                self.repository = repository
+
+        with container.request_context():
+            result = container.resolve(Service)
+
+        assert isinstance(result, Service)
+        assert isinstance(result.repository, Repository)
+
+    async def test_aresolve_request_scoped_auto_nested_dependencies(
+        self, container: Container
+    ) -> None:
+        @request
+        class Repository:
+            pass
+
+        @request
+        class Service:
+            def __init__(self, repository: Repository) -> None:
+                self.repository = repository
+
+        async with container.arequest_context():
+            result = await container.aresolve(Service)
+
+        assert isinstance(result, Service)
+        assert isinstance(result.repository, Repository)
+
     def test_resolve_scoped_thread_safe(self, container: Container) -> None:
         @container.provider(scope="request")
         def provide_unique_id() -> UniqueId:
@@ -1818,6 +1855,127 @@ class TestContainerCustomScopes:
             assert container.resolve(int) == 10
             assert container.resolve(str) == "test"
             assert container.resolve(float) == 3.14
+
+    def test_custom_scope_auto_nested_dependencies(self, container: Container) -> None:
+        container.register_scope("task")
+
+        @provided(scope="task")
+        class Repository:
+            pass
+
+        @provided(scope="task")
+        class Service:
+            def __init__(self, repository: Repository) -> None:
+                self.repository = repository
+
+        with container.scoped_context("task"):
+            result = container.resolve(Service)
+
+        assert isinstance(result, Service)
+        assert isinstance(result.repository, Repository)
+
+    async def test_custom_scope_auto_nested_dependencies_async(
+        self, container: Container
+    ) -> None:
+        container.register_scope("task")
+
+        @provided(scope="task")
+        class Repository:
+            pass
+
+        @provided(scope="task")
+        class Service:
+            def __init__(self, repository: Repository) -> None:
+                self.repository = repository
+
+        async with container.ascoped_context("task"):
+            result = await container.aresolve(Service)
+
+        assert isinstance(result, Service)
+        assert isinstance(result.repository, Repository)
+
+    def test_custom_scope_unresolved_error(self, container: Container) -> None:
+        container.register_scope("task")
+
+        @provided(scope="task")
+        class TaskRequest:
+            def __init__(self, task_id: str) -> None:
+                self.task_id = task_id
+
+        @container.provider(scope="task")
+        def task_handler(req: TaskRequest) -> str:
+            return req.task_id
+
+        with (
+            pytest.raises(
+                LookupError,
+                match=(
+                    "You are attempting to get the parameter `req` with the annotation "
+                    "`(.*?).TaskRequest` as a dependency into `(.*?).task_handler` "
+                    "which is not registered or set in the scoped context."
+                ),
+            ),
+            container.scoped_context("task"),
+        ):
+            container.resolve(str)
+
+    def test_custom_scope_with_context_set(self, container: Container) -> None:
+        container.register_scope("task")
+
+        @provided(scope="task")
+        class TaskRequest:
+            def __init__(self, task_id: str) -> None:
+                self.task_id = task_id
+
+        @container.provider(scope="task")
+        def task_handler(req: TaskRequest) -> str:
+            return req.task_id
+
+        with container.scoped_context("task") as context:
+            context.set(TaskRequest, TaskRequest(task_id="task-123"))
+            assert container.resolve(str) == "task-123"
+
+    def test_custom_scope_nested_parent_scope_dependency(
+        self, container: Container
+    ) -> None:
+        container.register_scope("task", parents=["request"])
+
+        @request
+        class RequestContext:
+            pass
+
+        @provided(scope="task")
+        class TaskHandler:
+            def __init__(self, ctx: RequestContext) -> None:
+                self.ctx = ctx
+
+        with container.request_context():
+            with container.scoped_context("task"):
+                result = container.resolve(TaskHandler)
+
+        assert isinstance(result, TaskHandler)
+        assert isinstance(result.ctx, RequestContext)
+
+    async def test_custom_scope_nested_parent_scope_dependency_async(
+        self, container: Container
+    ) -> None:
+        container.register_scope("task", parents=["request"])
+
+        @request
+        class RequestContext:
+            pass
+
+        @provided(scope="task")
+        class TaskHandler:
+            def __init__(self, ctx: RequestContext) -> None:
+                self.ctx = ctx
+
+        async with container.arequest_context():
+            async with container.ascoped_context("task"):
+                result = await container.aresolve(TaskHandler)
+
+        assert isinstance(result, TaskHandler)
+        assert isinstance(result.ctx, RequestContext)
 
     def test_unregister_custom_scoped_provider(self, container: Container) -> None:
         """Test unregistering a provider with custom scope."""
