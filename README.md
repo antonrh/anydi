@@ -6,7 +6,7 @@ Simple Dependency Injection library that uses Python type annotations.
 
 [![CI](https://github.com/antonrh/anydi/actions/workflows/ci.yml/badge.svg)](https://github.com/antonrh/anydi/actions/workflows/ci.yml)
 [![Coverage](https://codecov.io/gh/antonrh/anydi/branch/main/graph/badge.svg)](https://codecov.io/gh/antonrh/anydi)
-[![Documentation](https://readthedocs.org/projects/anydi/badge/?version=latest)](https://anydi.readthedocs.io/en/latest/)
+[![Documentation](https://readthedocs.org/projects/anydi/badge/?version=latest)](https://anydi.readthedocs.io/en/stable/)
 [![CodSpeed](https://img.shields.io/endpoint?url=https://codspeed.io/badge.json)](https://codspeed.io/antonrh/anydi?utm_source=badge)
 
 </div>
@@ -236,18 +236,18 @@ urlpatterns = [
 Want to know more? Here are helpful resources:
 
 **Core Documentation:**
-- [Core Concepts](https://anydi.readthedocs.io/en/latest/concepts/) - Learn about containers, providers, scopes, and dependency injection
-- [Providers](https://anydi.readthedocs.io/en/latest/usage/providers/) - How to register providers and manage resources
-- [Scopes](https://anydi.readthedocs.io/en/latest/usage/scopes/) - How to use built-in and custom scopes
-- [Dependency Injection](https://anydi.readthedocs.io/en/latest/usage/injection/) - Different ways to inject dependencies
-- [Testing](https://anydi.readthedocs.io/en/latest/usage/testing/) - How to test your code with provider overrides
+- [Core Concepts](https://anydi.readthedocs.io/en/stable/concepts/) - Learn about containers, providers, scopes, and dependency injection
+- [Providers](https://anydi.readthedocs.io/en/stable/usage/providers/) - How to register providers and manage resources
+- [Scopes](https://anydi.readthedocs.io/en/stable/usage/scopes/) - How to use built-in and custom scopes
+- [Dependency Injection](https://anydi.readthedocs.io/en/stable/usage/injection/) - Different ways to inject dependencies
+- [Testing](https://anydi.readthedocs.io/en/stable/usage/testing/) - How to test your code with provider overrides
 
 **Framework Integrations:**
-- [FastAPI](https://anydi.readthedocs.io/en/latest/extensions/fastapi/) - How to use with FastAPI
-- [Django](https://anydi.readthedocs.io/en/latest/extensions/django/) - How to use with Django and Django Ninja
-- [FastStream](https://anydi.readthedocs.io/en/latest/extensions/faststream/) - How to use with message brokers
-- [Typer](https://anydi.readthedocs.io/en/latest/extensions/typer/) - How to use in CLI applications
-- [Pydantic Settings](https://anydi.readthedocs.io/en/latest/extensions/pydantic_settings/) - How to manage configuration
+- [FastAPI](https://anydi.readthedocs.io/en/stable/extensions/fastapi/) - How to use with FastAPI
+- [Django](https://anydi.readthedocs.io/en/stable/extensions/django/) - How to use with Django and Django Ninja
+- [FastStream](https://anydi.readthedocs.io/en/stable/extensions/faststream/) - How to use with message brokers
+- [Typer](https://anydi.readthedocs.io/en/stable/extensions/typer/) - How to use in CLI applications
+- [Pydantic Settings](https://anydi.readthedocs.io/en/stable/extensions/pydantic_settings/) - How to manage configuration
 
 **Full Documentation:**
 - [Read the Docs](https://anydi.readthedocs.io/) - All documentation with examples and guides

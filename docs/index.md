@@ -8,7 +8,7 @@ Simple Dependency Injection library that uses Python type annotations.
 <a href="https://codecov.io/gh/antonrh/anydi">
     <img src="https://codecov.io/gh/antonrh/anydi/branch/main/graph/badge.svg" alt="Coverage">
 </a>
-<a href="https://anydi.readthedocs.io/en/latest/">
+<a href="https://anydi.readthedocs.io/en/stable/">
     <img src="https://readthedocs.org/projects/anydi/badge/?version=latest" alt="Documentation">
 </a>
 
@@ -226,3 +226,21 @@ urlpatterns = [
     path("api/", api.urls),
 ]
 ```
+
+## Learn More
+
+Want to know more? Here are helpful resources:
+
+**Core Documentation:**
+- [Core Concepts](concepts.md) - Learn about containers, providers, scopes, and dependency injection
+- [Providers](usage/providers/index.md) - How to register providers and manage resources
+- [Scopes](usage/scopes.md) - How to use built-in and custom scopes
+- [Dependency Injection](usage/injection.md) - Different ways to inject dependencies
+- [Testing](usage/testing.md) - How to test your code with provider overrides
+
+**Framework Integrations:**
+- [FastAPI](extensions/fastapi.md) - How to use with FastAPI
+- [Django](extensions/django.md) - How to use with Django and Django Ninja
+- [FastStream](extensions/faststream.md) - How to use with message brokers
+- [Typer](extensions/typer.md) - How to use in CLI applications
+- [Pydantic Settings](extensions/pydantic_settings.md) - How to manage configuration
