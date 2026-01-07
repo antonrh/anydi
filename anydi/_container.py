@@ -458,21 +458,14 @@ class Container:
             )
             has_default = default is not NOT_SET
 
-            # Check if provider exists before attempting to register (for scoped only)
-            was_auto_registered = (
-                is_scoped and parameter.annotation not in self._providers
-            )
-
             try:
                 sub_provider = self._get_or_register_provider(parameter.annotation)
             except LookupError as exc:
                 if (has_defaults and parameter.name in defaults) or has_default:
                     continue
-                # For request/custom scopes, allow unregistered dependencies
-                # They might be provided via context.set()
+                # For scoped (request/custom) dependencies, allow unresolved parameters
+                # that will be provided via context.set()
                 if is_scoped:
-                    # Add to unresolved list to provide better error messages
-                    # and prevent infinite recursion
                     self._resolver.add_unresolved(parameter.annotation)
                     parameters.append(
                         ProviderParameter(
@@ -480,8 +473,8 @@ class Container:
                             annotation=parameter.annotation,
                             default=default,
                             has_default=has_default,
-                            provider=None,  # Will check context at runtime
-                            shared_scope=True,  # Same scope, check context
+                            provider=None,
+                            shared_scope=True,
                         )
                     )
                     continue
@@ -493,9 +486,25 @@ class Container:
             if sub_provider.scope not in scope_provider:
                 scope_provider[sub_provider.scope] = sub_provider
 
-            # If provider was auto-registered and has same scope, mark as unresolved
-            if was_auto_registered and sub_provider.scope == scope:
+            # For scoped dependencies with same scope: if auto-registered provider
+            # has unresolved parameters, defer to context.set() instead
+            if (
+                is_scoped
+                and sub_provider.scope == scope
+                and any(p.provider is None for p in sub_provider.parameters)
+            ):
                 self._resolver.add_unresolved(parameter.annotation)
+                parameters.append(
+                    ProviderParameter(
+                        name=parameter.name,
+                        annotation=parameter.annotation,
+                        default=default,
+                        has_default=has_default,
+                        provider=None,
+                        shared_scope=True,
+                    )
+                )
+                continue
 
             parameters.append(
                 ProviderParameter(

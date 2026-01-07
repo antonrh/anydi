@@ -299,7 +299,7 @@ class Resolver:
                     create_lines.append("                    if compiled is None:")
                     create_lines.append(
                         "                        provider = "
-                        "container._get_or_register_provider(_param_annotations[{idx}])"
+                        f"container._get_or_register_provider(_param_annotations[{idx}])"
                     )
                     create_lines.append(
                         "                        compiled = "
