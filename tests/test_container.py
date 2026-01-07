@@ -1935,6 +1935,48 @@ class TestContainerCustomScopes:
             context.set(TaskRequest, TaskRequest(task_id="task-123"))
             assert container.resolve(str) == "task-123"
 
+    def test_custom_scope_nested_parent_scope_dependency(
+        self, container: Container
+    ) -> None:
+        container.register_scope("task", parents=["request"])
+
+        @request
+        class RequestContext:
+            pass
+
+        @provided(scope="task")
+        class TaskHandler:
+            def __init__(self, ctx: RequestContext) -> None:
+                self.ctx = ctx
+
+        with container.request_context():
+            with container.scoped_context("task"):
+                result = container.resolve(TaskHandler)
+
+        assert isinstance(result, TaskHandler)
+        assert isinstance(result.ctx, RequestContext)
+
+    async def test_custom_scope_nested_parent_scope_dependency_async(
+        self, container: Container
+    ) -> None:
+        container.register_scope("task", parents=["request"])
+
+        @request
+        class RequestContext:
+            pass
+
+        @provided(scope="task")
+        class TaskHandler:
+            def __init__(self, ctx: RequestContext) -> None:
+                self.ctx = ctx
+
+        async with container.arequest_context():
+            async with container.ascoped_context("task"):
+                result = await container.aresolve(TaskHandler)
+
+        assert isinstance(result, TaskHandler)
+        assert isinstance(result.ctx, RequestContext)
+
     def test_unregister_custom_scoped_provider(self, container: Container) -> None:
         """Test unregistering a provider with custom scope."""
         container.register_scope("task")
