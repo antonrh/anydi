@@ -1,6 +1,6 @@
 # FastStream Extension
 
-Integrating `AnyDI` with [`FastStream`](https://faststream.airt.ai/latest/) is straightforward. Because `FastStream` relies on [`FastDepends`](https://github.com/Lancetnik/FastDepends), you can reuse the same `Provide[...]` annotation or `Inject()` marker style as with the FastAPI extension, rather than FastDepends' native `Depends`.
+You can integrate `AnyDI` with [`FastStream`](https://faststream.airt.ai/latest/) easily. Since `FastStream` uses [`FastDepends`](https://github.com/Lancetnik/FastDepends), you can use the same `Provide[...]` annotation or `Inject()` marker as with FastAPI extension, instead of FastDepends' `Depends`.
 
 !!! warning "Version Requirement"
 
@@ -63,9 +63,9 @@ async def handle_greeting(
     return await service.greet(name=name)
 ```
 
-## Using Request-Scoped Dependencies
+## Request-scoped dependencies
 
-To use request-scoped dependencies with FastStream, use the built-in `RequestScopedMiddleware` that wraps message handlers in a request context. This is useful for message-level resources:
+To use request-scoped dependencies with FastStream, use the `RequestScopedMiddleware` that wraps message handlers in request context. This is useful for message-level resources:
 
 ```python
 import uuid
@@ -108,11 +108,11 @@ async def process_order(
 anydi.ext.faststream.install(broker, container)
 ```
 
-The `RequestScopedMiddleware` ensures that each message is processed within its own request context, allowing request-scoped dependencies to be properly resolved and isolated per message.
+The `RequestScopedMiddleware` processes each message in its own request context, so request-scoped dependencies are resolved and isolated per message.
 
-## Using Custom Scoped Dependencies
+## Custom scoped dependencies
 
-You can also use custom scopes with FastStream by creating a custom middleware for your specific scope:
+You can use custom scopes with FastStream by creating custom middleware for your scope:
 
 ```python
 from functools import cached_property
@@ -127,8 +127,6 @@ from anydi.ext.faststream import get_container_from_context
 
 
 class BatchContext:
-    """Context shared across messages in a batch."""
-
     def __init__(self, batch_id: str) -> None:
         self.batch_id = batch_id
         self.processed_count = 0

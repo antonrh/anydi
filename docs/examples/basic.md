@@ -1,8 +1,8 @@
 # Basic example
 
-In this example, we are creating a simple application using `AnyDI`. The application has a `User` model, a `UserRepository` and `UserService` that takes an instance of UserRepository as a dependency and provides methods for creating and retrieving users.
+This example shows how to build a simple application with `AnyDI`. The application has a `User` model, a `UserRepository` and `UserService` that depends on UserRepository instance and provides methods for creating and retrieving users.
 
-Here an example app structure:
+Example application structure:
 
 ```
 app/
@@ -16,7 +16,7 @@ app/
 
 `models.py`
 
-Defines the data model used in the application, in this case just a simple User model.
+Defines the data model for the application - a simple User model with ID and email fields.
 
 ```python
 import uuid
@@ -34,7 +34,7 @@ class User:
 
 `repositories.py`
 
-Defines the interface for a UserRepository, which is responsible for accessing and manipulating the User data. It also provides an implementation of this interface using an in-memory data store.
+Defines the repository interface for User data access and manipulation. Includes an in-memory implementation of this interface.
 
 ```python
 import abc
@@ -75,7 +75,7 @@ class InMemoryUserRepository(UserRepository):
 
 `services.py`
 
-Defines a UserService class that provides higher-level operations on the User data, such as retrieving all users, creating new users, and retrieving a user by their email address.
+Defines the UserService class that provides business logic operations - retrieving all users, creating new users, and finding users by email.
 
 ```python
 from app.models import User
@@ -100,7 +100,7 @@ class UserService:
 
 `modules.py`
 
-Defines two providers using AnyDI's @provider decorator. The first provider creates an instance of the InMemoryUserRepository class, which is then injected into the UserService provider when it is created.
+Defines dependency providers using the @provider decorator. The InMemoryUserRepository instance is registered and injected into UserService automatically.
 
 ```python
 from anydi import Module, provider
@@ -121,7 +121,7 @@ class AppModule(Module):
 
 `handlers.py`
 
-Defines several handlers that use the UserService instance to perform operations on the User data, such as retrieving all users, creating a new user, and retrieving a user by their email address.
+Defines handler functions that use injected UserService to perform operations - getting all users, creating users, and finding users by email.
 
 ```python
 from anydi import Inject, injectable
@@ -150,7 +150,7 @@ def create_user(email: str, user_service: UserService = Inject()) -> User:
 
 `main.py`
 
-Creates an instance of the AnyDI class, scans for providers and request handlers, starts the dependency injection container, and runs a small test suite to ensure that everything is working correctly.
+Creates the Container instance, scans for providers and handlers, starts the DI container, and runs tests to verify the application works correctly.
 
 ```python
 from anydi import Container

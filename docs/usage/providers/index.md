@@ -1,6 +1,6 @@
 # Providers
 
-Providers are the backbone of `AnyDI`. A provider is a function or a class that returns an instance of a specific type. Once a provider is registered with `Container`, it can be used to resolve dependencies throughout the application.
+Providers are the core of `AnyDI`. A provider is a function or class that returns an instance of a specific type. After registering a provider with `Container`, you can use it to resolve dependencies in your application.
 
 ## Quick Examples
 

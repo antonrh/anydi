@@ -2,7 +2,7 @@
 
 <div style="text-align: center;">
 
-Modern, lightweight Dependency Injection library using type annotations.
+Simple Dependency Injection library that uses Python type annotations.
 
 [![CI](https://github.com/antonrh/anydi/actions/workflows/ci.yml/badge.svg)](https://github.com/antonrh/anydi/actions/workflows/ci.yml)
 [![Coverage](https://codecov.io/gh/antonrh/anydi/branch/main/graph/badge.svg)](https://codecov.io/gh/antonrh/anydi)
@@ -18,21 +18,21 @@ http://anydi.readthedocs.io/
 
 ---
 
-`AnyDI` is a modern, lightweight Dependency Injection library suitable for any synchronous or asynchronous applications with Python 3.10+, based on type annotations ([PEP 484](https://peps.python.org/pep-0484/)).
+`AnyDI` is a simple Dependency Injection library for Python 3.10+. It works with sync and async applications and uses type annotations ([PEP 484](https://peps.python.org/pep-0484/)).
 
-The key features are:
+Main features:
 
-* **Type-safe**: Dependency resolution is driven by type hints.
-* **Async-ready**: Works the same for sync and async providers or injections.
-* **Scoped**: Built-in singleton, transient, and request scopes, plus custom scopes.
-* **Simple**: Small surface area keeps boilerplate low.
-* **Fast**: Has minimal overhead and resolves dependencies quickly.
-* **Named**: `Annotated[...]` makes multiple bindings per type simple.
-* **Managed**: Providers can open/close resources via context managers.
-* **Modular**: Compose containers or modules for large apps.
-* **Scanning**: Auto-discovers injectable callables.
-* **Integrated**: Extensions for popular frameworks.
-* **Testable**: Override providers directly in tests.
+* **Type-safe**: Uses type hints for dependency resolution.
+* **Async support**: Works with both sync and async code.
+* **Scopes**: Provides singleton, transient, and request scopes. Supports custom scope definitions.
+* **Simple**: Minimal boilerplate with straightforward API.
+* **Fast**: Low overhead dependency resolution.
+* **Named providers**: Use `Annotated[...]` for multiple providers per type.
+* **Resource management**: Context manager protocol support for lifecycle management.
+* **Modular**: Container and module composition for large applications.
+* **Auto-scan**: Automatic discovery of injectable callables.
+* **Framework integrations**: Extensions for popular frameworks.
+* **Testing**: Provider override mechanism for test isolation.
 
 ## Installation
 
@@ -231,23 +231,23 @@ urlpatterns = [
 ]
 ```
 
-## What's Next?
+## Learn More
 
-Ready to learn more? Check out these resources:
+Want to know more? Here are helpful resources:
 
 **Core Documentation:**
-- [Core Concepts](https://anydi.readthedocs.io/en/latest/concepts/) - Understand containers, providers, scopes, and dependency injection
-- [Providers](https://anydi.readthedocs.io/en/latest/usage/providers/) - Learn about registration, named providers, and resource management
-- [Scopes](https://anydi.readthedocs.io/en/latest/usage/scopes/) - Master lifecycle management with built-in and custom scopes
-- [Dependency Injection](https://anydi.readthedocs.io/en/latest/usage/injection/) - Explore injection patterns and techniques
-- [Testing](https://anydi.readthedocs.io/en/latest/usage/testing/) - Write testable code with provider overrides
+- [Core Concepts](https://anydi.readthedocs.io/en/latest/concepts/) - Learn about containers, providers, scopes, and dependency injection
+- [Providers](https://anydi.readthedocs.io/en/latest/usage/providers/) - How to register providers and manage resources
+- [Scopes](https://anydi.readthedocs.io/en/latest/usage/scopes/) - How to use built-in and custom scopes
+- [Dependency Injection](https://anydi.readthedocs.io/en/latest/usage/injection/) - Different ways to inject dependencies
+- [Testing](https://anydi.readthedocs.io/en/latest/usage/testing/) - How to test your code with provider overrides
 
 **Framework Integrations:**
-- [FastAPI](https://anydi.readthedocs.io/en/latest/extensions/fastapi/) - Build modern APIs with automatic dependency injection
-- [Django](https://anydi.readthedocs.io/en/latest/extensions/django/) - Integrate with Django and Django Ninja
-- [FastStream](https://anydi.readthedocs.io/en/latest/extensions/faststream/) - Message broker applications
-- [Typer](https://anydi.readthedocs.io/en/latest/extensions/typer/) - CLI applications with async support
-- [Pydantic Settings](https://anydi.readthedocs.io/en/latest/extensions/pydantic_settings/) - Configuration management
+- [FastAPI](https://anydi.readthedocs.io/en/latest/extensions/fastapi/) - How to use with FastAPI
+- [Django](https://anydi.readthedocs.io/en/latest/extensions/django/) - How to use with Django and Django Ninja
+- [FastStream](https://anydi.readthedocs.io/en/latest/extensions/faststream/) - How to use with message brokers
+- [Typer](https://anydi.readthedocs.io/en/latest/extensions/typer/) - How to use in CLI applications
+- [Pydantic Settings](https://anydi.readthedocs.io/en/latest/extensions/pydantic_settings/) - How to manage configuration
 
 **Full Documentation:**
-- [Read the Docs](https://anydi.readthedocs.io/) - Complete documentation with examples and guides
+- [Read the Docs](https://anydi.readthedocs.io/) - All documentation with examples and guides

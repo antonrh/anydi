@@ -1,9 +1,39 @@
 # Modules
 
-`AnyDI` provides a way to organize your code and configure dependencies for the dependency injection container.
-A module is a class that extends the `Module` base class and contains the configuration for the container.
+`AnyDI` lets you organize your code with modules. A module is a class that extends the `Module` base class. It contains configuration for the container.
 
-Here's an example how to create and register simple module:
+Here is how to create and register a simple module:
+
+```python
+from anydi import Container, Module, provider
+
+
+class Service:
+    def __init__(self, name: str) -> None:
+        self.name = name
+
+
+class AppModule(Module):
+    @provider(scope="singleton")
+    def service(self) -> Service:
+        return Service(name="demo")
+
+
+container = Container(modules=[AppModule()])
+
+# or
+# container.register_module(AppModule())
+
+assert container.is_registered(Service)
+```
+
+You can also override the `configure(self, container: Container) -> None` method to customize dependency registration when the module is loaded. Use it when you need to:
+
+- Register dependencies programmatically
+- Configure container settings
+- Perform complex registration logic that can't be done with `@provider` decorators
+
+Here is an example with `configure`:
 
 ```python
 from anydi import Container, Module, provider
@@ -29,12 +59,9 @@ class AppModule(Module):
 
 container = Container(modules=[AppModule()])
 
-# or
-# container.register_module(AppModule())
-
 assert container.is_registered(Service)
 assert container.is_registered(Repository)
 ```
 
-With `AnyDI`'s Modules, you can keep your code organized and easily manage your dependencies.
+Modules help you keep your code organized and manage dependencies easier.
 

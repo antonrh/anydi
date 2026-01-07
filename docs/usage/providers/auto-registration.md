@@ -1,6 +1,6 @@
 # Auto-Registration
 
-`AnyDI` doesn't require explicit registration for every type. It can dynamically resolve and auto-register dependencies, which simplifies setups where manually registering every class is impractical.
+`AnyDI` can auto-register dependencies without explicit registration. It resolves and registers dependencies dynamically, which simplifies configuration when you have many classes to register.
 
 ## Basic Auto-Registration
 
@@ -37,7 +37,7 @@ class UserService:
         return self.repo.find_user(user_id)
 ```
 
-You can instantiate these classes without manually registering each one. Simply register the root dependency (if needed) and the container will automatically resolve the entire dependency tree:
+You can instantiate these classes without manual registration. Register the root dependency (if needed) and the container will resolve the entire dependency tree automatically:
 
 ```python
 from typing import Iterator
@@ -66,9 +66,9 @@ assert container.is_resolved(UserRepository)
 assert container.is_resolved(Database)
 ```
 
-## Using Scope Decorators
+## Scope decorators
 
-The `@singleton`, `@transient`, and `@request` decorators mark classes for auto-registration with the specified scope:
+The `@singleton`, `@transient`, and `@request` decorators mark classes for auto-registration with their scope:
 
 ```python
 from anydi import Container, singleton, transient
@@ -102,9 +102,9 @@ assert handler1.config is handler2.config
 assert handler1 is not handler2
 ```
 
-## Mixing Explicit and Auto-Registration
+## Mixing explicit and auto-registration
 
-You can mix explicit registration with auto-registration:
+You can combine explicit registration with auto-registration:
 
 ```python
 from anydi import Container, singleton
@@ -134,24 +134,17 @@ notifier = container.resolve(NotificationService)
 notifier.notify("user@example.com", "Welcome!")
 ```
 
-## Benefits of Auto-Registration
+## Benefits of auto-registration
 
-1. **Less Boilerplate**: No need to manually register every class in your dependency tree
+1. **Less boilerplate**: No need to register every class manually in dependency tree
 2. **Maintainability**: Adding new dependencies doesn't require updating registration code
-3. **Flexibility**: Easily override specific dependencies while letting others auto-register
+3. **Flexibility**: Can override specific dependencies while others auto-register
 
 ## Limitations
 
-1. **Explicit is Better**: For public APIs or library interfaces, explicit registration provides better documentation
-2. **Circular Dependencies**: Auto-registration cannot resolve circular dependencies
-3. **Scope Validation**: The scope decorator must match the expected usage pattern
-
-## Best Practices
-
-1. **Use decorators consistently**: Apply `@singleton`, `@transient`, or `@request` to classes that should be auto-registered
-2. **Register roots explicitly**: Register root dependencies (like databases, config) with proper lifecycle management
-3. **Document auto-registered classes**: Make it clear which classes are auto-registered vs explicitly configured
-4. **Test resolution**: Ensure all dependencies resolve correctly, especially in complex trees
+1. **Explicit is better**: For public APIs or library interfaces, explicit registration gives better documentation
+2. **Circular dependencies**: Auto-registration cannot resolve circular dependencies
+3. **Scope validation**: The scope decorator must match the usage pattern
 
 ---
 

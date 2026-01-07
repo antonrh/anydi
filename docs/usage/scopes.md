@@ -1,16 +1,16 @@
 # Scopes
 
-`AnyDI` supports three built-in scopes for providers:
+`AnyDI` has three built-in scopes:
 
-* `transient` - New instance every time
-* `singleton` - One instance for the entire application
-* `request` - One instance per request context
+* `transient` - Creates new instance every time
+* `singleton` - Creates one instance for entire application
+* `request` - Creates one instance per request context
 
-In addition to these built-in scopes, you can register custom scopes to fit your application's specific needs.
+You can also create custom scopes for your specific needs.
 
 ## `transient` scope
 
-Providers with transient scope create a new instance of the object each time it's requested. You can set the scope when registering a provider.
+Transient providers create a new instance every time you request it.
 
 ### Example
 
@@ -42,7 +42,7 @@ assert tracker1.request_id != tracker2.request_id
 
 ## `singleton` scope
 
-Providers with singleton scope create a single instance of the object and return it every time it's requested.
+Singleton providers create one instance and return the same instance every time.
 
 ### Example
 
@@ -68,7 +68,7 @@ assert container.resolve(Service) == container.resolve(Service)
 
 ## `request` scope
 
-Providers with request scope create an instance of the object for each request. The instance is only available within the context of the request.
+Request providers create one instance for each request. You can only use the instance inside the request context.
 
 ### Example
 
@@ -115,11 +115,9 @@ async def main() -> None:
 
 ## `request` scoped instances
 
-In `AnyDI`, you can create `request-scoped` instances to manage dependencies that should be instantiated per request.
-This is particularly useful when handling dependencies with request-specific data that need to be isolated across different requests.
+You can create request-scoped instances for dependencies that need to be created per request. This is useful when you have request-specific data that should be separate for each request.
 
-To create a request context, you use the `request_context` (or `arequest_context` for async) method on the container.
-This context is then used to resolve dependencies scoped to the current request.
+To create a request context, use the `request_context` method (or `arequest_context` for async). Then you can resolve dependencies for that request.
 
 ```python
 from typing import Annotated
@@ -151,11 +149,11 @@ with container.request_context() as ctx:
 
 ## Custom Scopes
 
-In addition to the built-in scopes, `AnyDI` allows you to define custom scopes for your application. Custom scopes are useful when you need to manage the lifecycle of dependencies beyond the standard singleton, transient, and request scopes.
+You can create custom scopes for your application. Custom scopes are useful when you need to manage dependencies differently from the standard scopes.
 
-### Registering Custom Scopes
+### How to register custom scopes
 
-To register a custom scope, use the `register_scope` method on the container:
+Use the `register_scope` method:
 
 ```python
 from anydi import Container
@@ -169,23 +167,23 @@ container.register_scope("task")
 container.register_scope("workflow", parents=["task"])
 ```
 
-### Scope Hierarchy
+### Scope hierarchy
 
-Custom scopes support parent-child relationships. A scope can only depend on:
+Custom scopes can have parent-child relationships. A scope can only use dependencies from:
 - Itself
 - `singleton` scope (always allowed)
 - Its parent scopes
 
-For example, if you have a hierarchy like: `workflow` → `task` → `singleton`, then:
+For example, if you have: `workflow` → `task` → `singleton`, then:
 
-- `workflow` scoped providers can depend on `workflow`, `task`, and `singleton` scopes
-- `task` scoped providers can depend on `task` and `singleton` scopes
-- `singleton` scoped providers can only depend on `singleton` scope
-- `transient` scoped providers can depend on any scope
+- `workflow` providers can use `workflow`, `task`, and `singleton` dependencies
+- `task` providers can use `task` and `singleton` dependencies
+- `singleton` providers can only use `singleton` dependencies
+- `transient` providers can use any dependencies
 
-### Using Custom Scopes
+### How to use custom scopes
 
-Once registered, custom scopes work just like the built-in `request` scope:
+Custom scopes work like the built-in `request` scope:
 
 ```python
 from anydi import Container
@@ -208,12 +206,12 @@ container.register_scope("task")
 container.register_scope("workflow", parents=["task"])
 
 # Register providers with custom scopes
-@container.provider(scope="task")  # type: ignore[arg-type]
+@container.provider(scope="task")
 def task_context() -> TaskContext:
     return TaskContext(task_id="task-123")
 
 
-@container.provider(scope="workflow")  # type: ignore[arg-type]
+@container.provider(scope="workflow")
 def workflow_engine(task_context: TaskContext) -> WorkflowEngine:
     return WorkflowEngine(task_context)
 
@@ -237,12 +235,12 @@ async def process_workflow() -> None:
             # Process workflow...
 ```
 
-### Best Practices
+### Best practices
 
-1. **Define clear hierarchies**: Structure your scopes to reflect your application's logical boundaries (e.g., `request` → `transaction` → `batch`)
-2. **Avoid deep nesting**: Keep scope hierarchies shallow for better performance and maintainability
-3. **Use meaningful names**: Choose scope names that clearly indicate their purpose (`task`, `session`, `tenant`, etc.)
-4. **Validate dependencies**: The container automatically validates that scoped dependencies follow the hierarchy rules
+1. **Clear hierarchies**: Structure scopes to match your application logic (e.g., `request` → `transaction` → `batch`)
+2. **Avoid deep nesting**: Keep hierarchies simple for better performance
+3. **Use clear names**: Choose names that show the scope purpose (`task`, `session`, `tenant`, etc.)
+4. **Validate dependencies**: Container automatically checks that dependencies follow the hierarchy rules
 
 ### Common Use Cases
 
@@ -250,7 +248,7 @@ async def process_workflow() -> None:
 ```python
 container.register_scope("tenant")
 
-@container.provider(scope="tenant")  # type: ignore[arg-type]
+@container.provider(scope="tenant")
 def tenant_db() -> TenantDatabase:
     return TenantDatabase()
 ```
@@ -259,7 +257,7 @@ def tenant_db() -> TenantDatabase:
 ```python
 container.register_scope("job")
 
-@container.provider(scope="job")  # type: ignore[arg-type]
+@container.provider(scope="job")
 def job_context() -> JobContext:
     return JobContext()
 ```
@@ -268,7 +266,7 @@ def job_context() -> JobContext:
 ```python
 container.register_scope("session")
 
-@container.provider(scope="session")  # type: ignore[arg-type]
+@container.provider(scope="session")
 def session_data() -> SessionData:
     return SessionData()
 ```

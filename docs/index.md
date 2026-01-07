@@ -1,6 +1,6 @@
 # AnyDI
 
-Modern, lightweight Dependency Injection library using type annotations.
+Simple Dependency Injection library that uses Python type annotations.
 
 <a href="https://github.com/antonrh/anydi/actions/workflows/ci.yml">
     <img src="https://github.com/antonrh/anydi/actions/workflows/ci.yml/badge.svg" alt="CI">
@@ -14,21 +14,21 @@ Modern, lightweight Dependency Injection library using type annotations.
 
 ---
 
-`AnyDI` is a modern, lightweight Dependency Injection library suitable for any synchronous or asynchronous applications with Python 3.10+, based on type annotations ([PEP 484](https://peps.python.org/pep-0484/)).
+`AnyDI` is a simple Dependency Injection library for Python 3.10+. It works with sync and async applications and uses type annotations ([PEP 484](https://peps.python.org/pep-0484/)).
 
-The key features are:
+Main features:
 
-* **Type-safe**: Dependency resolution is driven by type hints.
-* **Async-ready**: Works the same for sync and async providers or injections.
-* **Scoped**: Built-in singleton, transient, and request scopes, plus custom scopes.
-* **Simple**: Small surface area keeps boilerplate low.
-* **Fast**: Has minimal overhead and resolves dependencies quickly.
-* **Named**: `Annotated[...]` makes multiple bindings per type simple.
-* **Managed**: Providers can open/close resources via context managers.
-* **Modular**: Compose containers or modules for large apps.
-* **Scanning**: Auto-discovers injectable callables.
-* **Integrated**: Extensions for popular frameworks.
-* **Testable**: Override providers directly in tests.
+* **Type-safe**: Uses type hints for dependency resolution.
+* **Async support**: Works with both sync and async code.
+* **Scopes**: Provides singleton, transient, and request scopes. Supports custom scope definitions.
+* **Simple**: Minimal boilerplate with straightforward API.
+* **Fast**: Low overhead dependency resolution.
+* **Named providers**: Use `Annotated[...]` for multiple providers per type.
+* **Resource management**: Context manager protocol support for lifecycle management.
+* **Modular**: Container and module composition for large applications.
+* **Auto-scan**: Automatic discovery of injectable callables.
+* **Framework integrations**: Extensions for popular frameworks.
+* **Testing**: Provider override mechanism for test isolation.
 
 ---
 

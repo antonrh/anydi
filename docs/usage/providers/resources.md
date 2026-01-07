@@ -1,8 +1,8 @@
 # Resource Management
 
-Resource providers are special types of providers that need to be started and stopped. This is useful for managing database connections, file handles, network sockets, or any other resources that require proper cleanup.
+Resource providers are special providers that need to start and stop. This is useful for database connections, file handles, network sockets, or any resources that need cleanup.
 
-`AnyDI` supports both synchronous and asynchronous resource providers.
+`AnyDI` supports both sync and async resource providers.
 
 ## Synchronous Resources
 
@@ -51,7 +51,7 @@ assert db.connected
 container.close()
 ```
 
-In this example, the `database_provider` function returns an iterator that yields a single `DatabaseConnection` object. The `.connect()` method is called when the resource is created, and the `.disconnect()` method is called when the resource is released.
+In this example, the `database_provider` function returns an iterator that yields a `DatabaseConnection` object. The `.connect()` method is called when the resource is created. The `.disconnect()` method is called when the resource is released.
 
 ## Asynchronous Resources
 
@@ -108,11 +108,11 @@ async def main() -> None:
 asyncio.run(main())
 ```
 
-In this example, the `async_database_provider` function returns an asynchronous iterator that yields a single `AsyncDatabase` object. The `.astart()` method is called asynchronously when the resource is created, and the `.aclose()` method is called asynchronously when the resource is released.
+In this example, the `async_database_provider` function returns an async iterator that yields an `AsyncDatabase` object. The `.astart()` method is called when the resource is created. The `.aclose()` method is called when the resource is released.
 
 ## Resource Events
 
-Sometimes, it can be useful to split the process of initializing and managing the lifecycle of an instance into separate providers. This allows you to keep instance creation separate from lifecycle management.
+Sometimes it is useful to split instance creation and lifecycle management into separate providers. This keeps instance creation separate from lifecycle management.
 
 ```python
 from typing import Iterator
@@ -171,9 +171,9 @@ assert client.closed
 !!! note
     This pattern can be used for both synchronous and asynchronous resources.
 
-## Automatic Resource Management
+## Automatic resource management
 
-When your class dependencies implement the context manager protocol by defining the `__enter__/__aenter__` and `__exit__/__aexit__` methods, these resources are automatically managed by the container for `singleton` and `request` scoped providers.
+When your class has the `__enter__/__aenter__` and `__exit__/__aexit__` methods (context manager protocol), the container manages these resources automatically for `singleton` and `request` scoped providers.
 
 ```python
 from anydi import Container, singleton
@@ -207,12 +207,12 @@ container.close()
 assert connection.disconnected
 ```
 
-## Best Practices
+## Best practices
 
-1. **Always clean up resources**: Use resource providers to ensure proper cleanup of connections, files, and other resources
+1. **Always clean up resources**: Use resource providers to ensure cleanup of connections, files, and other resources
 2. **Match async patterns**: Use async resource providers (`AsyncIterator`) for async resources
 3. **Separate concerns**: Consider using separate providers for instance creation and lifecycle management
-4. **Test resource cleanup**: Ensure your tests verify that resources are properly closed
+4. **Test resource cleanup**: Make sure your tests check that resources are closed properly
 
 ---
 
