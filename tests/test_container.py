@@ -1629,6 +1629,97 @@ class TestContainer:
         )
         assert provider is not None
 
+    def test_build_locks_registration(self) -> None:
+        """Test that registration is locked after build()."""
+
+        @singleton
+        class Service:
+            pass
+
+        container = Container()
+        container.register(Service)
+        container.build()
+
+        # Try to register after build
+        @singleton
+        class AnotherService:
+            pass
+
+        with pytest.raises(
+            RuntimeError,
+            match="Cannot register providers after build\\(\\) has been called.",
+        ):
+            container.register(AnotherService)
+
+    def test_build_allows_override_after_build(self) -> None:
+        """Test that override=True allows registration after build()."""
+
+        @singleton
+        class Service:
+            pass
+
+        container = Container()
+        container.register(Service)
+        container.build()
+
+        # Override should work even after build
+        @singleton
+        class MockService:
+            pass
+
+        container.register(Service, MockService, override=True)
+        assert container.resolve(Service).__class__.__name__ == "MockService"
+
+    def test_build_twice_raises_error(self) -> None:
+        """Test that calling build() twice raises RuntimeError."""
+
+        @singleton
+        class Service:
+            pass
+
+        container = Container()
+        container.register(Service)
+        container.build()
+
+        with pytest.raises(RuntimeError, match="Container has already been built"):
+            container.build()
+
+    def test_build_detects_circular_dependencies(self) -> None:
+        """Test that build() detects circular dependencies."""
+        container = Container()
+
+        class ServiceA:
+            pass
+
+        class ServiceB:
+            pass
+
+        class ServiceC:
+            pass
+
+        # Register providers with circular dependencies
+        @container.provider(scope="singleton")
+        def provide_a(b: ServiceB) -> ServiceA:
+            return ServiceA()
+
+        @container.provider(scope="singleton")
+        def provide_b(c: ServiceC) -> ServiceB:
+            return ServiceB()
+
+        @container.provider(scope="singleton")
+        def provide_c(a: ServiceA) -> ServiceC:
+            return ServiceC()
+
+        # Build should detect the circular dependency
+        with pytest.raises(
+            ValueError,
+            match=(
+                "Circular dependency detected: .* -> .* -> .*\\. "
+                "Please restructure your dependencies to break the cycle\\."
+            ),
+        ):
+            container.build()
+
 
 class TestContainerCustomScopes:
     """Tests for custom scope registration and resolution."""

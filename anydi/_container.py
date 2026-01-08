@@ -856,18 +856,7 @@ class Container:
     # == Build ==
 
     def build(self) -> None:
-        """
-        Build the container by validating the complete dependency graph.
-
-        Must be called after all providers and modules are registered and
-        before any resolution can occur.
-
-        Raises:
-            RuntimeError: If already built
-            ValueError: If circular dependencies detected
-            ValueError: If scope compatibility violations exist
-            LookupError: If required dependencies are missing
-        """
+        """Build the container by validating the complete dependency graph."""
         if self._built:
             raise RuntimeError("Container has already been built")
 
@@ -1000,10 +989,13 @@ class Container:
 
             # Visit dependencies
             for param in provider.parameters:
-                if param.provider is not None:
+                # Look up the dependency provider from self._providers instead of
+                # using param.provider, which might be stale/unresolved
+                if param.annotation in self._providers:
+                    dep_provider = self._providers[param.annotation]
                     visit(
                         param.annotation,
-                        param.provider,
+                        dep_provider,
                         path,
                         visited,
                         in_path,
@@ -1020,7 +1012,7 @@ class Container:
 
     def _validate_scope_compatibility(self) -> None:
         """Validate that all dependencies have compatible scopes."""
-        for _, provider in self._providers.items():
+        for provider in self._providers.values():
             scope = provider.scope
 
             # Skip validation for transient (can depend on anything)
