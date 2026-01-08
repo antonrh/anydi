@@ -65,7 +65,6 @@ class Container:
 
         # Build state
         self._built = False
-        self._resolved_providers: set[Any] = set()  # Track resolved providers
 
         # Register default scopes
         self.register_scope("request")
