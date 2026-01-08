@@ -63,6 +63,10 @@ class Container:
         self._modules = ModuleRegistrar(self)
         self._scanner = Scanner(self)
 
+        # Build state
+        self._built = False
+        self._resolved_providers: set[Any] = set()  # Track resolved providers
+
         # Register default scopes
         self.register_scope("request")
 
@@ -334,6 +338,11 @@ class Container:
         override: bool = False,
     ) -> Provider:
         """Register a provider for the specified interface."""
+        if self._built and not override:
+            raise RuntimeError(
+                "Cannot register providers after build() has been called. "
+                "All providers must be registered before building the container."
+            )
         if call is NOT_SET:
             call = interface
         return self._register_provider(call, scope, interface, override)
@@ -430,11 +439,6 @@ class Container:
 
         # Process parameters
         parameters: list[ProviderParameter] = []
-        scope_provider: dict[Scope, Provider] = {}
-        unresolved_parameter = None
-        unresolved_exc: LookupError | None = None
-        is_scoped = scope not in ("singleton", "transient")
-        scope_hierarchy = self._scopes.get(scope, ()) if scope != "transient" else ()
 
         for parameter in signature.parameters.values():
             if parameter.annotation is inspect.Parameter.empty:
@@ -451,86 +455,21 @@ class Container:
             has_default = parameter.default is not inspect.Parameter.empty
             default = parameter.default if has_default else NOT_SET
 
-            try:
-                sub_provider = self._get_or_register_provider(parameter.annotation)
-            except LookupError as exc:
-                if (defaults and parameter.name in defaults) or has_default:
-                    continue
-                # For scoped dependencies, allow unresolved parameters via context.set()
-                if is_scoped:
-                    self._resolver.add_unresolved(parameter.annotation)
-                    parameters.append(
-                        ProviderParameter(
-                            name=parameter.name,
-                            annotation=parameter.annotation,
-                            default=default,
-                            has_default=has_default,
-                            provider=None,
-                            shared_scope=True,
-                        )
-                    )
-                    continue
-                unresolved_parameter = parameter
-                unresolved_exc = exc
+            # Skip parameters provided via defaults (for create() method)
+            if defaults and parameter.name in defaults:
                 continue
 
-            # Track scope providers for validation
-            scope_provider.setdefault(sub_provider.scope, sub_provider)
-
-            # For scoped dependencies with same scope having unresolved params,
-            # defer to context.set() instead
-            if (
-                is_scoped
-                and sub_provider.scope == scope
-                and any(p.provider is None for p in sub_provider.parameters)
-            ):
-                self._resolver.add_unresolved(parameter.annotation)
-                parameters.append(
-                    ProviderParameter(
-                        name=parameter.name,
-                        annotation=parameter.annotation,
-                        default=default,
-                        has_default=has_default,
-                        provider=None,
-                        shared_scope=True,
-                    )
-                )
-                continue
-
-            # Validate scope compatibility inline
-            if scope_hierarchy and sub_provider.scope not in scope_hierarchy:
-                raise ValueError(
-                    f"The provider `{name}` with a `{scope}` scope "
-                    f"cannot depend on `{sub_provider}` with a "
-                    f"`{sub_provider.scope}` scope. Please ensure all "
-                    "providers are registered with matching scopes."
-                )
-
+            # Lazy registration: Store parameter without resolving dependencies
             parameters.append(
                 ProviderParameter(
                     name=parameter.name,
                     annotation=parameter.annotation,
                     default=default,
                     has_default=has_default,
-                    provider=sub_provider,
-                    shared_scope=sub_provider.scope == scope and scope != "transient",
+                    provider=None,  # Lazy - will be resolved in build()
+                    shared_scope=False,  # Lazy - will be computed in build()
                 )
             )
-
-        # Handle unresolved parameters
-        if unresolved_parameter:
-            if is_scoped:  # pragma: no cover
-                # Note: This branch is currently unreachable because
-                # unresolved_parameter is only set when is_scoped=False
-                self._resolver.add_unresolved(interface)
-            else:
-                raise LookupError(
-                    f"The provider `{name}` depends on `{unresolved_parameter.name}` "
-                    f"of type `{type_repr(unresolved_parameter.annotation)}`, "
-                    "which has not been registered or set. To resolve this, ensure "
-                    f"that `{unresolved_parameter.name}` is registered before "
-                    f"attempting to use it."
-                ) from unresolved_exc
 
         # Create and register provider
         provider = Provider(
@@ -586,22 +525,191 @@ class Container:
     ) -> Provider:
         """Get or register a provider by interface."""
         try:
-            return self._providers[interface]
+            provider = self._providers[interface]
         except KeyError:
             if inspect.isclass(interface) and is_provided(interface):
-                return self._register_provider(
+                provider = self._register_provider(
                     interface,
                     interface.__provided__["scope"],
                     NOT_SET,
                     False,
                     defaults,
                 )
-            raise LookupError(
-                f"The provider interface `{type_repr(interface)}` is either not "
-                "registered, not provided, or not set in the scoped context. "
-                "Please ensure that the provider interface is properly registered and "
-                "that the class is decorated with a scope before attempting to use it."
-            ) from None
+            else:
+                raise LookupError(
+                    f"The provider interface `{type_repr(interface)}` is either not "
+                    "registered, not provided, or not set in the scoped context. "
+                    "Please ensure that the provider interface is properly "
+                    "registered and that the class is decorated with a scope before "
+                    "attempting to use it."
+                ) from None
+
+        # Ensure provider dependencies are resolved if not built yet
+        if not self._built:
+            provider = self._ensure_provider_resolved(provider, set())
+
+        return provider
+
+    def _ensure_provider_resolved(  # noqa: C901
+        self, provider: Provider, resolving: set[Any]
+    ) -> Provider:
+        """Ensure dependencies are resolved, resolving on-the-fly if needed."""
+        # Check if we're already resolving this provider (circular dependency)
+        if provider.interface in resolving:
+            return provider
+
+        # Check if already resolved by examining parameters
+        # A provider is resolved if all its parameters either:
+        # 1. Have a provider set (provider is not None), OR
+        # 2. Have a default value, OR
+        # 3. Are marked for context.set() (provider=None but in unresolved list)
+        all_resolved = all(
+            param.provider is not None
+            or param.has_default
+            or (
+                param.provider is None and param.shared_scope
+            )  # Unresolved for context.set()
+            for param in provider.parameters
+        )
+        if all_resolved:
+            return provider
+
+        # Mark as currently being resolved
+        resolving = resolving | {provider.interface}
+
+        # Resolve dependencies for this provider
+        resolved_params: list[ProviderParameter] = []
+
+        for param in provider.parameters:
+            if param.provider is not None:
+                # Already resolved
+                resolved_params.append(param)
+                continue
+
+            # Try to resolve the dependency
+            # First check if this would create a circular dependency
+            if param.annotation in resolving:
+                # Circular dependency detected
+                # For scoped providers, leave it unresolved for context.set()
+                if provider.scope not in ("singleton", "transient"):
+                    self._resolver.add_unresolved(param.annotation)
+                    resolved_params.append(
+                        ProviderParameter(
+                            name=param.name,
+                            annotation=param.annotation,
+                            default=param.default,
+                            has_default=param.has_default,
+                            provider=None,
+                            shared_scope=True,
+                        )
+                    )
+                    continue
+                else:
+                    # Circular dependency in singleton/transient - error
+                    raise ValueError(
+                        f"Circular dependency detected: {provider.name} depends on "
+                        f"{type_repr(param.annotation)}"
+                    )
+
+            try:
+                dep_provider = self._get_provider(param.annotation)
+            except LookupError:
+                # Check if it's a @provided class
+                if inspect.isclass(param.annotation) and is_provided(param.annotation):
+                    provided_scope = param.annotation.__provided__["scope"]
+
+                    # Auto-register @provided class
+                    dep_provider = self._register_provider(
+                        param.annotation,
+                        provided_scope,
+                        NOT_SET,
+                        False,
+                    )
+                    # Recursively ensure the @provided class is resolved
+                    dep_provider = self._ensure_provider_resolved(
+                        dep_provider, resolving
+                    )
+                elif param.has_default:
+                    # Has default, can be missing
+                    resolved_params.append(param)
+                    continue
+                else:
+                    # Check if this is a scoped provider with potential context.set()
+                    if provider.scope not in ("singleton", "transient"):
+                        # Mark as unresolved for runtime context.set()
+                        self._resolver.add_unresolved(param.annotation)
+                        resolved_params.append(
+                            ProviderParameter(
+                                name=param.name,
+                                annotation=param.annotation,
+                                default=param.default,
+                                has_default=param.has_default,
+                                provider=None,
+                                shared_scope=True,
+                            )
+                        )
+                        continue
+                    else:
+                        # Required dependency is missing
+                        raise LookupError(
+                            f"The provider `{provider.name}` depends on "
+                            f"`{param.name}` of type "
+                            f"`{type_repr(param.annotation)}`, which has not been "
+                            f"registered or set. To resolve this, ensure that "
+                            f"`{param.name}` is registered before resolving."
+                        ) from None
+
+            # Ensure dependency is also resolved
+            dep_provider = self._ensure_provider_resolved(dep_provider, resolving)
+
+            # Validate scope compatibility
+            scope_hierarchy = (
+                self._scopes.get(provider.scope, ())
+                if provider.scope != "transient"
+                else ()
+            )
+            if scope_hierarchy and dep_provider.scope not in scope_hierarchy:
+                raise ValueError(
+                    f"The provider `{provider.name}` with a `{provider.scope}` scope "
+                    f"cannot depend on `{dep_provider.name}` with a "
+                    f"`{dep_provider.scope}` scope. Please ensure all providers are "
+                    f"registered with matching scopes."
+                )
+
+            # Calculate shared_scope
+            shared_scope = (
+                dep_provider.scope == provider.scope and provider.scope != "transient"
+            )
+
+            # Create resolved parameter
+            resolved_params.append(
+                ProviderParameter(
+                    name=param.name,
+                    annotation=param.annotation,
+                    default=param.default,
+                    has_default=param.has_default,
+                    provider=dep_provider,
+                    shared_scope=shared_scope,
+                )
+            )
+
+        # Replace provider with resolved version
+        resolved_provider = Provider(
+            call=provider.call,
+            scope=provider.scope,
+            interface=provider.interface,
+            name=provider.name,
+            parameters=tuple(resolved_params),
+            is_class=provider.is_class,
+            is_coroutine=provider.is_coroutine,
+            is_generator=provider.is_generator,
+            is_async_generator=provider.is_async_generator,
+            is_async=provider.is_async,
+            is_resource=provider.is_resource,
+        )
+        self._providers[provider.interface] = resolved_provider
+
+        return resolved_provider
 
     def _set_provider(self, provider: Provider) -> None:
         """Set a provider by interface."""
@@ -744,6 +852,202 @@ class Container:
         self, /, packages: PackageOrIterable, *, tags: Iterable[str] | None = None
     ) -> None:
         self._scanner.scan(packages=packages, tags=tags)
+
+    # == Build ==
+
+    def build(self) -> None:
+        """
+        Build the container by validating the complete dependency graph.
+
+        Must be called after all providers and modules are registered and
+        before any resolution can occur.
+
+        Raises:
+            RuntimeError: If already built
+            ValueError: If circular dependencies detected
+            ValueError: If scope compatibility violations exist
+            LookupError: If required dependencies are missing
+        """
+        if self._built:
+            raise RuntimeError("Container has already been built")
+
+        self._resolve_provider_dependencies()
+        self._detect_circular_dependencies()
+        self._validate_scope_compatibility()
+
+        self._built = True
+
+    def _resolve_provider_dependencies(self) -> None:
+        """Resolve all provider dependencies by filling in provider references."""
+        for interface, provider in list(self._providers.items()):
+            resolved_params: list[ProviderParameter] = []
+
+            for param in provider.parameters:
+                if param.provider is not None:
+                    # Already resolved
+                    resolved_params.append(param)
+                    continue
+
+                # Try to resolve the dependency
+                try:
+                    dep_provider = self._get_provider(param.annotation)
+                except LookupError:
+                    # Check if it's a @provided class
+                    if inspect.isclass(param.annotation) and is_provided(
+                        param.annotation
+                    ):
+                        provided_scope = param.annotation.__provided__["scope"]
+
+                        # Auto-register @provided class
+                        dep_provider = self._register_provider(
+                            param.annotation,
+                            provided_scope,
+                            NOT_SET,
+                            False,
+                        )
+                    elif param.has_default:
+                        # Has default, can be missing
+                        resolved_params.append(param)
+                        continue
+                    else:
+                        # Check if scoped provider with potential context.set()
+                        if provider.scope not in ("singleton", "transient"):
+                            # Mark as unresolved for runtime context.set()
+                            self._resolver.add_unresolved(param.annotation)
+                            resolved_params.append(
+                                ProviderParameter(
+                                    name=param.name,
+                                    annotation=param.annotation,
+                                    default=param.default,
+                                    has_default=param.has_default,
+                                    provider=None,
+                                    shared_scope=True,
+                                )
+                            )
+                            continue
+                        else:
+                            # Required dependency is missing
+                            raise LookupError(
+                                f"The provider `{provider.name}` depends on "
+                                f"`{param.name}` of type "
+                                f"`{type_repr(param.annotation)}`, which has not been "
+                                f"registered or set. To resolve this, ensure that "
+                                f"`{param.name}` is registered before calling build()."
+                            ) from None
+
+                # Calculate shared_scope
+                shared_scope = (
+                    dep_provider.scope == provider.scope
+                    and provider.scope != "transient"
+                )
+
+                # Create resolved parameter
+                resolved_params.append(
+                    ProviderParameter(
+                        name=param.name,
+                        annotation=param.annotation,
+                        default=param.default,
+                        has_default=param.has_default,
+                        provider=dep_provider,
+                        shared_scope=shared_scope,
+                    )
+                )
+
+            # Replace provider with resolved version
+            resolved_provider = Provider(
+                call=provider.call,
+                scope=provider.scope,
+                interface=provider.interface,
+                name=provider.name,
+                parameters=tuple(resolved_params),
+                is_class=provider.is_class,
+                is_coroutine=provider.is_coroutine,
+                is_generator=provider.is_generator,
+                is_async_generator=provider.is_async_generator,
+                is_async=provider.is_async,
+                is_resource=provider.is_resource,
+            )
+            self._providers[interface] = resolved_provider
+
+    def _detect_circular_dependencies(self) -> None:
+        """Detect circular dependencies in the provider graph."""
+
+        def visit(
+            interface: Any,
+            provider: Provider,
+            path: list[str],
+            visited: set[Any],
+            in_path: set[Any],
+        ) -> None:
+            """DFS traversal to detect cycles."""
+            if interface in in_path:
+                # Found a cycle!
+                cycle_start = next(
+                    i for i, name in enumerate(path) if name == provider.name
+                )
+                cycle_path = " -> ".join(path[cycle_start:] + [provider.name])
+                raise ValueError(
+                    f"Circular dependency detected: {cycle_path}. "
+                    f"Please restructure your dependencies to break the cycle."
+                )
+
+            if interface in visited:
+                return
+
+            visited.add(interface)
+            in_path.add(interface)
+            path.append(provider.name)
+
+            # Visit dependencies
+            for param in provider.parameters:
+                if param.provider is not None:
+                    visit(
+                        param.annotation,
+                        param.provider,
+                        path,
+                        visited,
+                        in_path,
+                    )
+
+            path.pop()
+            in_path.remove(interface)
+
+        visited: set[Any] = set()
+
+        for interface, provider in self._providers.items():
+            if interface not in visited:
+                visit(interface, provider, [], visited, set())
+
+    def _validate_scope_compatibility(self) -> None:
+        """Validate that all dependencies have compatible scopes."""
+        for _, provider in self._providers.items():
+            scope = provider.scope
+
+            # Skip validation for transient (can depend on anything)
+            if scope == "transient":
+                continue
+
+            # Get scope hierarchy for this provider
+            scope_hierarchy = (
+                self._scopes.get(scope, ()) if scope != "transient" else ()
+            )
+
+            # Check each dependency
+            for param in provider.parameters:
+                if param.provider is None:
+                    # Unresolved (allowed for scoped providers)
+                    continue
+
+                dep_scope = param.provider.scope
+
+                # Validate scope compatibility
+                if scope_hierarchy and dep_scope not in scope_hierarchy:
+                    raise ValueError(
+                        f"The provider `{provider.name}` with a `{scope}` scope "
+                        f"cannot depend on `{param.provider.name}` with a "
+                        f"`{dep_scope}` scope. Please ensure all providers are "
+                        f"registered with matching scopes."
+                    )
 
     # == Testing / Override Support ==
 

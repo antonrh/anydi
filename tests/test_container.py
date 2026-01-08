@@ -377,10 +377,12 @@ class TestContainer:
         def mixed(a: int, b: float) -> str:
             return f"{a} * {b} = {a * b}"
 
+        container.register(int, a, scope=scope3)
+        container.register(float, b, scope=scope2)
+        container.register(str, mixed, scope=scope1)
+
         try:
-            container.register(int, a, scope=scope3)
-            container.register(float, b, scope=scope2)
-            container.register(str, mixed, scope=scope1)
+            container.build()
         except ValueError:
             result = False
         else:
@@ -396,6 +398,7 @@ class TestContainer:
             return f"{n}"
 
         container.register(int, provider_int, scope="request")
+        container.register(str, provider_str, scope="singleton")
 
         with pytest.raises(
             ValueError,
@@ -405,7 +408,7 @@ class TestContainer:
                 "registered with matching scopes."
             ),
         ):
-            container.register(str, provider_str, scope="singleton")
+            container.build()
 
     def test_register_provider_with_not_registered_sub_provider(
         self,
@@ -414,15 +417,18 @@ class TestContainer:
         def dep2(dep1: int) -> str:
             return str(dep1)
 
+        container.register(str, dep2, scope="singleton")
+
         with pytest.raises(
             LookupError,
             match=(
                 "The provider `(.*?).dep2` depends on `dep1` of type `int`, "
                 "which has not been registered or set. To resolve this, "
-                "ensure that `dep1` is registered before attempting to use it."
+                "ensure that `dep1` is registered before "
+                "(calling build\\(\\)|resolving)."
             ),
         ):
-            container.register(str, dep2, scope="singleton")
+            container.build()
 
     def test_register_events(self, container: Container) -> None:
         events = []
@@ -908,9 +914,9 @@ class TestContainer:
             pytest.raises(
                 LookupError,
                 match=(
-                    "You are attempting to get the parameter `req` with the annotation "
-                    "`(.*?).Request` as a dependency into `(.*?).req_path` which is "
-                    "not registered or set in the scoped context."
+                    "You are attempting to get the parameter `path` with the "
+                    "annotation `str` as a dependency into `(.*?).Request` "
+                    "which is not registered or set in the scoped context."
                 ),
             ),
             container.request_context(),
@@ -1202,7 +1208,8 @@ class TestContainer:
             match=(
                 "The provider `(.*?)` depends on `name` of type "
                 "`str`, which has not been registered or set. To resolve this, "
-                "ensure that `name` is registered before attempting to use it."
+                "ensure that `name` is registered before "
+                "(calling build\\(\\)|resolving)."
             ),
         ):
             container.resolve(Service)
@@ -1219,7 +1226,8 @@ class TestContainer:
             match=(
                 "The provider `(.*?)` depends on `value` of type `(.*?)`, "
                 "which has not been registered or set. To resolve this, "
-                "ensure that `value` is registered before attempting to use it."
+                "ensure that `value` is registered before "
+                "(calling build\\(\\)|resolving)."
             ),
         ):
             _ = container.resolve(Klass)
@@ -1862,6 +1870,7 @@ class TestContainerCustomScopes:
             return f"value: {x}"
 
         container.register(int, transient_dep, scope="transient")
+        container.register(str, task_dep, scope="task")
 
         with pytest.raises(
             ValueError,
@@ -1870,7 +1879,7 @@ class TestContainerCustomScopes:
                 "cannot depend on .* with a `transient` scope"
             ),
         ):
-            container.register(str, task_dep, scope="task")
+            container.build()
 
     def test_custom_scope_allows_transient_dependencies_from_transient(
         self, container: Container
@@ -1958,8 +1967,8 @@ class TestContainerCustomScopes:
             pytest.raises(
                 LookupError,
                 match=(
-                    "You are attempting to get the parameter `req` with the annotation "
-                    "`(.*?).TaskRequest` as a dependency into `(.*?).task_handler` "
+                    "You are attempting to get the parameter `task_id` with the "
+                    "annotation `str` as a dependency into `(.*?).TaskRequest` "
                     "which is not registered or set in the scoped context."
                 ),
             ),
