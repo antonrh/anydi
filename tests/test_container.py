@@ -1,4 +1,5 @@
 import asyncio
+import logging
 import sys
 import threading
 import uuid
@@ -64,7 +65,7 @@ class TestContainer:
         assert provider.interface is str
 
     def test_register_provider_is_class(self, container: Container) -> None:
-        provider = container._register_provider(Class, "singleton")
+        provider = container.register(Class, scope="singleton")
 
         assert provider.is_class
         assert provider.interface is Class
@@ -136,7 +137,7 @@ class TestContainer:
         assert issubclass(provider.interface, Event)
 
     def test_register_provider_with_interface(self, container: Container) -> None:
-        provider = container._register_provider(lambda: "hello", "singleton", str)
+        provider = container.register(str, lambda: "hello", scope="singleton")
 
         assert provider.interface is str
 
@@ -144,7 +145,7 @@ class TestContainer:
         with pytest.raises(
             TypeError, match="Missing `(.*?)` provider return annotation."
         ):
-            container._register_provider(lambda: "hello", "singleton", None)
+            container.register(None, lambda: "hello", scope="singleton")
 
     def test_register_provider_provider_without_return_annotation(
         self, container: Container
@@ -162,7 +163,7 @@ class TestContainer:
             TypeError,
             match="The provider `Test` is invalid because it is not a callable object.",
         ):
-            container._register_provider("Test", "singleton")  # type: ignore
+            container.register("Test", scope="singleton")  # type: ignore
 
     def test_register_provider_iterator_no_arg_not_allowed(
         self, container: Container
@@ -185,7 +186,7 @@ class TestContainer:
                 "Please use one of the supported scopes when registering a provider."
             ),
         ):
-            container._register_provider(generator, "other")  # type: ignore
+            container.register(generator, scope="other")  # type: ignore
 
     def test_register_provider_transient_resource_not_allowed(
         self, container: Container
@@ -197,7 +198,7 @@ class TestContainer:
                 "register with a transient scope, which is not allowed."
             ),
         ):
-            container._register_provider(generator, "transient")
+            container.register(generator, scope="transient")
 
     def test_register_provider_without_annotation(self, container: Container) -> None:
         def service_ident() -> str:
@@ -209,7 +210,7 @@ class TestContainer:
         with pytest.raises(
             TypeError, match="Missing provider `(.*?)` dependency `ident` annotation."
         ):
-            container._register_provider(service, "singleton")
+            container.register(service, scope="singleton")
 
     def test_register_provider_positional_only_parameter_not_allowed(
         self, container: Container
@@ -221,7 +222,7 @@ class TestContainer:
             TypeError,
             match="Positional-only parameters are not allowed in the provider `(.*?)`.",
         ):
-            container._register_provider(provider_message, "singleton")
+            container.register(provider_message, scope="singleton")
 
     def test_register_provider_already_registered(self, container: Container) -> None:
         container.register(str, lambda: "test", scope="singleton")
@@ -1573,6 +1574,53 @@ class TestContainer:
         # But singleton dependency should be the same
         assert instance1.db is instance2.db
 
+    def test_logger_property(self) -> None:
+        custom_logger = logging.getLogger("custom")
+        container = Container(logger=custom_logger)
+
+        assert container.logger is custom_logger
+
+    def test_get_scoped_context_success(self) -> None:
+        @request
+        class RequestService:
+            pass
+
+        container = Container()
+
+        with container.request_context() as ctx:
+            retrieved_ctx = container._get_scoped_context("request")
+            assert retrieved_ctx is ctx
+
+    def test_reset_with_lookup_error(self) -> None:
+        container = Container()
+
+        container.register_scope("custom")
+
+        @provided(scope="custom")
+        class CustomService:
+            pass
+
+        container.register(CustomService, scope="custom")
+
+        container.reset()
+
+    def test_scoped_with_defaults_override(self) -> None:
+        class UnregisteredDep:
+            pass
+
+        @request
+        class ServiceNeedingDep:
+            def __init__(self, dep: UnregisteredDep) -> None:
+                self.dep = dep
+
+        container = Container()
+
+        # Register with defaults - should not raise even though dep is not registered
+        provider = container._register_provider(
+            ServiceNeedingDep, "request", defaults={"dep": UnregisteredDep()}
+        )
+        assert provider is not None
+
 
 class TestContainerCustomScopes:
     """Tests for custom scope registration and resolution."""
@@ -2393,6 +2441,21 @@ class TestContainerInjector:
 
         assert handler in container._injector._cache
 
+    def test_inject_with_annotated_and_default(self) -> None:
+        container = Container()
+
+        @container.provider(scope="singleton")
+        def value() -> int:
+            return 42
+
+        def handler(x: Annotated[int, Inject()] = 10) -> int:
+            return x
+
+        injected = container.inject(handler)
+        result = injected()
+
+        assert result == 10
+
 
 class TestContainerOverride:
     def test_override_instance(self) -> None:
@@ -2597,6 +2660,36 @@ class TestContainerOverride:
 
         with container.override(Service, service_mock):
             assert initialized is False
+
+    def test_override_without_dict(self) -> None:
+        class ServiceWithoutDict:
+            __slots__ = ("value",)
+
+            def __init__(self) -> None:
+                self.value = 42
+
+        container = Container()
+        container.register(ServiceWithoutDict, scope="singleton")
+
+        with container.override(ServiceWithoutDict, ServiceWithoutDict()):
+            result = container.resolve(ServiceWithoutDict)
+            assert result.value == 42
+
+    def test_override_existing_override(self) -> None:
+        @singleton
+        class Service:
+            def __init__(self) -> None:
+                self.name = "original"
+
+        container = Container()
+
+        override_instance = Service()
+        override_instance.name = "override"
+
+        with container.override(Service, override_instance):
+            result = container.resolve(Service)
+            assert result.name == "override"
+            assert result is override_instance
 
 
 # Test data for import_container tests

@@ -44,6 +44,14 @@ class TestContainerModuleRegistrator:
 
         assert container.is_registered(str)
 
+    def test_register_module_package(self, container: Container) -> None:
+        with pytest.raises(TypeError, match="The module must be a callable"):
+            container.register_module("os")
+
+    def test_import_module_invalid_name(self, container: Container) -> None:
+        with pytest.raises(ImportError, match="Cannot import 'nonexistent_module_xyz'"):
+            container.register_module("nonexistent_module_xyz")
+
     def test_register_module_ordered_providers(self, container: Container) -> None:
         class OrderedModule(Module):
             @provider(scope="singleton")
