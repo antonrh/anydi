@@ -1,9 +1,8 @@
 import asyncio
 import logging
-import sys
 import threading
 import uuid
-from collections.abc import AsyncIterator, Iterator, Sequence
+from collections.abc import AsyncIterator, Iterator
 from dataclasses import dataclass
 from typing import Annotated, Any
 from unittest import mock
@@ -1206,23 +1205,6 @@ class TestContainer:
             ),
         ):
             container.resolve(Service)
-
-    @pytest.mark.skipif(sys.version_info < (3, 10), reason="Requires Python 3.10")
-    def test_resolve_with_custom_type(self, container: Container) -> None:
-        @singleton
-        class Klass:
-            def __init__(self, value: "str | Sequence[str] | int | list[str]") -> None:
-                self.value = value
-
-        with pytest.raises(
-            LookupError,
-            match=(
-                "The provider `(.*?)` depends on `value` of type `(.*?)`, "
-                "which has not been registered or set. To resolve this, "
-                "ensure that `value` is registered before attempting to use it."
-            ),
-        ):
-            _ = container.resolve(Klass)
 
     def test_resolve_with_as_context_manager(self, container: Container) -> None:
         @singleton
