@@ -21,6 +21,7 @@ from anydi import (
     singleton,
     transient,
 )
+from anydi._resolver import InstanceProxy
 from anydi._types import Event
 
 from tests.fixtures import (
@@ -2672,6 +2673,23 @@ class TestContainerOverride:
             result = container.resolve(Service)
             assert result.name == "override"
             assert result is override_instance
+
+    def test_override_no_double_wrapping(self) -> None:
+        """Test that override doesn't double-wrap InstanceProxy values (issue #259)."""
+        container = Container()
+
+        # Test that _wrap_for_override doesn't double-wrap already wrapped values
+        resolver = container._resolver
+        original_value = "test-value"
+        wrapped_once = InstanceProxy(original_value, interface=str)
+
+        # Wrapping an already wrapped value should return the same wrapper
+        wrapped_again = resolver._wrap_for_override(str, wrapped_once)
+
+        # Should not be double-wrapped
+        assert isinstance(wrapped_again, InstanceProxy)
+        assert not isinstance(wrapped_again.__wrapped__, InstanceProxy)
+        assert wrapped_again.__wrapped__ == original_value
 
 
 # Test data for import_container tests
