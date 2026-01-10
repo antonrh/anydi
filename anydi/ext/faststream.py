@@ -78,7 +78,7 @@ def install(broker: BrokerUsecase[Any, Any], container: Container) -> None:
     broker._container = container  # type: ignore
     for handler in _get_broker_handlers(broker):
         call = handler._original_call  # noqa
-        for parameter in inspect.signature(call, eval_str=True).parameters.values():
+        for parameter in inspect.signature(call).parameters.values():
             _, should_inject, marker = container.validate_injected_parameter(
                 parameter, call=call
             )

@@ -11,7 +11,7 @@ import uuid
 from collections import defaultdict
 from collections.abc import AsyncIterator, Callable, Iterable, Iterator, Sequence
 from contextvars import ContextVar
-from typing import Any, TypeVar, get_args, get_origin, overload
+from typing import Any, ForwardRef, TypeVar, get_args, get_origin, overload
 
 from typing_extensions import ParamSpec, Self, type_repr
 
@@ -27,9 +27,11 @@ from ._types import (
     NOT_SET,
     Event,
     Scope,
+    evaluate_annotation,
     is_event_type,
     is_iterator_type,
     is_none_type,
+    resolve_forward_ref,
 )
 
 T = TypeVar("T", bound=Any)
@@ -399,12 +401,15 @@ class Container:
         self._validate_provider_scope(scope, name, is_resource)
 
         # Get signature and detect interface
-        signature = inspect.signature(call, eval_str=True)
+        signature = inspect.signature(call)
 
         if interface is NOT_SET:
             interface = call if is_class else signature.return_annotation
             if interface is inspect.Signature.empty:
                 interface = None
+            else:
+                # Evaluate annotation (try eager, fallback to ForwardRef if needed)
+                interface = evaluate_annotation(interface, module=call.__module__)
 
         # Handle iterator types for resources
         interface_origin = get_origin(interface)
@@ -448,21 +453,26 @@ class Container:
                     f"are not allowed in the provider `{name}`."
                 )
 
+            # Evaluate annotation (try eager, fallback to ForwardRef if needed)
+            annotation = evaluate_annotation(
+                parameter.annotation, module=call.__module__
+            )
+
             has_default = parameter.default is not inspect.Parameter.empty
             default = parameter.default if has_default else NOT_SET
 
             try:
-                sub_provider = self._get_or_register_provider(parameter.annotation)
+                sub_provider = self._get_or_register_provider(annotation)
             except LookupError as exc:
                 if (defaults and parameter.name in defaults) or has_default:
                     continue
                 # For scoped dependencies, allow unresolved parameters via context.set()
                 if is_scoped:
-                    self._resolver.add_unresolved(parameter.annotation)
+                    self._resolver.add_unresolved(annotation)
                     parameters.append(
                         ProviderParameter(
                             name=parameter.name,
-                            annotation=parameter.annotation,
+                            annotation=annotation,
                             default=default,
                             has_default=has_default,
                             provider=None,
@@ -484,11 +494,11 @@ class Container:
                 and sub_provider.scope == scope
                 and any(p.provider is None for p in sub_provider.parameters)
             ):
-                self._resolver.add_unresolved(parameter.annotation)
+                self._resolver.add_unresolved(annotation)
                 parameters.append(
                     ProviderParameter(
                         name=parameter.name,
-                        annotation=parameter.annotation,
+                        annotation=annotation,
                         default=default,
                         has_default=has_default,
                         provider=None,
@@ -509,7 +519,7 @@ class Container:
             parameters.append(
                 ProviderParameter(
                     name=parameter.name,
-                    annotation=parameter.annotation,
+                    annotation=annotation,
                     default=default,
                     has_default=has_default,
                     provider=sub_provider,
@@ -574,20 +584,34 @@ class Container:
         """Get provider by interface."""
         try:
             return self._providers[interface]
-        except KeyError as exc:
+        except KeyError:
+            # Try to find and resolve ForwardRef keys
+            for key in list(self._providers.keys()):
+                if isinstance(key, ForwardRef):
+                    try:
+                        resolved_key = resolve_forward_ref(key)
+                        if resolved_key == interface:
+                            # Replace ForwardRef key with resolved key
+                            provider = self._providers.pop(key)
+                            self._providers[resolved_key] = provider
+                            return provider
+                    except (NameError, AttributeError):
+                        # Can't resolve yet, skip
+                        continue
+
             raise LookupError(
                 f"The provider interface for `{type_repr(interface)}` has "
                 "not been registered. Please ensure that the provider interface is "
                 "properly registered before attempting to use it."
-            ) from exc
+            ) from None
 
     def _get_or_register_provider(
         self, interface: Any, defaults: dict[str, Any] | None = None
     ) -> Provider:
         """Get or register a provider by interface."""
         try:
-            return self._providers[interface]
-        except KeyError:
+            return self._get_provider(interface)
+        except LookupError:
             if inspect.isclass(interface) and is_provided(interface):
                 return self._register_provider(
                     interface,
