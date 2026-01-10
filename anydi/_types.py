@@ -32,13 +32,6 @@ def evaluate_annotation(annotation: Any, module: Any | None = None) -> Any:
     return annotation
 
 
-def resolve_forward_ref(annotation: Any) -> Any:
-    """Resolve a ForwardRef annotation to its actual type."""
-    if isinstance(annotation, ForwardRef):
-        return evaluate_forward_ref(annotation)
-    return annotation
-
-
 def is_event_type(obj: Any) -> bool:
     """Checks if an object is an event type."""
     return inspect.isclass(obj) and issubclass(obj, Event)
