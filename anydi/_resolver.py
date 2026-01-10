@@ -672,6 +672,8 @@ class Resolver:
 
     def _wrap_for_override(self, annotation: Any, value: Any) -> Any:
         """Hook for wrapping dependencies to enable override patching."""
+        if isinstance(value, InstanceProxy):
+            return value
         return InstanceProxy(value, interface=annotation)
 
     def _post_resolve_override(self, interface: Any, instance: Any) -> Any:  # noqa: C901
