@@ -11,7 +11,7 @@ import uuid
 from collections import defaultdict
 from collections.abc import AsyncIterator, Callable, Iterable, Iterator, Sequence
 from contextvars import ContextVar
-from typing import Any, ForwardRef, TypeVar, get_args, get_origin, overload
+from typing import Any, TypeVar, get_args, get_origin, overload
 
 from typing_extensions import ParamSpec, Self, type_repr
 
@@ -31,7 +31,6 @@ from ._types import (
     is_event_type,
     is_iterator_type,
     is_none_type,
-    resolve_forward_ref,
 )
 
 T = TypeVar("T", bound=Any)
@@ -585,20 +584,6 @@ class Container:
         try:
             return self._providers[interface]
         except KeyError:
-            # Try to find and resolve ForwardRef keys
-            for key in list(self._providers.keys()):
-                if isinstance(key, ForwardRef):
-                    try:
-                        resolved_key = resolve_forward_ref(key)
-                        if resolved_key == interface:
-                            # Replace ForwardRef key with resolved key
-                            provider = self._providers.pop(key)
-                            self._providers[resolved_key] = provider
-                            return provider
-                    except (NameError, AttributeError):
-                        # Can't resolve yet, skip
-                        continue
-
             raise LookupError(
                 f"The provider interface for `{type_repr(interface)}` has "
                 "not been registered. Please ensure that the provider interface is "
