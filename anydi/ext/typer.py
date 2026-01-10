@@ -84,7 +84,7 @@ def _wrap_async_callback_with_injection(
 
 def _process_callback(callback: Callable[..., Any], container: Container) -> Any:  # noqa: C901
     """Validate and wrap a callback for dependency injection."""
-    sig = inspect.signature(callback, eval_str=True)
+    sig = inspect.signature(callback)
     injected_param_names: set[str] = set()
     non_injected_params: set[inspect.Parameter] = set()
     scopes: set[Scope] = set()

@@ -63,7 +63,7 @@ def _validate_route_dependencies(
         call, *_ = dependant.cache_key
         if not call:
             continue  # pragma: no cover
-        for parameter in inspect.signature(call, eval_str=True).parameters.values():
+        for parameter in inspect.signature(call).parameters.values():
             _, should_inject, marker = container.validate_injected_parameter(
                 parameter, call=call
             )
