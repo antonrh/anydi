@@ -417,7 +417,7 @@ def _patch_pytest_fixtures(*, autoinject: bool) -> None:  # noqa: C901
 def _iter_injectable_parameters(
     func: Callable[..., Any], *, skip: tuple[str, ...] = ("request",)
 ) -> Iterator[tuple[str, Any]]:
-    annotations = get_annotations(func, eval_str=False)
+    annotations = get_annotations(func)
     skip_names = set(skip)
     for name, annotation in annotations.items():
         if name in skip_names or name == "return":
