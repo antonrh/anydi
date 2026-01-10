@@ -11,6 +11,7 @@ from anyio.pytest_plugin import extract_backend_and_options, get_runner
 from typing_extensions import get_annotations
 
 from anydi import Container, import_container
+from anydi._types import evaluate_annotation
 
 logger = logging.getLogger(__name__)
 
@@ -354,7 +355,7 @@ def _patch_pytest_fixtures(*, autoinject: bool) -> None:  # noqa: C901
             if not parameters:
                 return None
 
-            sig = inspect.signature(func, eval_str=True)
+            sig = inspect.signature(func)
             has_request_param = "request" in sig.parameters
 
             if has_request_param:
@@ -416,11 +417,13 @@ def _patch_pytest_fixtures(*, autoinject: bool) -> None:  # noqa: C901
 def _iter_injectable_parameters(
     func: Callable[..., Any], *, skip: tuple[str, ...] = ("request",)
 ) -> Iterator[tuple[str, Any]]:
-    annotations = get_annotations(func, eval_str=True)
+    annotations = get_annotations(func)
     skip_names = set(skip)
     for name, annotation in annotations.items():
         if name in skip_names or name == "return":
             continue
+        # Evaluate annotation (try eager, fallback to ForwardRef if needed)
+        annotation = evaluate_annotation(annotation, module=func.__module__)
         yield name, annotation
 
 
