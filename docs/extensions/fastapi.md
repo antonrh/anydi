@@ -105,7 +105,7 @@ from fastapi import FastAPI, Path, Request
 from starlette.middleware import Middleware
 
 import anydi.ext.fastapi
-from anydi import Container, Provide
+from anydi import Container, FromContext, Provide
 from anydi.ext.fastapi import RequestScopedMiddleware
 
 
@@ -129,7 +129,7 @@ container = Container()
 
 
 @container.provider(scope="request")
-def user_service(request: Request) -> UserService:
+def user_service(request: FromContext[Request]) -> UserService:
     return UserService(request=request)
 
 
@@ -153,7 +153,7 @@ async def get_user(
 anydi.ext.fastapi.install(app, container)
 ```
 
-With this setup, you can use request-scoped dependencies in your application. `Request` is automatically available in request-scoped providers, so you can access the request object and its data.
+With this setup, you can use request-scoped dependencies in your application. The `Request` object is provided by the `RequestScopedMiddleware` and marked with `FromContext[Request]` to indicate it comes from the runtime context.
 
 
 ## WebSocket Support
@@ -267,13 +267,15 @@ async def websocket_database(
 
 ### Accessing WebSocket Object
 
-The `WebSocket` object is automatically available in both `request` and `websocket` scoped providers:
+The `WebSocket` object is provided by the middleware in both `request` and `websocket` scoped providers. Use `FromContext[WebSocket]` to mark it as a runtime dependency:
 
 ```python
 from dataclasses import dataclass
 from typing import Any
 
 from starlette.websockets import WebSocket
+
+from anydi import FromContext
 
 
 @dataclass
@@ -283,7 +285,7 @@ class ConnectionInfo:
 
 
 @container.provider(scope="websocket")
-def connection_info(websocket: WebSocket) -> ConnectionInfo:
+def connection_info(websocket: FromContext[WebSocket]) -> ConnectionInfo:
     return ConnectionInfo(
         client=websocket.client.host if websocket.client else "unknown",
         headers=dict(websocket.headers),

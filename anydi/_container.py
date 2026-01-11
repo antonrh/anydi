@@ -28,7 +28,9 @@ from ._types import (
     Event,
     Scope,
     evaluate_annotation,
+    get_from_context_type,
     is_event_type,
+    is_from_context,
     is_iterator_type,
     is_none_type,
 )
@@ -435,9 +437,6 @@ class Container:
         # Process parameters
         parameters: list[ProviderParameter] = []
         scope_provider: dict[Scope, Provider] = {}
-        unresolved_parameter = None
-        unresolved_exc: LookupError | None = None
-        is_scoped = scope not in ("singleton", "transient")
         scope_hierarchy = self._scopes.get(scope, ()) if scope != "transient" else ()
 
         for parameter in signature.parameters.values():
@@ -457,54 +456,53 @@ class Container:
                 parameter.annotation, module=call.__module__
             )
 
-            has_default = parameter.default is not inspect.Parameter.empty
-            default = parameter.default if has_default else NOT_SET
-
-            try:
-                sub_provider = self._get_or_register_provider(annotation)
-            except LookupError as exc:
-                if (defaults and parameter.name in defaults) or has_default:
-                    continue
-                # For scoped dependencies, allow unresolved parameters via context.set()
-                if is_scoped:
-                    self._resolver.add_unresolved(annotation)
-                    parameters.append(
-                        ProviderParameter(
-                            name=parameter.name,
-                            annotation=annotation,
-                            default=default,
-                            has_default=has_default,
-                            provider=None,
-                            shared_scope=True,
-                        )
+            # Check if this is a FromContext[T] dependency
+            if is_from_context(annotation):
+                # Validate scope - only scoped providers can use FromContext
+                if not scope not in ("singleton", "transient"):
+                    raise ValueError(
+                        f"The provider `{name}` with scope `{scope}` cannot use "
+                        f"FromContext[{get_from_context_type(annotation).__name__}] "
+                        f"for parameter `{parameter.name}`. Only scoped providers "
+                        "(request, custom scopes) can have dependencies provided via "
+                        "context.set()."
                     )
-                    continue
-                unresolved_parameter = parameter
-                unresolved_exc = exc
-                continue
-
-            # Track scope providers for validation
-            scope_provider.setdefault(sub_provider.scope, sub_provider)
-
-            # For scoped dependencies with same scope having unresolved params,
-            # defer to context.set() instead
-            if (
-                is_scoped
-                and sub_provider.scope == scope
-                and any(p.provider is None for p in sub_provider.parameters)
-            ):
+                # Extract the inner type
+                annotation = get_from_context_type(annotation)
+                # Mark as unresolved - will be provided via context.set()
                 self._resolver.add_unresolved(annotation)
+                # Add parameter with provider=None
                 parameters.append(
                     ProviderParameter(
                         name=parameter.name,
                         annotation=annotation,
-                        default=default,
-                        has_default=has_default,
+                        default=NOT_SET,
+                        has_default=False,
                         provider=None,
                         shared_scope=True,
                     )
                 )
                 continue
+
+            has_default = parameter.default is not inspect.Parameter.empty
+            default = parameter.default if has_default else NOT_SET
+
+            # Skip parameters provided via defaults (for create() method)
+            if defaults and parameter.name in defaults:
+                continue
+
+            # Resolve dependency
+            try:
+                sub_provider = self._get_or_register_provider(annotation)
+            except LookupError:
+                # If parameter has a default value, skip it
+                if has_default:
+                    continue
+                # Otherwise, re-raise the error
+                raise
+
+            # Track scope providers for validation
+            scope_provider.setdefault(sub_provider.scope, sub_provider)
 
             # Validate scope compatibility inline
             if scope_hierarchy and sub_provider.scope not in scope_hierarchy:
@@ -525,21 +523,6 @@ class Container:
                     shared_scope=sub_provider.scope == scope and scope != "transient",
                 )
             )
-
-        # Handle unresolved parameters
-        if unresolved_parameter:
-            if is_scoped:  # pragma: no cover
-                # Note: This branch is currently unreachable because
-                # unresolved_parameter is only set when is_scoped=False
-                self._resolver.add_unresolved(interface)
-            else:
-                raise LookupError(
-                    f"The provider `{name}` depends on `{unresolved_parameter.name}` "
-                    f"of type `{type_repr(unresolved_parameter.annotation)}`, "
-                    "which has not been registered or set. To resolve this, ensure "
-                    f"that `{unresolved_parameter.name}` is registered before "
-                    f"attempting to use it."
-                ) from unresolved_exc
 
         # Create and register provider
         provider = Provider(

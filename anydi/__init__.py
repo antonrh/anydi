@@ -5,7 +5,7 @@ from ._decorators import injectable, provided, provider, request, singleton, tra
 from ._marker import Inject, Provide
 from ._module import Module
 from ._provider import ProviderDef as Provider
-from ._types import Scope
+from ._types import FromContext, Scope
 
 # Alias for dependency auto marker
 # TODO: deprecate it
@@ -14,6 +14,7 @@ auto = Inject()
 
 __all__ = [
     "Container",
+    "FromContext",
     "Inject",
     "Module",
     "Provide",
