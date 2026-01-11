@@ -119,10 +119,19 @@ You can create request-scoped instances for dependencies that need to be created
 
 To create a request context, use the `request_context` method (or `arequest_context` for async). Then you can resolve dependencies for that request.
 
+### Providing dependencies via context
+
+Sometimes you need to inject dependencies that are only available at runtime (like HTTP requests, user context, etc.). Use the `FromContext[T]` marker to indicate that a dependency will be provided via `context.set()`:
+
 ```python
 from typing import Annotated
 
-from anydi import Container
+from anydi import Container, FromContext
+
+
+class Request:
+    def __init__(self, param: str) -> None:
+        self.param = param
 
 
 class UserContext:
@@ -135,7 +144,7 @@ container = Container()
 
 
 @container.provider(scope="request")
-def user_context(request: Request) -> Annotated[UserContext, "current_user"]:
+def user_context(request: FromContext[Request]) -> Annotated[UserContext, "current_user"]:
     return UserContext(user_id=request.param, tenant_id="tenant-1")
 
 
@@ -146,6 +155,8 @@ with container.request_context() as ctx:
     assert user.user_id == "user-456"
     assert user.tenant_id == "tenant-1"
 ```
+
+**Important**: The `FromContext[T]` marker is required when a dependency will be provided via `context.set()`. This makes it explicit which dependencies are expected to come from the runtime context.
 
 ## Custom Scopes
 
@@ -221,6 +232,36 @@ with container.scoped_context("task"):
     with container.scoped_context("workflow"):
         engine = container.resolve(WorkflowEngine)
         assert engine.task_context.task_id == "task-123"
+```
+
+### Using FromContext with custom scopes
+
+Like the `request` scope, custom scopes can also use `FromContext[T]` for runtime-provided dependencies:
+
+```python
+from anydi import Container, FromContext
+
+
+class TaskRequest:
+    def __init__(self, task_id: str, user_id: str) -> None:
+        self.task_id = task_id
+        self.user_id = user_id
+
+
+container = Container()
+container.register_scope("task")
+
+
+@container.provider(scope="task")
+def task_handler(request: FromContext[TaskRequest]) -> str:
+    return f"Processing task {request.task_id} for user {request.user_id}"
+
+
+# Provide the task request at runtime
+with container.scoped_context("task") as ctx:
+    ctx.set(TaskRequest, TaskRequest(task_id="task-456", user_id="user-123"))
+    result = container.resolve(str)
+    assert result == "Processing task task-456 for user user-123"
 ```
 
 ### Async Custom Scopes

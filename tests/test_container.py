@@ -417,9 +417,8 @@ class TestContainer:
         with pytest.raises(
             LookupError,
             match=(
-                "The provider `(.*?).dep2` depends on `dep1` of type `int`, "
-                "which has not been registered or set. To resolve this, "
-                "ensure that `dep1` is registered before attempting to use it."
+                "The provider interface `int` is either not registered, not provided, "
+                "or not set in the scoped context"
             ),
         ):
             container.register(str, dep2, scope="singleton")
@@ -879,14 +878,16 @@ class TestContainer:
         assert result == instance
 
     def test_resolve_request_scoped_unresolved_yet(self, container: Container) -> None:
+        from anydi import FromContext
+
         @request
         class Request:
             def __init__(self, path: str) -> None:
                 self.path = path
 
         @container.provider(scope="request")
-        def req_path(req: Request) -> str:
-            return req.path
+        def req_path(req: FromContext[Request]) -> str:
+            return req.path  # type: ignore[attr-defined]
 
         with container.request_context() as context:
             context.set(Request, Request(path="test"))
@@ -895,14 +896,16 @@ class TestContainer:
     def test_resolve_request_scoped_unresolved_error(
         self, container: Container
     ) -> None:
+        from anydi import FromContext
+
         @request
         class Request:
             def __init__(self, path: str) -> None:
                 self.path = path
 
         @container.provider(scope="request")
-        def req_path(req: Request) -> str:
-            return req.path
+        def req_path(req: FromContext[Request]) -> str:
+            return req.path  # type: ignore[attr-defined]
 
         with (
             pytest.raises(
@@ -920,6 +923,8 @@ class TestContainer:
     def test_resolve_request_scoped_context_set_unregistered(
         self, container: Container
     ) -> None:
+        from anydi import FromContext
+
         class ExternalRequest:
             def __init__(self, rid: str) -> None:
                 self.rid = rid
@@ -929,8 +934,8 @@ class TestContainer:
                 self.request = request
 
         @container.provider(scope="request")
-        def request_context(request: ExternalRequest) -> RequestContext:
-            return RequestContext(request=request)
+        def request_context(request: FromContext[ExternalRequest]) -> RequestContext:
+            return RequestContext(request=request)  # type: ignore[arg-type]
 
         with container.request_context() as ctx:
             req = ExternalRequest(rid="req-1")
@@ -1200,9 +1205,8 @@ class TestContainer:
         with pytest.raises(
             LookupError,
             match=(
-                "The provider `(.*?)` depends on `name` of type "
-                "`str`, which has not been registered or set. To resolve this, "
-                "ensure that `name` is registered before attempting to use it."
+                "The provider interface `str` is either not registered, not provided, "
+                "or not set in the scoped context."
             ),
         ):
             container.resolve(Service)
@@ -1604,6 +1608,67 @@ class TestContainer:
         )
         assert provider is not None
 
+    def test_from_context_marker(self, container: Container) -> None:
+        """Test FromContext marker for unresolved dependencies."""
+        from anydi import FromContext
+
+        class Request:
+            def __init__(self, path: str) -> None:
+                self.path = path
+
+        class Service:
+            def __init__(self, request: Request) -> None:
+                self.request = request
+
+        @container.provider(scope="request")
+        def provide_service(request: FromContext[Request]) -> Service:
+            return Service(request)  # type: ignore[arg-type]
+
+        # Resolution should work with context.set()
+        with container.request_context() as ctx:
+            req = Request("/test")
+            ctx.set(Request, req)
+            service = container.resolve(Service)
+            assert service.request is req
+
+    def test_from_context_singleton_validation(self, container: Container) -> None:
+        """Test FromContext validation for singleton scope."""
+        from anydi import FromContext
+
+        class Request:
+            pass
+
+        class Service:
+            def __init__(self, request: Request) -> None:
+                self.request = request
+
+        # Should fail - singleton can't use FromContext
+        with pytest.raises(
+            ValueError,
+            match="cannot use FromContext.*Only scoped providers",
+        ):
+
+            @container.provider(scope="singleton")
+            def provide_service(request: FromContext[Request]) -> Service:
+                return Service(request)  # type: ignore[arg-type]
+
+    def test_from_context_transient_validation(self, container: Container) -> None:
+        """Test FromContext validation for transient scope."""
+        from anydi import FromContext
+
+        class Request:
+            pass
+
+        # Should fail - transient can't use FromContext
+        with pytest.raises(
+            ValueError,
+            match="cannot use FromContext.*Only scoped providers",
+        ):
+
+            @container.provider(scope="transient")
+            def provide_request(req: FromContext[Request]) -> Request:
+                return req  # type: ignore[return-value]
+
 
 class TestContainerCustomScopes:
     """Tests for custom scope registration and resolution."""
@@ -1926,6 +1991,8 @@ class TestContainerCustomScopes:
         assert isinstance(result.repository, Repository)
 
     def test_custom_scope_unresolved_error(self, container: Container) -> None:
+        from anydi import FromContext
+
         container.register_scope("task")
 
         @provided(scope="task")
@@ -1934,8 +2001,8 @@ class TestContainerCustomScopes:
                 self.task_id = task_id
 
         @container.provider(scope="task")
-        def task_handler(req: TaskRequest) -> str:
-            return req.task_id
+        def task_handler(req: FromContext[TaskRequest]) -> str:
+            return req.task_id  # type: ignore[attr-defined]
 
         with (
             pytest.raises(
@@ -1951,6 +2018,8 @@ class TestContainerCustomScopes:
             container.resolve(str)
 
     def test_custom_scope_with_context_set(self, container: Container) -> None:
+        from anydi import FromContext
+
         container.register_scope("task")
 
         @provided(scope="task")
@@ -1959,8 +2028,8 @@ class TestContainerCustomScopes:
                 self.task_id = task_id
 
         @container.provider(scope="task")
-        def task_handler(req: TaskRequest) -> str:
-            return req.task_id
+        def task_handler(req: FromContext[TaskRequest]) -> str:
+            return req.task_id  # type: ignore[attr-defined]
 
         with container.scoped_context("task") as context:
             context.set(TaskRequest, TaskRequest(task_id="task-123"))
