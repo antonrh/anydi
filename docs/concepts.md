@@ -15,10 +15,11 @@ container = Container()
 You can think of container as a registry that knows how to create and manage all your services.
 
 ### What container does:
-- Stores provider registrations
+- Stores providers (using lazy registration)
 - Resolves dependencies on demand
 - Manages object lifecycles (singleton, transient, request)
 - Performs dependency injection
+- Validates dependency graphs (optional, via `build()`)
 
 ## Provider
 
@@ -55,6 +56,58 @@ class NotificationService:
 - **Function providers**: Functions decorated with `@container.provider()`
 - **Class providers**: Classes decorated with `@singleton`, `@transient`, or `@request`
 - **Resource providers**: Generators that manage lifecycle
+
+### Dependency Graph
+
+AnyDI uses **lazy registration**. This means that when you register a provider, its dependencies are not immediately checked. This check happens later, either when you first resolve the provider with `resolve()`, or when you validate all providers at once with `build()`.
+
+Here's a simple illustration of a dependency graph:
+
+```mermaid
+graph TD
+    Service --> Repository
+    Repository --> Database
+```
+
+```python
+from anydi import Container, singleton
+
+container = Container()
+
+
+@singleton
+class Database:
+    pass
+
+
+@singleton
+class Repository:
+    def __init__(self, db: Database) -> None:
+        self.db = db
+
+
+@singleton
+class Service:
+    def __init__(self, repo: Repository) -> None:
+        self.repo = repo
+
+
+# Register providers - dependencies NOT checked yet
+container.register(Database)
+container.register(Repository)
+container.register(Service)
+
+# Option 1: Resolve on-demand
+my_service = container.resolve(Service)
+
+# Option 2: Validate entire graph upfront
+container.build()
+```
+
+#### Benefits of `build()`:
+- **Early Error Detection**: Catches circular dependencies and scope issues at startup, before they cause problems.
+- **Explicit Validation**: Validates the entire dependency graph in a single, clear step.
+
 
 ## Scope
 

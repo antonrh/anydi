@@ -5,7 +5,12 @@ After you register a provider with `Container`, you can use it to resolve depend
 
 ## Registering providers
 
-To register a provider, use the `register` method of the `Container`. The method takes the type of the object, the provider function or class, and a scope.
+You can register a provider using the `register` method on the `Container`. This method accepts the object's type, the provider (a function or class), and its scope.
+
+**Important:** AnyDI uses **lazy registration**. This means a provider's dependencies are not checked immediately upon registration. The check happens later in one of two cases:
+
+- **On-demand**: When you resolve the provider for the first time with `resolve()`.
+- **Upfront**: When you validate all providers at once with `build()`.
 
 ```python
 from anydi import Container
@@ -19,6 +24,7 @@ class EmailService:
 container = Container()
 container.register(EmailService, scope="singleton")
 
+# Provider dependencies are checked on first resolve
 service = container.resolve(EmailService)
 service.send("user@example.com", "Welcome!")
 ```
