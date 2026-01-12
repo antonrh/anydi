@@ -23,15 +23,7 @@ from ._module import ModuleDef, ModuleRegistrar
 from ._provider import Provider, ProviderDef, ProviderKind, ProviderParameter
 from ._resolver import Resolver
 from ._scanner import PackageOrIterable, Scanner
-from ._types import (
-    NOT_SET,
-    Event,
-    Scope,
-    evaluate_annotation,
-    is_event_type,
-    is_iterator_type,
-    is_none_type,
-)
+from ._types import NOT_SET, Event, Scope, is_event_type, is_iterator_type, is_none_type
 
 T = TypeVar("T", bound=Any)
 P = ParamSpec("P")
@@ -400,15 +392,12 @@ class Container:
         self._validate_provider_scope(scope, name, is_resource)
 
         # Get signature and detect interface
-        signature = inspect.signature(call)
+        signature = inspect.signature(call, eval_str=True)
 
         if interface is NOT_SET:
             interface = call if is_class else signature.return_annotation
             if interface is inspect.Signature.empty:
                 interface = None
-            else:
-                # Evaluate annotation (try eager, fallback to ForwardRef if needed)
-                interface = evaluate_annotation(interface, module=call.__module__)
 
         # Handle iterator types for resources
         interface_origin = get_origin(interface)
@@ -441,7 +430,9 @@ class Container:
         scope_hierarchy = self._scopes.get(scope, ()) if scope != "transient" else ()
 
         for parameter in signature.parameters.values():
-            if parameter.annotation is inspect.Parameter.empty:
+            annotation = parameter.annotation
+
+            if annotation is inspect.Parameter.empty:
                 raise TypeError(
                     f"Missing provider `{name}` "
                     f"dependency `{parameter.name}` annotation."
@@ -451,11 +442,6 @@ class Container:
                     "Positional-only parameters "
                     f"are not allowed in the provider `{name}`."
                 )
-
-            # Evaluate annotation (try eager, fallback to ForwardRef if needed)
-            annotation = evaluate_annotation(
-                parameter.annotation, module=call.__module__
-            )
 
             has_default = parameter.default is not inspect.Parameter.empty
             default = parameter.default if has_default else NOT_SET

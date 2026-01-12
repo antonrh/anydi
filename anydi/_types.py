@@ -5,9 +5,9 @@ from __future__ import annotations
 import inspect
 from collections.abc import AsyncIterator, Iterator
 from types import NoneType
-from typing import Any, ForwardRef, Literal
+from typing import Any, Literal
 
-from typing_extensions import Sentinel, evaluate_forward_ref
+from typing_extensions import Sentinel
 
 Scope = Literal["transient", "singleton", "request"] | str
 
@@ -18,18 +18,6 @@ class Event:
     """Represents an event object."""
 
     __slots__ = ()
-
-
-def evaluate_annotation(annotation: Any, module: Any | None = None) -> Any:
-    """Evaluate an annotation, falling back to ForwardRef on NameError."""
-    if isinstance(annotation, str):
-        forward_ref = ForwardRef(annotation, module=module)
-        try:
-            return evaluate_forward_ref(forward_ref)
-        except NameError:
-            # Name not defined yet - return ForwardRef for lazy resolution
-            return forward_ref
-    return annotation
 
 
 def is_event_type(obj: Any) -> bool:

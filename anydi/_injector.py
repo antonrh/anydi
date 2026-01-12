@@ -18,7 +18,6 @@ from typing import (
 from typing_extensions import ParamSpec, type_repr
 
 from ._marker import Marker, is_marker
-from ._types import evaluate_annotation
 
 if TYPE_CHECKING:
     from ._container import Container
@@ -69,7 +68,7 @@ class Injector:
     def _get_injected_params(self, call: Callable[..., Any]) -> dict[str, Any]:
         """Get the injected parameters of a callable object."""
         injected_params: dict[str, Any] = {}
-        for parameter in inspect.signature(call).parameters.values():
+        for parameter in inspect.signature(call, eval_str=True).parameters.values():
             interface, should_inject, _ = self.validate_parameter(parameter, call=call)
             if should_inject:
                 injected_params[parameter.name] = interface
@@ -79,13 +78,6 @@ class Injector:
         self, parameter: inspect.Parameter, *, call: Callable[..., Any]
     ) -> tuple[Any, bool, Marker | None]:
         """Validate an injected parameter."""
-        # Evaluate annotation first (try eager, fallback to ForwardRef if needed)
-        if parameter.annotation is not inspect.Parameter.empty:
-            evaluated_annotation = evaluate_annotation(
-                parameter.annotation, module=call.__module__
-            )
-            parameter = parameter.replace(annotation=evaluated_annotation)
-
         parameter = self.unwrap_parameter(parameter)
         interface = parameter.annotation
 
