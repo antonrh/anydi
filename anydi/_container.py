@@ -18,20 +18,12 @@ from typing_extensions import ParamSpec, Self, type_repr
 from ._context import InstanceContext
 from ._decorators import is_provided
 from ._injector import Injector
-from ._marker import Marker
+from ._marker import Marker, is_from_context_marker, unwrap_from_context
 from ._module import ModuleDef, ModuleRegistrar
 from ._provider import Provider, ProviderDef, ProviderKind, ProviderParameter
 from ._resolver import Resolver
 from ._scanner import PackageOrIterable, Scanner
-from ._types import (
-    NOT_SET,
-    Event,
-    Scope,
-    evaluate_annotation,
-    is_event_type,
-    is_iterator_type,
-    is_none_type,
-)
+from ._types import NOT_SET, Event, Scope, is_event_type, is_iterator_type, is_none_type
 
 T = TypeVar("T", bound=Any)
 P = ParamSpec("P")
@@ -408,15 +400,12 @@ class Container:
         self._validate_provider_scope(scope, name, is_resource)
 
         # Get signature and detect interface
-        signature = inspect.signature(call)
+        signature = inspect.signature(call, eval_str=True)
 
         if interface is NOT_SET:
             interface = call if is_class else signature.return_annotation
             if interface is inspect.Signature.empty:
                 interface = None
-            else:
-                # Evaluate annotation (try eager, fallback to ForwardRef if needed)
-                interface = evaluate_annotation(interface, module=call.__module__)
 
         # Handle iterator types for resources
         interface_origin = get_origin(interface)
@@ -444,7 +433,9 @@ class Container:
         parameters: list[ProviderParameter] = []
 
         for parameter in signature.parameters.values():
-            if parameter.annotation is inspect.Parameter.empty:
+            annotation = parameter.annotation
+
+            if annotation is inspect.Parameter.empty:
                 raise TypeError(
                     f"Missing provider `{name}` "
                     f"dependency `{parameter.name}` annotation."
@@ -455,11 +446,6 @@ class Container:
                     f"are not allowed in the provider `{name}`."
                 )
 
-            # Evaluate annotation (try eager, fallback to ForwardRef if needed)
-            annotation = evaluate_annotation(
-                parameter.annotation, module=call.__module__
-            )
-
             has_default = parameter.default is not inspect.Parameter.empty
             default = parameter.default if has_default else NOT_SET
 
@@ -468,6 +454,7 @@ class Container:
                 continue
 
             # Lazy registration: Store parameter without resolving dependencies
+            # Keep original annotation (including FromContext) for later resolution
             parameters.append(
                 ProviderParameter(
                     name=parameter.name,
@@ -594,17 +581,24 @@ class Container:
                 resolved_params.append(param)
                 continue
 
+            # Check if marked with FromContext
+            from_context = is_from_context_marker(param.annotation)
+            annotation = (
+                unwrap_from_context(param.annotation)
+                if from_context
+                else param.annotation
+            )
+
             # Try to resolve the dependency
             # First check if this would create a circular dependency
-            if param.annotation in resolving:
+            if annotation in resolving:
                 # Circular dependency detected
-                # For scoped providers, leave it unresolved for context.set()
-                if provider.scope not in ("singleton", "transient"):
-                    self._resolver.add_unresolved(param.annotation)
+                # For scoped providers with FromContext, leave unresolved
+                if provider.scope not in ("singleton", "transient") and from_context:
                     resolved_params.append(
                         ProviderParameter(
                             name=param.name,
-                            annotation=param.annotation,
+                            annotation=annotation,
                             default=param.default,
                             has_default=param.has_default,
                             provider=None,
@@ -616,19 +610,19 @@ class Container:
                     # Circular dependency in singleton/transient - error
                     raise ValueError(
                         f"Circular dependency detected: {provider.name} depends on "
-                        f"{type_repr(param.annotation)}"
+                        f"{type_repr(annotation)}"
                     )
 
             try:
-                dep_provider = self._get_provider(param.annotation)
+                dep_provider = self._get_provider(annotation)
             except LookupError:
                 # Check if it's a @provided class
-                if inspect.isclass(param.annotation) and is_provided(param.annotation):
-                    provided_scope = param.annotation.__provided__["scope"]
+                if inspect.isclass(annotation) and is_provided(annotation):
+                    provided_scope = annotation.__provided__["scope"]
 
                     # Auto-register @provided class
                     dep_provider = self._register_provider(
-                        param.annotation,
+                        annotation,
                         provided_scope,
                         NOT_SET,
                         False,
@@ -642,14 +636,15 @@ class Container:
                     resolved_params.append(param)
                     continue
                 else:
-                    # Check if this is a scoped provider with potential context.set()
-                    if provider.scope not in ("singleton", "transient"):
-                        # Mark as unresolved for runtime context.set()
-                        self._resolver.add_unresolved(param.annotation)
+                    # Only allow unresolved for scoped providers with FromContext
+                    if (
+                        provider.scope not in ("singleton", "transient")
+                        and from_context
+                    ):
                         resolved_params.append(
                             ProviderParameter(
                                 name=param.name,
-                                annotation=param.annotation,
+                                annotation=annotation,
                                 default=param.default,
                                 has_default=param.has_default,
                                 provider=None,
@@ -662,9 +657,11 @@ class Container:
                         raise LookupError(
                             f"The provider `{provider.name}` depends on "
                             f"`{param.name}` of type "
-                            f"`{type_repr(param.annotation)}`, which has not been "
+                            f"`{type_repr(annotation)}`, which has not been "
                             f"registered or set. To resolve this, ensure that "
-                            f"`{param.name}` is registered before resolving."
+                            f"`{param.name}` is registered before resolving, "
+                            f"or mark it with FromContext[...] if it should be "
+                            f"provided via scoped context."
                         ) from None
 
             # Ensure dependency is also resolved
@@ -689,11 +686,11 @@ class Container:
                 dep_provider.scope == provider.scope and provider.scope != "transient"
             )
 
-            # Create resolved parameter
+            # Create resolved parameter (use unwrapped annotation)
             resolved_params.append(
                 ProviderParameter(
                     name=param.name,
-                    annotation=param.annotation,
+                    annotation=annotation,
                     default=param.default,
                     has_default=param.has_default,
                     provider=dep_provider,
@@ -885,19 +882,25 @@ class Container:
                     resolved_params.append(param)
                     continue
 
+                # Check if marked with FromContext
+                from_context = is_from_context_marker(param.annotation)
+                annotation = (
+                    unwrap_from_context(param.annotation)
+                    if from_context
+                    else param.annotation
+                )
+
                 # Try to resolve the dependency
                 try:
-                    dep_provider = self._get_provider(param.annotation)
+                    dep_provider = self._get_provider(annotation)
                 except LookupError:
                     # Check if it's a @provided class
-                    if inspect.isclass(param.annotation) and is_provided(
-                        param.annotation
-                    ):
-                        provided_scope = param.annotation.__provided__["scope"]
+                    if inspect.isclass(annotation) and is_provided(annotation):
+                        provided_scope = annotation.__provided__["scope"]
 
                         # Auto-register @provided class
                         dep_provider = self._register_provider(
-                            param.annotation,
+                            annotation,
                             provided_scope,
                             NOT_SET,
                             False,
@@ -907,14 +910,15 @@ class Container:
                         resolved_params.append(param)
                         continue
                     else:
-                        # Check if scoped provider with potential context.set()
-                        if provider.scope not in ("singleton", "transient"):
-                            # Mark as unresolved for runtime context.set()
-                            self._resolver.add_unresolved(param.annotation)
+                        # Only allow unresolved for scoped providers with FromContext
+                        if (
+                            provider.scope not in ("singleton", "transient")
+                            and from_context
+                        ):
                             resolved_params.append(
                                 ProviderParameter(
                                     name=param.name,
-                                    annotation=param.annotation,
+                                    annotation=annotation,
                                     default=param.default,
                                     has_default=param.has_default,
                                     provider=None,
@@ -927,9 +931,11 @@ class Container:
                             raise LookupError(
                                 f"The provider `{provider.name}` depends on "
                                 f"`{param.name}` of type "
-                                f"`{type_repr(param.annotation)}`, which has not been "
+                                f"`{type_repr(annotation)}`, which has not been "
                                 f"registered or set. To resolve this, ensure that "
-                                f"`{param.name}` is registered before calling build()."
+                                f"`{param.name}` is registered before calling build(), "
+                                f"or mark it with FromContext[...] if it should be "
+                                f"provided via scoped context."
                             ) from None
 
                 # Calculate shared_scope
@@ -938,11 +944,11 @@ class Container:
                     and provider.scope != "transient"
                 )
 
-                # Create resolved parameter
+                # Create resolved parameter (use unwrapped annotation)
                 resolved_params.append(
                     ProviderParameter(
                         name=param.name,
-                        annotation=param.annotation,
+                        annotation=annotation,
                         default=param.default,
                         has_default=param.has_default,
                         provider=dep_provider,

@@ -2,7 +2,7 @@
 
 from ._container import Container, import_container
 from ._decorators import injectable, provided, provider, request, singleton, transient
-from ._marker import Inject, Provide
+from ._marker import FromContext, Inject, Provide
 from ._module import Module
 from ._provider import ProviderDef as Provider
 from ._types import Scope
@@ -14,6 +14,7 @@ auto = Inject()
 
 __all__ = [
     "Container",
+    "FromContext",
     "Inject",
     "Module",
     "Provide",

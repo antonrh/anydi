@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Annotated, Any, TypeVar
+from typing import TYPE_CHECKING, Annotated, Any, TypeGuard, TypeVar, get_origin
 
 from ._types import NOT_SET
 
@@ -114,3 +114,36 @@ else:
 
 def Inject() -> Any:
     return _marker_cls()
+
+
+class FromContextMarker:
+    """Marker for parameters that should be provided from scoped context."""
+
+    __slots__ = ()
+
+    def __class_getitem__(cls, item: Any) -> Any:
+        return Annotated[item, cls()]
+
+
+if TYPE_CHECKING:
+    FromContext = Annotated[T, FromContextMarker()]
+
+else:
+    FromContext = FromContextMarker
+
+
+def is_from_context_marker(annotation: Any) -> TypeGuard[FromContextMarker]:
+    """Check if annotation is FromContext[T]."""
+    if get_origin(annotation) is not Annotated:
+        return False
+    args = getattr(annotation, "__metadata__", ())
+    return any(isinstance(arg, FromContextMarker) for arg in args)
+
+
+def unwrap_from_context(annotation: Any) -> Any:
+    """Extract the inner type from FromContext[T], returning T."""
+    if not is_from_context_marker(annotation):
+        return annotation
+    # Get the first argument of Annotated[T, FromContextMarker()]
+    args = getattr(annotation, "__args__", ())
+    return args[0] if args else annotation

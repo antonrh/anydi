@@ -119,10 +119,19 @@ You can create request-scoped instances for dependencies that need to be created
 
 To create a request context, use the `request_context` method (or `arequest_context` for async). Then you can resolve dependencies for that request.
 
+### Using `FromContext` for external dependencies
+
+When a scoped provider depends on a value that will be provided at runtime via `context.set()`, use the `FromContext` marker to explicitly declare this dependency:
+
 ```python
 from typing import Annotated
 
-from anydi import Container
+from anydi import Container, FromContext
+
+
+class Request:
+    def __init__(self, param: str) -> None:
+        self.param = param
 
 
 class UserContext:
@@ -135,7 +144,7 @@ container = Container()
 
 
 @container.provider(scope="request")
-def user_context(request: Request) -> Annotated[UserContext, "current_user"]:
+def user_context(request: FromContext[Request]) -> Annotated[UserContext, "current_user"]:
     return UserContext(user_id=request.param, tenant_id="tenant-1")
 
 
@@ -146,6 +155,14 @@ with container.request_context() as ctx:
     assert user.user_id == "user-456"
     assert user.tenant_id == "tenant-1"
 ```
+
+The `FromContext[T]` marker tells AnyDI that:
+
+1. The `Request` type will be provided via `context.set()` at runtime
+2. The provider should wait for this value from the scoped context
+3. A `LookupError` will be raised if the value is not set before resolution
+
+This makes the dependency explicit and type-safe. Without `FromContext`, unregistered dependencies will raise an error at provider registration time.
 
 ## Custom Scopes
 

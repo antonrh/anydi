@@ -36,7 +36,6 @@ class CompiledResolver(NamedTuple):
 class Resolver:
     def __init__(self, container: Container) -> None:
         self._container = container
-        self._unresolved_interfaces: set[Any] = set()
         # Normal caches (fast path, no override checks)
         self._cache: dict[Any, CompiledResolver] = {}
         self._async_cache: dict[Any, CompiledResolver] = {}
@@ -58,9 +57,6 @@ class Resolver:
     def remove_override(self, interface: Any) -> None:
         """Remove an override instance for an interface."""
         self._override_instances.pop(interface, None)
-
-    def add_unresolved(self, interface: Any) -> None:
-        self._unresolved_interfaces.add(interface)
 
     def clear_caches(self) -> None:
         """Clear all cached resolvers."""
@@ -159,7 +155,8 @@ class Resolver:
         param_has_default: list[bool] = [False] * num_params
         param_names: list[str] = [""] * num_params
         param_shared_scopes: list[bool] = [False] * num_params
-        unresolved_messages: list[str] = [""] * num_params
+        # Only track unresolved messages for FromContext params (provider=None)
+        unresolved_messages: dict[int, str] = {}
 
         cache = (
             (self._async_override_cache if is_async else self._override_cache)
@@ -186,14 +183,15 @@ class Resolver:
                     compiled = self.compile(param.provider, is_async=is_async)
                     cache[param.provider.interface] = compiled
                 param_resolvers[idx] = compiled.resolve
-
-            unresolved_message = (
-                f"You are attempting to get the parameter `{param.name}` with the "
-                f"annotation `{type_repr(param.annotation)}` as a dependency into "
-                f"`{type_repr(provider.call)}` which is not registered or set in the "
-                "scoped context."
-            )
-            unresolved_messages[idx] = unresolved_message
+            elif param.shared_scope:
+                # Only generate unresolved message for FromContext params
+                # (shared_scope=True means it's a FromContext param)
+                unresolved_messages[idx] = (
+                    f"You are attempting to get the parameter `{param.name}` with the "
+                    f"annotation `{type_repr(param.annotation)}` as a dependency into "
+                    f"`{type_repr(provider.call)}` which is not registered or set "
+                    "in the scoped context."
+                )
 
         scope = provider.scope
         is_generator = provider.is_generator
@@ -240,6 +238,9 @@ class Resolver:
         if not no_params:
             # Only generate parameter resolution logic if there are parameters
             for idx, name in enumerate(param_names):
+                has_resolver = param_resolvers[idx] is not None
+                is_from_context = idx in unresolved_messages
+
                 create_lines.append(f"    # resolve param `{name}`")
                 create_lines.append(
                     f"    if defaults is not None and '{name}' in defaults:"
@@ -256,85 +257,88 @@ class Resolver:
                 else:
                     create_lines.append("        cached = NOT_SET_")
                 create_lines.append("        if cached is NOT_SET_:")
-                create_lines.append(
-                    f"            if _param_annotations[{idx}] in "
-                    "_unresolved_interfaces:"
-                )
-                create_lines.append(
-                    f"                raise LookupError(_unresolved_messages[{idx}])"
-                )
-                create_lines.append(
-                    f"            _dep_resolver = _param_resolvers[{idx}]"
-                )
-                create_lines.append("            if _dep_resolver is None:")
-                create_lines.append("                try:")
-                if is_async:
+
+                if is_from_context:
+                    # FromContext param: we know it's unresolved, raise directly
                     create_lines.append(
-                        f"                    compiled = "
-                        f"cache.get(_param_annotations[{idx}])"
+                        f"            raise LookupError(_unresolved_messages[{idx}])"
                     )
-                    create_lines.append("                    if compiled is None:")
+                elif has_resolver:
+                    # Has a pre-compiled resolver, use it directly
                     create_lines.append(
-                        "                        provider = "
-                        "container._get_or_register_provider("
-                        f"_param_annotations[{idx}])"
+                        f"            _dep_resolver = _param_resolvers[{idx}]"
                     )
-                    create_lines.append(
-                        "                        compiled = "
-                        "_compile(provider, is_async=True)"
-                    )
-                    create_lines.append(
-                        "                        cache[provider.interface] = compiled"
-                    )
-                    create_lines.append(
-                        f"                    arg_{idx} = "
-                        f"await compiled[0](container, "
-                        f"context if _param_shared_scopes[{idx}] else None)"
-                    )
+                    if is_async:
+                        create_lines.append(
+                            f"            arg_{idx} = await _dep_resolver("
+                            f"container, context if _param_shared_scopes[{idx}] "
+                            "else None)"
+                        )
+                    else:
+                        create_lines.append(
+                            f"            arg_{idx} = _dep_resolver("
+                            f"container, context if _param_shared_scopes[{idx}] "
+                            "else None)"
+                        )
                 else:
+                    # No resolver, try dynamic lookup
+                    create_lines.append("            try:")
+                    if is_async:
+                        create_lines.append(
+                            f"                compiled = "
+                            f"cache.get(_param_annotations[{idx}])"
+                        )
+                        create_lines.append("                if compiled is None:")
+                        create_lines.append(
+                            "                    provider = "
+                            "container._get_or_register_provider("
+                            f"_param_annotations[{idx}])"
+                        )
+                        create_lines.append(
+                            "                    compiled = "
+                            "_compile(provider, is_async=True)"
+                        )
+                        create_lines.append(
+                            "                    cache[provider.interface] = compiled"
+                        )
+                        create_lines.append(
+                            f"                arg_{idx} = "
+                            f"await compiled[0](container, "
+                            f"context if _param_shared_scopes[{idx}] else None)"
+                        )
+                    else:
+                        create_lines.append(
+                            f"                compiled = "
+                            f"cache.get(_param_annotations[{idx}])"
+                        )
+                        create_lines.append("                if compiled is None:")
+                        create_lines.append(
+                            "                    provider = "
+                            f"container._get_or_register_provider("
+                            f"_param_annotations[{idx}])"
+                        )
+                        create_lines.append(
+                            "                    compiled = "
+                            "_compile(provider, is_async=False)"
+                        )
+                        create_lines.append(
+                            "                    cache[provider.interface] = compiled"
+                        )
+                        create_lines.append(
+                            f"                arg_{idx} = "
+                            f"compiled[0](container, "
+                            f"context if _param_shared_scopes[{idx}] else None)"
+                        )
+                    create_lines.append("            except LookupError:")
                     create_lines.append(
-                        f"                    compiled = "
-                        f"cache.get(_param_annotations[{idx}])"
-                    )
-                    create_lines.append("                    if compiled is None:")
-                    create_lines.append(
-                        "                        provider = "
-                        f"container._get_or_register_provider(_param_annotations[{idx}])"
+                        f"                if _param_has_default[{idx}]:"
                     )
                     create_lines.append(
-                        "                        compiled = "
-                        "_compile(provider, is_async=False)"
+                        f"                    arg_{idx} = _param_defaults[{idx}]"
                     )
-                    create_lines.append(
-                        "                        cache[provider.interface] = compiled"
-                    )
-                    create_lines.append(
-                        f"                    arg_{idx} = "
-                        f"compiled[0](container, "
-                        f"context if _param_shared_scopes[{idx}] else None)"
-                    )
-                create_lines.append("                except LookupError:")
-                create_lines.append(
-                    f"                    if _param_has_default[{idx}]:"
-                )
-                create_lines.append(
-                    f"                        arg_{idx} = _param_defaults[{idx}]"
-                )
-                create_lines.append("                    else:")
-                create_lines.append("                        raise")
-                create_lines.append("            else:")
-                if is_async:
-                    create_lines.append(
-                        f"                arg_{idx} = await _dep_resolver("
-                        f"container, "
-                        f"context if _param_shared_scopes[{idx}] else None)"
-                    )
-                else:
-                    create_lines.append(
-                        f"                arg_{idx} = _dep_resolver("
-                        f"container, "
-                        f"context if _param_shared_scopes[{idx}] else None)"
-                    )
+                    create_lines.append("                else:")
+                    create_lines.append("                    raise")
+
                 create_lines.append("        else:")
                 create_lines.append(f"            arg_{idx} = cached")
                 # Wrap dependencies if in override mode (only for override version)
@@ -633,7 +637,6 @@ class Resolver:
             "_param_resolvers": param_resolvers,
             "_param_shared_scopes": param_shared_scopes,
             "_unresolved_messages": unresolved_messages,
-            "_unresolved_interfaces": self._unresolved_interfaces,
             "_NOT_SET": NOT_SET,
             "_contextmanager": contextlib.contextmanager,
             "_is_cm": is_context_manager,
