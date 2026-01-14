@@ -42,7 +42,7 @@ def _wrap_async_callback_with_injection(
     callback: Callable[..., Awaitable[Any]],
     container: Container,
     sig: inspect.Signature,
-    non_injected_params: set[inspect.Parameter],
+    non_injected_params: list[inspect.Parameter],
     scopes: set[Scope],
 ) -> Any:
     """Wrap async callback with injection in anyio.run()."""
@@ -86,7 +86,7 @@ def _process_callback(callback: Callable[..., Any], container: Container) -> Any
     """Validate and wrap a callback for dependency injection."""
     sig = inspect.signature(callback, eval_str=True)
     injected_param_names: set[str] = set()
-    non_injected_params: set[inspect.Parameter] = set()
+    non_injected_params: list[inspect.Parameter] = []
     scopes: set[Scope] = set()
 
     # Validate parameters and collect which ones need injection
@@ -103,7 +103,7 @@ def _process_callback(callback: Callable[..., Any], container: Container) -> Any
                 if inspect.isclass(interface) and is_provided(interface):
                     scopes.add(interface.__provided__["scope"])
         else:
-            non_injected_params.add(processed_parameter)
+            non_injected_params.append(processed_parameter)
 
     # If no parameters need injection and callback is not async, return original
     if not injected_param_names and not inspect.iscoroutinefunction(callback):
