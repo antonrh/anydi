@@ -2,14 +2,7 @@
 
 from __future__ import annotations
 
-from typing import (
-    TYPE_CHECKING,
-    Annotated,
-    Any,
-    TypeGuard,
-    TypeVar,
-    get_origin
-)
+from typing import TYPE_CHECKING, Annotated, Any, TypeGuard, TypeVar, get_origin
 
 from ._types import NOT_SET
 
@@ -136,7 +129,6 @@ if TYPE_CHECKING:
     FromContext = Annotated[T, FromContextMarker()]
 
 else:
-
     FromContext = FromContextMarker
 
 

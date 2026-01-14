@@ -188,8 +188,8 @@ class Resolver:
                 unresolved_messages[idx] = (
                     f"You are attempting to get the parameter `{param.name}` with the "
                     f"annotation `{type_repr(param.annotation)}` as a dependency into "
-                    f"`{type_repr(provider.call)}` which is not registered or set in the "
-                    "scoped context."
+                    f"`{type_repr(provider.call)}` which is not registered or set "
+                    "in the scoped context."
                 )
 
         scope = provider.scope
