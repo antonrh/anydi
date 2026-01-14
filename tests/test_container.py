@@ -12,6 +12,7 @@ from typing_extensions import Self
 
 from anydi import (
     Container,
+    FromContext,
     Inject,
     Provide,
     Provider,
@@ -885,7 +886,7 @@ class TestContainer:
                 self.path = path
 
         @container.provider(scope="request")
-        def req_path(req: Request) -> str:
+        def req_path(req: FromContext[Request]) -> str:
             return req.path
 
         with container.request_context() as context:
@@ -901,7 +902,7 @@ class TestContainer:
                 self.path = path
 
         @container.provider(scope="request")
-        def req_path(req: Request) -> str:
+        def req_path(req: FromContext[Request]) -> str:
             return req.path
 
         with (
@@ -929,7 +930,7 @@ class TestContainer:
                 self.request = request
 
         @container.provider(scope="request")
-        def request_context(request: ExternalRequest) -> RequestContext:
+        def request_context(request: FromContext[ExternalRequest]) -> RequestContext:
             return RequestContext(request=request)
 
         with container.request_context() as ctx:
@@ -1934,7 +1935,7 @@ class TestContainerCustomScopes:
                 self.task_id = task_id
 
         @container.provider(scope="task")
-        def task_handler(req: TaskRequest) -> str:
+        def task_handler(req: FromContext[TaskRequest]) -> str:
             return req.task_id
 
         with (
@@ -1959,7 +1960,7 @@ class TestContainerCustomScopes:
                 self.task_id = task_id
 
         @container.provider(scope="task")
-        def task_handler(req: TaskRequest) -> str:
+        def task_handler(req: FromContext[TaskRequest]) -> str:
             return req.task_id
 
         with container.scoped_context("task") as context:

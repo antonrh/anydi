@@ -18,7 +18,7 @@ from typing_extensions import ParamSpec, Self, type_repr
 from ._context import InstanceContext
 from ._decorators import is_provided
 from ._injector import Injector
-from ._marker import Marker
+from ._marker import Marker, is_from_context_marker, unwrap_from_context
 from ._module import ModuleDef, ModuleRegistrar
 from ._provider import Provider, ProviderDef, ProviderKind, ProviderParameter
 from ._resolver import Resolver
@@ -446,14 +446,20 @@ class Container:
             has_default = parameter.default is not inspect.Parameter.empty
             default = parameter.default if has_default else NOT_SET
 
+            # Check if annotation is marked with FromContext
+            from_context = is_from_context_marker(annotation)
+            if from_context:
+                # Unwrap FromContext[T] to get T
+                annotation = unwrap_from_context(annotation)
+
             try:
                 sub_provider = self._get_or_register_provider(annotation)
             except LookupError as exc:
                 if (defaults and parameter.name in defaults) or has_default:
                     continue
-                # For scoped dependencies, allow unresolved parameters via context.set()
-                if is_scoped:
-                    self._resolver.add_unresolved(annotation)
+                # For scoped dependencies, allow unresolved parameters only if
+                # explicitly marked with FromContext
+                if is_scoped and from_context:
                     parameters.append(
                         ProviderParameter(
                             name=parameter.name,
@@ -471,26 +477,6 @@ class Container:
 
             # Track scope providers for validation
             scope_provider.setdefault(sub_provider.scope, sub_provider)
-
-            # For scoped dependencies with same scope having unresolved params,
-            # defer to context.set() instead
-            if (
-                is_scoped
-                and sub_provider.scope == scope
-                and any(p.provider is None for p in sub_provider.parameters)
-            ):
-                self._resolver.add_unresolved(annotation)
-                parameters.append(
-                    ProviderParameter(
-                        name=parameter.name,
-                        annotation=annotation,
-                        default=default,
-                        has_default=has_default,
-                        provider=None,
-                        shared_scope=True,
-                    )
-                )
-                continue
 
             # Validate scope compatibility inline
             if scope_hierarchy and sub_provider.scope not in scope_hierarchy:
@@ -514,18 +500,15 @@ class Container:
 
         # Handle unresolved parameters
         if unresolved_parameter:
-            if is_scoped:  # pragma: no cover
-                # Note: This branch is currently unreachable because
-                # unresolved_parameter is only set when is_scoped=False
-                self._resolver.add_unresolved(interface)
-            else:
-                raise LookupError(
-                    f"The provider `{name}` depends on `{unresolved_parameter.name}` "
-                    f"of type `{type_repr(unresolved_parameter.annotation)}`, "
-                    "which has not been registered or set. To resolve this, ensure "
-                    f"that `{unresolved_parameter.name}` is registered before "
-                    f"attempting to use it."
-                ) from unresolved_exc
+            # Raise an error for any unresolved parameter not marked with FromContext
+            raise LookupError(
+                f"The provider `{name}` depends on `{unresolved_parameter.name}` "
+                f"of type `{type_repr(unresolved_parameter.annotation)}`, "
+                "which has not been registered or set. To resolve this, ensure "
+                f"that `{unresolved_parameter.name}` is registered before "
+                f"attempting to use it, or mark it with FromContext[...] "
+                "if it should be provided via scoped context."
+            ) from unresolved_exc
 
         # Create and register provider
         provider = Provider(
