@@ -323,24 +323,24 @@ class Container:
         from_context: bool = False,
         override: bool = False,
     ) -> Provider:
-        """Register a provider for the specified interface."""
+        """Register a provider for the specified dependency type."""
         if call is NOT_SET:
             call = interface
         return self._register_provider(interface, call, scope, from_context, override)
 
     def is_registered(self, interface: Any) -> bool:
-        """Check if a provider is registered for the specified interface."""
+        """Check if a provider is registered for the specified dependency type."""
         return interface in self._providers
 
     def has_provider_for(self, interface: Any) -> bool:
-        """Check if a provider exists for the specified interface."""
+        """Check if a provider exists for the specified dependency type."""
         return self.is_registered(interface) or is_provided(interface)
 
     def unregister(self, interface: Any) -> None:
-        """Unregister a provider by interface."""
+        """Unregister a provider by dependency type."""
         if not self.is_registered(interface):
             raise LookupError(
-                f"The provider interface `{type_repr(interface)}` not registered."
+                f"The provider `{type_repr(interface)}` is not registered."
             )
 
         provider = self._get_provider(interface)
@@ -394,14 +394,12 @@ class Container:
                 )
             if dependency_type is NOT_SET:
                 raise TypeError(
-                    "The `interface` parameter is required when using "
+                    "The `dependency_type` parameter is required when using "
                     "`from_context=True`."
                 )
             name = type_repr(dependency_type)
             if dependency_type in self._providers and not override:
-                raise LookupError(
-                    f"The provider interface `{name}` already registered."
-                )
+                raise LookupError(f"The provider `{name}` is already registered.")
 
             provider = Provider(
                 dependency_type=dependency_type,
@@ -442,8 +440,8 @@ class Container:
                     dependency_type = None
 
             # Unwrap iterator types for resources
-            interface_origin = get_origin(dependency_type)
-            if is_iterator_type(dependency_type) or is_iterator_type(interface_origin):
+            type_origin = get_origin(dependency_type)
+            if is_iterator_type(dependency_type) or is_iterator_type(type_origin):
                 args = get_args(dependency_type)
                 if not args:
                     raise TypeError(
@@ -459,7 +457,7 @@ class Container:
 
             if dependency_type in self._providers and not override:
                 raise LookupError(
-                    f"The provider interface `{type_repr(dependency_type)}` already "
+                    f"The provider `{type_repr(dependency_type)}` is already "
                     "registered."
                 )
 
@@ -553,15 +551,15 @@ class Container:
             return self._providers[dependency_type]
         except KeyError:
             raise LookupError(
-                f"The provider interface for `{type_repr(dependency_type)}` has "
-                "not been registered. Please ensure that the provider interface is "
+                f"The provider for `{type_repr(dependency_type)}` has "
+                "not been registered. Please ensure that the provider is "
                 "properly registered before attempting to use it."
             ) from None
 
     def _get_or_register_provider(
         self, dependency_type: Any, defaults: dict[str, Any] | None = None
     ) -> Provider:
-        """Get or register a provider by interface."""
+        """Get or register a provider by dependency type."""
         try:
             return self._get_provider(dependency_type)
         except LookupError:
@@ -575,14 +573,14 @@ class Container:
                     defaults,
                 )
             raise LookupError(
-                f"The provider interface `{type_repr(dependency_type)}` is either not "
+                f"The provider `{type_repr(dependency_type)}` is either not "
                 "registered, not provided, or not set in the scoped context. "
-                "Please ensure that the provider interface is properly registered and "
+                "Please ensure that the provider is properly registered and "
                 "that the class is decorated with a scope before attempting to use it."
             ) from None
 
     def _set_provider(self, provider: Provider) -> None:
-        """Set a provider by interface."""
+        """Set a provider by dependency type."""
         self._providers[provider.dependency_type] = provider
         if provider.is_resource:
             self._resources[provider.scope].append(provider.dependency_type)
@@ -603,7 +601,7 @@ class Container:
     def resolve(self, interface: T) -> T: ...  # type: ignore
 
     def resolve(self, interface: type[T]) -> T:
-        """Resolve an instance by interface using compiled sync resolver."""
+        """Resolve an instance by dependency type using compiled sync resolver."""
         cached = self._resolver.get_cached(interface, is_async=False)
         if cached is not None:
             return cached.resolve(self)
@@ -619,7 +617,7 @@ class Container:
     async def aresolve(self, interface: T) -> T: ...
 
     async def aresolve(self, interface: type[T]) -> T:
-        """Resolve an instance by interface asynchronously."""
+        """Resolve an instance by dependency type asynchronously."""
         cached = self._resolver.get_cached(interface, is_async=True)
         if cached is not None:
             return await cached.resolve(self)
@@ -628,30 +626,30 @@ class Container:
         compiled = self._resolver.compile(provider, is_async=True)
         return await compiled.resolve(self)
 
-    def create(self, interface: type[T], /, **defaults: Any) -> T:
-        """Create an instance by interface."""
+    def create(self, dependency_type: type[T], /, **defaults: Any) -> T:
+        """Create an instance by dependency type."""
         if not defaults:
-            cached = self._resolver.get_cached(interface, is_async=False)
+            cached = self._resolver.get_cached(dependency_type, is_async=False)
             if cached is not None:
                 return cached.create(self, None)
 
-        provider = self._get_or_register_provider(interface, defaults)
+        provider = self._get_or_register_provider(dependency_type, defaults)
         compiled = self._resolver.compile(provider, is_async=False)
         return compiled.create(self, defaults or None)
 
-    async def acreate(self, interface: type[T], /, **defaults: Any) -> T:
-        """Create an instance by interface asynchronously."""
+    async def acreate(self, dependency_type: type[T], /, **defaults: Any) -> T:
+        """Create an instance by dependency type asynchronously."""
         if not defaults:
-            cached = self._resolver.get_cached(interface, is_async=True)
+            cached = self._resolver.get_cached(dependency_type, is_async=True)
             if cached is not None:
                 return await cached.create(self, None)
 
-        provider = self._get_or_register_provider(interface, defaults)
+        provider = self._get_or_register_provider(dependency_type, defaults)
         compiled = self._resolver.compile(provider, is_async=True)
         return await compiled.create(self, defaults or None)
 
     def is_resolved(self, interface: Any) -> bool:
-        """Check if an instance by interface exists."""
+        """Check if an instance for the dependency type exists."""
         try:
             provider = self._get_provider(interface)
         except LookupError:
@@ -662,7 +660,7 @@ class Container:
         return interface in context
 
     def release(self, interface: Any) -> None:
-        """Release an instance by interface."""
+        """Release an instance by dependency type."""
         provider = self._get_provider(interface)
         if provider.scope == "transient":
             return None
@@ -730,7 +728,7 @@ class Container:
         """Override a dependency with a specific instance for testing."""
         if not self.has_provider_for(interface):
             raise LookupError(
-                f"The provider interface `{type_repr(interface)}` not registered."
+                f"The provider `{type_repr(interface)}` is not registered."
             )
         self._resolver.add_override(interface, instance)
         try:

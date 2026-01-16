@@ -227,7 +227,7 @@ class TestContainer:
         container.register(str, lambda: "test", scope="singleton")
 
         with pytest.raises(
-            LookupError, match="The provider interface `str` already registered."
+            LookupError, match="The provider `str` is already registered."
         ):
             container.register(str, lambda: "other", scope="singleton")
 
@@ -533,9 +533,7 @@ class TestContainer:
         assert not container.is_registered(str)
 
     def test_unregister_not_registered_provider(self, container: Container) -> None:
-        with pytest.raises(
-            LookupError, match="The provider interface `str` not registered."
-        ):
+        with pytest.raises(LookupError, match="The provider `str` is not registered."):
             container.unregister(str)
 
     # Lifespan
@@ -1040,9 +1038,9 @@ class TestContainer:
         with pytest.raises(
             LookupError,
             match=(
-                "The provider interface `str` is either not registered, not provided, "
+                "The provider `str` is either not registered, not provided, "
                 "or not set in the scoped context. Please ensure that the provider "
-                "interface is properly registered and that the class is decorated "
+                "is properly registered and that the class is decorated "
                 "with a scope before attempting to use it."
             ),
         ):
@@ -2462,9 +2460,7 @@ class TestContainerOverride:
     def test_override_instance_provider_not_registered_using_strict_mode(self) -> None:
         container = Container()
 
-        with pytest.raises(
-            LookupError, match="The provider interface `str` not registered."
-        ):
+        with pytest.raises(LookupError, match="The provider `str` is not registered."):
             with container.override(str, "test"):
                 pass
 
