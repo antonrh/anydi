@@ -99,7 +99,7 @@ class TestContainer:
         assert provider.dependency_type is str
 
     @pytest.mark.parametrize(
-        ("annotation", "expected"),
+        ("dependency_type", "expected"),
         [
             (str, str),
             (int, int),
@@ -114,10 +114,10 @@ class TestContainer:
             ('Annotated[str, "name"]', Annotated[str, "name"]),
         ],
     )
-    def test_register_provider_interface(
-        self, container: Container, annotation: type[Any], expected: type[Any]
+    def test_register_provider_dependency_type(
+        self, container: Container, dependency_type: type[Any], expected: type[Any]
     ) -> None:
-        def call() -> annotation:  # type: ignore
+        def call() -> dependency_type:  # type: ignore
             return object()
 
         provider = container._register_provider(NOT_SET, call, "singleton")
@@ -136,7 +136,7 @@ class TestContainer:
         assert provider.is_async_generator
         assert issubclass(provider.dependency_type, Event)
 
-    def test_register_provider_with_interface(self, container: Container) -> None:
+    def test_register_provider_with_dependency_type(self, container: Container) -> None:
         provider = container.register(str, lambda: "hello", scope="singleton")
 
         assert provider.dependency_type is str
