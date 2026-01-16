@@ -69,9 +69,11 @@ class Injector:
         """Get the injected parameters of a callable object."""
         injected_params: dict[str, Any] = {}
         for parameter in inspect.signature(call, eval_str=True).parameters.values():
-            interface, should_inject, _ = self.validate_parameter(parameter, call=call)
+            dependency_type, should_inject, _ = self.validate_parameter(
+                parameter, call=call
+            )
             if should_inject:
-                injected_params[parameter.name] = interface
+                injected_params[parameter.name] = dependency_type
         return injected_params
 
     def validate_parameter(
@@ -90,7 +92,7 @@ class Injector:
                 f"Missing `{type_repr(call)}` parameter `{parameter.name}` annotation."
             )
 
-        # Set inject marker interface
+        # Set inject marker dependency type
         parameter.default.dependency_type = dependency_type
 
         if not self.container.has_provider_for(dependency_type):

@@ -91,17 +91,17 @@ def _process_callback(callback: Callable[..., Any], container: Container) -> Any
 
     # Validate parameters and collect which ones need injection
     for parameter in sig.parameters.values():
-        interface, should_inject, _ = container.validate_injected_parameter(
+        dependency_type, should_inject, _ = container.validate_injected_parameter(
             parameter, call=callback
         )
         processed_parameter = container._injector.unwrap_parameter(parameter)
         if should_inject:
             injected_param_names.add(parameter.name)
             try:
-                scopes.add(container.providers[interface].scope)
+                scopes.add(container.providers[dependency_type].scope)
             except KeyError:
-                if inspect.isclass(interface) and is_provided(interface):
-                    scopes.add(interface.__provided__["scope"])
+                if inspect.isclass(dependency_type) and is_provided(dependency_type):
+                    scopes.add(dependency_type.__provided__["scope"])
         else:
             non_injected_params.append(processed_parameter)
 
