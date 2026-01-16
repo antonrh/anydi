@@ -50,7 +50,7 @@ class TestContainer:
 
         provider = container.register(str, provider_call, scope="transient")
 
-        assert provider.call == provider_call
+        assert provider.factory == provider_call
         assert provider.scope == "transient"
 
     def test_provider_decorator(self, container: Container) -> None:
@@ -60,7 +60,7 @@ class TestContainer:
 
         provider = container.providers[str]
 
-        assert provider.call == ident
+        assert provider.factory == ident
         assert provider.scope == "singleton"
         assert provider.dependency_type is str
 
@@ -241,7 +241,7 @@ class TestContainer:
             str, new_provider_call, scope="singleton", override=True
         )
 
-        assert provider.call == new_provider_call
+        assert provider.factory == new_provider_call
 
     def test_register_provider_named(self, container: Container) -> None:
         container.register(
@@ -1057,7 +1057,7 @@ class TestContainer:
 
         provider = container.providers[Service]
 
-        assert provider.call == Service
+        assert provider.factory == Service
         assert provider.scope == "singleton"
         assert provider.dependency_type == Service
 
@@ -1081,7 +1081,7 @@ class TestContainer:
 
         provider = container.providers[str]
 
-        assert provider.call == ident
+        assert provider.factory == ident
         assert provider.scope == "request"
         assert provider.dependency_type is str
 

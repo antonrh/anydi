@@ -409,7 +409,7 @@ class Container:
 
             provider = Provider(
                 dependency_type=interface,
-                call=lambda: None,
+                factory=lambda: None,
                 scope=scope,
                 from_context=True,
                 name=name,
@@ -509,7 +509,7 @@ class Container:
 
                 parameters.append(
                     ProviderParameter(
-                        annotation=param.annotation,
+                        dependency_type=param.annotation,
                         name=param.name,
                         default=default,
                         has_default=has_default,
@@ -533,7 +533,7 @@ class Container:
 
             provider = Provider(
                 dependency_type=interface,
-                call=call,
+                factory=call,
                 scope=scope,
                 from_context=False,
                 name=name,

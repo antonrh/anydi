@@ -91,7 +91,7 @@ class Resolver:
         for param in provider.parameters:
             if param.provider is not None:
                 # Look up the current provider to handle overrides
-                current_provider = self._container.providers.get(param.annotation)
+                current_provider = self._container.providers.get(param.dependency_type)
                 if current_provider is not None:
                     self.compile(current_provider, is_async=is_async)
                 else:
@@ -173,7 +173,7 @@ class Resolver:
         )
 
         for idx, param in enumerate(provider.parameters):
-            param_annotations[idx] = param.annotation
+            param_annotations[idx] = param.dependency_type
             param_defaults[idx] = param.default
             param_has_default[idx] = param.has_default
             param_names[idx] = param.name
@@ -181,7 +181,7 @@ class Resolver:
 
             if param.provider is not None:
                 # Look up the current provider from the container to handle overrides
-                current_provider = self._container.providers.get(param.annotation)
+                current_provider = self._container.providers.get(param.dependency_type)
                 if current_provider is not None:
                     compiled = cache.get(current_provider.dependency_type)
                 else:
@@ -195,9 +195,9 @@ class Resolver:
                 # Generate unresolved message for params without a provider
                 unresolved_messages[idx] = (
                     f"You are attempting to get the parameter `{param.name}` with the "
-                    f"annotation `{type_repr(param.annotation)}` as a dependency into "
-                    f"`{type_repr(provider.call)}` which is not registered or set "
-                    "in the scoped context."
+                    f"annotation `{type_repr(param.dependency_type)}` as a dependency "
+                    f"into `{provider.name}` which is not registered or set in the "
+                    f"scoped context."
                 )
 
         scope = provider.scope
@@ -637,7 +637,7 @@ class Resolver:
         ns: dict[str, Any] = {
             "_provider": provider,
             "_dependency_type": provider.dependency_type,
-            "_provider_call": provider.call,
+            "_provider_call": provider.factory,
             "_provider_name": provider.name,
             "_is_class": provider.is_class,
             "_param_annotations": param_annotations,

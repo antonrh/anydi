@@ -35,7 +35,7 @@ class ProviderKind(enum.IntEnum):
 
 @dataclass(frozen=True, slots=True)
 class ProviderParameter:
-    annotation: Any
+    dependency_type: Any
     name: str
     default: Any
     has_default: bool
@@ -46,7 +46,7 @@ class ProviderParameter:
 @dataclass(frozen=True, slots=True)
 class Provider:
     dependency_type: Any
-    call: Callable[..., Any]
+    factory: Callable[..., Any]
     scope: Scope
     from_context: bool
     name: str
