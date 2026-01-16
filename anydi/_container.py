@@ -328,22 +328,22 @@ class Container:
             call = interface
         return self._register_provider(interface, call, scope, from_context, override)
 
-    def is_registered(self, interface: Any) -> bool:
+    def is_registered(self, dependency_type: Any, /) -> bool:
         """Check if a provider is registered for the specified dependency type."""
-        return interface in self._providers
+        return dependency_type in self._providers
 
-    def has_provider_for(self, interface: Any) -> bool:
+    def has_provider_for(self, dependency_type: Any, /) -> bool:
         """Check if a provider exists for the specified dependency type."""
-        return self.is_registered(interface) or is_provided(interface)
+        return self.is_registered(dependency_type) or is_provided(dependency_type)
 
-    def unregister(self, interface: Any) -> None:
+    def unregister(self, dependency_type: Any, /) -> None:
         """Unregister a provider by dependency type."""
-        if not self.is_registered(interface):
+        if not self.is_registered(dependency_type):
             raise LookupError(
-                f"The provider `{type_repr(interface)}` is not registered."
+                f"The provider `{type_repr(dependency_type)}` is not registered."
             )
 
-        provider = self._get_provider(interface)
+        provider = self._get_provider(dependency_type)
 
         # Cleanup instance context
         if provider.scope != "transient":
@@ -352,7 +352,7 @@ class Container:
             except LookupError:
                 pass
             else:
-                del context[interface]
+                del context[dependency_type]
 
         # Cleanup provider references
         self._delete_provider(provider)
@@ -595,34 +595,34 @@ class Container:
     # == Instance Resolution ==
 
     @overload
-    def resolve(self, interface: type[T]) -> T: ...
+    def resolve(self, dependency_type: type[T], /) -> T: ...
 
     @overload
-    def resolve(self, interface: T) -> T: ...  # type: ignore
+    def resolve(self, dependency_type: T, /) -> T: ...  # type: ignore
 
-    def resolve(self, interface: type[T]) -> T:
+    def resolve(self, dependency_type: type[T], /) -> T:
         """Resolve an instance by dependency type using compiled sync resolver."""
-        cached = self._resolver.get_cached(interface, is_async=False)
+        cached = self._resolver.get_cached(dependency_type, is_async=False)
         if cached is not None:
             return cached.resolve(self)
 
-        provider = self._get_or_register_provider(interface)
+        provider = self._get_or_register_provider(dependency_type)
         compiled = self._resolver.compile(provider, is_async=False)
         return compiled.resolve(self)
 
     @overload
-    async def aresolve(self, interface: type[T]) -> T: ...
+    async def aresolve(self, dependency_type: type[T], /) -> T: ...
 
     @overload
-    async def aresolve(self, interface: T) -> T: ...
+    async def aresolve(self, dependency_type: T, /) -> T: ...
 
-    async def aresolve(self, interface: type[T]) -> T:
+    async def aresolve(self, dependency_type: type[T], /) -> T:
         """Resolve an instance by dependency type asynchronously."""
-        cached = self._resolver.get_cached(interface, is_async=True)
+        cached = self._resolver.get_cached(dependency_type, is_async=True)
         if cached is not None:
             return await cached.resolve(self)
 
-        provider = self._get_or_register_provider(interface)
+        provider = self._get_or_register_provider(dependency_type)
         compiled = self._resolver.compile(provider, is_async=True)
         return await compiled.resolve(self)
 
@@ -648,24 +648,24 @@ class Container:
         compiled = self._resolver.compile(provider, is_async=True)
         return await compiled.create(self, defaults or None)
 
-    def is_resolved(self, interface: Any) -> bool:
+    def is_resolved(self, dependency_type: Any, /) -> bool:
         """Check if an instance for the dependency type exists."""
         try:
-            provider = self._get_provider(interface)
+            provider = self._get_provider(dependency_type)
         except LookupError:
             return False
         if provider.scope == "transient":
             return False
         context = self._get_instance_context(provider.scope)
-        return interface in context
+        return dependency_type in context
 
-    def release(self, interface: Any) -> None:
+    def release(self, dependency_type: Any, /) -> None:
         """Release an instance by dependency type."""
-        provider = self._get_provider(interface)
+        provider = self._get_provider(dependency_type)
         if provider.scope == "transient":
             return None
         context = self._get_instance_context(provider.scope)
-        del context[interface]
+        del context[dependency_type]
 
     def reset(self) -> None:
         """Reset resolved instances."""
@@ -724,17 +724,17 @@ class Container:
     # == Testing / Override Support ==
 
     @contextlib.contextmanager
-    def override(self, interface: Any, instance: Any) -> Iterator[None]:
+    def override(self, dependency_type: Any, /, instance: Any) -> Iterator[None]:
         """Override a dependency with a specific instance for testing."""
-        if not self.has_provider_for(interface):
+        if not self.has_provider_for(dependency_type):
             raise LookupError(
-                f"The provider `{type_repr(interface)}` is not registered."
+                f"The provider `{type_repr(dependency_type)}` is not registered."
             )
-        self._resolver.add_override(interface, instance)
+        self._resolver.add_override(dependency_type, instance)
         try:
             yield
         finally:
-            self._resolver.remove_override(interface)
+            self._resolver.remove_override(dependency_type)
 
 
 def import_container(container_path: str) -> Container:
