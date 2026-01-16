@@ -148,6 +148,12 @@ class Resolver:
         self, provider: Provider, *, is_async: bool, with_override: bool = False
     ) -> CompiledResolver:
         """Compile optimized resolver functions for the given provider."""
+        # Handle from_context providers with simplified code generation
+        if provider.from_context:
+            return self._compile_from_context_resolver(
+                provider, is_async=is_async, with_override=with_override
+            )
+
         num_params = len(provider.parameters)
         param_resolvers: list[Any] = [None] * num_params
         param_annotations: list[Any] = [None] * num_params
@@ -155,7 +161,7 @@ class Resolver:
         param_has_default: list[bool] = [False] * num_params
         param_names: list[str] = [""] * num_params
         param_shared_scopes: list[bool] = [False] * num_params
-        # Only track unresolved messages for FromContext params (provider=None)
+        # Track unresolved messages for params with provider=None
         unresolved_messages: dict[int, str] = {}
 
         cache = (
@@ -184,7 +190,7 @@ class Resolver:
                     cache[param.provider.interface] = compiled
                 param_resolvers[idx] = compiled.resolve
             else:
-                # Only generate unresolved message for FromContext params
+                # Generate unresolved message for params without a provider
                 unresolved_messages[idx] = (
                     f"You are attempting to get the parameter `{param.name}` with the "
                     f"annotation `{type_repr(param.annotation)}` as a dependency into "
@@ -258,7 +264,7 @@ class Resolver:
                 create_lines.append("        if cached is NOT_SET_:")
 
                 if is_from_context:
-                    # FromContext param: we know it's unresolved, raise directly
+                    # Unresolved param without provider: raise directly
                     create_lines.append(
                         f"            raise LookupError(_unresolved_messages[{idx}])"
                     )
@@ -661,6 +667,87 @@ class Resolver:
             ns["_run_sync"] = anyio.to_thread.run_sync
         else:
             ns["_is_async"] = provider.is_async
+
+        exec(src, ns)
+        resolver = ns["_resolver"]
+        creator = ns["_resolver_create"]
+
+        return CompiledResolver(resolver, creator)
+
+    def _compile_from_context_resolver(
+        self, provider: Provider, *, is_async: bool, with_override: bool = False
+    ) -> CompiledResolver:
+        """Compile a resolver for from_context providers.
+
+        from_context providers get their instances from the scoped context
+        via context.set(), not from a factory call.
+        """
+        scope = provider.scope
+        interface_repr = type_repr(provider.interface)
+
+        # Build resolver function
+        resolver_lines: list[str] = []
+        if is_async:
+            resolver_lines.append("async def _resolver(container, context=None):")
+        else:
+            resolver_lines.append("def _resolver(container, context=None):")
+
+        resolver_lines.append("    NOT_SET_ = _NOT_SET")
+
+        # Get context from context variable
+        resolver_lines.append("    if context is None:")
+        resolver_lines.append("        try:")
+        resolver_lines.append("            context = _scoped_context_var.get()")
+        resolver_lines.append("        except LookupError:")
+        resolver_lines.append(
+            f"            raise LookupError("
+            f"'The {scope} context has not been started. "
+            f"Please ensure that the {scope} context is properly initialized "
+            f"before attempting to use it.')"
+        )
+
+        if with_override:
+            self._add_override_check(resolver_lines)
+
+        # Check if instance is set in context
+        resolver_lines.append("    inst = context._instances.get(_interface, NOT_SET_)")
+        resolver_lines.append("    if inst is NOT_SET_:")
+        resolver_lines.append(
+            f"        raise LookupError("
+            f"'The provider `{interface_repr}` is registered with from_context=True "
+            f"but has not been set in the {scope} context. "
+            f"Please call context.set({interface_repr}, instance) before "
+            f"attempting to resolve it.')"
+        )
+        resolver_lines.append("    return inst")
+
+        # Build creator function (not typically used for from_context, but needed)
+        create_resolver_lines: list[str] = []
+        if is_async:
+            create_resolver_lines.append(
+                "async def _resolver_create(container, defaults=None):"
+            )
+        else:
+            create_resolver_lines.append(
+                "def _resolver_create(container, defaults=None):"
+            )
+        create_resolver_lines.append(
+            f"    raise TypeError("
+            f"'Cannot create instance for from_context provider `{interface_repr}`. "
+            f"Use context.set() instead.')"
+        )
+
+        lines = resolver_lines + [""] + create_resolver_lines
+        src = "\n".join(lines)
+
+        ns: dict[str, Any] = {
+            "_interface": provider.interface,
+            "_NOT_SET": NOT_SET,
+            "_scoped_context_var": self._container._get_scoped_context_var(  # type: ignore[reportPrivateUsage]
+                scope
+            ),
+            "resolver": self,
+        }
 
         exec(src, ns)
         resolver = ns["_resolver"]

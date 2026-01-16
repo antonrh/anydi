@@ -12,7 +12,6 @@ from typing_extensions import Self
 
 from anydi import (
     Container,
-    FromContext,
     Inject,
     Provide,
     Provider,
@@ -182,9 +181,8 @@ class TestContainer:
         with pytest.raises(
             ValueError,
             match=(
-                "The provider `(.*?)` scope is invalid. Only the following scopes "
-                "are supported: .*(singleton|transient|request).* "
-                "Please use one of the supported scopes when registering a provider."
+                "The scope `other` is not registered. "
+                r"Please register the scope first using register_scope\(\)."
             ),
         ):
             container.register(generator, scope="other")  # type: ignore
@@ -879,46 +877,47 @@ class TestContainer:
 
         assert result == instance
 
-    def test_resolve_request_scoped_unresolved_yet(self, container: Container) -> None:
-        @request
+    def test_resolve_request_scoped_from_context(self, container: Container) -> None:
         class Request:
             def __init__(self, path: str) -> None:
                 self.path = path
 
+        container.register(Request, scope="request", from_context=True)
+
         @container.provider(scope="request")
-        def req_path(req: FromContext[Request]) -> str:
+        def req_path(req: Request) -> str:
             return req.path
 
         with container.request_context() as context:
             context.set(Request, Request(path="test"))
             assert container.resolve(str) == "test"
 
-    def test_resolve_request_scoped_unresolved_error(
+    def test_resolve_request_scoped_from_context_not_set(
         self, container: Container
     ) -> None:
-        @request
         class Request:
             def __init__(self, path: str) -> None:
                 self.path = path
 
+        container.register(Request, scope="request", from_context=True)
+
         @container.provider(scope="request")
-        def req_path(req: FromContext[Request]) -> str:
+        def req_path(req: Request) -> str:
             return req.path
 
         with (
             pytest.raises(
                 LookupError,
                 match=(
-                    "You are attempting to get the parameter `req` with the annotation "
-                    "`(.*?).Request` as a dependency into `(.*?).req_path` which is "
-                    "not registered or set in the scoped context."
+                    r"The provider `.*Request` is registered with "
+                    r"from_context=True but has not been set in the request context."
                 ),
             ),
             container.request_context(),
         ):
             container.resolve(str)
 
-    def test_resolve_request_scoped_context_set_unregistered(
+    def test_resolve_request_scoped_with_from_context_dependency(
         self, container: Container
     ) -> None:
         class ExternalRequest:
@@ -929,8 +928,10 @@ class TestContainer:
             def __init__(self, *, request: ExternalRequest) -> None:
                 self.request = request
 
+        container.register(ExternalRequest, scope="request", from_context=True)
+
         @container.provider(scope="request")
-        def request_context(request: FromContext[ExternalRequest]) -> RequestContext:
+        def request_context(request: ExternalRequest) -> RequestContext:
             return RequestContext(request=request)
 
         with container.request_context() as ctx:
@@ -1926,41 +1927,42 @@ class TestContainerCustomScopes:
         assert isinstance(result, Service)
         assert isinstance(result.repository, Repository)
 
-    def test_custom_scope_unresolved_error(self, container: Container) -> None:
+    def test_custom_scope_from_context_not_set(self, container: Container) -> None:
         container.register_scope("task")
 
-        @provided(scope="task")
         class TaskRequest:
             def __init__(self, task_id: str) -> None:
                 self.task_id = task_id
 
+        container.register(TaskRequest, scope="task", from_context=True)
+
         @container.provider(scope="task")
-        def task_handler(req: FromContext[TaskRequest]) -> str:
+        def task_handler(req: TaskRequest) -> str:
             return req.task_id
 
         with (
             pytest.raises(
                 LookupError,
                 match=(
-                    "You are attempting to get the parameter `req` with the annotation "
-                    "`(.*?).TaskRequest` as a dependency into `(.*?).task_handler` "
-                    "which is not registered or set in the scoped context."
+                    r"The provider `.*TaskRequest` is registered with "
+                    r"from_context=True but has not been set in the task context."
                 ),
             ),
             container.scoped_context("task"),
         ):
             container.resolve(str)
 
-    def test_custom_scope_with_context_set(self, container: Container) -> None:
+    def test_custom_scope_from_context_success(self, container: Container) -> None:
         container.register_scope("task")
 
-        @provided(scope="task")
         class TaskRequest:
             def __init__(self, task_id: str) -> None:
                 self.task_id = task_id
 
+        container.register(TaskRequest, scope="task", from_context=True)
+
         @container.provider(scope="task")
-        def task_handler(req: FromContext[TaskRequest]) -> str:
+        def task_handler(req: TaskRequest) -> str:
             return req.task_id
 
         with container.scoped_context("task") as context:
