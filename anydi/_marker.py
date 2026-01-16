@@ -98,9 +98,7 @@ class _ProvideMeta(type):
     """Metaclass for Provide that delegates __class_getitem__ to the active marker."""
 
     def __getitem__(cls, item: Any) -> Any:
-        if hasattr(_marker_cls, "__class_getitem__"):
-            return _marker_cls.__class_getitem__(item)  # type: ignore
-        return Annotated[item, _marker_cls()]
+        return _marker_cls.__class_getitem__(item)
 
 
 if TYPE_CHECKING:
