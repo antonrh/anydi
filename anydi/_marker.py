@@ -55,7 +55,7 @@ class Marker:
     @property
     def dependency_type(self) -> Any:
         if self._dependency_type is NOT_SET:
-            raise TypeError("Interface is not set.")
+            raise TypeError("Dependency type is not set.")
         return self._dependency_type
 
     @dependency_type.setter
