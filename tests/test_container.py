@@ -22,7 +22,7 @@ from anydi import (
     transient,
 )
 from anydi._resolver import InstanceProxy
-from anydi._types import NOT_SET, Event
+from anydi._types import Event
 
 from tests.fixtures import (
     Class,
@@ -71,13 +71,13 @@ class TestContainer:
         assert provider.dependency_type is Class
 
     def test_register_provider_is_generator(self, container: Container) -> None:
-        provider = container._register_provider(NOT_SET, generator, "singleton")
+        provider = container.register(factory=generator, scope="singleton")
 
         assert provider.is_generator
         assert provider.dependency_type is str
 
     def test_register_provider_is_async_generator(self, container: Container) -> None:
-        provider = container._register_provider(NOT_SET, async_generator, "singleton")
+        provider = container.register(factory=async_generator, scope="singleton")
 
         assert provider.is_async_generator
         assert provider.dependency_type is str
@@ -93,7 +93,7 @@ class TestContainer:
         assert dependent() is container
 
     def test_register_provider_is_coro(self, container: Container) -> None:
-        provider = container._register_provider(NOT_SET, coro, "singleton")
+        provider = container.register(factory=coro, scope="singleton")
 
         assert provider.is_coroutine
         assert provider.dependency_type is str
@@ -120,18 +120,18 @@ class TestContainer:
         def call() -> dependency_type:  # type: ignore
             return object()
 
-        provider = container._register_provider(NOT_SET, call, "singleton")
+        provider = container.register(factory=call, scope="singleton")
 
         assert provider.dependency_type == expected
 
     def test_register_provider_event(self, container: Container) -> None:
-        provider = container._register_provider(NOT_SET, event, "singleton")
+        provider = container.register(factory=event, scope="singleton")
 
         assert provider.is_generator
         assert issubclass(provider.dependency_type, Event)
 
     def test_register_provider_async_event(self, container: Container) -> None:
-        provider = container._register_provider(NOT_SET, async_event, "singleton")
+        provider = container.register(factory=async_event, scope="singleton")
 
         assert provider.is_async_generator
         assert issubclass(provider.dependency_type, Event)
@@ -156,7 +156,7 @@ class TestContainer:
         with pytest.raises(
             TypeError, match="Missing `(.*?)` provider return annotation."
         ):
-            container._register_provider(NOT_SET, provide_message, "singleton")
+            container.register(factory=provide_message, scope="singleton")
 
     def test_register_provider_not_callable(self, container: Container) -> None:
         with pytest.raises(
@@ -171,11 +171,11 @@ class TestContainer:
         with pytest.raises(
             TypeError,
             match=(
-                "Cannot use `(.*?)` resource type annotation "
-                "without actual type argument."
+                "Cannot use `(.*?)` resource type annotation without actual "
+                "type argument."
             ),
         ):
-            container._register_provider(NOT_SET, iterator, "singleton")
+            container.register(factory=iterator, scope="singleton")
 
     def test_register_provider_unsupported_scope(self, container: Container) -> None:
         with pytest.raises(
