@@ -111,8 +111,8 @@ class Container:
     def start(self) -> None:
         """Start the singleton context."""
         # Resolve all singleton resources
-        for interface in self._resources.get("singleton", []):
-            self.resolve(interface)
+        for dependency_type in self._resources.get("singleton", []):
+            self.resolve(dependency_type)
 
     def close(self) -> None:
         """Close the singleton context."""
@@ -376,7 +376,7 @@ class Container:
         self,
         call: Callable[..., Any],
         scope: Scope,
-        interface: Any = NOT_SET,
+        dependency_type: Any = NOT_SET,
         from_context: bool = False,
         override: bool = False,
         defaults: dict[str, Any] | None = None,
@@ -396,19 +396,19 @@ class Container:
                     f"The `from_context=True` option cannot be used with "
                     f"`{scope}` scope. Use a scoped context like 'request' instead."
                 )
-            if interface is NOT_SET:
+            if dependency_type is NOT_SET:
                 raise TypeError(
                     "The `interface` parameter is required when using "
                     "`from_context=True`."
                 )
-            name = type_repr(interface)
-            if interface in self._providers and not override:
+            name = type_repr(dependency_type)
+            if dependency_type in self._providers and not override:
                 raise LookupError(
                     f"The provider interface `{name}` already registered."
                 )
 
             provider = Provider(
-                dependency_type=interface,
+                dependency_type=dependency_type,
                 factory=lambda: None,
                 scope=scope,
                 from_context=True,
@@ -440,30 +440,30 @@ class Container:
             signature = inspect.signature(call, eval_str=True)
 
             # Detect interface from call or return annotation
-            if interface is NOT_SET:
-                interface = call if is_class else signature.return_annotation
-                if interface is inspect.Signature.empty:
-                    interface = None
+            if dependency_type is NOT_SET:
+                dependency_type = call if is_class else signature.return_annotation
+                if dependency_type is inspect.Signature.empty:
+                    dependency_type = None
 
             # Unwrap iterator types for resources
-            interface_origin = get_origin(interface)
-            if is_iterator_type(interface) or is_iterator_type(interface_origin):
-                args = get_args(interface)
+            interface_origin = get_origin(dependency_type)
+            if is_iterator_type(dependency_type) or is_iterator_type(interface_origin):
+                args = get_args(dependency_type)
                 if not args:
                     raise TypeError(
                         f"Cannot use `{name}` resource type annotation "
                         "without actual type argument."
                     )
-                interface = args[0]
-                if is_none_type(interface):
-                    interface = type(f"Event_{uuid.uuid4().hex}", (Event,), {})
+                dependency_type = args[0]
+                if is_none_type(dependency_type):
+                    dependency_type = type(f"Event_{uuid.uuid4().hex}", (Event,), {})
 
-            if is_none_type(interface):
+            if is_none_type(dependency_type):
                 raise TypeError(f"Missing `{name}` provider return annotation.")
 
-            if interface in self._providers and not override:
+            if dependency_type in self._providers and not override:
                 raise LookupError(
-                    f"The provider interface `{type_repr(interface)}` already "
+                    f"The provider interface `{type_repr(dependency_type)}` already "
                     "registered."
                 )
 
@@ -532,7 +532,7 @@ class Container:
                 ) from unresolved_exc
 
             provider = Provider(
-                dependency_type=interface,
+                dependency_type=dependency_type,
                 factory=call,
                 scope=scope,
                 from_context=False,
