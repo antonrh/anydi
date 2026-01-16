@@ -45,7 +45,7 @@ class ProviderParameter:
 
 @dataclass(frozen=True, slots=True)
 class Provider:
-    interface: Any
+    dependency_type: Any
     call: Callable[..., Any]
     scope: Scope
     from_context: bool

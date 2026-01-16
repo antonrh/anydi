@@ -19,13 +19,13 @@ if TYPE_CHECKING:
 class InstanceProxy(wrapt.ObjectProxy):  # type: ignore
     """Proxy for dependency instances to enable override support."""
 
-    def __init__(self, wrapped: Any, *, interface: type[Any]) -> None:
+    def __init__(self, wrapped: Any, *, dependency_type: Any) -> None:
         super().__init__(wrapped)  # type: ignore
-        self._self_interface = interface
+        self._self_dependency_type = dependency_type
 
     @property
-    def interface(self) -> type[Any]:
-        return self._self_interface
+    def dependency_type(self) -> Any:
+        return self._self_dependency_type
 
 
 class CompiledResolver(NamedTuple):
@@ -50,13 +50,13 @@ class Resolver:
         """Check if override mode is enabled."""
         return bool(self._overrides)
 
-    def add_override(self, interface: Any, instance: Any) -> None:
-        """Add an override instance for an interface."""
-        self._overrides[interface] = instance
+    def add_override(self, dependency_type: Any, instance: Any) -> None:
+        """Add an override instance for a dependency type."""
+        self._overrides[dependency_type] = instance
 
-    def remove_override(self, interface: Any) -> None:
-        """Remove an override instance for an interface."""
-        self._overrides.pop(interface, None)
+    def remove_override(self, dependency_type: Any) -> None:
+        """Remove an override instance for a dependency type."""
+        self._overrides.pop(dependency_type, None)
 
     def clear_caches(self) -> None:
         """Clear all cached resolvers."""
@@ -65,13 +65,15 @@ class Resolver:
         self._override_cache.clear()
         self._async_override_cache.clear()
 
-    def get_cached(self, interface: Any, *, is_async: bool) -> CompiledResolver | None:
+    def get_cached(
+        self, dependency_type: Any, *, is_async: bool
+    ) -> CompiledResolver | None:
         """Get cached resolver if it exists."""
         if self.override_mode:
             cache = self._async_override_cache if is_async else self._override_cache
         else:
             cache = self._async_cache if is_async else self._cache
-        return cache.get(interface)
+        return cache.get(dependency_type)
 
     def compile(self, provider: Provider, *, is_async: bool) -> CompiledResolver:
         """Compile an optimized resolver function for the given provider."""
@@ -82,8 +84,8 @@ class Resolver:
             cache = self._async_cache if is_async else self._cache
 
         # Check if already compiled in cache
-        if provider.interface in cache:
-            return cache[provider.interface]
+        if provider.dependency_type in cache:
+            return cache[provider.dependency_type]
 
         # Recursively compile dependencies first
         for param in provider.parameters:
@@ -101,7 +103,7 @@ class Resolver:
         )
 
         # Store the compiled functions in the cache
-        cache[provider.interface] = compiled
+        cache[provider.dependency_type] = compiled
 
         return compiled
 
@@ -113,7 +115,7 @@ class Resolver:
         lines.append("    if override_mode:")
         if include_not_set:
             lines.append("        NOT_SET_ = _NOT_SET")
-        lines.append("        override = resolver._get_override_for(_interface)")
+        lines.append("        override = resolver._get_override_for(_dependency_type)")
         lines.append("        if override is not NOT_SET_:")
         lines.append("            return override")
 
@@ -181,13 +183,13 @@ class Resolver:
                 # Look up the current provider from the container to handle overrides
                 current_provider = self._container.providers.get(param.annotation)
                 if current_provider is not None:
-                    compiled = cache.get(current_provider.interface)
+                    compiled = cache.get(current_provider.dependency_type)
                 else:
                     # Fallback to the original provider if not in container
-                    compiled = cache.get(param.provider.interface)
+                    compiled = cache.get(param.provider.dependency_type)
                 if compiled is None:
                     compiled = self.compile(param.provider, is_async=is_async)
-                    cache[param.provider.interface] = compiled
+                    cache[param.provider.dependency_type] = compiled
                 param_resolvers[idx] = compiled.resolve
             else:
                 # Generate unresolved message for params without a provider
@@ -304,7 +306,8 @@ class Resolver:
                             "_compile(provider, is_async=True)"
                         )
                         create_lines.append(
-                            "                    cache[provider.interface] = compiled"
+                            "                    cache[provider.dependency_type] = "
+                            "compiled"
                         )
                         create_lines.append(
                             f"                arg_{idx} = "
@@ -327,7 +330,8 @@ class Resolver:
                             "_compile(provider, is_async=False)"
                         )
                         create_lines.append(
-                            "                    cache[provider.interface] = compiled"
+                            "                    cache[provider.dependency_type] = "
+                            "compiled"
                         )
                         create_lines.append(
                             f"                arg_{idx} = "
@@ -484,13 +488,13 @@ class Resolver:
                 create_lines.append("        context.enter(inst)")
 
         create_lines.append("    if context is not None and store:")
-        create_lines.append("        context._items[_interface] = inst")
+        create_lines.append("        context._items[_dependency_type] = inst")
 
         # Wrap instance if in override mode (only for override version)
         if with_override:
             create_lines.append("    if override_mode:")
             create_lines.append(
-                "        inst = resolver._post_resolve_override(_interface, inst)"
+                "        inst = resolver._post_resolve_override(_dependency_type, inst)"
             )
         create_lines.append("    return inst")
 
@@ -529,7 +533,7 @@ class Resolver:
                 self._add_override_check(resolver_lines)
 
             # Fast path: check cached instance
-            resolver_lines.append("    inst = context.get(_interface)")
+            resolver_lines.append("    inst = context.get(_dependency_type)")
             resolver_lines.append("    if inst is not NOT_SET_:")
             resolver_lines.append("        return inst")
 
@@ -537,7 +541,7 @@ class Resolver:
                 resolver_lines.append("    async with context.alock():")
             else:
                 resolver_lines.append("    with context.lock():")
-            resolver_lines.append("        inst = context.get(_interface)")
+            resolver_lines.append("        inst = context.get(_dependency_type)")
             resolver_lines.append("        if inst is not NOT_SET_:")
             resolver_lines.append("            return inst")
             self._add_create_call(
@@ -566,7 +570,9 @@ class Resolver:
                 self._add_override_check(resolver_lines)
 
             # Fast path: check cached instance (inline dict access for speed)
-            resolver_lines.append("    inst = context._items.get(_interface, NOT_SET_)")
+            resolver_lines.append(
+                "    inst = context._items.get(_dependency_type, NOT_SET_)"
+            )
             resolver_lines.append("    if inst is not NOT_SET_:")
             resolver_lines.append("        return inst")
 
@@ -630,7 +636,7 @@ class Resolver:
 
         ns: dict[str, Any] = {
             "_provider": provider,
-            "_interface": provider.interface,
+            "_dependency_type": provider.dependency_type,
             "_provider_call": provider.call,
             "_provider_name": provider.name,
             "_is_class": provider.is_class,
@@ -681,7 +687,7 @@ class Resolver:
         via context.set(), not from a factory call.
         """
         scope = provider.scope
-        interface_repr = type_repr(provider.interface)
+        dependency_repr = provider.name
 
         # Build resolver function
         resolver_lines: list[str] = []
@@ -708,13 +714,15 @@ class Resolver:
             self._add_override_check(resolver_lines)
 
         # Check if instance is set in context
-        resolver_lines.append("    inst = context._items.get(_interface, NOT_SET_)")
+        resolver_lines.append(
+            "    inst = context._items.get(_dependency_type, NOT_SET_)"
+        )
         resolver_lines.append("    if inst is NOT_SET_:")
         resolver_lines.append(
             f"        raise LookupError("
-            f"'The provider `{interface_repr}` is registered with from_context=True "
+            f"'The provider `{dependency_repr}` is registered with from_context=True "
             f"but has not been set in the {scope} context. "
-            f"Please call context.set({interface_repr}, instance) before "
+            f"Please call context.set({dependency_repr}, instance) before "
             f"attempting to resolve it.')"
         )
         resolver_lines.append("    return inst")
@@ -731,7 +739,7 @@ class Resolver:
             )
         create_resolver_lines.append(
             f"    raise TypeError("
-            f"'Cannot create instance for from_context provider `{interface_repr}`. "
+            f"'Cannot create instance for from_context provider `{dependency_repr}`. "
             f"Use context.set() instead.')"
         )
 
@@ -739,7 +747,7 @@ class Resolver:
         src = "\n".join(lines)
 
         ns: dict[str, Any] = {
-            "_interface": provider.interface,
+            "_dependency_type": provider.dependency_type,
             "_NOT_SET": NOT_SET,
             "_scoped_context_var": self._container._get_scoped_context_var(  # type: ignore[reportPrivateUsage]
                 scope
@@ -753,20 +761,20 @@ class Resolver:
 
         return CompiledResolver(resolver, creator)
 
-    def _get_override_for(self, interface: Any) -> Any:
-        """Hook for checking if an interface has an override."""
-        return self._overrides.get(interface, NOT_SET)
+    def _get_override_for(self, dependency_type: Any) -> Any:
+        """Hook for checking if a dependency type has an override."""
+        return self._overrides.get(dependency_type, NOT_SET)
 
-    def _wrap_for_override(self, annotation: Any, value: Any) -> Any:
+    def _wrap_for_override(self, dependency_type: Any, instance: Any) -> Any:
         """Hook for wrapping dependencies to enable override patching."""
-        if isinstance(value, InstanceProxy):
-            return value
-        return InstanceProxy(value, interface=annotation)
+        if isinstance(instance, InstanceProxy):
+            return instance
+        return InstanceProxy(instance, dependency_type=dependency_type)
 
-    def _post_resolve_override(self, interface: Any, instance: Any) -> Any:  # noqa: C901
+    def _post_resolve_override(self, dependency_type: Any, instance: Any) -> Any:  # noqa: C901
         """Hook for patching resolved instances to support override."""
-        if interface in self._overrides:
-            return self._overrides[interface]
+        if dependency_type in self._overrides:
+            return self._overrides[dependency_type]
 
         if not hasattr(instance, "__dict__") or hasattr(
             instance, "__resolver_getter__"
@@ -774,16 +782,16 @@ class Resolver:
             return instance
 
         wrapped = {
-            name: value.interface
+            name: value.dependency_type
             for name, value in instance.__dict__.items()
             if isinstance(value, InstanceProxy)
         }
 
         def __resolver_getter__(name: str) -> Any:
             if name in wrapped:
-                _interface = wrapped[name]
+                _dependency_type = wrapped[name]
                 # Resolve the dependency if it's wrapped
-                return self._container.resolve(_interface)
+                return self._container.resolve(_dependency_type)
             raise LookupError
 
         # Attach the resolver getter to the instance

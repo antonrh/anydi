@@ -62,25 +62,25 @@ class TestContainer:
 
         assert provider.call == ident
         assert provider.scope == "singleton"
-        assert provider.interface is str
+        assert provider.dependency_type is str
 
     def test_register_provider_is_class(self, container: Container) -> None:
         provider = container.register(Class, scope="singleton")
 
         assert provider.is_class
-        assert provider.interface is Class
+        assert provider.dependency_type is Class
 
     def test_register_provider_is_generator(self, container: Container) -> None:
         provider = container._register_provider(generator, "singleton")
 
         assert provider.is_generator
-        assert provider.interface is str
+        assert provider.dependency_type is str
 
     def test_register_provider_is_async_generator(self, container: Container) -> None:
         provider = container._register_provider(async_generator, "singleton")
 
         assert provider.is_async_generator
-        assert provider.interface is str
+        assert provider.dependency_type is str
 
     def test_container_available_as_dependency(self, container: Container) -> None:
         assert container.has_provider_for(Container)
@@ -96,7 +96,7 @@ class TestContainer:
         provider = container._register_provider(coro, "singleton")
 
         assert provider.is_coroutine
-        assert provider.interface is str
+        assert provider.dependency_type is str
 
     @pytest.mark.parametrize(
         ("annotation", "expected"),
@@ -122,24 +122,24 @@ class TestContainer:
 
         provider = container._register_provider(call, "singleton")
 
-        assert provider.interface == expected
+        assert provider.dependency_type == expected
 
     def test_register_provider_event(self, container: Container) -> None:
         provider = container._register_provider(event, "singleton")
 
         assert provider.is_generator
-        assert issubclass(provider.interface, Event)
+        assert issubclass(provider.dependency_type, Event)
 
     def test_register_provider_async_event(self, container: Container) -> None:
         provider = container._register_provider(async_event, "singleton")
 
         assert provider.is_async_generator
-        assert issubclass(provider.interface, Event)
+        assert issubclass(provider.dependency_type, Event)
 
     def test_register_provider_with_interface(self, container: Container) -> None:
         provider = container.register(str, lambda: "hello", scope="singleton")
 
-        assert provider.interface is str
+        assert provider.dependency_type is str
 
     def test_register_provider_with_none(self, container: Container) -> None:
         with pytest.raises(
@@ -1059,7 +1059,7 @@ class TestContainer:
 
         assert provider.call == Service
         assert provider.scope == "singleton"
-        assert provider.interface == Service
+        assert provider.dependency_type == Service
 
     def test_resolve_provider_scope_from_sub_provider_request(
         self,
@@ -1083,7 +1083,7 @@ class TestContainer:
 
         assert provider.call == ident
         assert provider.scope == "request"
-        assert provider.interface is str
+        assert provider.dependency_type is str
 
     def test_resolve_nested_singleton_provider(self, container: Container) -> None:
         @singleton
@@ -2684,7 +2684,7 @@ class TestContainerOverride:
         # Test that _wrap_for_override doesn't double-wrap already wrapped values
         resolver = container._resolver
         original_value = "test-value"
-        wrapped_once = InstanceProxy(original_value, interface=str)
+        wrapped_once = InstanceProxy(original_value, dependency_type=str)
 
         # Wrapping an already wrapped value should return the same wrapper
         wrapped_again = resolver._wrap_for_override(str, wrapped_once)

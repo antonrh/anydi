@@ -408,7 +408,7 @@ class Container:
                 )
 
             provider = Provider(
-                interface=interface,
+                dependency_type=interface,
                 call=lambda: None,
                 scope=scope,
                 from_context=True,
@@ -532,7 +532,7 @@ class Container:
                 ) from unresolved_exc
 
             provider = Provider(
-                interface=interface,
+                dependency_type=interface,
                 call=call,
                 scope=scope,
                 from_context=False,
@@ -587,16 +587,16 @@ class Container:
 
     def _set_provider(self, provider: Provider) -> None:
         """Set a provider by interface."""
-        self._providers[provider.interface] = provider
+        self._providers[provider.dependency_type] = provider
         if provider.is_resource:
-            self._resources[provider.scope].append(provider.interface)
+            self._resources[provider.scope].append(provider.dependency_type)
 
     def _delete_provider(self, provider: Provider) -> None:
         """Delete a provider."""
-        if provider.interface in self._providers:
-            del self._providers[provider.interface]
+        if provider.dependency_type in self._providers:
+            del self._providers[provider.dependency_type]
         if provider.is_resource:
-            self._resources[provider.scope].remove(provider.interface)
+            self._resources[provider.scope].remove(provider.dependency_type)
 
     # == Instance Resolution ==
 
