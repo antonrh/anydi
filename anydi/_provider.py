@@ -56,6 +56,7 @@ class Provider:
     is_async_generator: bool
     is_async: bool
     is_resource: bool
+    from_context: bool = False
 
 
 @dataclass(frozen=True, slots=True)
