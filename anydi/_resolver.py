@@ -368,15 +368,19 @@ class Resolver:
                 create_lines.append("        }")
                 create_lines.append("        call_kwargs.update(defaults)")
                 create_lines.append(
-                    "        inst = await _provider_call(**call_kwargs)"
+                    "        inst = await _provider_factory(**call_kwargs)"
                 )
                 create_lines.append("    else:")
-                create_lines.append(f"        inst = await _provider_call({call_args})")
+                create_lines.append(
+                    f"        inst = await _provider_factory({call_args})"
+                )
             else:
                 create_lines.append("    if defaults is not None:")
-                create_lines.append("        inst = await _provider_call(**defaults)")
+                create_lines.append(
+                    "        inst = await _provider_factory(**defaults)"
+                )
                 create_lines.append("    else:")
-                create_lines.append("        inst = await _provider_call()")
+                create_lines.append("        inst = await _provider_factory()")
         elif is_async and is_async_generator:
             # Async generator - use async context manager
             create_lines.append("    if context is None:")
@@ -395,20 +399,21 @@ class Resolver:
                 create_lines.append("        }")
                 create_lines.append("        call_kwargs.update(defaults)")
                 create_lines.append(
-                    "        cm = _asynccontextmanager(_provider_call)(**call_kwargs)"
+                    "        cm = "
+                    "_asynccontextmanager(_provider_factory)(**call_kwargs)"
                 )
                 create_lines.append("    else:")
                 create_lines.append(
-                    f"        cm = _asynccontextmanager(_provider_call)({call_args})"
+                    f"        cm = _asynccontextmanager(_provider_factory)({call_args})"
                 )
             else:
                 create_lines.append("    if defaults is not None:")
                 create_lines.append(
-                    "        cm = _asynccontextmanager(_provider_call)(**defaults)"
+                    "        cm = _asynccontextmanager(_provider_factory)(**defaults)"
                 )
                 create_lines.append("    else:")
                 create_lines.append(
-                    "        cm = _asynccontextmanager(_provider_call)()"
+                    "        cm = _asynccontextmanager(_provider_factory)()"
                 )
             create_lines.append("    inst = await context.aenter(cm)")
         elif is_generator:
@@ -429,19 +434,19 @@ class Resolver:
                 create_lines.append("        }")
                 create_lines.append("        call_kwargs.update(defaults)")
                 create_lines.append(
-                    "        cm = _contextmanager(_provider_call)(**call_kwargs)"
+                    "        cm = _contextmanager(_provider_factory)(**call_kwargs)"
                 )
                 create_lines.append("    else:")
                 create_lines.append(
-                    f"        cm = _contextmanager(_provider_call)({call_args})"
+                    f"        cm = _contextmanager(_provider_factory)({call_args})"
                 )
             else:
                 create_lines.append("    if defaults is not None:")
                 create_lines.append(
-                    "        cm = _contextmanager(_provider_call)(**defaults)"
+                    "        cm = _contextmanager(_provider_factory)(**defaults)"
                 )
                 create_lines.append("    else:")
-                create_lines.append("        cm = _contextmanager(_provider_call)()")
+                create_lines.append("        cm = _contextmanager(_provider_factory)()")
             if is_async:
                 # In async mode, run sync context manager enter in thread
                 create_lines.append("    inst = await _run_sync(context.enter, cm)")
@@ -458,14 +463,14 @@ class Resolver:
                     create_lines.append(f"            '{name}': arg_{idx},")
                 create_lines.append("        }")
                 create_lines.append("        call_kwargs.update(defaults)")
-                create_lines.append("        inst = _provider_call(**call_kwargs)")
+                create_lines.append("        inst = _provider_factory(**call_kwargs)")
                 create_lines.append("    else:")
-                create_lines.append(f"        inst = _provider_call({call_args})")
+                create_lines.append(f"        inst = _provider_factory({call_args})")
             else:
                 create_lines.append("    if defaults is not None:")
-                create_lines.append("        inst = _provider_call(**defaults)")
+                create_lines.append("        inst = _provider_factory(**defaults)")
                 create_lines.append("    else:")
-                create_lines.append("        inst = _provider_call()")
+                create_lines.append("        inst = _provider_factory()")
 
             # Handle context managers
             if is_async:
@@ -631,9 +636,8 @@ class Resolver:
         src = "\n".join(lines)
 
         ns: dict[str, Any] = {
-            "_provider": provider,
             "_dependency_type": provider.dependency_type,
-            "_provider_call": provider.factory,
+            "_provider_factory": provider.factory,
             "_provider_name": provider.name,
             "_is_class": provider.is_class,
             "_param_types": param_types,
