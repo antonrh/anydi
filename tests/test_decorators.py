@@ -3,8 +3,6 @@ import pytest
 from anydi import Module, injectable, provider, request, singleton, transient
 from anydi._decorators import is_injectable, is_provided
 
-from tests.fixtures import Service
-
 
 def test_provider_decorator() -> None:
     class TestModule(Module):
@@ -19,7 +17,9 @@ def test_provider_decorator() -> None:
 
 
 def test_request_decorator() -> None:
-    request(Service)
+    @request
+    class Service:
+        pass
 
     assert is_provided(Service)
 
@@ -56,7 +56,9 @@ def test_request_decorator_with_args() -> None:
 
 
 def test_transient_decorator() -> None:
-    transient(Service)
+    @transient
+    class Service:
+        pass
 
     assert is_provided(Service)
 
@@ -85,7 +87,9 @@ def test_transient_decorator_invalid_args() -> None:
 
 
 def test_singleton_decorator() -> None:
-    singleton(Service)
+    @singleton
+    class Service:
+        pass
 
     assert is_provided(Service)
 
