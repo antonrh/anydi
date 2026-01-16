@@ -35,8 +35,8 @@ class ProviderKind(enum.IntEnum):
 
 @dataclass(frozen=True, slots=True)
 class ProviderParameter:
-    name: str
     annotation: Any
+    name: str
     default: Any
     has_default: bool
     provider: Provider | None = None
@@ -45,9 +45,10 @@ class ProviderParameter:
 
 @dataclass(frozen=True, slots=True)
 class Provider:
+    interface: Any
     call: Callable[..., Any]
     scope: Scope
-    interface: Any
+    from_context: bool
     name: str
     parameters: tuple[ProviderParameter, ...]
     is_class: bool

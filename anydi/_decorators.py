@@ -28,22 +28,93 @@ class ProvidedMetadata(TypedDict):
     """Metadata for classes marked as provided by AnyDI."""
 
     scope: Scope
+    from_context: bool
 
 
-def provided(*, scope: Scope) -> Callable[[ClassT], ClassT]:
+@overload
+def provided(cls: ClassT, *, scope: Scope, from_context: bool = False) -> ClassT: ...
+
+
+@overload
+def provided(
+    *, scope: Scope, from_context: bool = False
+) -> Callable[[ClassT], ClassT]: ...
+
+
+def provided(
+    cls: ClassT | None = None, *, scope: Scope, from_context: bool = False
+) -> Callable[[ClassT], ClassT] | ClassT:
     """Decorator for marking a class as provided by AnyDI with a specific scope."""
 
-    def decorator(cls: ClassT) -> ClassT:
-        cls.__provided__ = ProvidedMetadata(scope=scope)
-        return cls
+    def decorator(c: ClassT) -> ClassT:
+        c.__provided__ = ProvidedMetadata(scope=scope, from_context=from_context)
 
-    return decorator
+        return c
+
+    if cls is None:
+        return decorator
+
+    return decorator(cls)
 
 
-# Scoped decorators for class-level providers
-transient = provided(scope="transient")
-request = provided(scope="request")
-singleton = provided(scope="singleton")
+@overload
+def singleton(cls: ClassT) -> ClassT: ...
+
+
+@overload
+def singleton() -> Callable[[ClassT], ClassT]: ...
+
+
+def singleton(cls: ClassT | None = None) -> Callable[[ClassT], ClassT] | ClassT:
+    """Decorator for marking a class as a singleton dependency."""
+
+    if cls is None:
+        return provided(scope="singleton", from_context=False)
+
+    return provided(cls, scope="singleton", from_context=False)
+
+
+@overload
+def transient(cls: ClassT) -> ClassT: ...
+
+
+@overload
+def transient() -> Callable[[ClassT], ClassT]: ...
+
+
+def transient(cls: ClassT | None = None) -> Callable[[ClassT], ClassT] | ClassT:
+    """Decorator for marking a class as a transient dependency."""
+
+    if cls is None:
+        return provided(scope="transient", from_context=False)
+
+    return provided(cls, scope="transient", from_context=False)
+
+
+@overload
+def request(cls: ClassT, *, from_context: bool = False) -> ClassT: ...
+
+
+@overload
+def request(*, from_context: bool = False) -> Callable[[ClassT], ClassT]: ...
+
+
+def request(
+    cls: ClassT | None = None, *, from_context: bool = False
+) -> Callable[[ClassT], ClassT] | ClassT:
+    """Decorator for marking a class as a request-scoped dependency."""
+
+    if cls is None:
+        return provided(
+            scope="request",
+            from_context=from_context,
+        )
+
+    return provided(
+        cls,
+        scope="request",
+        from_context=from_context,
+    )
 
 
 class Provided(Protocol):
