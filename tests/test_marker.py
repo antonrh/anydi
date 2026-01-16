@@ -4,11 +4,11 @@ from anydi._marker import Marker
 
 
 class TestMarker:
-    def test_interface_not_set(self) -> None:
+    def test_dependency_type_not_set(self) -> None:
         marker = Marker()
 
         with pytest.raises(TypeError, match="Interface is not set"):
-            _ = marker.interface
+            _ = marker.dependency_type
 
     def test_attr_fallback_lookup(self) -> None:
         marker = Marker()
