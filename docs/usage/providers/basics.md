@@ -5,7 +5,9 @@ After you register a provider with `Container`, you can use it to resolve depend
 
 ## Registering providers
 
-To register a provider, use the `register` method of the `Container`. The method takes the type of the object, the provider function or class, and a scope.
+To register a provider, use the `register` method of the `Container`. The method takes the `dependency_type` (the type of the object) and the `factory` (the provider function or class), and a `scope`.
+
+If the `factory` is not provided, the `dependency_type` itself is used as the factory (e.g., when registering a class).
 
 ```python
 from anydi import Container
@@ -17,6 +19,11 @@ class EmailService:
 
 
 container = Container()
+
+# Explicitly using argument names
+container.register(dependency_type=EmailService, scope="singleton")
+
+# Using positional arguments (recommended)
 container.register(EmailService, scope="singleton")
 
 service = container.resolve(EmailService)
@@ -48,7 +55,7 @@ service.notify("user-123", "Hello!")
 
 ## Unregistering providers
 
-To unregister a provider, use the `unregister` method of the `Container`. The method takes the interface of the dependency you want to remove.
+To unregister a provider, use the `unregister` method of the `Container`. The method takes the dependency type you want to remove.
 
 ```python
 from anydi import Container
@@ -104,7 +111,7 @@ assert container.is_registered(LoggerService)
 
 ### Checking resolution
 
-To check if a provider has a resolved instance, use the `is_resolved` method of the `Container`. This method takes the interface of the dependency.
+To check if a provider has a resolved instance, use the `is_resolved` method of the `Container`. This method takes the dependency type.
 
 ```python
 from anydi import Container
@@ -144,7 +151,7 @@ assert not container.is_resolved(CacheService)
 
 ## Releasing instances
 
-To release a provider instance, use the `release` method of the `Container`. This method takes the interface of the dependency. You can also reset all instances with the `reset` method.
+To release a provider instance, use the `release` method of the `Container`. This method takes the dependency type. You can also reset all instances with the `reset` method.
 
 ```python
 from anydi import Container

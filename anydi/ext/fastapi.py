@@ -35,7 +35,7 @@ class FastAPIMarker(params.Depends, Marker):
     async def _fastapi_dependency(
         self, container: Annotated[Container, Depends(get_container)]
     ) -> Any:
-        return await container.aresolve(self.interface)
+        return await container.aresolve(self.dependency_type)
 
 
 # Configure Inject() and Provide[T] to use FastAPI-specific marker at import time

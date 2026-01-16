@@ -22,7 +22,7 @@ You can think of container as a registry that knows how to create and manage all
 
 ## Provider
 
-A provider is a function or class that creates an object of a specific type. It tells the container how to create a dependency.
+A provider is a function or class that creates an object of a specific type. It tells the container how to create a dependency. In the code, this is referred to as the `factory`.
 
 ```python
 from anydi import Container
@@ -36,7 +36,7 @@ class EmailService:
 container = Container()
 
 
-# Function provider
+# Function provider (factory)
 @container.provider(scope="singleton")
 def email_service() -> EmailService:
     return EmailService()
@@ -115,15 +115,15 @@ container.run(process_order)
 - **Maintainability**: Explicit dependencies make code easier to understand
 - **Decoupling**: Services don't need to know dependency instantiation logic
 
-## Interface
+## Dependency Type
 
-An interface is a type annotation that identifies a dependency. Usually it is a class, but it can be any type.
+A dependency type is a type annotation that identifies a dependency. Usually it is a class, but it can be any type. In the container, it's represented as the `dependency_type`.
 
 ```python
 from typing import Protocol
 
 
-# Protocol-based interface
+# Protocol-based type
 class StorageBackend(Protocol):
     def save(self, key: str, data: bytes) -> None: ...
     def load(self, key: str) -> bytes: ...
@@ -138,11 +138,11 @@ class LocalStorage:
         ...
 
 
-# Register implementation for interface
+# Register implementation for dependency type
 container.register(StorageBackend, lambda: LocalStorage(), scope="singleton")
 ```
 
-### Named interfaces:
+### Named dependency types:
 You can use `Annotated` to register multiple providers for the same type:
 
 ```python

@@ -12,18 +12,18 @@ T = TypeVar("T")
 class Marker:
     """Marker stored in annotations or defaults to request injection."""
 
-    __slots__ = ("_interface", "_attrs", "_preferred_owner", "_current_owner")
+    __slots__ = ("_dependency_type", "_attrs", "_preferred_owner", "_current_owner")
 
     _FRAMEWORK_ATTRS = frozenset({"dependency", "use_cache", "cast", "cast_result"})
 
-    def __init__(self, interface: Any = NOT_SET) -> None:
+    def __init__(self, dependency_type: Any = NOT_SET) -> None:
         # Avoid reinitializing attributes when mixins call __init__ multiple times
         if not hasattr(self, "_attrs"):
             super().__init__()
             self._attrs: dict[str, dict[str, Any]] = {}
             self._preferred_owner = "fastapi"
             self._current_owner: str | None = None
-        self._interface = interface
+        self._dependency_type = dependency_type
 
     def set_owner(self, owner: str) -> None:
         self._preferred_owner = owner
@@ -53,14 +53,14 @@ class Marker:
         raise AttributeError(name)
 
     @property
-    def interface(self) -> Any:
-        if self._interface is NOT_SET:
-            raise TypeError("Interface is not set.")
-        return self._interface
+    def dependency_type(self) -> Any:
+        if self._dependency_type is NOT_SET:
+            raise TypeError("Dependency type is not set.")
+        return self._dependency_type
 
-    @interface.setter
-    def interface(self, interface: Any) -> None:
-        self._interface = interface
+    @dependency_type.setter
+    def dependency_type(self, dependency_type: Any) -> None:
+        self._dependency_type = dependency_type
 
     def __class_getitem__(cls, item: Any) -> Any:
         return Annotated[item, cls()]
@@ -98,9 +98,7 @@ class _ProvideMeta(type):
     """Metaclass for Provide that delegates __class_getitem__ to the active marker."""
 
     def __getitem__(cls, item: Any) -> Any:
-        if hasattr(_marker_cls, "__class_getitem__"):
-            return _marker_cls.__class_getitem__(item)  # type: ignore
-        return Annotated[item, _marker_cls()]
+        return _marker_cls.__class_getitem__(item)
 
 
 if TYPE_CHECKING:

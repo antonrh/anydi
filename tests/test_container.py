@@ -44,13 +44,13 @@ def container() -> Container:
 
 
 class TestContainer:
-    def test_register_provider(self, container: Container) -> None:
+    def test_register(self, container: Container) -> None:
         def provider_call() -> str:
             return "test"
 
         provider = container.register(str, provider_call, scope="transient")
 
-        assert provider.call == provider_call
+        assert provider.factory == provider_call
         assert provider.scope == "transient"
 
     def test_provider_decorator(self, container: Container) -> None:
@@ -60,27 +60,27 @@ class TestContainer:
 
         provider = container.providers[str]
 
-        assert provider.call == ident
+        assert provider.factory == ident
         assert provider.scope == "singleton"
-        assert provider.interface is str
+        assert provider.dependency_type is str
 
-    def test_register_provider_is_class(self, container: Container) -> None:
+    def test_register_is_class(self, container: Container) -> None:
         provider = container.register(Class, scope="singleton")
 
         assert provider.is_class
-        assert provider.interface is Class
+        assert provider.dependency_type is Class
 
-    def test_register_provider_is_generator(self, container: Container) -> None:
-        provider = container._register_provider(generator, "singleton")
+    def test_register_is_generator(self, container: Container) -> None:
+        provider = container.register(factory=generator, scope="singleton")
 
         assert provider.is_generator
-        assert provider.interface is str
+        assert provider.dependency_type is str
 
-    def test_register_provider_is_async_generator(self, container: Container) -> None:
-        provider = container._register_provider(async_generator, "singleton")
+    def test_register_is_async_generator(self, container: Container) -> None:
+        provider = container.register(factory=async_generator, scope="singleton")
 
         assert provider.is_async_generator
-        assert provider.interface is str
+        assert provider.dependency_type is str
 
     def test_container_available_as_dependency(self, container: Container) -> None:
         assert container.has_provider_for(Container)
@@ -92,14 +92,14 @@ class TestContainer:
 
         assert dependent() is container
 
-    def test_register_provider_is_coro(self, container: Container) -> None:
-        provider = container._register_provider(coro, "singleton")
+    def test_register_is_coro(self, container: Container) -> None:
+        provider = container.register(factory=coro, scope="singleton")
 
         assert provider.is_coroutine
-        assert provider.interface is str
+        assert provider.dependency_type is str
 
     @pytest.mark.parametrize(
-        ("annotation", "expected"),
+        ("dependency_type", "expected"),
         [
             (str, str),
             (int, int),
@@ -114,70 +114,66 @@ class TestContainer:
             ('Annotated[str, "name"]', Annotated[str, "name"]),
         ],
     )
-    def test_register_provider_interface(
-        self, container: Container, annotation: type[Any], expected: type[Any]
+    def test_register_dependency_type(
+        self, container: Container, dependency_type: type[Any], expected: type[Any]
     ) -> None:
-        def call() -> annotation:  # type: ignore
+        def call() -> dependency_type:  # type: ignore
             return object()
 
-        provider = container._register_provider(call, "singleton")
+        provider = container.register(factory=call, scope="singleton")
 
-        assert provider.interface == expected
+        assert provider.dependency_type == expected
 
-    def test_register_provider_event(self, container: Container) -> None:
-        provider = container._register_provider(event, "singleton")
+    def test_register_event(self, container: Container) -> None:
+        provider = container.register(factory=event, scope="singleton")
 
         assert provider.is_generator
-        assert issubclass(provider.interface, Event)
+        assert issubclass(provider.dependency_type, Event)
 
-    def test_register_provider_async_event(self, container: Container) -> None:
-        provider = container._register_provider(async_event, "singleton")
+    def test_register_async_event(self, container: Container) -> None:
+        provider = container.register(factory=async_event, scope="singleton")
 
         assert provider.is_async_generator
-        assert issubclass(provider.interface, Event)
+        assert issubclass(provider.dependency_type, Event)
 
-    def test_register_provider_with_interface(self, container: Container) -> None:
+    def test_register_with_dependency_type(self, container: Container) -> None:
         provider = container.register(str, lambda: "hello", scope="singleton")
 
-        assert provider.interface is str
+        assert provider.dependency_type is str
 
-    def test_register_provider_with_none(self, container: Container) -> None:
+    def test_register_with_none(self, container: Container) -> None:
         with pytest.raises(
             TypeError, match="Missing `(.*?)` provider return annotation."
         ):
             container.register(None, lambda: "hello", scope="singleton")
 
-    def test_register_provider_provider_without_return_annotation(
-        self, container: Container
-    ) -> None:
+    def test_register_without_return_annotation(self, container: Container) -> None:
         def provide_message():  # type: ignore[no-untyped-def]
             return "hello"
 
         with pytest.raises(
             TypeError, match="Missing `(.*?)` provider return annotation."
         ):
-            container._register_provider(provide_message, "singleton")
+            container.register(factory=provide_message, scope="singleton")
 
-    def test_register_provider_not_callable(self, container: Container) -> None:
+    def test_register_not_callable(self, container: Container) -> None:
         with pytest.raises(
             TypeError,
             match="The provider `Test` is invalid because it is not a callable object.",
         ):
             container.register("Test", scope="singleton")  # type: ignore
 
-    def test_register_provider_iterator_no_arg_not_allowed(
-        self, container: Container
-    ) -> None:
+    def test_register_iterator_no_arg_not_allowed(self, container: Container) -> None:
         with pytest.raises(
             TypeError,
             match=(
-                "Cannot use `(.*?)` resource type annotation "
-                "without actual type argument."
+                "Cannot use `(.*?)` resource type annotation without actual "
+                "type argument."
             ),
         ):
-            container._register_provider(iterator, "singleton")
+            container.register(factory=iterator, scope="singleton")
 
-    def test_register_provider_unsupported_scope(self, container: Container) -> None:
+    def test_register_unsupported_scope(self, container: Container) -> None:
         with pytest.raises(
             ValueError,
             match=(
@@ -187,7 +183,7 @@ class TestContainer:
         ):
             container.register(generator, scope="other")  # type: ignore
 
-    def test_register_provider_transient_resource_not_allowed(
+    def test_register_transient_resource_not_allowed(
         self, container: Container
     ) -> None:
         with pytest.raises(
@@ -199,7 +195,7 @@ class TestContainer:
         ):
             container.register(generator, scope="transient")
 
-    def test_register_provider_without_annotation(self, container: Container) -> None:
+    def test_register_without_annotation(self, container: Container) -> None:
         def service_ident() -> str:
             return "10000"
 
@@ -211,7 +207,7 @@ class TestContainer:
         ):
             container.register(service, scope="singleton")
 
-    def test_register_provider_positional_only_parameter_not_allowed(
+    def test_register_positional_only_parameter_not_allowed(
         self, container: Container
     ) -> None:
         def provider_message(a: int, /, b: str) -> str:
@@ -223,15 +219,15 @@ class TestContainer:
         ):
             container.register(provider_message, scope="singleton")
 
-    def test_register_provider_already_registered(self, container: Container) -> None:
+    def test_register_already_registered(self, container: Container) -> None:
         container.register(str, lambda: "test", scope="singleton")
 
         with pytest.raises(
-            LookupError, match="The provider interface `str` already registered."
+            LookupError, match="The provider `str` is already registered."
         ):
             container.register(str, lambda: "other", scope="singleton")
 
-    def test_register_provider_override(self, container: Container) -> None:
+    def test_register_override(self, container: Container) -> None:
         container.register(str, lambda: "old", scope="singleton")
 
         def new_provider_call() -> str:
@@ -241,9 +237,9 @@ class TestContainer:
             str, new_provider_call, scope="singleton", override=True
         )
 
-        assert provider.call == new_provider_call
+        assert provider.factory == new_provider_call
 
-    def test_register_provider_named(self, container: Container) -> None:
+    def test_register_named(self, container: Container) -> None:
         container.register(
             Annotated[str, "msg1"],
             lambda: "test1",
@@ -261,17 +257,17 @@ class TestContainer:
     def test_register_providers_via_constructor(self) -> None:
         container = Container(
             providers=[
-                Provider(call=lambda: "test", scope="singleton", interface=str),
-                Provider(call=lambda: 1, scope="singleton", interface=int),
+                Provider(
+                    factory=lambda: "test", scope="singleton", dependency_type=str
+                ),
+                Provider(factory=lambda: 1, scope="singleton", dependency_type=int),
             ]
         )
 
         assert container.is_registered(str)
         assert container.is_registered(int)
 
-    def test_register_provider_invalid_transient_resource(
-        self, container: Container
-    ) -> None:
+    def test_register_invalid_transient_resource(self, container: Container) -> None:
         def provider_call() -> Iterator[str]:
             yield "test"
 
@@ -284,7 +280,7 @@ class TestContainer:
         ):
             container.register(str, provider_call, scope="transient")
 
-    def test_register_provider_invalid_transient_async_resource(
+    def test_register_invalid_transient_async_resource(
         self,
         container: Container,
     ) -> None:
@@ -300,7 +296,7 @@ class TestContainer:
         ):
             container.register(str, provider_call, scope="transient")
 
-    def test_register_provider_valid_resource(self, container: Container) -> None:
+    def test_register_valid_resource(self, container: Container) -> None:
         def provider_call1() -> Iterator[str]:
             yield "test"
 
@@ -310,7 +306,7 @@ class TestContainer:
         container.register(str, provider_call1, scope="singleton")
         container.register(int, provider_call2, scope="request")
 
-    def test_register_provider_valid_async_resource(self, container: Container) -> None:
+    def test_register_valid_async_resource(self, container: Container) -> None:
         async def provider_call1() -> AsyncIterator[str]:
             yield "test"
 
@@ -359,7 +355,7 @@ class TestContainer:
             ("request", "request", "request", True),
         ],
     )
-    def test_register_provider_match_scopes(
+    def test_register_match_scopes(
         self,
         container: Container,
         scope1: Scope,
@@ -387,7 +383,7 @@ class TestContainer:
 
         assert result == valid
 
-    def test_register_provider_match_scopes_error(self, container: Container) -> None:
+    def test_register_match_scopes_error(self, container: Container) -> None:
         def provider_int() -> int:
             return 1000
 
@@ -406,7 +402,7 @@ class TestContainer:
         ):
             container.register(str, provider_str, scope="singleton")
 
-    def test_register_provider_with_not_registered_sub_provider(
+    def test_register_with_not_registered_sub_provider(
         self,
         container: Container,
     ) -> None:
@@ -501,6 +497,109 @@ class TestContainer:
             "event_1: after test",
         ]
 
+    def test_register_provider_unresolved_parameter_with_defaults(
+        self, container: Container
+    ) -> None:
+        """Test registering a provider with an unresolved parameter with default."""
+
+        def provider_with_default(param: int = 10) -> str:
+            return str(param)
+
+        # Should not raise an error because `param` has a default
+        container.register(str, provider_with_default, scope="singleton")
+        assert container.resolve(str) == "10"
+
+    def test_register_provider_unresolved_parameter_with_defaults_dict(
+        self, container: Container
+    ) -> None:
+        """Test registering a provider with an unresolved parameter with defaults."""
+
+        @singleton
+        class ServiceWithParam:
+            def __init__(self, param: int) -> None:
+                self.param = param
+
+        # 'param' is not registered in container, but provided via defaults
+        service = container.create(ServiceWithParam, param=20)
+        assert service.param == 20
+
+    def test_register_provider_unresolved_parameter_raises(
+        self, container: Container
+    ) -> None:
+        """Test registering a provider with an unresolved parameter raises."""
+
+        def provider_with_param(param: int) -> str:
+            return str(param)
+
+        with pytest.raises(
+            LookupError, match="The provider `(.*?)` depends on `param` of type `int`"
+        ):
+            container.register(str, provider_with_param, scope="singleton")
+
+    def test_register_provider_scope_mismatch(self, container: Container) -> None:
+        """Test that registering a provider with a scope mismatch raises ValueError."""
+        container.register(int, lambda: 1, scope="request")
+
+        def provider_singleton(param: int) -> str:
+            return str(param)
+
+        with pytest.raises(
+            ValueError,
+            match="The provider `(.*?)` with a `singleton` scope cannot depend on",
+        ):
+            container.register(str, provider_singleton, scope="singleton")
+
+    def test_from_context_singleton_scope_raises(self, container: Container) -> None:
+        """Test that from_context=True with singleton scope raises ValueError."""
+        with pytest.raises(
+            ValueError,
+            match=(
+                "The `from_context=True` option cannot be used with `singleton` scope"
+            ),
+        ):
+            container.register(int, scope="singleton", from_context=True)
+
+    def test_from_context_transient_scope_raises(self, container: Container) -> None:
+        """Test that from_context=True with transient scope raises ValueError."""
+        with pytest.raises(
+            ValueError,
+            match=(
+                "The `from_context=True` option cannot be used with `transient` scope"
+            ),
+        ):
+            container.register(int, scope="transient", from_context=True)
+
+    def test_from_context_missing_dependency_type(self, container: Container) -> None:
+        """Test that from_context=True without dependency_type raises TypeError."""
+        with pytest.raises(
+            TypeError,
+            match=(
+                "The `dependency_type` parameter is required "
+                "when using `from_context=True`"
+            ),
+        ):
+            container.register(scope="request", from_context=True)
+
+    def test_from_context_already_registered(self, container: Container) -> None:
+        """Test registering duplicate from_context provider raises LookupError."""
+        container.register(int, scope="request", from_context=True)
+        with pytest.raises(
+            LookupError, match="The provider `int` is already registered"
+        ):
+            container.register(int, scope="request", from_context=True)
+
+    def test_register_provider_defaults_handling(self, container: Container) -> None:
+        """Test that defaults are correctly handled in _register_provider logic."""
+
+        @singleton
+        class MyService:
+            def __init__(self, a: int) -> None:
+                self.a = a
+
+        # Using create to trigger registration with defaults
+        service = container.create(MyService, a=100)
+        assert service.a == 100
+
     def test_unregister_provider(self, container: Container) -> None:
         container.register(str, lambda: "test", scope="singleton")
 
@@ -533,9 +632,7 @@ class TestContainer:
         assert not container.is_registered(str)
 
     def test_unregister_not_registered_provider(self, container: Container) -> None:
-        with pytest.raises(
-            LookupError, match="The provider interface `str` not registered."
-        ):
+        with pytest.raises(LookupError, match="The provider `str` is not registered."):
             container.unregister(str)
 
     # Lifespan
@@ -1040,9 +1137,9 @@ class TestContainer:
         with pytest.raises(
             LookupError,
             match=(
-                "The provider interface `str` is either not registered, not provided, "
+                "The provider `str` is either not registered, not provided, "
                 "or not set in the scoped context. Please ensure that the provider "
-                "interface is properly registered and that the class is decorated "
+                "is properly registered and that the class is decorated "
                 "with a scope before attempting to use it."
             ),
         ):
@@ -1057,9 +1154,9 @@ class TestContainer:
 
         provider = container.providers[Service]
 
-        assert provider.call == Service
+        assert provider.factory == Service
         assert provider.scope == "singleton"
-        assert provider.interface == Service
+        assert provider.dependency_type == Service
 
     def test_resolve_provider_scope_from_sub_provider_request(
         self,
@@ -1081,9 +1178,9 @@ class TestContainer:
 
         provider = container.providers[str]
 
-        assert provider.call == ident
+        assert provider.factory == ident
         assert provider.scope == "request"
-        assert provider.interface is str
+        assert provider.dependency_type is str
 
     def test_resolve_nested_singleton_provider(self, container: Container) -> None:
         @singleton
@@ -1589,22 +1686,35 @@ class TestContainer:
 
         container.reset()
 
-    def test_scoped_with_defaults_override(self) -> None:
-        class UnregisteredDep:
-            pass
+    def test_scoped_with_defaults_override(self, container: Container) -> None:
+        container.register(int, lambda: 1, scope="request")
 
-        @request
-        class ServiceNeedingDep:
-            def __init__(self, dep: UnregisteredDep) -> None:
-                self.dep = dep
+        with container.request_context():
+            assert container.create(int) == 1
 
-        container = Container()
+    def test_register_deprecated_interface(self, container: Container) -> None:
+        with pytest.warns(
+            DeprecationWarning,
+            match="The `interface` is deprecated. Use `dependency_type` instead.",
+        ):
+            container.register(interface=int, factory=lambda: 42)
 
-        # Register with defaults - should not raise even though dep is not registered
-        provider = container._register_provider(
-            ServiceNeedingDep, "request", defaults={"dep": UnregisteredDep()}
-        )
-        assert provider is not None
+        assert container.resolve(int) == 42
+
+    def test_register_deprecated_call(self, container: Container) -> None:
+        with pytest.warns(
+            DeprecationWarning,
+            match="The `call` is deprecated. Use `factory` instead.",
+        ):
+            container.register(int, call=lambda: 42)
+
+        assert container.resolve(int) == 42
+
+    def test_register_deprecated_both(self, container: Container) -> None:
+        with pytest.warns(DeprecationWarning, match="is deprecated"):
+            container.register(interface=int, call=lambda: 42)
+
+        assert container.resolve(int) == 42
 
 
 class TestContainerCustomScopes:
@@ -2462,9 +2572,7 @@ class TestContainerOverride:
     def test_override_instance_provider_not_registered_using_strict_mode(self) -> None:
         container = Container()
 
-        with pytest.raises(
-            LookupError, match="The provider interface `str` not registered."
-        ):
+        with pytest.raises(LookupError, match="The provider `str` is not registered."):
             with container.override(str, "test"):
                 pass
 
@@ -2678,21 +2786,27 @@ class TestContainerOverride:
             assert result is override_instance
 
     def test_override_no_double_wrapping(self) -> None:
-        """Test that override doesn't double-wrap InstanceProxy values (issue #259)."""
         container = Container()
+        container.register(int, lambda: 1)
 
-        # Test that _wrap_for_override doesn't double-wrap already wrapped values
-        resolver = container._resolver
-        original_value = "test-value"
-        wrapped_once = InstanceProxy(original_value, interface=str)
+        instance = 2
+        with container.override(int, instance):
+            resolved = container.resolve(int)
+            assert resolved == instance
+            assert not isinstance(resolved, InstanceProxy)
 
-        # Wrapping an already wrapped value should return the same wrapper
-        wrapped_again = resolver._wrap_for_override(str, wrapped_once)
+    def test_override_deprecated_interface(self) -> None:
+        container = Container()
+        container.register(int, factory=lambda: 0)
 
-        # Should not be double-wrapped
-        assert isinstance(wrapped_again, InstanceProxy)
-        assert not isinstance(wrapped_again.__wrapped__, InstanceProxy)
-        assert wrapped_again.__wrapped__ == original_value
+        with pytest.warns(
+            DeprecationWarning,
+            match="The `interface` is deprecated. Use `dependency_type` instead.",
+        ):
+            with container.override(interface=int, instance=42):
+                assert container.resolve(int) == 42
+
+        assert container.resolve(int) == 0
 
 
 # Test data for import_container tests

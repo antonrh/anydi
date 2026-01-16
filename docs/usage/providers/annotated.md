@@ -1,6 +1,6 @@
 # Named Providers
 
-Sometimes you need to register multiple providers for the same type. For example, you might want multiple database connections or different implementations of the same interface. You can do this with the `Annotated` type hint and a string name to tell providers apart.
+Sometimes you need to register multiple providers for the same type. For example, you might want multiple database connections or different implementations of the same type. You can do this with the `Annotated` type hint and a string name to tell providers apart.
 
 ## Basic Usage
 
