@@ -60,11 +60,7 @@ class Container:
         self.register_scope("request")
 
         # Register self as provider
-        self._register_provider(
-            Container,
-            lambda: self,
-            "singleton",
-        )
+        self.register(Container, lambda: self, scope="singleton")
 
         # Register providers
         providers = providers or []
