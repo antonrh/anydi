@@ -362,12 +362,12 @@ class Container:
         self._delete_provider(provider)
 
     def provider(
-        self, *, scope: Scope, form_context: bool = False, override: bool = False
+        self, *, scope: Scope, from_context: bool = False, override: bool = False
     ) -> Callable[[Callable[P, T]], Callable[P, T]]:
         """Decorator to register a provider function with the specified scope."""
 
         def decorator(call: Callable[P, T]) -> Callable[P, T]:
-            self._register_provider(call, scope, NOT_SET, form_context, override)
+            self._register_provider(call, scope, NOT_SET, from_context, override)
             return call
 
         return decorator
