@@ -261,8 +261,10 @@ class TestContainer:
     def test_register_providers_via_constructor(self) -> None:
         container = Container(
             providers=[
-                Provider(call=lambda: "test", scope="singleton", interface=str),
-                Provider(call=lambda: 1, scope="singleton", interface=int),
+                Provider(
+                    factory=lambda: "test", scope="singleton", dependency_type=str
+                ),
+                Provider(factory=lambda: 1, scope="singleton", dependency_type=int),
             ]
         )
 

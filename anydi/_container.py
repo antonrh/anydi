@@ -8,6 +8,7 @@ import inspect
 import logging
 import types
 import uuid
+import warnings
 from collections import defaultdict
 from collections.abc import AsyncIterator, Callable, Iterable, Iterator, Sequence
 from contextvars import ContextVar
@@ -66,8 +67,8 @@ class Container:
         providers = providers or []
         for provider in providers:
             self._register_provider(
-                provider.interface,
-                provider.call,
+                provider.dependency_type,
+                provider.factory,
                 provider.scope,
             )
 
@@ -316,17 +317,36 @@ class Container:
 
     def register(
         self,
-        interface: Any,
-        call: Callable[..., Any] = NOT_SET,
+        dependency_type: Any = NOT_SET,
+        factory: Callable[..., Any] = NOT_SET,
         *,
         scope: Scope = "singleton",
         from_context: bool = False,
         override: bool = False,
+        interface: Any = NOT_SET,
+        call: Callable[..., Any] = NOT_SET,
     ) -> Provider:
         """Register a provider for the specified dependency type."""
-        if call is NOT_SET:
-            call = interface
-        return self._register_provider(interface, call, scope, from_context, override)
+        if interface is not NOT_SET:
+            warnings.warn(
+                "The `interface` is deprecated. Use `dependency_type` instead.",
+                DeprecationWarning,
+                stacklevel=2,
+            )
+        if call is not NOT_SET:
+            warnings.warn(
+                "The `call` argument is deprecated. Use `factory` instead.",
+                DeprecationWarning,
+                stacklevel=2,
+            )
+
+        if dependency_type is NOT_SET:
+            dependency_type = interface
+        if factory is NOT_SET:
+            factory = call if call is not NOT_SET else dependency_type
+        return self._register_provider(
+            dependency_type, factory, scope, from_context, override
+        )
 
     def is_registered(self, dependency_type: Any, /) -> bool:
         """Check if a provider is registered for the specified dependency type."""
@@ -384,6 +404,10 @@ class Container:
                 f"The scope `{scope}` is not registered. "
                 "Please register the scope first using register_scope()."
             )
+
+        # Default factory to dependency_type if not set
+        if not from_context and factory is NOT_SET:
+            factory = dependency_type
 
         # Handle from_context providers (context-provided dependencies)
         if from_context:
@@ -724,8 +748,30 @@ class Container:
     # == Testing / Override Support ==
 
     @contextlib.contextmanager
-    def override(self, dependency_type: Any, /, instance: Any) -> Iterator[None]:
+    def override(
+        self,
+        dependency_type: Any = NOT_SET,
+        /,
+        instance: Any = NOT_SET,
+        *,
+        interface: Any = NOT_SET,
+    ) -> Iterator[None]:
         """Override a dependency with a specific instance for testing."""
+        if interface is not NOT_SET:
+            warnings.warn(
+                "The `interface` is deprecated. Use `dependency_type` instead.",
+                DeprecationWarning,
+                stacklevel=2,
+            )
+            if dependency_type is NOT_SET:
+                dependency_type = interface
+
+        if dependency_type is NOT_SET:
+            raise TypeError("override() missing required argument: 'dependency_type'")
+
+        if instance is NOT_SET:
+            raise TypeError("override() missing required argument: 'instance'")
+
         if not self.has_provider_for(dependency_type):
             raise LookupError(
                 f"The provider `{type_repr(dependency_type)}` is not registered."

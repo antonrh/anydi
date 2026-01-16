@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import enum
 import inspect
+import warnings
 from collections.abc import Callable
 from dataclasses import KW_ONLY, dataclass
 from typing import Any
@@ -59,9 +60,38 @@ class Provider:
     is_resource: bool
 
 
-@dataclass(frozen=True, slots=True)
+@dataclass(slots=True)
 class ProviderDef:
-    interface: Any
-    call: Callable[..., Any] = NOT_SET
+    dependency_type: Any = NOT_SET
+    factory: Callable[..., Any] = NOT_SET
     _: KW_ONLY
     scope: Scope = "singleton"
+    interface: Any = NOT_SET
+    call: Callable[..., Any] = NOT_SET
+
+    def __post_init__(self) -> None:
+        if self.interface is not NOT_SET:
+            warnings.warn(
+                (
+                    "The `interface` argument is deprecated. "
+                    "Use `dependency_type` instead."
+                ),
+                DeprecationWarning,
+                stacklevel=2,
+            )
+        if self.call is not NOT_SET:
+            warnings.warn(
+                "The `call` argument is deprecated. Use `factory` instead.",
+                DeprecationWarning,
+                stacklevel=2,
+            )
+
+        if self.dependency_type is NOT_SET:
+            self.dependency_type = self.interface
+        if self.factory is NOT_SET:
+            self.factory = self.call
+
+        if self.interface is NOT_SET:
+            self.interface = self.dependency_type
+        if self.call is NOT_SET:
+            self.call = self.factory
