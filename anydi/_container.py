@@ -335,7 +335,7 @@ class Container:
             )
         if call is not NOT_SET:
             warnings.warn(
-                "The `call` argument is deprecated. Use `factory` instead.",
+                "The `call` is deprecated. Use `factory` instead.",
                 DeprecationWarning,
                 stacklevel=2,
             )

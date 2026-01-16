@@ -72,16 +72,13 @@ class ProviderDef:
     def __post_init__(self) -> None:
         if self.interface is not NOT_SET:
             warnings.warn(
-                (
-                    "The `interface` argument is deprecated. "
-                    "Use `dependency_type` instead."
-                ),
+                "The `interface` is deprecated. Use `dependency_type` instead.",
                 DeprecationWarning,
                 stacklevel=2,
             )
         if self.call is not NOT_SET:
             warnings.warn(
-                "The `call` argument is deprecated. Use `factory` instead.",
+                "The `call` is deprecated. Use `factory` instead.",
                 DeprecationWarning,
                 stacklevel=2,
             )
@@ -91,7 +88,5 @@ class ProviderDef:
         if self.factory is NOT_SET:
             self.factory = self.call
 
-        if self.interface is NOT_SET:
-            self.interface = self.dependency_type
-        if self.call is NOT_SET:
-            self.call = self.factory
+        self.interface = self.dependency_type
+        self.call = self.factory

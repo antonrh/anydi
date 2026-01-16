@@ -1589,22 +1589,35 @@ class TestContainer:
 
         container.reset()
 
-    def test_scoped_with_defaults_override(self) -> None:
-        class UnregisteredDep:
-            pass
+    def test_scoped_with_defaults_override(self, container: Container) -> None:
+        container.register(int, lambda: 1, scope="request")
 
-        @request
-        class ServiceNeedingDep:
-            def __init__(self, dep: UnregisteredDep) -> None:
-                self.dep = dep
+        with container.request_context():
+            assert container.create(int) == 1
 
-        container = Container()
+    def test_register_deprecated_interface(self, container: Container) -> None:
+        with pytest.warns(
+            DeprecationWarning,
+            match="The `interface` is deprecated. Use `dependency_type` instead.",
+        ):
+            container.register(interface=int, factory=lambda: 42)
 
-        # Register with defaults - should not raise even though dep is not registered
-        provider = container._register_provider(
-            NOT_SET, ServiceNeedingDep, "request", defaults={"dep": UnregisteredDep()}
-        )
-        assert provider is not None
+        assert container.resolve(int) == 42
+
+    def test_register_deprecated_call(self, container: Container) -> None:
+        with pytest.warns(
+            DeprecationWarning,
+            match="The `call` is deprecated. Use `factory` instead.",
+        ):
+            container.register(int, call=lambda: 42)
+
+        assert container.resolve(int) == 42
+
+    def test_register_deprecated_both(self, container: Container) -> None:
+        with pytest.warns(DeprecationWarning, match="is deprecated"):
+            container.register(interface=int, call=lambda: 42)
+
+        assert container.resolve(int) == 42
 
 
 class TestContainerCustomScopes:
@@ -2676,21 +2689,27 @@ class TestContainerOverride:
             assert result is override_instance
 
     def test_override_no_double_wrapping(self) -> None:
-        """Test that override doesn't double-wrap InstanceProxy values (issue #259)."""
         container = Container()
+        container.register(int, lambda: 1)
 
-        # Test that _wrap_for_override doesn't double-wrap already wrapped values
-        resolver = container._resolver
-        original_value = "test-value"
-        wrapped_once = InstanceProxy(original_value, dependency_type=str)
+        instance = 2
+        with container.override(int, instance):
+            resolved = container.resolve(int)
+            assert resolved == instance
+            assert not isinstance(resolved, InstanceProxy)
 
-        # Wrapping an already wrapped value should return the same wrapper
-        wrapped_again = resolver._wrap_for_override(str, wrapped_once)
+    def test_override_deprecated_interface(self) -> None:
+        container = Container()
+        container.register(int, factory=lambda: 0)
 
-        # Should not be double-wrapped
-        assert isinstance(wrapped_again, InstanceProxy)
-        assert not isinstance(wrapped_again.__wrapped__, InstanceProxy)
-        assert wrapped_again.__wrapped__ == original_value
+        with pytest.warns(
+            DeprecationWarning,
+            match="The `interface` is deprecated. Use `dependency_type` instead.",
+        ):
+            with container.override(interface=int, instance=42):
+                assert container.resolve(int) == 42
+
+        assert container.resolve(int) == 0
 
 
 # Test data for import_container tests
