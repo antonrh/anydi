@@ -43,20 +43,20 @@ class Resolver:
         self._override_cache: dict[Any, CompiledResolver] = {}
         self._async_override_cache: dict[Any, CompiledResolver] = {}
         # Override instances storage
-        self._override_instances: dict[Any, Any] = {}
+        self._overrides: dict[Any, Any] = {}
 
     @property
     def override_mode(self) -> bool:
         """Check if override mode is enabled."""
-        return bool(self._override_instances)
+        return bool(self._overrides)
 
     def add_override(self, interface: Any, instance: Any) -> None:
         """Add an override instance for an interface."""
-        self._override_instances[interface] = instance
+        self._overrides[interface] = instance
 
     def remove_override(self, interface: Any) -> None:
         """Remove an override instance for an interface."""
-        self._override_instances.pop(interface, None)
+        self._overrides.pop(interface, None)
 
     def clear_caches(self) -> None:
         """Clear all cached resolvers."""
@@ -255,7 +255,7 @@ class Resolver:
                 # Direct dict access for shared scope params (avoids method call)
                 if param_shared_scopes[idx]:
                     create_lines.append(
-                        f"        cached = (context._instances.get("
+                        f"        cached = (context._items.get("
                         f"_param_annotations[{idx}], NOT_SET_) "
                         f"if context is not None else NOT_SET_)"
                     )
@@ -484,7 +484,7 @@ class Resolver:
                 create_lines.append("        context.enter(inst)")
 
         create_lines.append("    if context is not None and store:")
-        create_lines.append("        context._instances[_interface] = inst")
+        create_lines.append("        context._items[_interface] = inst")
 
         # Wrap instance if in override mode (only for override version)
         if with_override:
@@ -566,9 +566,7 @@ class Resolver:
                 self._add_override_check(resolver_lines)
 
             # Fast path: check cached instance (inline dict access for speed)
-            resolver_lines.append(
-                "    inst = context._instances.get(_interface, NOT_SET_)"
-            )
+            resolver_lines.append("    inst = context._items.get(_interface, NOT_SET_)")
             resolver_lines.append("    if inst is not NOT_SET_:")
             resolver_lines.append("        return inst")
 
@@ -710,7 +708,7 @@ class Resolver:
             self._add_override_check(resolver_lines)
 
         # Check if instance is set in context
-        resolver_lines.append("    inst = context._instances.get(_interface, NOT_SET_)")
+        resolver_lines.append("    inst = context._items.get(_interface, NOT_SET_)")
         resolver_lines.append("    if inst is NOT_SET_:")
         resolver_lines.append(
             f"        raise LookupError("
@@ -757,7 +755,7 @@ class Resolver:
 
     def _get_override_for(self, interface: Any) -> Any:
         """Hook for checking if an interface has an override."""
-        return self._override_instances.get(interface, NOT_SET)
+        return self._overrides.get(interface, NOT_SET)
 
     def _wrap_for_override(self, annotation: Any, value: Any) -> Any:
         """Hook for wrapping dependencies to enable override patching."""
@@ -767,8 +765,8 @@ class Resolver:
 
     def _post_resolve_override(self, interface: Any, instance: Any) -> Any:  # noqa: C901
         """Hook for patching resolved instances to support override."""
-        if interface in self._override_instances:
-            return self._override_instances[interface]
+        if interface in self._overrides:
+            return self._overrides[interface]
 
         if not hasattr(instance, "__dict__") or hasattr(
             instance, "__resolver_getter__"
