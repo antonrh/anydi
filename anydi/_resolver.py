@@ -245,7 +245,6 @@ class Resolver:
         if not no_params:
             # Only generate parameter resolution logic if there are parameters
             for idx, name in enumerate(param_names):
-                has_resolver = param_resolvers[idx] is not None
                 is_from_context = idx in unresolved_messages
 
                 create_lines.append(f"    # resolve param `{name}`")
@@ -270,7 +269,7 @@ class Resolver:
                     create_lines.append(
                         f"            raise LookupError(_unresolved_messages[{idx}])"
                     )
-                elif has_resolver:
+                else:
                     # Has a pre-compiled resolver, use it directly
                     create_lines.append(
                         f"            _dep_resolver = _param_resolvers[{idx}]"
@@ -287,62 +286,6 @@ class Resolver:
                             f"container, context if _param_shared_scopes[{idx}] "
                             "else None)"
                         )
-                else:
-                    # No resolver, try dynamic lookup
-                    create_lines.append("            try:")
-                    if is_async:
-                        create_lines.append(
-                            f"                compiled = cache.get(_param_types[{idx}])"
-                        )
-                        create_lines.append("                if compiled is None:")
-                        create_lines.append(
-                            "                    provider = "
-                            "container._get_or_register_provider(_param_types[{idx}])"
-                        )
-                        create_lines.append(
-                            "                    compiled = "
-                            "_compile(provider, is_async=True)"
-                        )
-                        create_lines.append(
-                            "                    cache[provider.dependency_type] = "
-                            "compiled"
-                        )
-                        create_lines.append(
-                            f"                arg_{idx} = "
-                            f"await compiled[0](container, "
-                            f"context if _param_shared_scopes[{idx}] else None)"
-                        )
-                    else:
-                        create_lines.append(
-                            f"                compiled = cache.get(_param_types[{idx}])"
-                        )
-                        create_lines.append("                if compiled is None:")
-                        create_lines.append(
-                            "                    provider = "
-                            f"container._get_or_register_provider(_param_types[{idx}])"
-                        )
-                        create_lines.append(
-                            "                    compiled = "
-                            "_compile(provider, is_async=False)"
-                        )
-                        create_lines.append(
-                            "                    cache[provider.dependency_type] = "
-                            "compiled"
-                        )
-                        create_lines.append(
-                            f"                arg_{idx} = "
-                            f"compiled[0](container, "
-                            f"context if _param_shared_scopes[{idx}] else None)"
-                        )
-                    create_lines.append("            except LookupError:")
-                    create_lines.append(
-                        f"                if _param_has_default[{idx}]:"
-                    )
-                    create_lines.append(
-                        f"                    arg_{idx} = _param_defaults[{idx}]"
-                    )
-                    create_lines.append("                else:")
-                    create_lines.append("                    raise")
 
                 create_lines.append("        else:")
                 create_lines.append(f"            arg_{idx} = cached")
