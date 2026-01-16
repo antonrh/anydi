@@ -134,8 +134,8 @@ class Container:
 
     async def astart(self) -> None:
         """Start the singleton context asynchronously."""
-        for interface in self._resources.get("singleton", []):
-            await self.aresolve(interface)
+        for dependency_type in self._resources.get("singleton", []):
+            await self.aresolve(dependency_type)
 
     async def aclose(self) -> None:
         """Close the singleton context asynchronously."""
@@ -158,10 +158,10 @@ class Container:
         token = context_var.set(context)
 
         # Resolve all request resources
-        for interface in self._resources.get(scope, []):
-            if not is_event_type(interface):
+        for dependency_type in self._resources.get(scope, []):
+            if not is_event_type(dependency_type):
                 continue
-            self.resolve(interface)
+            self.resolve(dependency_type)
 
         with context:
             yield context
@@ -184,10 +184,10 @@ class Container:
         token = context_var.set(context)
 
         # Resolve all request resources
-        for interface in self._resources.get(scope, []):
-            if not is_event_type(interface):
+        for dependency_type in self._resources.get(scope, []):
+            if not is_event_type(dependency_type):
                 continue
-            await self.aresolve(interface)
+            await self.aresolve(dependency_type)
 
         async with context:
             yield context
@@ -551,35 +551,35 @@ class Container:
             self._resolver.clear_caches()
         return provider
 
-    def _get_provider(self, interface: Any) -> Provider:
-        """Get provider by interface."""
+    def _get_provider(self, dependency_type: Any) -> Provider:
+        """Get provider by dependency type."""
         try:
-            return self._providers[interface]
+            return self._providers[dependency_type]
         except KeyError:
             raise LookupError(
-                f"The provider interface for `{type_repr(interface)}` has "
+                f"The provider interface for `{type_repr(dependency_type)}` has "
                 "not been registered. Please ensure that the provider interface is "
                 "properly registered before attempting to use it."
             ) from None
 
     def _get_or_register_provider(
-        self, interface: Any, defaults: dict[str, Any] | None = None
+        self, dependency_type: Any, defaults: dict[str, Any] | None = None
     ) -> Provider:
         """Get or register a provider by interface."""
         try:
-            return self._get_provider(interface)
+            return self._get_provider(dependency_type)
         except LookupError:
-            if inspect.isclass(interface) and is_provided(interface):
+            if inspect.isclass(dependency_type) and is_provided(dependency_type):
                 return self._register_provider(
-                    interface,
-                    interface.__provided__["scope"],
+                    dependency_type,
+                    dependency_type.__provided__["scope"],
                     NOT_SET,
-                    interface.__provided__["from_context"],
+                    dependency_type.__provided__["from_context"],
                     False,
                     defaults,
                 )
             raise LookupError(
-                f"The provider interface `{type_repr(interface)}` is either not "
+                f"The provider interface `{type_repr(dependency_type)}` is either not "
                 "registered, not provided, or not set in the scoped context. "
                 "Please ensure that the provider interface is properly registered and "
                 "that the class is decorated with a scope before attempting to use it."
@@ -675,14 +675,14 @@ class Container:
 
     def reset(self) -> None:
         """Reset resolved instances."""
-        for interface, provider in self._providers.items():
+        for dependency_type, provider in self._providers.items():
             if provider.scope == "transient":
                 continue
             try:
                 context = self._get_instance_context(provider.scope)
             except LookupError:
                 continue
-            del context[interface]
+            del context[dependency_type]
 
     # == Injection Utilities ==
 
