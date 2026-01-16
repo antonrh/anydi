@@ -3,7 +3,7 @@ from __future__ import annotations
 import enum
 import inspect
 from collections.abc import Callable
-from dataclasses import dataclass
+from dataclasses import KW_ONLY, dataclass
 from typing import Any
 
 from ._types import NOT_SET, Scope
@@ -61,6 +61,7 @@ class Provider:
 
 @dataclass(frozen=True, slots=True)
 class ProviderDef:
-    call: Callable[..., Any]
-    scope: Scope
-    interface: Any = NOT_SET
+    interface: Any
+    call: Callable[..., Any] = NOT_SET
+    _: KW_ONLY
+    scope: Scope = "singleton"
