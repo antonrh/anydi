@@ -142,7 +142,7 @@ notifier.notify("user@example.com", "Welcome!")
 
 ## Limitations
 
-1. **Explicit is better**: For public APIs or library interfaces, explicit registration gives better documentation
+1. **Explicit is better**: For public APIs or library public APIs, explicit registration gives better documentation
 2. **Circular dependencies**: Auto-registration cannot resolve circular dependencies
 3. **Scope validation**: The scope decorator must match the usage pattern
 
