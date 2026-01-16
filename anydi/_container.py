@@ -324,15 +324,13 @@ class Container:
         call: Callable[..., Any] = NOT_SET,
         *,
         scope: Scope = "singleton",
-        override: bool = False,
         from_context: bool = False,
+        override: bool = False,
     ) -> Provider:
         """Register a provider for the specified interface."""
         if call is NOT_SET:
             call = interface
-        return self._register_provider(
-            call, scope, interface, override, from_context=from_context
-        )
+        return self._register_provider(call, scope, interface, from_context, override)
 
     def is_registered(self, interface: Any) -> bool:
         """Check if a provider is registered for the specified interface."""
@@ -364,12 +362,12 @@ class Container:
         self._delete_provider(provider)
 
     def provider(
-        self, *, scope: Scope, override: bool = False
+        self, *, scope: Scope, form_context: bool = False, override: bool = False
     ) -> Callable[[Callable[P, T]], Callable[P, T]]:
         """Decorator to register a provider function with the specified scope."""
 
         def decorator(call: Callable[P, T]) -> Callable[P, T]:
-            self._register_provider(call, scope, NOT_SET, override)
+            self._register_provider(call, scope, NOT_SET, form_context, override)
             return call
 
         return decorator
@@ -379,10 +377,9 @@ class Container:
         call: Callable[..., Any],
         scope: Scope,
         interface: Any = NOT_SET,
+        from_context: bool = False,
         override: bool = False,
         defaults: dict[str, Any] | None = None,
-        *,
-        from_context: bool = False,
     ) -> Provider:
         """Register a provider with the specified scope."""
         # Validate scope is registered
@@ -411,9 +408,10 @@ class Container:
                 )
 
             provider = Provider(
+                interface=interface,
                 call=lambda: None,
                 scope=scope,
-                interface=interface,
+                from_context=True,
                 name=name,
                 parameters=(),
                 is_class=False,
@@ -422,7 +420,6 @@ class Container:
                 is_async_generator=False,
                 is_async=False,
                 is_resource=False,
-                from_context=True,
             )
         else:
             # Regular provider registration
@@ -512,8 +509,8 @@ class Container:
 
                 parameters.append(
                     ProviderParameter(
-                        name=param.name,
                         annotation=param.annotation,
+                        name=param.name,
                         default=default,
                         has_default=has_default,
                         provider=sub_provider,
@@ -535,9 +532,10 @@ class Container:
                 ) from unresolved_exc
 
             provider = Provider(
+                interface=interface,
                 call=call,
                 scope=scope,
-                interface=interface,
+                from_context=False,
                 name=name,
                 parameters=tuple(parameters),
                 is_class=is_class,
@@ -576,6 +574,7 @@ class Container:
                     interface,
                     interface.__provided__["scope"],
                     NOT_SET,
+                    interface.__provided__["from_context"],
                     False,
                     defaults,
                 )
