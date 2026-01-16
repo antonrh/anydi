@@ -158,7 +158,7 @@ class Resolver:
 
         num_params = len(provider.parameters)
         param_resolvers: list[Any] = [None] * num_params
-        param_annotations: list[Any] = [None] * num_params
+        param_types: list[Any] = [None] * num_params
         param_defaults: list[Any] = [None] * num_params
         param_has_default: list[bool] = [False] * num_params
         param_names: list[str] = [""] * num_params
@@ -173,7 +173,7 @@ class Resolver:
         )
 
         for idx, param in enumerate(provider.parameters):
-            param_annotations[idx] = param.dependency_type
+            param_types[idx] = param.dependency_type
             param_defaults[idx] = param.default
             param_has_default[idx] = param.has_default
             param_names[idx] = param.name
@@ -258,7 +258,7 @@ class Resolver:
                 if param_shared_scopes[idx]:
                     create_lines.append(
                         f"        cached = (context._items.get("
-                        f"_param_annotations[{idx}], NOT_SET_) "
+                        f"_param_types[{idx}], NOT_SET_) "
                         f"if context is not None else NOT_SET_)"
                     )
                 else:
@@ -292,14 +292,12 @@ class Resolver:
                     create_lines.append("            try:")
                     if is_async:
                         create_lines.append(
-                            f"                compiled = "
-                            f"cache.get(_param_annotations[{idx}])"
+                            f"                compiled = cache.get(_param_types[{idx}])"
                         )
                         create_lines.append("                if compiled is None:")
                         create_lines.append(
                             "                    provider = "
-                            "container._get_or_register_provider("
-                            f"_param_annotations[{idx}])"
+                            "container._get_or_register_provider(_param_types[{idx}])"
                         )
                         create_lines.append(
                             "                    compiled = "
@@ -316,14 +314,12 @@ class Resolver:
                         )
                     else:
                         create_lines.append(
-                            f"                compiled = "
-                            f"cache.get(_param_annotations[{idx}])"
+                            f"                compiled = cache.get(_param_types[{idx}])"
                         )
                         create_lines.append("                if compiled is None:")
                         create_lines.append(
                             "                    provider = "
-                            f"container._get_or_register_provider("
-                            f"_param_annotations[{idx}])"
+                            f"container._get_or_register_provider(_param_types[{idx}])"
                         )
                         create_lines.append(
                             "                    compiled = "
@@ -355,7 +351,7 @@ class Resolver:
                     create_lines.append("    if override_mode:")
                     create_lines.append(
                         f"        arg_{idx} = resolver._wrap_for_override("
-                        f"_param_annotations[{idx}], arg_{idx})"
+                        f"_param_types[{idx}], arg_{idx})"
                     )
 
         # Handle different provider types
@@ -640,7 +636,7 @@ class Resolver:
             "_provider_call": provider.factory,
             "_provider_name": provider.name,
             "_is_class": provider.is_class,
-            "_param_annotations": param_annotations,
+            "_param_types": param_types,
             "_param_defaults": param_defaults,
             "_param_has_default": param_has_default,
             "_param_resolvers": param_resolvers,
