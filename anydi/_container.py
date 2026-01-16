@@ -61,18 +61,18 @@ class Container:
 
         # Register self as provider
         self._register_provider(
+            Container,
             lambda: self,
             "singleton",
-            Container,
         )
 
         # Register providers
         providers = providers or []
         for provider in providers:
             self._register_provider(
+                provider.interface,
                 provider.call,
                 provider.scope,
-                provider.interface,
             )
 
         # Register modules
@@ -330,7 +330,7 @@ class Container:
         """Register a provider for the specified interface."""
         if call is NOT_SET:
             call = interface
-        return self._register_provider(call, scope, interface, from_context, override)
+        return self._register_provider(interface, call, scope, from_context, override)
 
     def is_registered(self, interface: Any) -> bool:
         """Check if a provider is registered for the specified interface."""
@@ -367,16 +367,16 @@ class Container:
         """Decorator to register a provider function with the specified scope."""
 
         def decorator(call: Callable[P, T]) -> Callable[P, T]:
-            self._register_provider(call, scope, NOT_SET, from_context, override)
+            self._register_provider(NOT_SET, call, scope, from_context, override)
             return call
 
         return decorator
 
     def _register_provider(  # noqa: C901
         self,
-        call: Callable[..., Any],
+        dependency_type: Any,
+        factory: Callable[..., Any],
         scope: Scope,
-        dependency_type: Any = NOT_SET,
         from_context: bool = False,
         override: bool = False,
         defaults: dict[str, Any] | None = None,
@@ -423,8 +423,8 @@ class Container:
             )
         else:
             # Regular provider registration
-            name = type_repr(call)
-            kind = ProviderKind.from_call(call)
+            name = type_repr(factory)
+            kind = ProviderKind.from_call(factory)
             is_class = kind == ProviderKind.CLASS
             is_coroutine = kind == ProviderKind.COROUTINE
             is_generator = kind == ProviderKind.GENERATOR
@@ -437,11 +437,11 @@ class Container:
                     "with a transient scope, which is not allowed."
                 )
 
-            signature = inspect.signature(call, eval_str=True)
+            signature = inspect.signature(factory, eval_str=True)
 
-            # Detect interface from call or return annotation
+            # Detect dependency_type from factory or return annotation
             if dependency_type is NOT_SET:
-                dependency_type = call if is_class else signature.return_annotation
+                dependency_type = factory if is_class else signature.return_annotation
                 if dependency_type is inspect.Signature.empty:
                     dependency_type = None
 
@@ -533,7 +533,7 @@ class Container:
 
             provider = Provider(
                 dependency_type=dependency_type,
-                factory=call,
+                factory=factory,
                 scope=scope,
                 from_context=False,
                 name=name,
@@ -571,9 +571,9 @@ class Container:
         except LookupError:
             if inspect.isclass(dependency_type) and is_provided(dependency_type):
                 return self._register_provider(
+                    NOT_SET,
                     dependency_type,
                     dependency_type.__provided__["scope"],
-                    NOT_SET,
                     dependency_type.__provided__["from_context"],
                     False,
                     defaults,
