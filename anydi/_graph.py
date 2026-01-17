@@ -22,6 +22,7 @@ class Graph:
         output_format: Literal["plain", "mermaid", "dot", "json"] = "plain",
         *,
         full_path: bool = False,
+        **kwargs: Any,
     ) -> str:
         """Draw the dependency graph."""
         if output_format == "mermaid":
@@ -29,7 +30,7 @@ class Graph:
         if output_format == "dot":
             return self._dot(full_path=full_path)
         if output_format == "json":
-            return self._json(full_path=full_path)
+            return self._json(full_path=full_path, ident=kwargs.get("ident", 2))
         return self._tree(full_path=full_path)
 
     def _mermaid(self, full_path: bool) -> str:
@@ -103,7 +104,7 @@ class Graph:
         lines.append("}")
         return "\n".join(lines)
 
-    def _json(self, full_path: bool) -> str:
+    def _json(self, full_path: bool, ident: int) -> str:
         """Generate JSON format dependency graph."""
         nodes: list[dict[str, Any]] = []
         links: list[dict[str, Any]] = []
@@ -146,7 +147,7 @@ class Graph:
                     }
                 )
 
-        return json.dumps({"nodes": nodes, "links": links}, indent=2)
+        return json.dumps({"nodes": nodes, "links": links}, indent=ident)
 
     def _tree(self, full_path: bool) -> str:
         """Generate tree format dependency graph."""

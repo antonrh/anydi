@@ -14,8 +14,8 @@ def main() -> None:
         help="Path to the container instance or factory (e.g., 'module:container')",
     )
     parser.add_argument(
-        "--format",
-        "-f",
+        "--output-format",
+        "-o",
         choices=["plain", "mermaid", "dot", "json"],
         default="plain",
         help="Output format for the dependency graph",
@@ -24,6 +24,12 @@ def main() -> None:
         "--full-path",
         action="store_true",
         help="Show full module path for dependencies",
+    )
+    parser.add_argument(
+        "--indent",
+        type=int,
+        default=2,
+        help="JSON indentation level",
     )
 
     args = parser.parse_args()
@@ -34,7 +40,11 @@ def main() -> None:
         print(f"Error: {exc}", file=sys.stderr)  # noqa: T201
         sys.exit(1)
 
-    graph_out = container.graph(output_format=args.format, full_path=args.full_path)
+    graph_out = container.graph(
+        output_format=args.output_format,
+        full_path=args.full_path,
+        ident=args.indent,
+    )
     print(graph_out)  # noqa: T201
 
 

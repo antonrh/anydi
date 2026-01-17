@@ -912,11 +912,16 @@ class Container:
         output_format: Literal["plain", "mermaid", "dot", "json"] = "plain",
         *,
         full_path: bool = False,
+        **kwargs: Any,
     ) -> str:
         """Draw the dependency graph."""
         if not self.ready:
             self.build()
-        return self._graph.draw(output_format=output_format, full_path=full_path)
+        return self._graph.draw(
+            output_format=output_format,
+            full_path=full_path,
+            **kwargs,
+        )
 
     def _resolve_provider_dependencies(self) -> None:
         """Resolve all provider dependencies by filling in provider references."""
