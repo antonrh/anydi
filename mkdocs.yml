@@ -33,6 +33,7 @@ nav:
     - Dependency Injection: usage/injection.md
     - Modules: usage/modules.md
     - Testing: usage/testing.md
+    - CLI: usage/cli.md
   - Extensions:
     - FastAPI: extensions/fastapi.md
     - FastStream: extensions/faststream.md
