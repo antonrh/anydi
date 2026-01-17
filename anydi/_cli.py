@@ -53,8 +53,6 @@ def main() -> None:
         except Exception as exc:
             print(f"Error scanning packages: {exc}", file=sys.stderr)  # noqa: T201
             sys.exit(1)
-        else:
-            container.rebuild()
 
     graph_out = container.graph(
         output_format=args.output_format,
