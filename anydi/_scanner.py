@@ -52,9 +52,13 @@ class Scanner:
 
         # First: register @provided classes
         for cls in provided_classes:
-            if not self._container.is_registered(cls):
+            dependency_type = cls.__provided__.get("dependency_type", cls)
+            if not self._container.is_registered(dependency_type):
                 scope = cls.__provided__["scope"]
-                self._container.register(cls, scope=scope)
+                from_context = cls.__provided__.get("from_context", False)
+                self._container.register(
+                    dependency_type, cls, scope=scope, from_context=from_context
+                )
 
         # Second: inject @injectable functions
         for dependency in injectable_dependencies:

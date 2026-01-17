@@ -70,6 +70,9 @@ class Container:
                 provider.dependency_type,
                 provider.factory,
                 provider.scope,
+                provider.from_context,
+                False,
+                None,
             )
 
         # Register modules
@@ -345,7 +348,7 @@ class Container:
         if factory is NOT_SET:
             factory = call if call is not NOT_SET else dependency_type
         return self._register_provider(
-            dependency_type, factory, scope, from_context, override
+            dependency_type, factory, scope, from_context, override, None
         )
 
     def is_registered(self, dependency_type: Any, /) -> bool:
@@ -378,12 +381,12 @@ class Container:
         self._delete_provider(provider)
 
     def provider(
-        self, *, scope: Scope, from_context: bool = False, override: bool = False
+        self, *, scope: Scope, override: bool = False
     ) -> Callable[[Callable[P, T]], Callable[P, T]]:
         """Decorator to register a provider function with the specified scope."""
 
         def decorator(call: Callable[P, T]) -> Callable[P, T]:
-            self._register_provider(NOT_SET, call, scope, from_context, override)
+            self._register_provider(NOT_SET, call, scope, False, override, None)
             return call
 
         return decorator
@@ -393,9 +396,9 @@ class Container:
         dependency_type: Any,
         factory: Callable[..., Any],
         scope: Scope,
-        from_context: bool = False,
-        override: bool = False,
-        defaults: dict[str, Any] | None = None,
+        from_context: bool,
+        override: bool,
+        defaults: dict[str, Any] | None,
     ) -> Provider:
         """Register a provider with the specified scope."""
         # Validate scope is registered
@@ -591,8 +594,8 @@ class Container:
                 return self._register_provider(
                     dependency_type,
                     dependency_type,
-                    dependency_type.__provided__["scope"],
-                    dependency_type.__provided__["from_context"],
+                    dependency_type.__provided__.get("scope", "singleton"),
+                    dependency_type.__provided__.get("from_context", False),
                     False,
                     defaults,
                 )

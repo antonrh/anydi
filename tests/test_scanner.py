@@ -73,14 +73,15 @@ class TestContainerScanner:
 
         container.scan(["tests.scan_app.c"])
 
-        # Should register 2 @provided classes (SingletonService and TransientService)
-        assert register_spy.call_count == 2
+        # Should register 3 @provided classes
+        assert register_spy.call_count == 3
 
-        from .scan_app.c.services import SingletonService, TransientService
+        from .scan_app.c.services import IRepository, SingletonService, TransientService
 
         # Verify classes are registered
         assert container.is_registered(SingletonService)
         assert container.is_registered(TransientService)
+        assert container.is_registered(IRepository)
 
         # Verify they can be resolved
         singleton_service = container.resolve(SingletonService)
@@ -102,8 +103,23 @@ class TestContainerScanner:
 
         container.scan(["tests.scan_app.c"])
 
-        # Should only register TransientService (SingletonService already registered)
-        assert register_spy.call_count == 1
+        # Should register TransientService and UserRepository
+        assert register_spy.call_count == 2
 
         # Verify both classes are registered
         assert container.is_registered(SingletonService)
+
+    def test_scan_registers_provided_class_with_dependency_type(
+        self, container: Container
+    ) -> None:
+        container.scan(["tests.scan_app.c"])
+
+        from .scan_app.c.services import IRepository, UserRepository
+
+        # Verify class is registered under interface
+        assert container.is_registered(IRepository)
+
+        # Resolve by interface
+        repo = container.resolve(IRepository)
+        assert isinstance(repo, UserRepository)
+        assert repo.get(1) == {"id": 1, "name": "Alice"}

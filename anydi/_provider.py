@@ -65,6 +65,7 @@ class ProviderDef:
     dependency_type: Any = NOT_SET
     factory: Callable[..., Any] = NOT_SET
     _: KW_ONLY
+    from_context: bool = False
     scope: Scope = "singleton"
     interface: Any = NOT_SET
     call: Callable[..., Any] = NOT_SET
