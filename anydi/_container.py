@@ -18,6 +18,7 @@ from typing_extensions import ParamSpec, Self, type_repr
 
 from ._context import InstanceContext
 from ._decorators import is_provided
+from ._graph import Graph
 from ._injector import Injector
 from ._marker import Marker
 from ._module import ModuleDef, ModuleRegistrar
@@ -56,6 +57,7 @@ class Container:
         self._injector = Injector(self)
         self._modules = ModuleRegistrar(self)
         self._scanner = Scanner(self)
+        self._graph = Graph(self)
 
         # Build state
         self._built = False
@@ -909,30 +911,7 @@ class Container:
         """Draw the dependency graph."""
         if not self._built:
             self.build()
-
-        def get_name(name: str) -> str:
-            if full_path:
-                return name
-            return name.rsplit(".", 1)[-1]
-
-        lines: list[str] = []
-
-        if output_format == "mermaid":
-            lines.append("graph TD")
-
-        for provider in self._providers.values():
-            provider_name = get_name(provider.name)
-            for param in provider.parameters:
-                if param.provider is None:
-                    continue
-                dep_name = get_name(param.provider.name)
-
-                if output_format == "mermaid":
-                    lines.append(f"    {provider_name} --> {dep_name}")
-                else:
-                    lines.append(f"{provider_name} -> {dep_name}")
-
-        return "\n".join(lines)
+        return self._graph.draw(output_format=output_format, full_path=full_path)
 
     def _resolve_provider_dependencies(self) -> None:
         """Resolve all provider dependencies by filling in provider references."""
