@@ -7,6 +7,8 @@ from collections.abc import Callable
 from dataclasses import KW_ONLY, dataclass
 from typing import Any
 
+from typing_extensions import type_repr
+
 from ._types import NOT_SET, Scope
 
 
@@ -50,7 +52,6 @@ class Provider:
     factory: Callable[..., Any]
     scope: Scope
     from_context: bool
-    name: str
     parameters: tuple[ProviderParameter, ...]
     is_class: bool
     is_coroutine: bool
@@ -58,6 +59,15 @@ class Provider:
     is_async_generator: bool
     is_async: bool
     is_resource: bool
+
+    def __repr__(self) -> str:
+        dep_repr = type_repr(self.dependency_type)
+        # For class providers, factory == dependency_type, so just show the type
+        if self.is_class:
+            return dep_repr
+        # For factory providers, include the factory path
+        factory_repr = type_repr(self.factory)
+        return f"{dep_repr} (via {factory_repr})"
 
 
 @dataclass(slots=True)
