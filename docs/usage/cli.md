@@ -18,7 +18,7 @@ anydi myapp.container:create_container
 
 ## Output Formats
 
-### Plain Text (Default)
+### Tree (Default)
 
 Shows dependencies as a tree:
 
@@ -206,7 +206,7 @@ anydi myapp:container -s myapp
 
 | Option            | Short | Description                                      |
 |-------------------|-------|--------------------------------------------------|
-| `--output-format` | `-o`  | Output format: `plain`, `mermaid`, `dot`, `json` |
+| `--output-format` | `-o`  | Output format: `tree`, `mermaid`, `dot`, `json`  |
 | `--full-path`     |       | Show full module paths                           |
 | `--indent`        | `-i`  | JSON indentation (default: 2)                    |
 | `--scan`          | `-s`  | Packages to scan for providers                   |

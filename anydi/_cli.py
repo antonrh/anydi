@@ -16,8 +16,8 @@ def main() -> None:
     parser.add_argument(
         "--output-format",
         "-o",
-        choices=["plain", "mermaid", "dot", "json"],
-        default="plain",
+        choices=["tree", "mermaid", "dot", "json"],
+        default="tree",
         help="Output format for the dependency graph",
     )
     parser.add_argument(

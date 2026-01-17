@@ -51,7 +51,7 @@ class TestCLIMain:
             main()
 
         container.graph.assert_called_once_with(
-            output_format="plain",
+            output_format="tree",
             full_path=False,
             ident=2,
         )

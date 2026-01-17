@@ -21,7 +21,7 @@ class Graph:
 
     def draw(
         self,
-        output_format: Literal["plain", "mermaid", "dot", "json"] = "plain",
+        output_format: Literal["tree", "mermaid", "dot", "json"] = "tree",
         *,
         full_path: bool = False,
         **kwargs: Any,
