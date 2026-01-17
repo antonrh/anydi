@@ -59,7 +59,7 @@ class NotificationService:
 
 ### Dependency Graph
 
-AnyDI uses **lazy registration**. This means that when you register a provider, its dependencies are not immediately checked. This check happens later, either when you first resolve the provider with `resolve()`, or when you validate all providers at once with `build()`.
+AnyDI uses **lazy registration**. This means that when you register a provider, it doesn't check dependencies right away. The check happens later, either when you first resolve the provider with `resolve()`, or when you validate all providers at once with `build()`.
 
 Here's a simple illustration of a dependency graph:
 
@@ -97,16 +97,22 @@ container.register(Database)
 container.register(Repository)
 container.register(Service)
 
-# Option 1: Resolve on-demand
+# Find decorated classes in your code
+container.scan(["myapp.modules"])
+
+# Option 1: Check dependencies when you need them
 my_service = container.resolve(Service)
 
-# Option 2: Validate entire graph upfront
+# Option 2: Check all dependencies at once
 container.build()
 ```
 
 #### Benefits of `build()`:
-- **Early Error Detection**: Catches circular dependencies and scope issues at startup, before they cause problems.
-- **Explicit Validation**: Validates the entire dependency graph in a single, clear step.
+- **Catch errors early**: Finds circular dependencies and scope problems before the application runs.
+- **Check everything**: Checks the entire dependency graph in one step.
+
+!!! info
+    If you use decorators (like `@singleton`), call `container.scan()` before `container.build()`. This ensures that AnyDI checks all your decorated classes.
 
 
 ## Scope

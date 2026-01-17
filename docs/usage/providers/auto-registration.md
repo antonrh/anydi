@@ -96,9 +96,9 @@ repo = container.resolve(UserRepository)
 | `@transient` | `@provided(scope="transient")` |
 | `@request` | `@provided(scope="request")` |
 
-### Register by interface with `dependency_type`
+### Register with a different `dependency_type`
 
-Use `dependency_type` to register a class under its interface. This works with `container.scan()`:
+Use `dependency_type` to register a class as a different type (e.g., a base class or protocol). This works with `container.scan()`:
 
 ```python
 from abc import ABC, abstractmethod
@@ -120,7 +120,7 @@ class UserRepository(IRepository):
 container = Container()
 container.scan(["myapp.repositories"])
 
-# Resolve by interface
+# Resolve by dependency type
 repo = container.resolve(IRepository)
 ```
 
@@ -169,7 +169,7 @@ class UserRepository:
 This keeps your classes free from framework imports. The `__provided__` dict supports:
 
 - `scope` (required) - `"singleton"`, `"transient"`, or `"request"`
-- `dependency_type` (optional) - interface to register under (works with `scan()`)
+- `dependency_type` (optional) - the type to register as, e.g., a base class or protocol (works with `scan()`)
 - `from_context` (optional) - `True` if set via `context.set()`, only for `"request"` scope
 
 ## Mixing explicit and auto-registration
@@ -215,6 +215,32 @@ notifier.notify("user@example.com", "Welcome!")
 1. **Explicit is better**: For public APIs or library public APIs, explicit registration gives better documentation
 2. **Circular dependencies**: Auto-registration cannot resolve circular dependencies
 3. **Scope validation**: The scope decorator must match the usage pattern
+
+## Scanning and build
+
+AnyDI can find and register classes automatically when they are needed. However, it's better to use the `scan()` method to find all decorated classes when your application starts.
+
+If you use `build()` to check your dependencies for errors, you should call `scan()` **before** `build()`. This makes sure the container knows about all your decorated classes.
+
+```python
+from anydi import Container
+
+container = Container()
+
+# 1. Scan packages to find @provided classes
+container.scan(["myapp.services", "myapp.repositories"])
+
+# 2. Build and check the dependency graph
+container.build()
+
+# 3. Use the container
+service = container.resolve(MyService)
+```
+
+By calling `scan()` before `build()`, AnyDI can:
+- Find all classes with decorators like `@singleton` or `@request`.
+- Check that all dependencies exist.
+- Find circular dependencies or scope problems at startup.
 
 ---
 
