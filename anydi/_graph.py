@@ -108,46 +108,35 @@ class Graph:
 
     def _json(self, full_path: bool, ident: int) -> str:
         """Generate JSON format dependency graph."""
-        nodes: list[dict[str, Any]] = []
-        links: list[dict[str, Any]] = []
-        seen_nodes: set[Any] = set()
+        container_type = type(self._container)
+        providers: list[dict[str, Any]] = []
 
         for provider in self._container.providers.values():
-            if provider.dependency_type not in seen_nodes:
-                nodes.append(
-                    {
-                        "dependency_type": type_repr(provider.dependency_type),
-                        "scope": provider.scope,
-                        "from_context": provider.from_context,
-                    }
-                )
-                seen_nodes.add(provider.dependency_type)
+            # Exclude Container itself
+            if provider.dependency_type is container_type:
+                continue
 
+            dependencies: list[dict[str, str]] = []
             for param in provider.parameters:
                 if param.provider is None:
                     continue
-
-                if param.provider.dependency_type not in seen_nodes:
-                    nodes.append(
-                        {
-                            "dependency_type": type_repr(
-                                param.provider.dependency_type
-                            ),
-                            "scope": param.provider.scope,
-                            "from_context": param.provider.from_context,
-                        }
-                    )
-                    seen_nodes.add(param.provider.dependency_type)
-
-                links.append(
+                dependencies.append(
                     {
-                        "source": type_repr(provider.dependency_type),
-                        "target": type_repr(param.provider.dependency_type),
-                        "label": param.name,
+                        "name": param.name,
+                        "type": self._get_name(param.provider, full_path),
                     }
                 )
 
-        return json.dumps({"nodes": nodes, "links": links}, indent=ident)
+            providers.append(
+                {
+                    "type": self._get_name(provider, full_path),
+                    "scope": provider.scope,
+                    "from_context": provider.from_context,
+                    "dependencies": dependencies,
+                }
+            )
+
+        return json.dumps({"providers": providers}, indent=ident)
 
     def _tree(self, full_path: bool) -> str:
         """Generate tree format dependency graph."""

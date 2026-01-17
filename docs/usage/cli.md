@@ -1,6 +1,6 @@
 # Command Line Interface
 
-AnyDI provides a CLI tool to visualize your dependency graph.
+AnyDI provides a CLI tool to validate and visualize your dependency graph.
 
 ## Basic Usage
 
@@ -137,14 +137,29 @@ Output:
 
 ```json
 {
-  "nodes": [
-    {"dependency_type": "UserService", "scope": "singleton", "from_context": false},
-    {"dependency_type": "UserRepository", "scope": "singleton", "from_context": false},
-    {"dependency_type": "Database", "scope": "singleton", "from_context": false}
-  ],
-  "links": [
-    {"source": "UserService", "target": "UserRepository", "label": "repo"},
-    {"source": "UserRepository", "target": "Database", "label": "db"}
+  "providers": [
+    {
+      "type": "Database",
+      "scope": "singleton",
+      "from_context": false,
+      "dependencies": []
+    },
+    {
+      "type": "UserRepository",
+      "scope": "singleton",
+      "from_context": false,
+      "dependencies": [
+        {"name": "db", "type": "Database"}
+      ]
+    },
+    {
+      "type": "UserService",
+      "scope": "singleton",
+      "from_context": false,
+      "dependencies": [
+        {"name": "repo", "type": "UserRepository"}
+      ]
+    }
   ]
 }
 ```

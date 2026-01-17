@@ -206,3 +206,123 @@ class TestContainerGraph:
 
         assert "tests.test_graph.GraphRepository (singleton)" in result
         assert "tests.test_graph.GraphDatabase (singleton)" in result
+
+    def test_graph_dot_format(self) -> None:
+        """Test graph output in DOT format."""
+        container = Container()
+        container.register(GraphDatabase, scope="singleton")
+        container.register(GraphRepository, scope="singleton")
+        container.register(GraphService, scope="singleton")
+
+        result = container.graph(output_format="dot")
+
+        assert "digraph G {" in result
+        assert "node [shape=box];" in result
+        assert (
+            '"GraphRepository (singleton)" -> "GraphDatabase (singleton)" [label="db"];'
+        ) in result
+        assert (
+            '"GraphService (singleton)" -> "GraphRepository (singleton)" '
+            '[label="repo"];'
+        ) in result
+        assert result.endswith("}")
+
+    def test_graph_dot_with_context(self) -> None:
+        """Test DOT format shows dashed lines for context deps."""
+        container = Container()
+        container.register(GraphDatabase, scope="singleton")
+        container.register(GraphCurrentUser, scope="request", from_context=True)
+
+        class LocalRequestService:
+            def __init__(self, db: GraphDatabase, user: GraphCurrentUser) -> None:
+                self.db = db
+                self.user = user
+
+        container.register(LocalRequestService, scope="request")
+
+        result = container.graph(output_format="dot")
+
+        assert "[style=dashed]" in result
+        assert '[label="user"]' in result
+        assert '[label="db"]' in result
+
+    def test_graph_dot_empty(self) -> None:
+        """Test DOT graph with no dependencies."""
+        container = Container()
+
+        result = container.graph(output_format="dot")
+
+        assert result == "digraph G {\n    node [shape=box];\n}"
+
+    def test_graph_json_format(self) -> None:
+        """Test graph output in JSON format."""
+        import json
+
+        container = Container()
+        container.register(GraphDatabase, scope="singleton")
+        container.register(GraphRepository, scope="singleton")
+
+        result = container.graph(output_format="json")
+        data = json.loads(result)
+
+        assert "providers" in data
+        assert len(data["providers"]) == 2
+
+        # Find providers by type
+        providers_by_type = {p["type"]: p for p in data["providers"]}
+
+        assert "GraphDatabase" in providers_by_type
+        assert providers_by_type["GraphDatabase"]["scope"] == "singleton"
+        assert providers_by_type["GraphDatabase"]["dependencies"] == []
+
+        assert "GraphRepository" in providers_by_type
+        assert providers_by_type["GraphRepository"]["scope"] == "singleton"
+        assert providers_by_type["GraphRepository"]["dependencies"] == [
+            {"name": "db", "type": "GraphDatabase"}
+        ]
+
+    def test_graph_json_with_context(self) -> None:
+        """Test JSON format includes from_context flag."""
+        import json
+
+        container = Container()
+        container.register(GraphDatabase, scope="singleton")
+        container.register(GraphCurrentUser, scope="request", from_context=True)
+
+        result = container.graph(output_format="json")
+        data = json.loads(result)
+
+        providers_by_type = {p["type"]: p for p in data["providers"]}
+
+        assert providers_by_type["GraphDatabase"]["from_context"] is False
+        assert providers_by_type["GraphCurrentUser"]["from_context"] is True
+
+    def test_graph_json_full_path(self) -> None:
+        """Test JSON format with full module path."""
+        import json
+
+        container = Container()
+        container.register(GraphDatabase, scope="singleton")
+        container.register(GraphRepository, scope="singleton")
+
+        result = container.graph(output_format="json", full_path=True)
+        data = json.loads(result)
+
+        providers_by_type = {p["type"]: p for p in data["providers"]}
+
+        assert "tests.test_graph.GraphDatabase" in providers_by_type
+        assert "tests.test_graph.GraphRepository" in providers_by_type
+        assert providers_by_type["tests.test_graph.GraphRepository"][
+            "dependencies"
+        ] == [{"name": "db", "type": "tests.test_graph.GraphDatabase"}]
+
+    def test_graph_json_empty(self) -> None:
+        """Test JSON graph with no dependencies."""
+        import json
+
+        container = Container()
+
+        result = container.graph(output_format="json")
+        data = json.loads(result)
+
+        assert data == {"providers": []}
