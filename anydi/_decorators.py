@@ -11,11 +11,13 @@ from typing import (
     overload,
 )
 
+from typing_extensions import NotRequired
+
 if TYPE_CHECKING:
     from ._module import Module
 
 
-from ._types import Scope
+from ._types import NOT_SET, Scope
 
 T = TypeVar("T")
 P = ParamSpec("P")
@@ -27,12 +29,15 @@ ModuleT = TypeVar("ModuleT", bound="Module")
 class ProvidedMetadata(TypedDict):
     """Metadata for classes marked as provided by AnyDI."""
 
+    dependency_type: NotRequired[Any]
     scope: Scope
     from_context: bool
 
 
 @overload
-def provided(cls: ClassT, *, scope: Scope, from_context: bool = False) -> ClassT: ...
+def provided(
+    dependency_type: Any, /, *, scope: Scope, from_context: bool = False
+) -> Callable[[ClassT], ClassT]: ...
 
 
 @overload
@@ -42,13 +47,40 @@ def provided(
 
 
 def provided(
-    cls: ClassT | None = None, *, scope: Scope, from_context: bool = False
-) -> Callable[[ClassT], ClassT] | ClassT:
+    dependency_type: Any = NOT_SET, /, *, scope: Scope, from_context: bool = False
+) -> Callable[[ClassT], ClassT]:
     """Decorator for marking a class as provided by AnyDI with a specific scope."""
 
-    def decorator(c: ClassT) -> ClassT:
-        c.__provided__ = ProvidedMetadata(scope=scope, from_context=from_context)
+    def decorator(cls: ClassT) -> ClassT:
+        metadata: ProvidedMetadata = {"scope": scope, "from_context": from_context}
+        if dependency_type is not NOT_SET:
+            metadata["dependency_type"] = dependency_type
+        cls.__provided__ = metadata  # type: ignore[attr-defined]
+        return cls
 
+    return decorator
+
+
+@overload
+def singleton(cls: ClassT, /) -> ClassT: ...
+
+
+@overload
+def singleton(
+    cls: None = None, /, *, dependency_type: Any = NOT_SET
+) -> Callable[[ClassT], ClassT]: ...
+
+
+def singleton(
+    cls: ClassT | None = None, /, *, dependency_type: Any = NOT_SET
+) -> Callable[[ClassT], ClassT] | ClassT:
+    """Decorator for marking a class as a singleton dependency."""
+
+    def decorator(c: ClassT) -> ClassT:
+        metadata: ProvidedMetadata = {"scope": "singleton", "from_context": False}
+        if dependency_type is not NOT_SET:
+            metadata["dependency_type"] = dependency_type
+        c.__provided__ = metadata  # type: ignore[attr-defined]
         return c
 
     if cls is None:
@@ -58,63 +90,63 @@ def provided(
 
 
 @overload
-def singleton(cls: ClassT) -> ClassT: ...
+def transient(cls: ClassT, /) -> ClassT: ...
 
 
 @overload
-def singleton() -> Callable[[ClassT], ClassT]: ...
+def transient(
+    cls: None = None, /, *, dependency_type: Any = NOT_SET
+) -> Callable[[ClassT], ClassT]: ...
 
 
-def singleton(cls: ClassT | None = None) -> Callable[[ClassT], ClassT] | ClassT:
-    """Decorator for marking a class as a singleton dependency."""
-
-    if cls is None:
-        return provided(scope="singleton", from_context=False)
-
-    return provided(cls, scope="singleton", from_context=False)
-
-
-@overload
-def transient(cls: ClassT) -> ClassT: ...
-
-
-@overload
-def transient() -> Callable[[ClassT], ClassT]: ...
-
-
-def transient(cls: ClassT | None = None) -> Callable[[ClassT], ClassT] | ClassT:
+def transient(
+    cls: ClassT | None = None, /, *, dependency_type: Any = NOT_SET
+) -> Callable[[ClassT], ClassT] | ClassT:
     """Decorator for marking a class as a transient dependency."""
 
+    def decorator(c: ClassT) -> ClassT:
+        metadata: ProvidedMetadata = {"scope": "transient", "from_context": False}
+        if dependency_type is not NOT_SET:
+            metadata["dependency_type"] = dependency_type
+        c.__provided__ = metadata  # type: ignore[attr-defined]
+        return c
+
     if cls is None:
-        return provided(scope="transient", from_context=False)
+        return decorator
 
-    return provided(cls, scope="transient", from_context=False)
-
-
-@overload
-def request(cls: ClassT, *, from_context: bool = False) -> ClassT: ...
+    return decorator(cls)
 
 
 @overload
-def request(*, from_context: bool = False) -> Callable[[ClassT], ClassT]: ...
+def request(cls: ClassT, /, *, from_context: bool = False) -> ClassT: ...
+
+
+@overload
+def request(
+    cls: None = None, /, *, dependency_type: Any = NOT_SET, from_context: bool = False
+) -> Callable[[ClassT], ClassT]: ...
 
 
 def request(
-    cls: ClassT | None = None, *, from_context: bool = False
+    cls: ClassT | None = None,
+    /,
+    *,
+    dependency_type: Any = NOT_SET,
+    from_context: bool = False,
 ) -> Callable[[ClassT], ClassT] | ClassT:
     """Decorator for marking a class as a request-scoped dependency."""
 
-    if cls is None:
-        return provided(
-            scope="request",
-            from_context=from_context,
-        )
+    def decorator(c: ClassT) -> ClassT:
+        metadata: ProvidedMetadata = {"scope": "request", "from_context": from_context}
+        if dependency_type is not NOT_SET:
+            metadata["dependency_type"] = dependency_type
+        c.__provided__ = metadata  # type: ignore[attr-defined]
+        return c
 
-    return provided(
-        cls,
-        scope="request",
-        from_context=from_context,
-    )
+    if cls is None:
+        return decorator
+
+    return decorator(cls)
 
 
 class Provided(Protocol):
