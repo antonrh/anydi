@@ -433,16 +433,17 @@ class Container:
                     "The `dependency_type` parameter is required when using "
                     "`from_context=True`."
                 )
-            name = type_repr(dependency_type)
             if dependency_type in self._providers and not override:
-                raise LookupError(f"The provider `{name}` is already registered.")
+                raise LookupError(
+                    f"The provider `{type_repr(dependency_type)}` is already "
+                    "registered."
+                )
 
             provider = Provider(
                 dependency_type=dependency_type,
                 factory=lambda: None,
                 scope=scope,
                 from_context=True,
-                name=name,
                 parameters=(),
                 is_class=False,
                 is_coroutine=False,
@@ -539,7 +540,6 @@ class Container:
                 factory=factory,
                 scope=scope,
                 from_context=False,
-                name=name,
                 parameters=tuple(parameters),
                 is_class=is_class,
                 is_coroutine=is_coroutine,
@@ -632,27 +632,27 @@ class Container:
                 resolved_params.append(param)
                 continue
 
-            annotation = param.dependency_type
+            dependency_type = param.dependency_type
 
             # Try to resolve the dependency
             # First check if this would create a circular dependency
-            if annotation in resolving:
+            if dependency_type in resolving:
                 raise ValueError(
-                    f"Circular dependency detected: {provider.name} depends on "
-                    f"{type_repr(annotation)}"
+                    f"Circular dependency detected: {provider} depends on "
+                    f"{type_repr(dependency_type)}"
                 )
 
             try:
-                dep_provider = self._get_provider(annotation)
+                dep_provider = self._get_provider(dependency_type)
             except LookupError:
                 # Check if it's a @provided class
-                if inspect.isclass(annotation) and is_provided(annotation):
-                    provided_scope = annotation.__provided__["scope"]
+                if inspect.isclass(dependency_type) and is_provided(dependency_type):
+                    provided_scope = dependency_type.__provided__["scope"]
 
                     # Auto-register @provided class
                     dep_provider = self._register_provider(
-                        annotation,
-                        annotation,
+                        dependency_type,
+                        dependency_type,
                         provided_scope,
                         False,
                         False,
@@ -669,9 +669,8 @@ class Container:
                 else:
                     # Required dependency is missing
                     raise LookupError(
-                        f"The provider `{provider.name}` depends on "
-                        f"`{param.name}` of type "
-                        f"`{type_repr(annotation)}`, which has not been "
+                        f"The provider `{provider}` depends on `{param.name}` of type "
+                        f"`{type_repr(dependency_type)}`, which has not been "
                         f"registered or set. To resolve this, ensure that "
                         f"`{param.name}` is registered before resolving, "
                         f"or register it with `from_context=True` if it should be "
@@ -683,7 +682,7 @@ class Container:
                 resolved_params.append(
                     ProviderParameter(
                         name=param.name,
-                        dependency_type=annotation,
+                        dependency_type=dependency_type,
                         default=param.default,
                         has_default=param.has_default,
                         provider=dep_provider,
@@ -703,8 +702,8 @@ class Container:
             )
             if scope_hierarchy and dep_provider.scope not in scope_hierarchy:
                 raise ValueError(
-                    f"The provider `{provider.name}` with a `{provider.scope}` scope "
-                    f"cannot depend on `{dep_provider.name}` with a "
+                    f"The provider `{provider}` with a `{provider.scope}` scope "
+                    f"cannot depend on `{dep_provider}` with a "
                     f"`{dep_provider.scope}` scope. Please ensure all providers are "
                     f"registered with matching scopes."
                 )
@@ -718,7 +717,7 @@ class Container:
             resolved_params.append(
                 ProviderParameter(
                     name=param.name,
-                    dependency_type=annotation,
+                    dependency_type=dependency_type,
                     default=param.default,
                     has_default=param.has_default,
                     provider=dep_provider,
@@ -731,7 +730,6 @@ class Container:
             factory=provider.factory,
             scope=provider.scope,
             dependency_type=provider.dependency_type,
-            name=provider.name,
             parameters=tuple(resolved_params),
             is_class=provider.is_class,
             is_coroutine=provider.is_coroutine,
@@ -939,7 +937,7 @@ class Container:
                     else:
                         # Required dependency is missing
                         raise LookupError(
-                            f"The provider `{provider.name}` depends on "
+                            f"The provider `{provider}` depends on "
                             f"`{param.name}` of type "
                             f"`{type_repr(param_dependency_type)}`, which has not been "
                             f"registered or set. To resolve this, ensure that "
@@ -985,7 +983,6 @@ class Container:
                 factory=provider.factory,
                 scope=provider.scope,
                 dependency_type=provider.dependency_type,
-                name=provider.name,
                 parameters=tuple(resolved_params),
                 is_class=provider.is_class,
                 is_coroutine=provider.is_coroutine,
@@ -1011,9 +1008,9 @@ class Container:
             if dependency_type in in_path:
                 # Found a cycle!
                 cycle_start = next(
-                    i for i, name in enumerate(path) if name == provider.name
+                    i for i, name in enumerate(path) if name == str(provider)
                 )
-                cycle_path = " -> ".join(path[cycle_start:] + [provider.name])
+                cycle_path = " -> ".join(path[cycle_start:] + [str(provider)])
                 raise ValueError(
                     f"Circular dependency detected: {cycle_path}. "
                     f"Please restructure your dependencies to break the cycle."
@@ -1024,7 +1021,7 @@ class Container:
 
             visited.add(dependency_type)
             in_path.add(dependency_type)
-            path.append(provider.name)
+            path.append(str(provider))
 
             # Visit dependencies
             for param in provider.parameters:
@@ -1074,8 +1071,8 @@ class Container:
                 # Validate scope compatibility
                 if scope_hierarchy and dep_scope not in scope_hierarchy:
                     raise ValueError(
-                        f"The provider `{provider.name}` with a `{scope}` scope "
-                        f"cannot depend on `{param.provider.name}` with a "
+                        f"The provider `{provider}` with a `{scope}` scope "
+                        f"cannot depend on `{param.provider}` with a "
                         f"`{dep_scope}` scope. Please ensure all providers are "
                         f"registered with matching scopes."
                     )

@@ -196,7 +196,7 @@ class Resolver:
                 unresolved_messages[idx] = (
                     f"You are attempting to get the parameter `{param.name}` with the "
                     f"annotation `{type_repr(param.dependency_type)}` as a dependency "
-                    f"into `{provider.name}` which is not registered or set in the "
+                    f"into `{provider}` which is not registered or set in the "
                     f"scoped context."
                 )
 
@@ -224,7 +224,7 @@ class Resolver:
                 create_lines.append("    if _is_async:")
                 create_lines.append(
                     "        raise TypeError("
-                    'f"The instance for the provider `{_provider_name}` '
+                    'f"The instance for the provider `{_dependency_repr}` '
                     'cannot be created in synchronous mode."'
                     ")"
                 )
@@ -235,7 +235,7 @@ class Resolver:
                 create_lines.append("    if _is_async:")
                 create_lines.append(
                     "        raise TypeError("
-                    'f"The instance for the provider `{_provider_name}` '
+                    'f"The instance for the provider `{_dependency_repr}` '
                     'cannot be created in synchronous mode."'
                     ")"
                 )
@@ -588,8 +588,8 @@ class Resolver:
 
         ns: dict[str, Any] = {
             "_dependency_type": provider.dependency_type,
+            "_dependency_repr": type_repr(provider.dependency_type),
             "_provider_factory": provider.factory,
-            "_provider_name": provider.name,
             "_is_class": provider.is_class,
             "_param_types": param_types,
             "_param_defaults": param_defaults,
@@ -638,7 +638,7 @@ class Resolver:
         via context.set(), not from a factory call.
         """
         scope = provider.scope
-        dependency_repr = provider.name
+        dependency_repr = type_repr(provider.dependency_type)
 
         # Build resolver function
         resolver_lines: list[str] = []

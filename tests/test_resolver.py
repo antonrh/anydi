@@ -222,7 +222,6 @@ class TestResolver:
             factory=my_func,
             scope="transient",
             from_context=False,
-            name="my_func",
             parameters=(
                 ProviderParameter(
                     dependency_type=int,
@@ -252,12 +251,14 @@ class TestResolver:
         container = Container()
         resolver = container._resolver
 
+        def my_main_func(i: int) -> str:
+            return str(i)
+
         sub_provider = Provider(
             dependency_type=int,
             factory=lambda: 42,
             scope="singleton",
             from_context=False,
-            name="int_provider",
             parameters=(),
             is_class=False,
             is_coroutine=False,
@@ -269,10 +270,9 @@ class TestResolver:
 
         main_provider = Provider(
             dependency_type=str,
-            factory=lambda i: str(i),
+            factory=my_main_func,
             scope="singleton",
             from_context=False,
-            name="str_provider",
             parameters=(
                 ProviderParameter(
                     dependency_type=int,
@@ -325,11 +325,10 @@ class TestResolver:
             yield 42
 
         provider = Provider(
-            dependency_type=int,
+            dependency_type=str,
             factory=my_agen,
             scope="transient",
             from_context=False,
-            name="my_agen",
             parameters=(),
             is_class=False,
             is_coroutine=False,
@@ -356,7 +355,6 @@ class TestResolver:
             factory=my_gen,
             scope="transient",
             from_context=False,
-            name="my_gen",
             parameters=(),
             is_class=False,
             is_coroutine=False,
