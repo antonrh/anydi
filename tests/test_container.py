@@ -2,7 +2,6 @@ import asyncio
 import logging
 import threading
 import uuid
-from abc import ABC, abstractmethod
 from collections.abc import AsyncIterator, Iterator
 from dataclasses import dataclass
 from typing import Annotated, Any
@@ -1159,33 +1158,6 @@ class TestContainer:
         assert provider.factory == Service
         assert provider.scope == "singleton"
         assert provider.dependency_type == Service
-
-    def test_resolve_provided_by_dependency_type(self, container: Container) -> None:
-        class IService(ABC):
-            @abstractmethod
-            def do_something(self) -> str:
-                pass
-
-        @provided(IService, scope="singleton")
-        class ServiceImpl(IService):
-            def do_something(self) -> str:
-                return "done"
-
-        # Resolving ServiceImpl registers it under IService dependency_type
-        instance1 = container.resolve(ServiceImpl)
-
-        assert isinstance(instance1, ServiceImpl)
-        assert instance1.do_something() == "done"
-
-        # Now IService can be resolved and returns the same singleton instance
-        instance2 = container.resolve(IService)
-
-        assert instance1 is instance2
-
-        provider = container.providers[IService]
-        assert provider.factory == ServiceImpl
-        assert provider.scope == "singleton"
-        assert provider.dependency_type == IService
 
     def test_resolve_provider_scope_from_sub_provider_request(
         self,

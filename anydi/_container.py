@@ -592,12 +592,10 @@ class Container:
         except LookupError:
             if inspect.isclass(dependency_type) and is_provided(dependency_type):
                 return self._register_provider(
-                    dependency_type.__provided__.get(
-                        "dependency_type", dependency_type
-                    ),
                     dependency_type,
-                    dependency_type.__provided__["scope"],
-                    dependency_type.__provided__["from_context"],
+                    dependency_type,
+                    dependency_type.__provided__.get("scope", "singleton"),
+                    dependency_type.__provided__.get("from_context", False),
                     False,
                     defaults,
                 )

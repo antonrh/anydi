@@ -23,7 +23,6 @@ def test_provided_decorator() -> None:
     assert is_provided(Service)
     assert Service.__provided__ == {
         "scope": "singleton",
-        "from_context": False,
     }
 
 
@@ -37,7 +36,6 @@ def test_provided_decorator_with_dependency_type() -> None:
     assert ServiceImpl.__provided__ == {
         "dependency_type": IService,
         "scope": "singleton",
-        "from_context": False,
     }
 
 
@@ -52,7 +50,6 @@ def test_singleton_decorator() -> None:
     assert is_provided(Service)
     assert Service.__provided__ == {
         "scope": "singleton",
-        "from_context": False,
     }
 
 
@@ -64,7 +61,6 @@ def test_singleton_decorator_call() -> None:
     assert is_provided(Service)
     assert Service.__provided__ == {
         "scope": "singleton",
-        "from_context": False,
     }
 
 
@@ -78,7 +74,6 @@ def test_singleton_decorator_with_dependency_type() -> None:
     assert ServiceImpl.__provided__ == {
         "dependency_type": IService,
         "scope": "singleton",
-        "from_context": False,
     }
 
 
@@ -93,7 +88,6 @@ def test_transient_decorator() -> None:
     assert is_provided(Service)
     assert Service.__provided__ == {
         "scope": "transient",
-        "from_context": False,
     }
 
 
@@ -105,7 +99,6 @@ def test_transient_decorator_call() -> None:
     assert is_provided(Service)
     assert Service.__provided__ == {
         "scope": "transient",
-        "from_context": False,
     }
 
 
@@ -119,7 +112,6 @@ def test_transient_decorator_with_dependency_type() -> None:
     assert ServiceImpl.__provided__ == {
         "dependency_type": IService,
         "scope": "transient",
-        "from_context": False,
     }
 
 
@@ -139,7 +131,6 @@ def test_request_decorator() -> None:
     assert is_provided(Service)
     assert Service.__provided__ == {
         "scope": "request",
-        "from_context": False,
     }
 
 
@@ -151,7 +142,6 @@ def test_request_decorator_call() -> None:
     assert is_provided(Service)
     assert Service.__provided__ == {
         "scope": "request",
-        "from_context": False,
     }
 
 
@@ -177,7 +167,6 @@ def test_request_decorator_with_dependency_type() -> None:
     assert ServiceImpl.__provided__ == {
         "dependency_type": IService,
         "scope": "request",
-        "from_context": False,
     }
 
 

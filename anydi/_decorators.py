@@ -31,7 +31,7 @@ class ProvidedMetadata(TypedDict):
 
     dependency_type: NotRequired[Any]
     scope: Scope
-    from_context: bool
+    from_context: NotRequired[bool]
 
 
 @overload
@@ -52,9 +52,11 @@ def provided(
     """Decorator for marking a class as provided by AnyDI with a specific scope."""
 
     def decorator(cls: ClassT) -> ClassT:
-        metadata: ProvidedMetadata = {"scope": scope, "from_context": from_context}
+        metadata: ProvidedMetadata = {"scope": scope}
         if dependency_type is not NOT_SET:
             metadata["dependency_type"] = dependency_type
+        if from_context:
+            metadata["from_context"] = from_context
         cls.__provided__ = metadata  # type: ignore[attr-defined]
         return cls
 
@@ -77,7 +79,7 @@ def singleton(
     """Decorator for marking a class as a singleton dependency."""
 
     def decorator(c: ClassT) -> ClassT:
-        metadata: ProvidedMetadata = {"scope": "singleton", "from_context": False}
+        metadata: ProvidedMetadata = {"scope": "singleton"}
         if dependency_type is not NOT_SET:
             metadata["dependency_type"] = dependency_type
         c.__provided__ = metadata  # type: ignore[attr-defined]
@@ -105,7 +107,7 @@ def transient(
     """Decorator for marking a class as a transient dependency."""
 
     def decorator(c: ClassT) -> ClassT:
-        metadata: ProvidedMetadata = {"scope": "transient", "from_context": False}
+        metadata: ProvidedMetadata = {"scope": "transient"}
         if dependency_type is not NOT_SET:
             metadata["dependency_type"] = dependency_type
         c.__provided__ = metadata  # type: ignore[attr-defined]
@@ -137,9 +139,11 @@ def request(
     """Decorator for marking a class as a request-scoped dependency."""
 
     def decorator(c: ClassT) -> ClassT:
-        metadata: ProvidedMetadata = {"scope": "request", "from_context": from_context}
+        metadata: ProvidedMetadata = {"scope": "request"}
         if dependency_type is not NOT_SET:
             metadata["dependency_type"] = dependency_type
+        if from_context:
+            metadata["from_context"] = from_context
         c.__provided__ = metadata  # type: ignore[attr-defined]
         return c
 

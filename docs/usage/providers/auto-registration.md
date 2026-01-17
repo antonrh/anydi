@@ -68,39 +68,109 @@ assert container.is_resolved(Database)
 
 ## Scope decorators
 
-The `@singleton`, `@transient`, and `@request` decorators mark classes for auto-registration with their scope:
+### `@provided` decorator
+
+The main decorator for auto-registration. Requires `scope`:
 
 ```python
-from anydi import Container, singleton, transient
+from anydi import Container, provided
 
 
-@singleton
-class ConfigService:
-    def __init__(self) -> None:
-        self.config = {"env": "production"}
+@provided(scope="singleton")
+class UserRepository:
+    def find(self, id: int) -> dict:
+        return {"id": id, "name": "Alice"}
 
 
-@transient
-class RequestHandler:
-    def __init__(self, config: ConfigService) -> None:
-        self.config = config
+container = Container()
+repo = container.resolve(UserRepository)
+```
 
-    def handle(self) -> str:
-        return f"Handling request in {self.config.config['env']}"
+### Shortcut decorators
+
+`@singleton`, `@transient`, and `@request` are shortcuts for `@provided`:
+
+| Shortcut | Equivalent |
+|----------|------------|
+| `@singleton` | `@provided(scope="singleton")` |
+| `@transient` | `@provided(scope="transient")` |
+| `@request` | `@provided(scope="request")` |
+
+### Register by interface with `dependency_type`
+
+Use `dependency_type` to register a class under its interface. This works with `container.scan()`:
+
+```python
+from abc import ABC, abstractmethod
+from anydi import Container, provided
+
+
+class IRepository(ABC):
+    @abstractmethod
+    def find(self, id: int) -> dict:
+        pass
+
+
+@provided(IRepository, scope="singleton")
+class UserRepository(IRepository):
+    def find(self, id: int) -> dict:
+        return {"id": id, "name": "Alice"}
+
+
+container = Container()
+container.scan(["myapp.repositories"])
+
+# Resolve by interface
+repo = container.resolve(IRepository)
+```
+
+All decorators support `dependency_type` as keyword argument:
+
+```python
+@singleton(dependency_type=IRepository)
+class UserRepository(IRepository):
+    pass
+```
+
+### `@request` with `from_context`
+
+Use `from_context=True` when instance is set via `context.set()`:
+
+```python
+from anydi import Container, request
+
+
+@request(from_context=True)
+class Request:
+    def __init__(self, path: str) -> None:
+        self.path = path
 
 
 container = Container()
 
-# Auto-registration happens on first resolve
-handler1 = container.resolve(RequestHandler)
-handler2 = container.resolve(RequestHandler)
-
-# ConfigService is singleton - same instance
-assert handler1.config is handler2.config
-
-# RequestHandler is transient - different instances
-assert handler1 is not handler2
+with container.request_context() as ctx:
+    ctx.set(Request, Request(path="/users"))
+    req = container.resolve(Request)
+    assert req.path == "/users"
 ```
+
+## Decoupled registration with `__provided__`
+
+If you want to avoid importing `anydi` decorators in your classes, use the `__provided__` class variable directly:
+
+```python
+class UserRepository:
+    __provided__ = {"scope": "singleton"}
+
+    def find(self, id: int) -> dict:
+        return {"id": id, "name": "Alice"}
+```
+
+This keeps your classes free from framework imports. The `__provided__` dict supports:
+
+- `scope` (required) - `"singleton"`, `"transient"`, or `"request"`
+- `dependency_type` (optional) - interface to register under (works with `scan()`)
+- `from_context` (optional) - `True` if set via `context.set()`, only for `"request"` scope
 
 ## Mixing explicit and auto-registration
 
