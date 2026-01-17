@@ -54,11 +54,16 @@ def main() -> None:
             print(f"Error scanning packages: {exc}", file=sys.stderr)  # noqa: T201
             sys.exit(1)
 
-    graph_out = container.graph(
-        output_format=args.output_format,
-        full_path=args.full_path,
-        ident=args.indent,
-    )
+    try:
+        graph_out = container.graph(
+            output_format=args.output_format,
+            full_path=args.full_path,
+            ident=args.indent,
+        )
+    except (LookupError, ValueError, TypeError) as exc:
+        print(f"Error: {exc}", file=sys.stderr)  # noqa: T201
+        sys.exit(1)
+
     print(graph_out)  # noqa: T201
 
 
