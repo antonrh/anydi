@@ -174,9 +174,11 @@ class TestContainerGraph:
         container = Container()
         container.register(GraphDatabase, scope="singleton")
 
-        assert container._built is False
+        assert container.ready is False
+
         container.graph()
-        assert container._built is True
+
+        assert container.ready is True
 
     def test_graph_empty_container(self) -> None:
         """Test graph with no dependencies."""

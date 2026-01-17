@@ -60,7 +60,7 @@ class Container:
         self._graph = Graph(self)
 
         # Build state
-        self._built = False
+        self._ready = False
 
         # Register default scopes
         self.register_scope("request")
@@ -91,6 +91,11 @@ class Container:
     def providers(self) -> dict[type[Any], Provider]:
         """Get the registered providers."""
         return self._providers
+
+    @property
+    def ready(self) -> bool:
+        """Check if the container is ready."""
+        return self._ready
 
     @property
     def logger(self) -> logging.Logger:
@@ -335,7 +340,7 @@ class Container:
         call: Callable[..., Any] = NOT_SET,
     ) -> Provider:
         """Register a provider for the specified dependency type."""
-        if self._built and not override:
+        if self.ready and not override:
             raise RuntimeError(
                 "Cannot register providers after build() has been called. "
                 "All providers must be registered before building the container."
@@ -593,7 +598,7 @@ class Container:
                 ) from None
 
         # Ensure provider dependencies are resolved if not built yet
-        if not self._built:
+        if not self.ready:
             provider = self._ensure_provider_resolved(provider, set())
 
         return provider
@@ -893,14 +898,14 @@ class Container:
 
     def build(self) -> None:
         """Build the container by validating the complete dependency graph."""
-        if self._built:
+        if self.ready:
             raise RuntimeError("Container has already been built")
 
         self._resolve_provider_dependencies()
         self._detect_circular_dependencies()
         self._validate_scope_compatibility()
 
-        self._built = True
+        self._ready = True
 
     def graph(
         self,
@@ -909,7 +914,7 @@ class Container:
         full_path: bool = False,
     ) -> str:
         """Draw the dependency graph."""
-        if not self._built:
+        if not self.ready:
             self.build()
         return self._graph.draw(output_format=output_format, full_path=full_path)
 
