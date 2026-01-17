@@ -199,13 +199,7 @@ myapp.services.UserService (singleton)
 Scan packages for providers before generating graph:
 
 ```shell
-anydi myapp:container --scan myapp.services myapp.repositories
-```
-
-Or use short form:
-
-```shell
-anydi myapp:container -s myapp.services -s myapp.repositories
+anydi myapp:container -s myapp
 ```
 
 ## All Options
