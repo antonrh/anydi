@@ -999,14 +999,14 @@ class Container:
         """Detect circular dependencies in the provider graph."""
 
         def visit(
-            interface: Any,
+            dependency_type: Any,
             provider: Provider,
             path: list[str],
             visited: set[Any],
             in_path: set[Any],
         ) -> None:
             """DFS traversal to detect cycles."""
-            if interface in in_path:
+            if dependency_type in in_path:
                 # Found a cycle!
                 cycle_start = next(
                     i for i, name in enumerate(path) if name == provider.name
@@ -1017,11 +1017,11 @@ class Container:
                     f"Please restructure your dependencies to break the cycle."
                 )
 
-            if interface in visited:
+            if dependency_type in visited:
                 return
 
-            visited.add(interface)
-            in_path.add(interface)
+            visited.add(dependency_type)
+            in_path.add(dependency_type)
             path.append(provider.name)
 
             # Visit dependencies
@@ -1039,7 +1039,7 @@ class Container:
                     )
 
             path.pop()
-            in_path.remove(interface)
+            in_path.remove(dependency_type)
 
         visited: set[Any] = set()
 
