@@ -1,6 +1,8 @@
 """Test module with @provided classes."""
 
-from anydi import singleton, transient
+from abc import ABC, abstractmethod
+
+from anydi import provided, singleton, transient
 
 
 @singleton
@@ -18,3 +20,19 @@ class TransientService:
     def __init__(self, singleton_service: SingletonService) -> None:
         self.singleton_service = singleton_service
         self.name = "transient_service"
+
+
+class IRepository(ABC):
+    """Repository interface."""
+
+    @abstractmethod
+    def get(self, user_id: int) -> dict:
+        pass
+
+
+@provided(IRepository, scope="singleton")
+class UserRepository(IRepository):
+    """User repository implementation."""
+
+    def get(self, user_id: int) -> dict:
+        return {"id": user_id, "name": "Alice"}

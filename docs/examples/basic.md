@@ -34,7 +34,7 @@ class User:
 
 `repositories.py`
 
-Defines the repository interface for User data access and manipulation. Includes an in-memory implementation of this interface.
+Defines the repository abstract class for User data access and manipulation. Includes an in-memory implementation of this class.
 
 ```python
 import abc

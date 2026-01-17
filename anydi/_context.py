@@ -15,22 +15,22 @@ from ._types import NOT_SET
 class InstanceContext:
     """A context to store instances."""
 
-    __slots__ = ("_instances", "_stack", "_async_stack", "_lock", "_async_lock")
+    __slots__ = ("_items", "_stack", "_async_stack", "_lock", "_async_lock")
 
     def __init__(self) -> None:
-        self._instances: dict[Any, Any] = {}
+        self._items: dict[Any, Any] = {}
         self._stack: contextlib.ExitStack | None = None
         self._async_stack: contextlib.AsyncExitStack | None = None
         self._lock: threading.RLock | None = None
         self._async_lock: AsyncRLock | None = None
 
-    def get(self, interface: Any, default: Any = NOT_SET) -> Any:
+    def get(self, key: Any, default: Any = NOT_SET) -> Any:
         """Get an instance from the context."""
-        return self._instances.get(interface, default)
+        return self._items.get(key, default)
 
-    def set(self, interface: Any, value: Any) -> None:
+    def set(self, key: Any, value: Any) -> None:
         """Set an instance in the context."""
-        self._instances[interface] = value
+        self._items[key] = value
 
     def enter(self, cm: contextlib.AbstractContextManager[Any]) -> Any:
         """Enter the context."""
@@ -44,17 +44,17 @@ class InstanceContext:
             self._async_stack = contextlib.AsyncExitStack()
         return await self._async_stack.enter_async_context(cm)
 
-    def __setitem__(self, interface: Any, value: Any) -> None:
-        self._instances[interface] = value
+    def __setitem__(self, key: Any, value: Any) -> None:
+        self._items[key] = value
 
-    def __getitem__(self, interface: Any) -> Any:
-        return self._instances[interface]
+    def __getitem__(self, key: Any) -> Any:
+        return self._items[key]
 
-    def __contains__(self, interface: Any) -> bool:
-        return interface in self._instances
+    def __contains__(self, key: Any) -> bool:
+        return key in self._items
 
-    def __delitem__(self, interface: Any) -> None:
-        self._instances.pop(interface, None)
+    def __delitem__(self, key: Any) -> None:
+        self._items.pop(key, None)
 
     def __enter__(self) -> Self:
         """Enter the context."""

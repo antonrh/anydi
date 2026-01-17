@@ -1,6 +1,6 @@
 # Testing
 
-To test with `AnyDI`, use the `.override(interface=..., instance=...)` context manager. This replaces a dependency temporarily during testing. It helps you isolate code from its dependencies.
+To test with `AnyDI`, use the `.override(dependency_type, instance)` context manager. This replaces a dependency temporarily during testing. It helps you isolate code from its dependencies.
 The `container.override()` works only inside the `with` block. When the block ends, the original dependency comes back.
 
 ```python

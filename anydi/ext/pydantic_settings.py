@@ -26,14 +26,14 @@ def install(
         all_fields = {**settings_cls.model_fields, **settings_cls.model_computed_fields}
         for setting_name, field_info in all_fields.items():
             if isinstance(field_info, ComputedFieldInfo):
-                interface = field_info.return_type
+                origin = field_info.return_type
             elif isinstance(field_info, FieldInfo):
-                interface = field_info.annotation
+                origin = field_info.annotation
             else:
                 continue
 
             container.register(
-                Annotated[interface, f"{prefix}{setting_name}"],
+                Annotated[origin, f"{prefix}{setting_name}"],
                 _get_setting_value(getattr(_settings, setting_name)),
                 scope="singleton",
             )

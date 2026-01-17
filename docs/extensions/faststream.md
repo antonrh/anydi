@@ -45,7 +45,7 @@ anydi.ext.faststream.install(broker, container)
 
 !!! note
 
-    To detect a dependency interface, provide a valid type annotation.
+    To detect a dependency type, provide a valid type annotation.
 
     `Provide[Service]` is equivalent to `Annotated[Service, Inject()]`.
 

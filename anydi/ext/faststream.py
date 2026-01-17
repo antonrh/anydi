@@ -62,7 +62,7 @@ class FastStreamMarker(Dependant, Marker):
 
     async def _faststream_dependency(self, context: ContextRepo) -> Any:
         container = get_container_from_context(context)
-        return await container.aresolve(self.interface)
+        return await container.aresolve(self.dependency_type)
 
 
 # Configure Inject() and Provide[T] to use FastStream-specific marker

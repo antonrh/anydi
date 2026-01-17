@@ -69,9 +69,11 @@ class Injector:
         """Get the injected parameters of a callable object."""
         injected_params: dict[str, Any] = {}
         for parameter in inspect.signature(call, eval_str=True).parameters.values():
-            interface, should_inject, _ = self.validate_parameter(parameter, call=call)
+            dependency_type, should_inject, _ = self.validate_parameter(
+                parameter, call=call
+            )
             if should_inject:
-                injected_params[parameter.name] = interface
+                injected_params[parameter.name] = dependency_type
         return injected_params
 
     def validate_parameter(
@@ -79,28 +81,28 @@ class Injector:
     ) -> tuple[Any, bool, Marker | None]:
         """Validate an injected parameter."""
         parameter = self.unwrap_parameter(parameter)
-        interface = parameter.annotation
+        dependency_type = parameter.annotation
 
         marker = parameter.default
         if not is_marker(marker):
-            return interface, False, None
+            return dependency_type, False, None
 
-        if interface is inspect.Parameter.empty:
+        if dependency_type is inspect.Parameter.empty:
             raise TypeError(
                 f"Missing `{type_repr(call)}` parameter `{parameter.name}` annotation."
             )
 
-        # Set inject marker interface
-        parameter.default.interface = interface
+        # Set inject marker dependency type
+        parameter.default.dependency_type = dependency_type
 
-        if not self.container.has_provider_for(interface):
+        if not self.container.has_provider_for(dependency_type):
             raise LookupError(
                 f"`{type_repr(call)}` has an unknown dependency parameter "
                 f"`{parameter.name}` with an annotation of "
-                f"`{type_repr(interface)}`."
+                f"`{type_repr(dependency_type)}`."
             )
 
-        return interface, True, marker
+        return dependency_type, True, marker
 
     @staticmethod
     def unwrap_parameter(parameter: inspect.Parameter) -> inspect.Parameter:

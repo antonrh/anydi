@@ -11,11 +11,13 @@ from typing import (
     overload,
 )
 
+from typing_extensions import NotRequired
+
 if TYPE_CHECKING:
     from ._module import Module
 
 
-from ._types import Scope
+from ._types import NOT_SET, Scope
 
 T = TypeVar("T")
 P = ParamSpec("P")
@@ -27,23 +29,128 @@ ModuleT = TypeVar("ModuleT", bound="Module")
 class ProvidedMetadata(TypedDict):
     """Metadata for classes marked as provided by AnyDI."""
 
+    dependency_type: NotRequired[Any]
     scope: Scope
+    from_context: NotRequired[bool]
 
 
-def provided(*, scope: Scope) -> Callable[[ClassT], ClassT]:
+@overload
+def provided(
+    dependency_type: Any, /, *, scope: Scope, from_context: bool = False
+) -> Callable[[ClassT], ClassT]: ...
+
+
+@overload
+def provided(
+    *, scope: Scope, from_context: bool = False
+) -> Callable[[ClassT], ClassT]: ...
+
+
+def provided(
+    dependency_type: Any = NOT_SET, /, *, scope: Scope, from_context: bool = False
+) -> Callable[[ClassT], ClassT]:
     """Decorator for marking a class as provided by AnyDI with a specific scope."""
 
     def decorator(cls: ClassT) -> ClassT:
-        cls.__provided__ = ProvidedMetadata(scope=scope)
+        metadata: ProvidedMetadata = {"scope": scope}
+        if dependency_type is not NOT_SET:
+            metadata["dependency_type"] = dependency_type
+        if from_context:
+            metadata["from_context"] = from_context
+        cls.__provided__ = metadata  # type: ignore[attr-defined]
         return cls
 
     return decorator
 
 
-# Scoped decorators for class-level providers
-transient = provided(scope="transient")
-request = provided(scope="request")
-singleton = provided(scope="singleton")
+@overload
+def singleton(cls: ClassT, /) -> ClassT: ...
+
+
+@overload
+def singleton(
+    cls: None = None, /, *, dependency_type: Any = NOT_SET
+) -> Callable[[ClassT], ClassT]: ...
+
+
+def singleton(
+    cls: ClassT | None = None, /, *, dependency_type: Any = NOT_SET
+) -> Callable[[ClassT], ClassT] | ClassT:
+    """Decorator for marking a class as a singleton dependency."""
+
+    def decorator(c: ClassT) -> ClassT:
+        metadata: ProvidedMetadata = {"scope": "singleton"}
+        if dependency_type is not NOT_SET:
+            metadata["dependency_type"] = dependency_type
+        c.__provided__ = metadata  # type: ignore[attr-defined]
+        return c
+
+    if cls is None:
+        return decorator
+
+    return decorator(cls)
+
+
+@overload
+def transient(cls: ClassT, /) -> ClassT: ...
+
+
+@overload
+def transient(
+    cls: None = None, /, *, dependency_type: Any = NOT_SET
+) -> Callable[[ClassT], ClassT]: ...
+
+
+def transient(
+    cls: ClassT | None = None, /, *, dependency_type: Any = NOT_SET
+) -> Callable[[ClassT], ClassT] | ClassT:
+    """Decorator for marking a class as a transient dependency."""
+
+    def decorator(c: ClassT) -> ClassT:
+        metadata: ProvidedMetadata = {"scope": "transient"}
+        if dependency_type is not NOT_SET:
+            metadata["dependency_type"] = dependency_type
+        c.__provided__ = metadata  # type: ignore[attr-defined]
+        return c
+
+    if cls is None:
+        return decorator
+
+    return decorator(cls)
+
+
+@overload
+def request(cls: ClassT, /, *, from_context: bool = False) -> ClassT: ...
+
+
+@overload
+def request(
+    cls: None = None, /, *, dependency_type: Any = NOT_SET, from_context: bool = False
+) -> Callable[[ClassT], ClassT]: ...
+
+
+def request(
+    cls: ClassT | None = None,
+    /,
+    *,
+    dependency_type: Any = NOT_SET,
+    from_context: bool = False,
+) -> Callable[[ClassT], ClassT] | ClassT:
+    """Decorator for marking a class as a request-scoped dependency."""
+
+    def decorator(c: ClassT) -> ClassT:
+        metadata: ProvidedMetadata = {"scope": "request"}
+        if dependency_type is not NOT_SET:
+            metadata["dependency_type"] = dependency_type
+        if from_context:
+            metadata["from_context"] = from_context
+        c.__provided__ = metadata  # type: ignore[attr-defined]
+        return c
+
+    if cls is None:
+        return decorator
+
+    return decorator(cls)
 
 
 class Provided(Protocol):
