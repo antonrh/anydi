@@ -45,6 +45,9 @@ dependencies = [
 [project.urls]
 Repository = "https://github.com/antonrh/anydi"
 
+[project.scripts]
+anydi = "anydi._cli:main"
+
 [project.entry-points.pytest11]
 anydi = "anydi.ext.pytest_plugin"
 

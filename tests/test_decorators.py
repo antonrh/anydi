@@ -12,6 +12,27 @@ class IService(ABC):
         pass
 
 
+def test_is_not_provided() -> None:
+    class Service:
+        pass
+
+    assert not is_provided(Service)
+
+
+def test_is_not_provided_no_scope() -> None:
+    class Service:
+        __provided__ = {}
+
+    assert not is_provided(Service)
+
+
+def test_is_provided_has_scope() -> None:
+    class Service:
+        __provided__ = {"scope": "singleton"}
+
+    assert is_provided(Service)
+
+
 # provided decorator tests
 
 

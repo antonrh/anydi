@@ -12,12 +12,13 @@ import warnings
 from collections import defaultdict
 from collections.abc import AsyncIterator, Callable, Iterable, Iterator, Sequence
 from contextvars import ContextVar
-from typing import Any, TypeVar, get_args, get_origin, overload
+from typing import Any, Literal, TypeVar, get_args, get_origin, overload
 
 from typing_extensions import ParamSpec, Self, type_repr
 
 from ._context import InstanceContext
 from ._decorators import is_provided
+from ._graph import Graph
 from ._injector import Injector
 from ._marker import Marker
 from ._module import ModuleDef, ModuleRegistrar
@@ -56,9 +57,10 @@ class Container:
         self._injector = Injector(self)
         self._modules = ModuleRegistrar(self)
         self._scanner = Scanner(self)
+        self._graph = Graph(self)
 
         # Build state
-        self._built = False
+        self._ready = False
 
         # Register default scopes
         self.register_scope("request")
@@ -89,6 +91,11 @@ class Container:
     def providers(self) -> dict[type[Any], Provider]:
         """Get the registered providers."""
         return self._providers
+
+    @property
+    def ready(self) -> bool:
+        """Check if the container is ready."""
+        return self._ready
 
     @property
     def logger(self) -> logging.Logger:
@@ -333,7 +340,7 @@ class Container:
         call: Callable[..., Any] = NOT_SET,
     ) -> Provider:
         """Register a provider for the specified dependency type."""
-        if self._built and not override:
+        if self.ready and not override:
             raise RuntimeError(
                 "Cannot register providers after build() has been called. "
                 "All providers must be registered before building the container."
@@ -591,7 +598,7 @@ class Container:
                 ) from None
 
         # Ensure provider dependencies are resolved if not built yet
-        if not self._built:
+        if not self.ready:
             provider = self._ensure_provider_resolved(provider, set())
 
         return provider
@@ -889,14 +896,37 @@ class Container:
 
     def build(self) -> None:
         """Build the container by validating the complete dependency graph."""
-        if self._built:
+        if self.ready:
             raise RuntimeError("Container has already been built")
 
         self._resolve_provider_dependencies()
         self._detect_circular_dependencies()
         self._validate_scope_compatibility()
 
-        self._built = True
+        self._ready = True
+
+    def rebuild(self) -> None:
+        """Rebuild the container by re-validating the complete dependency graph."""
+        if self._ready:
+            self._ready = False
+            self._resolver.clear_caches()
+        self.build()
+
+    def graph(
+        self,
+        output_format: Literal["tree", "mermaid", "dot", "json"] = "tree",
+        *,
+        full_path: bool = False,
+        **kwargs: Any,
+    ) -> str:
+        """Draw the dependency graph."""
+        if not self.ready:
+            self.build()
+        return self._graph.draw(
+            output_format=output_format,
+            full_path=full_path,
+            **kwargs,
+        )
 
     def _resolve_provider_dependencies(self) -> None:
         """Resolve all provider dependencies by filling in provider references."""

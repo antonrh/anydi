@@ -158,7 +158,7 @@ class Provided(Protocol):
 
 
 def is_provided(cls: Any) -> TypeGuard[type[Provided]]:
-    return hasattr(cls, "__provided__")
+    return hasattr(cls, "__provided__") and "scope" in cls.__provided__
 
 
 class ProviderMetadata(TypedDict):
