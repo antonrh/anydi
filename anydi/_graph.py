@@ -5,6 +5,8 @@ from __future__ import annotations
 import json
 from typing import TYPE_CHECKING, Any, Literal
 
+from typing_extensions import type_repr
+
 from ._provider import Provider
 
 if TYPE_CHECKING:
@@ -39,9 +41,9 @@ class Graph:
         seen_nodes: set[str] = set()
 
         for provider in self._container.providers.values():
-            provider_name = self._get_name(provider.name, full_path)
+            dependency_repr = self._get_name(provider, full_path)
             scope_label = self._get_scope_label(provider.scope, provider.from_context)
-            node_id = provider_name.replace(".", "_")
+            node_id = dependency_repr.replace(".", "_")
 
             if node_id not in seen_nodes:
                 seen_nodes.add(node_id)
@@ -50,7 +52,7 @@ class Graph:
                 if param.provider is None:
                     continue
 
-                dep_name = self._get_name(param.provider.name, full_path)
+                dep_name = self._get_name(param.provider, full_path)
                 dep_scope = self._get_scope_label(
                     param.provider.scope, param.provider.from_context
                 )
@@ -66,7 +68,7 @@ class Graph:
                     arrow = "-->"
 
                 lines.append(
-                    f'    {node_id}["{provider_name} ({scope_label})"] '
+                    f'    {node_id}["{dependency_repr} ({scope_label})"] '
                     f"{arrow}|{param.name}| "
                     f'{dep_node_id}["{dep_name} ({dep_scope})"]'
                 )
@@ -80,7 +82,7 @@ class Graph:
         seen_edges: set[tuple[str, str]] = set()
 
         for provider in self._container.providers.values():
-            provider_name = self._get_name(provider.name, full_path)
+            provider_name = self._get_name(provider, full_path)
             scope_label = self._get_scope_label(provider.scope, provider.from_context)
             node_id = f'"{provider_name} ({scope_label})"'
 
@@ -88,7 +90,7 @@ class Graph:
                 if param.provider is None:
                     continue
 
-                dep_name = self._get_name(param.provider.name, full_path)
+                dep_name = self._get_name(param.provider, full_path)
                 dep_scope = self._get_scope_label(
                     param.provider.scope, param.provider.from_context
                 )
@@ -108,41 +110,39 @@ class Graph:
         """Generate JSON format dependency graph."""
         nodes: list[dict[str, Any]] = []
         links: list[dict[str, Any]] = []
-        seen_nodes: set[str] = set()
+        seen_nodes: set[Any] = set()
 
         for provider in self._container.providers.values():
-            provider_id = provider.name
-            if provider_id not in seen_nodes:
+            if provider.dependency_type not in seen_nodes:
                 nodes.append(
                     {
-                        "id": provider_id,
-                        "name": self._get_name(provider.name, full_path),
+                        "dependency_type": type_repr(provider.dependency_type),
                         "scope": provider.scope,
                         "from_context": provider.from_context,
                     }
                 )
-                seen_nodes.add(provider_id)
+                seen_nodes.add(provider.dependency_type)
 
             for param in provider.parameters:
                 if param.provider is None:
                     continue
 
-                dep_id = param.provider.name
-                if dep_id not in seen_nodes:
+                if param.provider.dependency_type not in seen_nodes:
                     nodes.append(
                         {
-                            "id": dep_id,
-                            "name": self._get_name(param.provider.name, full_path),
+                            "dependency_type": type_repr(
+                                param.provider.dependency_type
+                            ),
                             "scope": param.provider.scope,
                             "from_context": param.provider.from_context,
                         }
                     )
-                    seen_nodes.add(dep_id)
+                    seen_nodes.add(param.provider.dependency_type)
 
                 links.append(
                     {
-                        "source": provider_id,
-                        "target": dep_id,
+                        "source": type_repr(provider.dependency_type),
+                        "target": type_repr(param.provider.dependency_type),
                         "label": param.name,
                     }
                 )
@@ -153,17 +153,21 @@ class Graph:
         """Generate tree format dependency graph."""
         lines: list[str] = []
 
-        # Find root providers (providers that are not dependencies of others)
+        # Find all dependency types (providers that are dependencies of others)
         all_deps: set[Any] = set()
         for provider in self._container.providers.values():
             for param in provider.parameters:
                 if param.provider is not None:
                     all_deps.add(param.provider.dependency_type)
 
+        # Root providers: not a dependency of any other provider
+        # Exclude Container itself (internal implementation detail)
+        container_type = type(self._container)
         root_providers = [
             p
             for p in self._container.providers.values()
-            if p.dependency_type not in all_deps and p.parameters
+            if p.dependency_type not in all_deps
+            and p.dependency_type is not container_type
         ]
 
         for i, provider in enumerate(root_providers):
@@ -174,11 +178,11 @@ class Graph:
 
         return "\n".join(lines)
 
-    @staticmethod
+    @classmethod
     def _format_tree_node(
-        provider: Provider, full_path: bool, param_name: str | None = None
+        cls, provider: Provider, full_path: bool, param_name: str | None = None
     ) -> str:
-        name = Graph._get_name(provider.name, full_path)
+        name = cls._get_name(provider, full_path)
         scope_label = Graph._get_scope_label(provider.scope, provider.from_context)
         context_marker = " [context]" if provider.from_context else ""
         if param_name:
@@ -212,10 +216,10 @@ class Graph:
             )
 
     @staticmethod
-    def _get_name(name: str, full_path: bool) -> str:
+    def _get_name(provider: Provider, full_path: bool) -> str:
         if full_path:
-            return name
-        return name.rsplit(".", 1)[-1]
+            return type_repr(provider.dependency_type)
+        return type_repr(provider.dependency_type).rsplit(".", 1)[-1]
 
     @staticmethod
     def _get_scope_label(scope: str, from_context: bool) -> str:
