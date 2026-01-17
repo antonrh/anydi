@@ -421,10 +421,11 @@ class TestContainerRegistration:
         with pytest.raises(
             LookupError,
             match=(
-                "The provider `(.*?).dep2` depends on `dep1` of type `int`, "
-                "which has not been registered or set. To resolve this, "
-                "ensure that `dep1` is registered before "
-                "(calling build\\(\\)|resolving)."
+                r"The provider `str \(via (.*?)\.dep2\)` depends on `dep1` of type "
+                r"`int`, which has not been registered or set. To resolve this, "
+                r"ensure that `dep1` is registered before "
+                r"calling build\(\), or register it with `from_context=True` "
+                r"if it should be provided via scoped context."
             ),
         ):
             container.build()
@@ -961,7 +962,7 @@ class TestContainerResolution:
         with pytest.raises(
             TypeError,
             match=(
-                "The instance for the provider `(.*?).provide` cannot be created "
+                "The instance for the provider `str` cannot be created "
                 "in synchronous mode."
             ),
         ):
@@ -1044,7 +1045,7 @@ class TestContainerResolution:
         with pytest.raises(
             TypeError,
             match=(
-                "The instance for the provider `(.*?).provide` cannot be created "
+                "The instance for the provider `str` cannot be created "
                 "in synchronous mode."
             ),
         ):
@@ -1383,7 +1384,7 @@ class TestContainerResolution:
         with pytest.raises(
             TypeError,
             match=(
-                "The instance for the provider `(.*?).get_uuid` cannot "
+                "The instance for the provider `uuid.UUID` cannot "
                 "be created in synchronous mode."
             ),
         ):
