@@ -265,10 +265,18 @@ class Resolver:
                 create_lines.append("        if cached is NOT_SET_:")
 
                 if is_from_context:
-                    # Unresolved param without provider: raise directly
-                    create_lines.append(
-                        f"            raise LookupError(_unresolved_messages[{idx}])"
-                    )
+                    # Unresolved param without provider
+                    if param_has_default[idx]:
+                        # Has default, use it
+                        create_lines.append(
+                            f"            arg_{idx} = _param_defaults[{idx}]"
+                        )
+                    else:
+                        # No default, raise
+                        create_lines.append(
+                            "            raise LookupError("
+                            f"_unresolved_messages[{idx}])"
+                        )
                 else:
                     # Has a pre-compiled resolver, use it directly
                     create_lines.append(

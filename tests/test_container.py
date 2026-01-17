@@ -1,4 +1,5 @@
 import asyncio
+import inspect
 import logging
 import threading
 import uuid
@@ -44,8 +45,10 @@ def container() -> Container:
     return Container()
 
 
-class TestContainer:
-    def test_register(self, container: Container) -> None:
+class TestContainerRegistration:
+    """Tests for container Registration functionality."""
+
+    def test_register_provider(self, container: Container) -> None:
         def provider_call() -> str:
             return "test"
 
@@ -93,7 +96,7 @@ class TestContainer:
 
         assert dependent() is container
 
-    def test_register_is_coro(self, container: Container) -> None:
+    def test_register_provider_is_coro(self, container: Container) -> None:
         provider = container.register(factory=coro, scope="singleton")
 
         assert provider.is_coroutine
@@ -373,10 +376,12 @@ class TestContainer:
         def mixed(a: int, b: float) -> str:
             return f"{a} * {b} = {a * b}"
 
+        container.register(int, a, scope=scope3)
+        container.register(float, b, scope=scope2)
+        container.register(str, mixed, scope=scope1)
+
         try:
-            container.register(int, a, scope=scope3)
-            container.register(float, b, scope=scope2)
-            container.register(str, mixed, scope=scope1)
+            container.build()
         except ValueError:
             result = False
         else:
@@ -392,6 +397,7 @@ class TestContainer:
             return f"{n}"
 
         container.register(int, provider_int, scope="request")
+        container.register(str, provider_str, scope="singleton")
 
         with pytest.raises(
             ValueError,
@@ -401,7 +407,7 @@ class TestContainer:
                 "registered with matching scopes."
             ),
         ):
-            container.register(str, provider_str, scope="singleton")
+            container.build()
 
     def test_register_with_not_registered_sub_provider(
         self,
@@ -410,15 +416,18 @@ class TestContainer:
         def dep2(dep1: int) -> str:
             return str(dep1)
 
+        container.register(str, dep2, scope="singleton")
+
         with pytest.raises(
             LookupError,
             match=(
                 "The provider `(.*?).dep2` depends on `dep1` of type `int`, "
                 "which has not been registered or set. To resolve this, "
-                "ensure that `dep1` is registered before attempting to use it."
+                "ensure that `dep1` is registered before "
+                "(calling build\\(\\)|resolving)."
             ),
         ):
-            container.register(str, dep2, scope="singleton")
+            container.build()
 
     def test_register_events(self, container: Container) -> None:
         events = []
@@ -532,10 +541,12 @@ class TestContainer:
         def provider_with_param(param: int) -> str:
             return str(param)
 
+        container.register(str, provider_with_param, scope="singleton")
+
         with pytest.raises(
             LookupError, match="The provider `(.*?)` depends on `param` of type `int`"
         ):
-            container.register(str, provider_with_param, scope="singleton")
+            container.resolve(str)
 
     def test_register_provider_scope_mismatch(self, container: Container) -> None:
         """Test that registering a provider with a scope mismatch raises ValueError."""
@@ -544,11 +555,13 @@ class TestContainer:
         def provider_singleton(param: int) -> str:
             return str(param)
 
+        container.register(str, provider_singleton, scope="singleton")
+
         with pytest.raises(
             ValueError,
             match="The provider `(.*?)` with a `singleton` scope cannot depend on",
         ):
-            container.register(str, provider_singleton, scope="singleton")
+            container.resolve(str)
 
     def test_from_context_singleton_scope_raises(self, container: Container) -> None:
         """Test that from_context=True with singleton scope raises ValueError."""
@@ -638,103 +651,276 @@ class TestContainer:
 
     # Lifespan
 
-    def test_start_and_close_singleton_context(self, container: Container) -> None:
-        events = []
+    def test_container_with_modules_in_constructor(self) -> None:
+        """Test passing modules in Container constructor."""
 
-        def dep1() -> Iterator[str]:
-            events.append("dep1:before")
-            yield "test"
-            events.append("dep1:after")
+        @singleton
+        class Service:
+            pass
 
-        container.register(str, dep1, scope="singleton")
+        def setup_module(container: Container) -> None:
+            container.register(Service)
 
-        container.start()
+        container = Container(modules=[setup_module])
+        assert container.has_provider_for(Service)
 
-        assert container.resolve(str) == "test"
+    def test_register_module_directly(self) -> None:
+        """Test calling register_module() directly."""
+        container = Container()
 
-        container.close()
+        @singleton
+        class DirectService:
+            pass
 
-        assert events == ["dep1:before", "dep1:after"]
+        def setup_module(container: Container) -> None:
+            container.register(DirectService)
 
-    def test_request_context(self, container: Container) -> None:
-        events = []
+        container.register_module(setup_module)
+        assert container.has_provider_for(DirectService)
 
-        def dep1() -> Iterator[str]:
-            events.append("dep1:before")
-            yield "test"
-            events.append("dep1:after")
 
-        container.register(str, dep1, scope="request")
+class TestContainerBuild:
+    """Tests for container Build functionality."""
 
-        with container.request_context():
-            assert container.resolve(str) == "test"
+    def test_build_locks_registration(self) -> None:
+        """Test that registration is locked after build()."""
 
-        assert events == ["dep1:before", "dep1:after"]
+        @singleton
+        class Service:
+            pass
 
-    # Asynchronous lifespan
+        container = Container()
+        container.register(Service)
+        container.build()
 
-    async def test_astart_and_aclose_singleton_context(
-        self, container: Container
-    ) -> None:
-        events = []
+        # Try to register after build
+        @singleton
+        class AnotherService:
+            pass
 
-        async def dep1() -> AsyncIterator[str]:
-            events.append("dep1:before")
-            yield "test"
-            events.append("dep1:after")
+        with pytest.raises(
+            RuntimeError,
+            match="Cannot register providers after build\\(\\) has been called.",
+        ):
+            container.register(AnotherService)
 
-        container.register(str, dep1, scope="singleton")
+    def test_build_allows_override_after_build(self) -> None:
+        """Test that override=True allows registration after build()."""
 
-        await container.astart()
+        @singleton
+        class Service:
+            pass
 
-        assert container.resolve(str) == "test"
+        container = Container()
+        container.register(Service)
+        container.build()
 
-        await container.aclose()
+        # Override should work even after build
+        @singleton
+        class MockService:
+            pass
 
-        assert events == ["dep1:before", "dep1:after"]
+        container.register(Service, MockService, override=True)
+        assert container.resolve(Service).__class__.__name__ == "MockService"
 
-    async def test_arequest_context(self, container: Container) -> None:
-        events = []
+    def test_build_twice_raises_error(self) -> None:
+        """Test that calling build() twice raises RuntimeError."""
 
-        async def dep1() -> AsyncIterator[str]:
-            events.append("dep1:before")
-            yield "test"
-            events.append("dep1:after")
+        @singleton
+        class Service:
+            pass
 
-        container.register(str, dep1, scope="request")
+        container = Container()
+        container.register(Service)
+        container.build()
 
-        async with container.arequest_context():
-            assert await container.aresolve(str) == "test"
+        with pytest.raises(RuntimeError, match="Container has already been built"):
+            container.build()
 
-        assert events == ["dep1:before", "dep1:after"]
+    def test_build_detects_circular_dependencies(self) -> None:
+        """Test that build() detects circular dependencies."""
+        container = Container()
 
-    def test_reset_resolved_instances(self, container: Container) -> None:
-        container.register(str, lambda: "test", scope="singleton")
-        container.register(int, lambda: 1, scope="singleton")
+        class ServiceA:
+            pass
 
-        container.resolve(str)
-        container.resolve(int)
+        class ServiceB:
+            pass
 
-        assert container.is_resolved(str)
-        assert container.is_resolved(int)
+        class ServiceC:
+            pass
 
-        container.reset()
+        # Register providers with circular dependencies
+        @container.provider(scope="singleton")
+        def provide_a(b: ServiceB) -> ServiceA:
+            return ServiceA()
 
-        assert not container.is_resolved(str)
-        assert not container.is_resolved(int)
+        @container.provider(scope="singleton")
+        def provide_b(c: ServiceC) -> ServiceB:
+            return ServiceB()
 
-    def test_reset_transient(self, container: Container) -> None:
-        container.register(str, lambda: "test", scope="transient")
+        @container.provider(scope="singleton")
+        def provide_c(a: ServiceA) -> ServiceC:
+            return ServiceC()
 
-        _ = container.resolve(str)
+        # Build should detect the circular dependency
+        with pytest.raises(
+            ValueError,
+            match=(
+                "Circular dependency detected: .* -> .* -> .*\\. "
+                "Please restructure your dependencies to break the cycle\\."
+            ),
+        ):
+            container.build()
 
-        assert not container.is_resolved(str)
+    def test_build_with_provided_auto_registration(self) -> None:
+        """Test that @provided classes are auto-registered during build()."""
 
-        container.reset()
+        @singleton
+        class AutoService:
+            pass
 
-        assert not container.is_resolved(str)
+        @singleton
+        class DependentService:
+            def __init__(self, auto: AutoService) -> None:
+                self.auto = auto
 
-    # Instance
+        container = Container()
+        container.register(DependentService)
+        container.build()
+
+        # AutoService should be auto-registered
+        assert container.has_provider_for(AutoService)
+        service = container.resolve(DependentService)
+        assert isinstance(service.auto, AutoService)
+
+    def test_build_with_parameter_defaults(self) -> None:
+        """Test build() handles parameters with defaults correctly."""
+        container = Container()
+
+        @singleton
+        class OptionalDep:
+            pass
+
+        @container.provider(scope="singleton")
+        def service_with_default(opt: OptionalDep | None = None) -> str:
+            return "has_default"
+
+        # OptionalDep is not registered, but has default
+        container.build()
+
+        result = container.resolve(str)
+        assert result == "has_default"
+
+    def test_build_with_request_scoped_from_context_dependency(self) -> None:
+        """Test build() with request-scoped provider having from_context dependency."""
+        container = Container()
+
+        class ExternalData:
+            def __init__(self, value: str) -> None:
+                self.value = value
+
+        class RequestService:
+            def __init__(self, data: ExternalData) -> None:
+                self.data = data
+
+        # Register ExternalData as from_context (will be provided via context.set)
+        container.register(ExternalData, scope="request", from_context=True)
+
+        @container.provider(scope="request")
+        def provide_service(data: ExternalData) -> RequestService:
+            return RequestService(data)
+
+        # Build should succeed
+        container.build()
+
+        # Resolution should fail without context.set()
+        with pytest.raises(
+            LookupError, match=r"from_context=True but has not been set"
+        ):
+            with container.request_context():
+                container.resolve(RequestService)
+
+        # Resolution should succeed with context.set()
+        with container.request_context() as ctx:
+            ctx.set(ExternalData, ExternalData(value="test"))
+            result = container.resolve(RequestService)
+            assert result.data.value == "test"
+
+    def test_build_already_resolved_parameters(self) -> None:
+        """Test build() skips already-resolved parameters."""
+        container = Container()
+
+        @singleton
+        class DepA:
+            pass
+
+        @singleton
+        class DepB:
+            pass
+
+        @singleton
+        class Service:
+            def __init__(self, a: DepA, b: DepB) -> None:
+                self.a = a
+                self.b = b
+
+        container.register(DepA)
+        container.register(DepB)
+        container.register(Service)
+
+        # Build once to resolve
+        container.build()
+
+        # Verify service can be resolved
+        service = container.resolve(Service)
+        assert isinstance(service.a, DepA)
+        assert isinstance(service.b, DepB)
+
+    def test_build_after_on_the_fly_resolution(self) -> None:
+        """Test build() after some providers already resolved on-the-fly."""
+        container = Container()
+
+        @singleton
+        class DepA:
+            pass
+
+        @singleton
+        class DepB:
+            pass
+
+        @singleton
+        class ServiceX:
+            pass
+
+        @singleton
+        class ServiceY:
+            pass
+
+        @container.provider(scope="singleton")
+        def provide_x(a: DepA) -> ServiceX:
+            return ServiceX()
+
+        @container.provider(scope="singleton")
+        def provide_y(b: DepB) -> ServiceY:
+            return ServiceY()
+
+        container.register(DepA)
+        container.register(DepB)
+
+        # Resolve ServiceX on-the-fly (this resolves DepA)
+        container.resolve(ServiceX)
+
+        # Now call build() - ServiceX and DepA are already resolved
+        # This hits the already-resolved parameter path (lines 876-877)
+        container.build()
+
+        # Verify both services work
+        assert isinstance(container.resolve(ServiceY), ServiceY)
+
+
+class TestContainerResolution:
+    """Tests for container Resolution functionality."""
 
     def test_resolve_singleton_scoped(self, container: Container) -> None:
         instance = "test"
@@ -1039,6 +1225,93 @@ class TestContainer:
             result = container.resolve(RequestContext)
             assert result.request.rid == "req-1"
 
+    def test_register_from_context_with_singleton_scope_error(
+        self, container: Container
+    ) -> None:
+        class MyService:
+            pass
+
+        with pytest.raises(
+            ValueError,
+            match=r"from_context=True.*cannot be used with.*singleton.*scope",
+        ):
+            container.register(MyService, scope="singleton", from_context=True)
+
+    def test_register_from_context_with_transient_scope_error(
+        self, container: Container
+    ) -> None:
+        class MyService:
+            pass
+
+        with pytest.raises(
+            ValueError,
+            match=r"from_context=True.*cannot be used with.*transient.*scope",
+        ):
+            container.register(MyService, scope="transient", from_context=True)
+
+    def test_register_from_context_already_registered_error(
+        self, container: Container
+    ) -> None:
+        class Request:
+            pass
+
+        container.register(Request, scope="request", from_context=True)
+
+        with pytest.raises(
+            LookupError,
+            match=r"The provider .*Request.* is already registered",
+        ):
+            container.register(Request, scope="request", from_context=True)
+
+    async def test_aresolve_request_scoped_from_context(
+        self, container: Container
+    ) -> None:
+        class Request:
+            def __init__(self, path: str) -> None:
+                self.path = path
+
+        container.register(Request, scope="request", from_context=True)
+
+        @container.provider(scope="request")
+        def req_path(req: Request) -> str:
+            return req.path
+
+        async with container.arequest_context() as ctx:
+            ctx.set(Request, Request(path="/async-test"))
+            result = await container.aresolve(str)
+            assert result == "/async-test"
+
+    async def test_aresolve_request_scoped_from_context_not_set(
+        self, container: Container
+    ) -> None:
+        class Request:
+            pass
+
+        container.register(Request, scope="request", from_context=True)
+
+        with pytest.raises(
+            LookupError,
+            match=r"from_context=True but has not been set in the request context",
+        ):
+            async with container.arequest_context():
+                await container.aresolve(Request)
+
+    def test_resolve_with_inject_marker_as_default(self, container: Container) -> None:
+        """Test that Inject() marker as default triggers resolution, not default use."""
+
+        @singleton
+        class Config:
+            value = "test-config"
+
+        @singleton
+        class Service:
+            def __init__(self, config: Config = Inject()) -> None:
+                self.config = config
+
+        result = container.resolve(Service)
+        assert isinstance(result.config, Config)
+        assert result.config.value == "test-config"
+
     def test_resolve_request_scoped_auto_nested_dependencies(
         self, container: Container
     ) -> None:
@@ -1302,7 +1575,8 @@ class TestContainer:
             match=(
                 "The provider `(.*?)` depends on `name` of type "
                 "`str`, which has not been registered or set. To resolve this, "
-                "ensure that `name` is registered before attempting to use it."
+                "ensure that `name` is registered before "
+                "(calling build\\(\\)|resolving)."
             ),
         ):
             container.resolve(Service)
@@ -1433,60 +1707,107 @@ class TestContainer:
 
         assert not container.is_resolved(str)
 
-    def test_resource_delegated_exception(self, container: Container) -> None:
-        resource = Resource()
+    def test_on_the_fly_resolution_with_circular_dependency(self) -> None:
+        """Test circular dependency detection during on-the-fly resolution."""
 
-        @container.provider(scope="request")
-        def resource_provider() -> Iterator[Resource]:
-            try:
-                yield resource
-            except Exception:  # noqa
-                resource.rollback()
-                raise
-            else:
-                resource.commit()
+        @singleton
+        class ServiceA:
+            pass
 
-        def _resolve() -> None:
-            resource = container.resolve(Resource)
-            resource.run()
-            raise ValueError("error")
+        @singleton
+        class ServiceB:
+            pass
 
-        with pytest.raises(ValueError, match="error"), container.request_context():
-            _resolve()
+        container = Container()
 
-        assert resource.called
-        assert not resource.committed
-        assert resource.rolled_back
+        @container.provider(scope="singleton")
+        def provide_a(b: ServiceB) -> ServiceA:
+            return ServiceA()
 
-    async def test_async_resource_delegated_exception(
-        self, container: Container
-    ) -> None:
-        resource = Resource()
+        @container.provider(scope="singleton")
+        def provide_b(a: ServiceA) -> ServiceB:
+            return ServiceB()
 
-        @container.provider(scope="request")
-        async def resource_provider() -> AsyncIterator[Resource]:
-            try:
-                yield resource
-            except Exception:  # noqa
-                resource.rollback()
-                raise
-            else:
-                resource.commit()
+        # Don't call build() - try to resolve on-the-fly
+        # This should detect circular dependency
+        with pytest.raises(ValueError, match="Circular dependency detected"):
+            container.resolve(ServiceA)
 
-        async def _resolve() -> None:
-            resource = await container.aresolve(Resource)
-            resource.run()
-            raise ValueError("error")
+    def test_on_the_fly_resolution_scope_incompatibility(self) -> None:
+        """Test scope validation during on-the-fly resolution."""
+        container = Container()
 
-        with pytest.raises(ValueError, match="error"):
-            async with container.arequest_context():
-                await _resolve()
+        @singleton
+        class RequestDep:
+            pass
 
-        assert resource.called
-        assert not resource.committed
-        assert resource.rolled_back
+        @request
+        class SingletonService:
+            pass
 
-    # Inspections
+        @container.provider(scope="singleton")
+        def provide_singleton(dep: RequestDep) -> SingletonService:
+            return SingletonService()
+
+        container.register(RequestDep, scope="request")
+
+        # Try to resolve without build - should detect scope incompatibility
+        with pytest.raises(
+            ValueError,
+            match="cannot depend on.*with a.*scope",
+        ):
+            container.resolve(SingletonService)
+
+    def test_on_the_fly_already_resolved_parameters(self) -> None:
+        """Test skipping already resolved parameters during on-the-fly resolution."""
+        container = Container()
+
+        @singleton
+        class DepA:
+            pass
+
+        @singleton
+        class DepB:
+            pass
+
+        @singleton
+        class Service:
+            pass
+
+        # Register providers with dependencies
+        @container.provider(scope="singleton")
+        def provide_service(a: DepA, b: DepB) -> Service:
+            return Service()
+
+        container.register(DepA)
+        container.register(DepB)
+
+        # Resolve without build() - will resolve on-the-fly
+        # This hits the already-resolved check in _ensure_provider_resolved
+        service = container.resolve(Service)
+        assert isinstance(service, Service)
+
+    def test_circular_dependency_self_reference(self) -> None:
+        """Test circular dependency where provider references itself."""
+        container = Container()
+
+        @singleton
+        class SelfRef:
+            pass
+
+        # Create a self-referencing provider
+        @container.provider(scope="singleton")
+        def provide_self_ref(self_dep: SelfRef) -> SelfRef:
+            return SelfRef()
+
+        # Try to resolve - should detect circular dependency
+        # This hits line 558 (early return when already in resolving set)
+        with pytest.raises(ValueError, match="Circular dependency"):
+            container.resolve(SelfRef)
+
+
+class TestContainerCreate:
+    """Tests for container Create functionality."""
 
     def test_create_transient(self) -> None:
         @transient
@@ -1657,11 +1978,107 @@ class TestContainer:
         # But singleton dependency should be the same
         assert instance1.db is instance2.db
 
-    def test_logger_property(self) -> None:
-        custom_logger = logging.getLogger("custom")
-        container = Container(logger=custom_logger)
 
-        assert container.logger is custom_logger
+class TestContainerContext:
+    """Tests for container Context functionality."""
+
+    def test_start_and_close_singleton_context(self, container: Container) -> None:
+        events = []
+
+        def dep1() -> Iterator[str]:
+            events.append("dep1:before")
+            yield "test"
+            events.append("dep1:after")
+
+        container.register(str, dep1, scope="singleton")
+
+        container.start()
+
+        assert container.resolve(str) == "test"
+
+        container.close()
+
+        assert events == ["dep1:before", "dep1:after"]
+
+    def test_request_context(self, container: Container) -> None:
+        events = []
+
+        def dep1() -> Iterator[str]:
+            events.append("dep1:before")
+            yield "test"
+            events.append("dep1:after")
+
+        container.register(str, dep1, scope="request")
+
+        with container.request_context():
+            assert container.resolve(str) == "test"
+
+        assert events == ["dep1:before", "dep1:after"]
+
+    # Asynchronous lifespan
+
+    async def test_astart_and_aclose_singleton_context(
+        self, container: Container
+    ) -> None:
+        events = []
+
+        async def dep1() -> AsyncIterator[str]:
+            events.append("dep1:before")
+            yield "test"
+            events.append("dep1:after")
+
+        container.register(str, dep1, scope="singleton")
+
+        await container.astart()
+
+        assert container.resolve(str) == "test"
+
+        await container.aclose()
+
+        assert events == ["dep1:before", "dep1:after"]
+
+    async def test_arequest_context(self, container: Container) -> None:
+        events = []
+
+        async def dep1() -> AsyncIterator[str]:
+            events.append("dep1:before")
+            yield "test"
+            events.append("dep1:after")
+
+        container.register(str, dep1, scope="request")
+
+        async with container.arequest_context():
+            assert await container.aresolve(str) == "test"
+
+        assert events == ["dep1:before", "dep1:after"]
+
+    def test_reset_resolved_instances(self, container: Container) -> None:
+        container.register(str, lambda: "test", scope="singleton")
+        container.register(int, lambda: 1, scope="singleton")
+
+        container.resolve(str)
+        container.resolve(int)
+
+        assert container.is_resolved(str)
+        assert container.is_resolved(int)
+
+        container.reset()
+
+        assert not container.is_resolved(str)
+        assert not container.is_resolved(int)
+
+    def test_reset_transient(self, container: Container) -> None:
+        container.register(str, lambda: "test", scope="transient")
+
+        _ = container.resolve(str)
+
+        assert not container.is_resolved(str)
+
+        container.reset()
+
+        assert not container.is_resolved(str)
+
+    # Instance
 
     def test_get_scoped_context_success(self) -> None:
         @request
@@ -1716,6 +2133,186 @@ class TestContainer:
             container.register(interface=int, call=lambda: 42)
 
         assert container.resolve(int) == 42
+
+    def test_get_context_scopes_with_resources(self) -> None:
+        """Test get_context_scopes includes scopes with resource providers."""
+        container = Container()
+
+        # Register custom scope with resource provider
+        container.register_scope("task", parents=["singleton"])
+
+        @container.provider(scope="task")
+        def task_resource() -> Iterator[str]:
+            yield "task_value"
+
+        # Call with specific scopes to trigger the helper function
+        # This will add task and its parent singleton
+        scopes = container.get_context_scopes(scopes={"task"})
+
+        # Should include task and its parents
+        assert "singleton" in scopes
+        assert "task" in scopes
+
+        # Test that scopes with resources are included
+        scopes2 = container.get_context_scopes(scopes={"singleton"})
+        # Should include task because it has a resource
+        assert "task" in scopes2
+
+
+class TestContainerLifecycle:
+    """Tests for container Lifecycle functionality."""
+
+    def test_resource_delegated_exception(self, container: Container) -> None:
+        resource = Resource()
+
+        @container.provider(scope="request")
+        def resource_provider() -> Iterator[Resource]:
+            try:
+                yield resource
+            except Exception:  # noqa
+                resource.rollback()
+                raise
+            else:
+                resource.commit()
+
+        def _resolve() -> None:
+            resource = container.resolve(Resource)
+            resource.run()
+            raise ValueError("error")
+
+        with pytest.raises(ValueError, match="error"), container.request_context():
+            _resolve()
+
+        assert resource.called
+        assert not resource.committed
+        assert resource.rolled_back
+
+    async def test_async_resource_delegated_exception(
+        self, container: Container
+    ) -> None:
+        resource = Resource()
+
+        @container.provider(scope="request")
+        async def resource_provider() -> AsyncIterator[Resource]:
+            try:
+                yield resource
+            except Exception:  # noqa
+                resource.rollback()
+                raise
+            else:
+                resource.commit()
+
+        async def _resolve() -> None:
+            resource = await container.aresolve(Resource)
+            resource.run()
+            raise ValueError("error")
+
+        with pytest.raises(ValueError, match="error"):
+            async with container.arequest_context():
+                await _resolve()
+
+        assert resource.called
+        assert not resource.committed
+        assert resource.rolled_back
+
+    # Inspections
+
+
+class TestContainerUtilities:
+    """Tests for container Utilities functionality."""
+
+    def test_container_available_as_dependency(self, container: Container) -> None:
+        assert container.has_provider_for(Container)
+        assert container.resolve(Container) is container
+
+        @container.inject
+        def dependent(current: Container = Inject()) -> Container:
+            return current
+
+        assert dependent() is container
+
+    def test_logger_property(self) -> None:
+        custom_logger = logging.getLogger("custom")
+        container = Container(logger=custom_logger)
+
+        assert container.logger is custom_logger
+
+    def test_has_scope(self) -> None:
+        """Test has_scope() method."""
+        container = Container()
+        assert container.has_scope("singleton")
+        assert container.has_scope("transient")
+        assert container.has_scope("request")
+        assert not container.has_scope("nonexistent")
+
+        container.register_scope("custom")
+        assert container.has_scope("custom")
+
+    def test_scan_packages(self) -> None:
+        """Test scanning packages for providers."""
+        container = Container()
+
+        # Scan just the decorators module which has no external dependencies
+        container.scan("anydi._decorators")
+
+        # After scanning, container should work
+        assert container is not None
+
+    def test_inject_decorator_without_arguments(self) -> None:
+        """Test using @container.inject without parentheses."""
+        container = Container()
+
+        @singleton
+        class Service:
+            value = "test"
+
+        container.register(Service)
+
+        @container.inject
+        def func(service: Service = Inject()) -> str:
+            return service.value
+
+        result = func()
+        assert result == "test"
+
+    def test_inject_decorator_with_parentheses(self) -> None:
+        """Test using @container.inject() with parentheses."""
+        container = Container()
+
+        @singleton
+        class Service:
+            value = "test"
+
+        container.register(Service)
+
+        @container.inject()
+        def func(service: Service = Inject()) -> str:
+            return service.value
+
+        result = func()
+        assert result == "test"
+
+    def test_validate_injected_parameter(self) -> None:
+        """Test validate_injected_parameter() method."""
+        container = Container()
+
+        @singleton
+        class Service:
+            pass
+
+        container.register(Service)
+
+        def example_func(service: Service = Inject()) -> None:
+            pass
+
+        sig = inspect.signature(example_func)
+        param = sig.parameters["service"]
+        annotation, has_marker, marker = container.validate_injected_parameter(
+            param, call=example_func
+        )
+        assert annotation is Service
+        assert has_marker is True
+        assert marker is not None
 
 
 class TestContainerCustomScopes:
@@ -1958,6 +2555,7 @@ class TestContainerCustomScopes:
             return f"value: {x}"
 
         container.register(int, transient_dep, scope="transient")
+        container.register(str, task_dep, scope="task")
 
         with pytest.raises(
             ValueError,
@@ -1966,7 +2564,7 @@ class TestContainerCustomScopes:
                 "cannot depend on .* with a `transient` scope"
             ),
         ):
-            container.register(str, task_dep, scope="task")
+            container.build()
 
     def test_custom_scope_allows_transient_dependencies_from_transient(
         self, container: Container

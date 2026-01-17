@@ -15,10 +15,11 @@ container = Container()
 You can think of container as a registry that knows how to create and manage all your services.
 
 ### What container does:
-- Stores provider registrations
+- Stores providers (using lazy registration)
 - Resolves dependencies on demand
 - Manages object lifecycles (singleton, transient, request)
 - Performs dependency injection
+- Validates dependency graphs (optional, via `build()`)
 
 ## Provider
 
@@ -55,6 +56,64 @@ class NotificationService:
 - **Function providers**: Functions decorated with `@container.provider()`
 - **Class providers**: Classes decorated with `@singleton`, `@transient`, or `@request`
 - **Resource providers**: Generators that manage lifecycle
+
+### Dependency Graph
+
+AnyDI uses **lazy registration**. This means that when you register a provider, it doesn't check dependencies right away. The check happens later, either when you first resolve the provider with `resolve()`, or when you validate all providers at once with `build()`.
+
+Here's a simple illustration of a dependency graph:
+
+```mermaid
+graph TD
+    Service --> Repository
+    Repository --> Database
+```
+
+```python
+from anydi import Container, singleton
+
+container = Container()
+
+
+@singleton
+class Database:
+    pass
+
+
+@singleton
+class Repository:
+    def __init__(self, db: Database) -> None:
+        self.db = db
+
+
+@singleton
+class Service:
+    def __init__(self, repo: Repository) -> None:
+        self.repo = repo
+
+
+# Register providers - dependencies NOT checked yet
+container.register(Database)
+container.register(Repository)
+container.register(Service)
+
+# Find decorated classes in your code
+container.scan(["myapp.modules"])
+
+# Option 1: Check dependencies when you need them
+my_service = container.resolve(Service)
+
+# Option 2: Check all dependencies at once
+container.build()
+```
+
+#### Benefits of `build()`:
+- **Catch errors early**: Finds circular dependencies and scope problems before the application runs.
+- **Check everything**: Checks the entire dependency graph in one step.
+
+!!! info
+    If you use decorators (like `@singleton`), call `container.scan()` before `container.build()`. This ensures that AnyDI checks all your decorated classes.
+
 
 ## Scope
 

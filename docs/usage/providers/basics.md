@@ -9,6 +9,11 @@ To register a provider, use the `register` method of the `Container`. The method
 
 If the `factory` is not provided, the `dependency_type` itself is used as the factory (e.g., when registering a class).
 
+**Important:** AnyDI uses **lazy registration**. This means a provider's dependencies are not checked immediately upon registration. The check happens later in one of two cases:
+
+- **On-demand**: When you resolve the provider for the first time with `resolve()`.
+- **Upfront**: When you validate all providers at once with `build()`.
+
 ```python
 from anydi import Container
 
@@ -26,6 +31,7 @@ container.register(dependency_type=EmailService, scope="singleton")
 # Using positional arguments (recommended)
 container.register(EmailService, scope="singleton")
 
+# Provider dependencies are checked on first resolve
 service = container.resolve(EmailService)
 service.send("user@example.com", "Welcome!")
 ```
