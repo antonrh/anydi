@@ -151,3 +151,22 @@ class TestCLIMain:
         captured = capsys.readouterr()
         assert "Error scanning packages:" in captured.err
         assert "Failed to scan package" in captured.err
+
+    def test_main_with_graph_error(self, capsys: pytest.CaptureFixture[str]) -> None:
+        """Test main exits with error when graph/build fails."""
+        container = Container()
+        container.graph = mock.MagicMock(
+            side_effect=LookupError("Missing dependency `db`")
+        )
+
+        with (
+            mock.patch("sys.argv", ["anydi", "mymodule:container"]),
+            mock.patch("anydi._cli.import_container", return_value=container),
+            pytest.raises(SystemExit) as exc_info,
+        ):
+            main()
+
+        assert exc_info.value.code == 1
+        captured = capsys.readouterr()
+        assert "Error:" in captured.err
+        assert "Missing dependency" in captured.err
