@@ -909,7 +909,7 @@ class Container:
 
     def graph(
         self,
-        output_format: Literal["plain", "mermaid"] = "plain",
+        output_format: Literal["plain", "mermaid", "dot", "json"] = "plain",
         *,
         full_path: bool = False,
     ) -> str:
