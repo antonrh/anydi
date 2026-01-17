@@ -12,7 +12,7 @@ import warnings
 from collections import defaultdict
 from collections.abc import AsyncIterator, Callable, Iterable, Iterator, Sequence
 from contextvars import ContextVar
-from typing import Any, TypeVar, get_args, get_origin, overload
+from typing import Any, Literal, TypeVar, get_args, get_origin, overload
 
 from typing_extensions import ParamSpec, Self, type_repr
 
@@ -899,6 +899,40 @@ class Container:
         self._validate_scope_compatibility()
 
         self._built = True
+
+    def graph(
+        self,
+        output_format: Literal["plain", "mermaid"] = "plain",
+        *,
+        full_path: bool = False,
+    ) -> str:
+        """Draw the dependency graph."""
+        if not self._built:
+            self.build()
+
+        def get_name(name: str) -> str:
+            if full_path:
+                return name
+            return name.rsplit(".", 1)[-1]
+
+        lines: list[str] = []
+
+        if output_format == "mermaid":
+            lines.append("graph TD")
+
+        for provider in self._providers.values():
+            provider_name = get_name(provider.name)
+            for param in provider.parameters:
+                if param.provider is None:
+                    continue
+                dep_name = get_name(param.provider.name)
+
+                if output_format == "mermaid":
+                    lines.append(f"    {provider_name} --> {dep_name}")
+                else:
+                    lines.append(f"{provider_name} -> {dep_name}")
+
+        return "\n".join(lines)
 
     def _resolve_provider_dependencies(self) -> None:
         """Resolve all provider dependencies by filling in provider references."""

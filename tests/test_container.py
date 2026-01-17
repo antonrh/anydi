@@ -3478,3 +3478,251 @@ class TestImportContainer:
 
         with pytest.raises(ImportError, match="Expected Container instance"):
             import_container("tests.test_container:_TestService")
+
+
+class GraphDatabase:
+    pass
+
+
+class GraphCache:
+    pass
+
+
+class GraphRepository:
+    def __init__(self, db: GraphDatabase) -> None:
+        self.db = db
+
+
+class GraphCachedRepository:
+    def __init__(self, db: GraphDatabase, cache: GraphCache) -> None:
+        self.db = db
+        self.cache = cache
+
+
+class GraphService:
+    def __init__(self, repo: GraphRepository) -> None:
+        self.repo = repo
+
+
+class GraphServiceWithMultipleDeps:
+    def __init__(
+        self, repo: GraphRepository, cache: GraphCache, db: GraphDatabase
+    ) -> None:
+        self.repo = repo
+        self.cache = cache
+        self.db = db
+
+
+class GraphController:
+    def __init__(self, service: GraphService, cache: GraphCache) -> None:
+        self.service = service
+        self.cache = cache
+
+
+class TestContainerGraph:
+    """Tests for the graph method."""
+
+    def test_graph_plain_format(self) -> None:
+        """Test graph output in plain format (short names by default)."""
+        container = Container()
+        container.register(GraphDatabase, scope="singleton")
+        container.register(GraphRepository, scope="singleton")
+        container.register(GraphService, scope="singleton")
+
+        result = container.graph(output_format="plain")
+
+        assert result == (
+            "GraphRepository -> GraphDatabase\nGraphService -> GraphRepository"
+        )
+
+    def test_graph_mermaid_format(self) -> None:
+        """Test graph output in mermaid format (short names by default)."""
+        container = Container()
+        container.register(GraphDatabase, scope="singleton")
+        container.register(GraphRepository, scope="singleton")
+        container.register(GraphService, scope="singleton")
+
+        result = container.graph(output_format="mermaid")
+
+        assert result == (
+            "graph TD\n"
+            "    GraphRepository --> GraphDatabase\n"
+            "    GraphService --> GraphRepository"
+        )
+
+    def test_graph_auto_builds(self) -> None:
+        """Test that graph calls build if not already built."""
+        container = Container()
+        container.register(GraphDatabase, scope="singleton")
+
+        assert container._built is False
+        container.graph()
+        assert container._built is True
+
+    def test_graph_empty_container(self) -> None:
+        """Test graph with no dependencies."""
+        container = Container()
+
+        result = container.graph(output_format="plain")
+
+        assert result == ""
+
+    def test_graph_mermaid_empty(self) -> None:
+        """Test mermaid graph with no dependencies."""
+        container = Container()
+
+        result = container.graph(output_format="mermaid")
+
+        assert result == "graph TD"
+
+    def test_graph_multiple_dependencies(self) -> None:
+        """Test graph with provider having multiple dependencies."""
+        container = Container()
+        container.register(GraphDatabase, scope="singleton")
+        container.register(GraphCache, scope="singleton")
+        container.register(GraphRepository, scope="singleton")
+        container.register(GraphServiceWithMultipleDeps, scope="singleton")
+
+        result = container.graph(output_format="plain")
+
+        assert result == (
+            "GraphRepository -> GraphDatabase\n"
+            "GraphServiceWithMultipleDeps -> GraphRepository\n"
+            "GraphServiceWithMultipleDeps -> GraphCache\n"
+            "GraphServiceWithMultipleDeps -> GraphDatabase"
+        )
+
+    def test_graph_diamond_dependency(self) -> None:
+        """Test graph with diamond dependency pattern."""
+        container = Container()
+        container.register(GraphDatabase, scope="singleton")
+        container.register(GraphCache, scope="singleton")
+        container.register(GraphRepository, scope="singleton")
+        container.register(GraphService, scope="singleton")
+        container.register(GraphController, scope="singleton")
+
+        result = container.graph(output_format="plain")
+
+        assert result == (
+            "GraphRepository -> GraphDatabase\n"
+            "GraphService -> GraphRepository\n"
+            "GraphController -> GraphService\n"
+            "GraphController -> GraphCache"
+        )
+
+    def test_graph_mermaid_diamond_dependency(self) -> None:
+        """Test mermaid graph with diamond dependency pattern."""
+        container = Container()
+        container.register(GraphDatabase, scope="singleton")
+        container.register(GraphCache, scope="singleton")
+        container.register(GraphRepository, scope="singleton")
+        container.register(GraphService, scope="singleton")
+        container.register(GraphController, scope="singleton")
+
+        result = container.graph(output_format="mermaid")
+
+        assert result == (
+            "graph TD\n"
+            "    GraphRepository --> GraphDatabase\n"
+            "    GraphService --> GraphRepository\n"
+            "    GraphController --> GraphService\n"
+            "    GraphController --> GraphCache"
+        )
+
+    def test_graph_shared_dependency(self) -> None:
+        """Test graph where multiple providers share the same dependency."""
+        container = Container()
+        container.register(GraphDatabase, scope="singleton")
+        container.register(GraphCache, scope="singleton")
+        container.register(GraphRepository, scope="singleton")
+        container.register(GraphCachedRepository, scope="singleton")
+
+        result = container.graph(output_format="plain")
+
+        assert result == (
+            "GraphRepository -> GraphDatabase\n"
+            "GraphCachedRepository -> GraphDatabase\n"
+            "GraphCachedRepository -> GraphCache"
+        )
+
+    def test_graph_already_built(self) -> None:
+        """Test that graph works when container is already built."""
+        container = Container()
+        container.register(GraphDatabase, scope="singleton")
+        container.register(GraphRepository, scope="singleton")
+
+        container.build()
+        assert container._built is True
+
+        result = container.graph(output_format="plain")
+
+        assert result == "GraphRepository -> GraphDatabase"
+
+    def test_graph_with_different_scopes(self) -> None:
+        """Test graph with providers of different scopes."""
+        container = Container()
+        container.register(GraphDatabase, scope="singleton")
+        container.register(GraphCache, scope="transient")
+        container.register(GraphCachedRepository, scope="transient")
+
+        result = container.graph(output_format="plain")
+
+        assert result == (
+            "GraphCachedRepository -> GraphDatabase\n"
+            "GraphCachedRepository -> GraphCache"
+        )
+
+    def test_graph_full_path_plain(self) -> None:
+        """Test graph with full module path in plain format."""
+        container = Container()
+        container.register(GraphDatabase, scope="singleton")
+        container.register(GraphRepository, scope="singleton")
+        container.register(GraphService, scope="singleton")
+
+        result = container.graph(output_format="plain", full_path=True)
+
+        assert result == (
+            "tests.test_container.GraphRepository -> "
+            "tests.test_container.GraphDatabase\n"
+            "tests.test_container.GraphService -> "
+            "tests.test_container.GraphRepository"
+        )
+
+    def test_graph_full_path_mermaid(self) -> None:
+        """Test graph with full module path in mermaid format."""
+        container = Container()
+        container.register(GraphDatabase, scope="singleton")
+        container.register(GraphRepository, scope="singleton")
+        container.register(GraphService, scope="singleton")
+
+        result = container.graph(output_format="mermaid", full_path=True)
+
+        assert result == (
+            "graph TD\n"
+            "    tests.test_container.GraphRepository --> "
+            "tests.test_container.GraphDatabase\n"
+            "    tests.test_container.GraphService --> "
+            "tests.test_container.GraphRepository"
+        )
+
+    def test_graph_full_path_complex(self) -> None:
+        """Test graph with full module path for complex dependency graph."""
+        container = Container()
+        container.register(GraphDatabase, scope="singleton")
+        container.register(GraphCache, scope="singleton")
+        container.register(GraphRepository, scope="singleton")
+        container.register(GraphService, scope="singleton")
+        container.register(GraphController, scope="singleton")
+
+        result = container.graph(output_format="plain", full_path=True)
+
+        assert result == (
+            "tests.test_container.GraphRepository -> "
+            "tests.test_container.GraphDatabase\n"
+            "tests.test_container.GraphService -> "
+            "tests.test_container.GraphRepository\n"
+            "tests.test_container.GraphController -> "
+            "tests.test_container.GraphService\n"
+            "tests.test_container.GraphController -> "
+            "tests.test_container.GraphCache"
+        )
