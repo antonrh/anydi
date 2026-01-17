@@ -62,7 +62,7 @@ The service argument has a default value `Inject()`. This tells `AnyDI` which de
 
 ## Annotation Equivalents
 
-AnyDI understands these different ways to declare injected dependency (they all work the same):
+`AnyDI` understands these different ways to declare injected dependency (they all work the same):
 
 ```python
 dependency: MyType = Inject()

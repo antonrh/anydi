@@ -1,6 +1,6 @@
 # Core Concepts
 
-Learn these basic concepts to use AnyDI better.
+Learn these basic concepts to use `AnyDI` better.
 
 ## Container
 
@@ -59,7 +59,7 @@ class NotificationService:
 
 ### Dependency Graph
 
-AnyDI uses **lazy registration**. This means that when you register a provider, it doesn't check dependencies right away. The check happens later, either when you first resolve the provider with `resolve()`, or when you validate all providers at once with `build()`.
+`AnyDI` uses **lazy registration**. This means that when you register a provider, it doesn't check dependencies right away. The check happens later, either when you first resolve the provider with `resolve()`, or when you validate all providers at once with `build()`.
 
 Here's a simple illustration of a dependency graph:
 
@@ -112,7 +112,7 @@ container.build()
 - **Check everything**: Checks the entire dependency graph in one step.
 
 !!! info
-    If you use decorators (like `@singleton`), call `container.scan()` before `container.build()`. This ensures that AnyDI checks all your decorated classes.
+    If you use decorators (like `@singleton`), call `container.scan()` before `container.build()`. This ensures that `AnyDI` checks all your decorated classes.
 
 
 ## Scope
@@ -271,7 +271,7 @@ container.close()
 ```
 
 ### Context managers:
-AnyDI works with Python's context managers:
+`AnyDI` works with Python's context managers:
 
 ```python
 # Singleton context

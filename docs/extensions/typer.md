@@ -30,7 +30,7 @@ def hello(
     typer.echo(greeting)
 
 
-# Install AnyDI support in Typer
+# Install `AnyDI` support in Typer
 anydi.ext.typer.install(app, container)
 ```
 

@@ -149,7 +149,7 @@ async def get_user(
     return {"id": user.id, "email": user.email}
 
 
-# Install AnyDI support in FastAPI
+# Install `AnyDI` support in FastAPI
 anydi.ext.fastapi.install(app, container)
 ```
 

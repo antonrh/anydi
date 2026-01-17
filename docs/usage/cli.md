@@ -1,6 +1,6 @@
 # Command Line Interface
 
-AnyDI provides a CLI tool to validate and visualize your dependency graph.
+`AnyDI` provides a CLI tool to validate and visualize your dependency graph.
 
 ## Basic Usage
 

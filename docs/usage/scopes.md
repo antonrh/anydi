@@ -159,7 +159,7 @@ with container.request_context() as ctx:
     assert user.tenant_id == "tenant-1"
 ```
 
-The `from_context=True` option tells AnyDI that:
+The `from_context=True` option tells `AnyDI` that:
 
 1. The `Request` type will be provided via `context.set()` at runtime
 2. No factory function is needed - instances are set directly in the context

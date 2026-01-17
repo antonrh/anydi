@@ -218,7 +218,7 @@ notifier.notify("user@example.com", "Welcome!")
 
 ## Scanning and build
 
-AnyDI can find and register classes automatically when they are needed. However, it's better to use the `scan()` method to find all decorated classes when your application starts.
+`AnyDI` can find and register classes automatically when they are needed. However, it's better to use the `scan()` method to find all decorated classes when your application starts.
 
 If you use `build()` to check your dependencies for errors, you should call `scan()` **before** `build()`. This makes sure the container knows about all your decorated classes.
 
@@ -237,7 +237,7 @@ container.build()
 service = container.resolve(MyService)
 ```
 
-By calling `scan()` before `build()`, AnyDI can:
+By calling `scan()` before `build()`, `AnyDI` can:
 - Find all classes with decorators like `@singleton` or `@request`.
 - Check that all dependencies exist.
 - Find circular dependencies or scope problems at startup.

@@ -1,6 +1,6 @@
 # Pydantic Settings Extension
 
-The Pydantic Settings extension loads settings from a Pydantic model into an AnyDI container.
+The Pydantic Settings extension loads settings from a Pydantic model into an `AnyDI` container.
 
 ## Quick Start
 
