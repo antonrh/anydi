@@ -902,7 +902,7 @@ class Container:
 
     def _resolve_provider_dependencies(self) -> None:
         """Resolve all provider dependencies by filling in provider references."""
-        for interface, provider in list(self._providers.items()):
+        for dependency_type, provider in list(self._providers.items()):
             resolved_params: list[ProviderParameter] = []
 
             for param in provider.parameters:
@@ -911,20 +911,22 @@ class Container:
                     resolved_params.append(param)
                     continue
 
-                annotation = param.dependency_type
+                param_dependency_type = param.dependency_type
 
                 # Try to resolve the dependency
                 try:
-                    dep_provider = self._get_provider(annotation)
+                    dep_provider = self._get_provider(param_dependency_type)
                 except LookupError:
                     # Check if it's a @provided class
-                    if inspect.isclass(annotation) and is_provided(annotation):
-                        provided_scope = annotation.__provided__["scope"]
+                    if inspect.isclass(param_dependency_type) and is_provided(
+                        param_dependency_type
+                    ):
+                        provided_scope = param_dependency_type.__provided__["scope"]
 
                         # Auto-register @provided class
                         dep_provider = self._register_provider(
-                            annotation,
-                            annotation,
+                            param_dependency_type,
+                            param_dependency_type,
                             provided_scope,
                             False,
                             False,
@@ -939,7 +941,7 @@ class Container:
                         raise LookupError(
                             f"The provider `{provider.name}` depends on "
                             f"`{param.name}` of type "
-                            f"`{type_repr(annotation)}`, which has not been "
+                            f"`{type_repr(param_dependency_type)}`, which has not been "
                             f"registered or set. To resolve this, ensure that "
                             f"`{param.name}` is registered before calling build(), "
                             f"or register it with `from_context=True` if it should be "
@@ -951,7 +953,7 @@ class Container:
                     resolved_params.append(
                         ProviderParameter(
                             name=param.name,
-                            dependency_type=annotation,
+                            dependency_type=param_dependency_type,
                             default=param.default,
                             has_default=param.has_default,
                             provider=dep_provider,
@@ -970,7 +972,7 @@ class Container:
                 resolved_params.append(
                     ProviderParameter(
                         name=param.name,
-                        dependency_type=annotation,
+                        dependency_type=param_dependency_type,
                         default=param.default,
                         has_default=param.has_default,
                         provider=dep_provider,
@@ -993,7 +995,7 @@ class Container:
                 is_resource=provider.is_resource,
                 from_context=provider.from_context,
             )
-            self._providers[interface] = resolved_provider
+            self._providers[dependency_type] = resolved_provider
 
     def _detect_circular_dependencies(self) -> None:
         """Detect circular dependencies in the provider graph."""
@@ -1043,9 +1045,9 @@ class Container:
 
         visited: set[Any] = set()
 
-        for interface, provider in self._providers.items():
-            if interface not in visited:
-                visit(interface, provider, [], visited, set())
+        for dependency_type, provider in self._providers.items():
+            if dependency_type not in visited:
+                visit(dependency_type, provider, [], visited, set())
 
     def _validate_scope_compatibility(self) -> None:
         """Validate that all dependencies have compatible scopes."""
