@@ -907,6 +907,13 @@ class Container:
 
         self._ready = True
 
+    def rebuild(self) -> None:
+        """Rebuild the container by re-validating the complete dependency graph."""
+        if self._ready:
+            self._ready = False
+            self._resolver.clear_caches()
+        self.build()
+
     def graph(
         self,
         output_format: Literal["plain", "mermaid", "dot", "json"] = "plain",

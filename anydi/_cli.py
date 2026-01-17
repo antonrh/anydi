@@ -27,9 +27,16 @@ def main() -> None:
     )
     parser.add_argument(
         "--indent",
+        "-i",
         type=int,
         default=2,
         help="JSON indentation level",
+    )
+    parser.add_argument(
+        "--scan",
+        "-s",
+        nargs="+",
+        help="Packages or modules to scan for dependencies",
     )
 
     args = parser.parse_args()
@@ -39,6 +46,15 @@ def main() -> None:
     except (ImportError, ValueError) as exc:
         print(f"Error: {exc}", file=sys.stderr)  # noqa: T201
         sys.exit(1)
+
+    if args.scan:
+        try:
+            container.scan(args.scan)
+        except Exception as exc:
+            print(f"Error scanning packages: {exc}", file=sys.stderr)  # noqa: T201
+            sys.exit(1)
+        else:
+            container.rebuild()
 
     graph_out = container.graph(
         output_format=args.output_format,
