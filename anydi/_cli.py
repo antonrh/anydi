@@ -14,6 +14,12 @@ def main() -> None:
         help="Path to the container instance or factory (e.g., 'module:container')",
     )
     parser.add_argument(
+        "--app-dir",
+        default="",
+        help="Look for APP in the specified directory, by adding this to the "
+        "PYTHONPATH. Defaults to the current working directory.",
+    )
+    parser.add_argument(
         "--output-format",
         "-o",
         choices=["tree", "mermaid", "dot", "json"],
@@ -40,6 +46,9 @@ def main() -> None:
     )
 
     args = parser.parse_args()
+
+    if args.app_dir is not None:
+        sys.path.insert(0, args.app_dir)
 
     try:
         container = import_container(args.container)
