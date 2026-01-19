@@ -724,6 +724,38 @@ class TestContainerBuild:
         container.register(Service, MockService, override=True)
         assert container.resolve(Service).__class__.__name__ == "MockService"
 
+    def test_build_override_provider_with_dependencies_after_build(self) -> None:
+        """Test override provider with dependencies resolves correctly after build()."""
+
+        @singleton
+        class Config:
+            value = "config"
+
+        @singleton
+        class Service:
+            def __init__(self, config: Config) -> None:
+                self.config = config
+
+            def get_data(self) -> str:
+                return f"original: {self.config.value}"
+
+        container = Container()
+        container.register(Config)
+        container.register(Service)
+        container.build()
+
+        # Override with a provider that has dependencies
+        @container.provider(scope="singleton", override=True)
+        def mock_service(config: Config) -> Service:
+            class MockService(Service):
+                def get_data(self) -> str:
+                    return f"mocked: {self.config.value}"
+
+            return MockService(config)
+
+        service = container.resolve(Service)
+        assert service.get_data() == "mocked: config"
+
     def test_build_twice_raises_error(self) -> None:
         """Test that calling build() twice raises RuntimeError."""
 
