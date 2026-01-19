@@ -183,8 +183,10 @@ def pytest_fixture_setup(  # noqa: C901
 
 @pytest.fixture(scope="session")
 def container(request: pytest.FixtureRequest) -> Container:
-    """Container fixture."""
-    return _find_container(request)
+    """Container fixture with testing mode enabled."""
+    container = _find_container(request)
+    container.enable_testing_mode()
+    return container
 
 
 @pytest.fixture
@@ -441,6 +443,7 @@ def _resolve_dependencies_sync(
     *,
     target: str,
 ) -> dict[str, Any]:
+    container.enable_testing_mode()
     resolved: dict[str, Any] = {}
     for param_name, annotation in parameters:
         try:
@@ -462,6 +465,7 @@ async def _resolve_dependencies_async(
     *,
     target: str,
 ) -> dict[str, Any]:
+    container.enable_testing_mode()
     resolved: dict[str, Any] = {}
     for param_name, annotation in parameters:
         try:

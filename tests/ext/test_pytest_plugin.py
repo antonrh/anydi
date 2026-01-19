@@ -1,5 +1,6 @@
 from collections.abc import AsyncIterator, Iterator
 from typing import Any
+from unittest import mock
 
 import pytest
 
@@ -7,8 +8,23 @@ from anydi import Container
 from anydi.ext import pytest_plugin
 
 
+class Repository:
+    """Repository for testing override scenarios."""
+
+    def get(self, item_id: int) -> dict[str, Any] | None:
+        return None
+
+
 class Service:
+    """Service with repository dependency for testing."""
+
     name = "service"
+
+    def __init__(self, repo: Repository) -> None:
+        self.repo = repo
+
+    def get_item(self, item_id: int) -> dict[str, Any] | None:
+        return self.repo.get(item_id)
 
 
 class UnknownService:
@@ -18,6 +34,7 @@ class UnknownService:
 @pytest.fixture(scope="session")
 def container() -> Container:
     container = Container()
+    container.register(Repository)
     container.register(Service)
     return container
 
@@ -204,3 +221,33 @@ async def test_inject_into_async_generator_fixture(
     injected_async_generator_fixture: str,
 ) -> None:
     assert injected_async_generator_fixture == "service"
+
+
+def test_container_testing_mode_enabled(container: Container) -> None:
+    """Test that container is in testing mode when enable_testing_mode is called."""
+    assert container.testing_mode is True
+
+
+@pytest.mark.inject
+def test_override_works_for_injected_service(
+    container: Container, service: Service
+) -> None:
+    """Test that override works for already-resolved injected services."""
+
+    # Verify service works with original repository
+    assert service.get_item(100) is None
+
+    # Create mock repository
+    repo_mock = mock.MagicMock(spec=Repository)
+    repo_mock.get.return_value = {"id": 100, "name": "mocked"}
+
+    # Override should work for the already-injected service
+    with container.override(Repository, instance=repo_mock):
+        item = service.get_item(100)
+
+        assert item is not None
+        assert item["id"] == 100
+        assert item["name"] == "mocked"
+
+    # After override context, original behavior is restored
+    assert service.get_item(100) is None
