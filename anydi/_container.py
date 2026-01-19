@@ -559,6 +559,11 @@ class Container:
         self._set_provider(provider)
         if override:
             self._resolver.clear_caches()
+
+        # Resolve dependencies for providers registered after build()
+        if self.ready:
+            provider = self._ensure_provider_resolved(provider, set())
+
         return provider
 
     def _get_provider(self, dependency_type: Any) -> Provider:
