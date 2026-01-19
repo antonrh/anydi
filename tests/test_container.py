@@ -795,6 +795,34 @@ class TestContainerBuild:
         service = container.resolve(DependentService)
         assert isinstance(service.auto, AutoService)
 
+    def test_build_resolve_unregistered_provided_class_after_build(self) -> None:
+        """Test resolving an unregistered @provided class after build()."""
+
+        @singleton
+        class Repository:
+            def get_data(self) -> str:
+                return "data"
+
+        @request
+        class Handler:
+            def __init__(self, repo: Repository) -> None:
+                self.repo = repo
+
+        container = Container()
+        container.register(Repository)
+        # Handler is NOT registered - relies on auto-discovery via @request
+        container.build()
+        container.start()
+
+        try:
+            with container.request_context():
+                handler = container.resolve(Handler)
+                assert isinstance(handler, Handler)
+                assert isinstance(handler.repo, Repository)
+                assert handler.repo.get_data() == "data"
+        finally:
+            container.close()
+
     def test_build_with_parameter_defaults(self) -> None:
         """Test build() handles parameters with defaults correctly."""
         container = Container()
