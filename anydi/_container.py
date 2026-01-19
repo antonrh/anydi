@@ -62,6 +62,9 @@ class Container:
         # Build state
         self._ready = False
 
+        # Testing mode (enables override support for all resolutions)
+        self._testing_mode = False
+
         # Register default scopes
         self.register_scope("request")
 
@@ -1117,6 +1120,30 @@ class Container:
                     )
 
     # == Testing / Override Support ==
+
+    def enable_testing_mode(self) -> None:
+        """Enable testing mode for override support on all resolutions."""
+        if not self._testing_mode:
+            self._testing_mode = True
+            self._resolver.clear_caches()
+
+    def disable_testing_mode(self) -> None:
+        """Disable testing mode for override support on all resolutions."""
+        if self._testing_mode:
+            self._testing_mode = False
+            self._resolver.clear_caches()
+
+    @contextlib.contextmanager
+    def testing_mode(self) -> Iterator[None]:
+        if self._testing_mode:
+            yield
+            return
+
+        self.enable_testing_mode()
+        try:
+            yield
+        finally:
+            self.disable_testing_mode()
 
     @contextlib.contextmanager
     def override(
