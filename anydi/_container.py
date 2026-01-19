@@ -576,6 +576,7 @@ class Container:
         self, dependency_type: Any, defaults: dict[str, Any] | None = None
     ) -> Provider:
         """Get or register a provider by dependency type."""
+        registered = False
         try:
             provider = self._get_provider(dependency_type)
         except LookupError:
@@ -588,6 +589,7 @@ class Container:
                     False,
                     defaults,
                 )
+                registered = True
             else:
                 raise LookupError(
                     f"The provider `{type_repr(dependency_type)}` is either not "
@@ -597,8 +599,10 @@ class Container:
                     "use it."
                 ) from None
 
-        # Ensure provider dependencies are resolved if not built yet
-        if not self.ready:
+        # Resolve dependencies:
+        # - For existing providers: only if container is not built yet
+        # - For newly auto-registered providers: always (even after build)
+        if registered or not self.ready:
             provider = self._ensure_provider_resolved(provider, set())
 
         return provider
