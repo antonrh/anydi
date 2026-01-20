@@ -1,6 +1,46 @@
 # Testing
 
-To test with `AnyDI`, use the `.override(dependency_type, instance)` context manager. This replaces a dependency temporarily during testing. It helps you isolate code from its dependencies.
+## Test Mode
+
+When overriding dependencies in tests, AnyDI uses a special **test mode** that enables proper override support throughout the dependency graph. Test mode ensures that overridden dependencies are correctly propagated to all dependent services.
+
+### Enabling Test Mode
+
+You can enable test mode in two ways:
+
+**Using the context manager (recommended):**
+
+```python
+with container.test_mode():
+    with container.override(Repository, mock_repo):
+        # All resolutions here will use the override
+        service = container.resolve(Service)
+```
+
+**Using explicit methods:**
+
+```python
+container.enable_test_mode()
+try:
+    with container.override(Repository, mock_repo):
+        service = container.resolve(Service)
+finally:
+    container.disable_test_mode()
+```
+
+### Why Test Mode Matters
+
+AnyDI compiles optimized resolvers for fast dependency resolution. Test mode switches to a separate set of resolvers that include override checking logic. This ensures:
+
+- Overrides are checked at every resolution point
+- Nested dependencies correctly receive overridden instances
+- No performance impact in production (normal resolvers have no override checks)
+
+**Note:** If you use the pytest plugin (see below), test mode is automatically enabled for you.
+
+## Overriding Dependencies
+
+Use the `.override(dependency_type, instance)` context manager to replace a dependency temporarily during testing. It helps you isolate code from its dependencies.
 The `container.override()` works only inside the `with` block. When the block ends, the original dependency comes back.
 
 ```python
@@ -43,7 +83,19 @@ def test_handler() -> None:
     repo_mock = mock.Mock(spec=Repository)
     repo_mock.all.return_value = [Item(name="mock1"), Item(name="mock2")]
 
-    with container.override(Repository, repo_mock):
+    with container.test_mode():
+        with container.override(Repository, repo_mock):
+            assert get_items() == [Item(name="mock1"), Item(name="mock2")]
+```
+
+Or using nested context managers in a single `with` statement:
+
+```python
+def test_handler() -> None:
+    repo_mock = mock.Mock(spec=Repository)
+    repo_mock.all.return_value = [Item(name="mock1"), Item(name="mock2")]
+
+    with container.test_mode(), container.override(Repository, repo_mock):
         assert get_items() == [Item(name="mock1"), Item(name="mock2")]
 ```
 
@@ -100,6 +152,8 @@ This approach is useful when you want to:
 ## Pytest Plugin
 
 `AnyDI` has a pytest plugin that injects dependencies into test functions automatically. This makes tests simpler and cleaner.
+
+**Important:** The pytest plugin automatically enables test mode on the container, so you don't need to call `enable_test_mode()` or use the `test_mode()` context manager when using the plugin. You can use `container.override()` directly in your tests.
 
 ### Configuration
 
