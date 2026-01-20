@@ -1151,6 +1151,14 @@ class Container:
         interface: Any = NOT_SET,
     ) -> Iterator[None]:
         """Override a dependency with a specific instance for testing."""
+        if not self._test_mode:
+            warnings.warn(
+                "Using override() without enabling test mode. "
+                "Consider using `with container.test_mode():` for consistent behavior.",
+                UserWarning,
+                stacklevel=2,
+            )
+
         if interface is not NOT_SET:
             warnings.warn(
                 "The `interface` is deprecated. Use `dependency_type` instead.",
