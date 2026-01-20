@@ -1123,15 +1123,11 @@ class Container:
 
     def enable_test_mode(self) -> None:
         """Enable test mode for override support on all resolutions."""
-        if not self._test_mode:
-            self._test_mode = True
-            self._resolver.clear_caches()
+        self._test_mode = True
 
     def disable_test_mode(self) -> None:
         """Disable test mode for override support on all resolutions."""
-        if self._test_mode:
-            self._test_mode = False
-            self._resolver.clear_caches()
+        self._test_mode = False
 
     @contextlib.contextmanager
     def test_mode(self) -> Iterator[None]:
@@ -1139,11 +1135,11 @@ class Container:
             yield
             return
 
-        self.enable_test_mode()
+        self._test_mode = True
         try:
             yield
         finally:
-            self.disable_test_mode()
+            self._test_mode = False
 
     @contextlib.contextmanager
     def override(
