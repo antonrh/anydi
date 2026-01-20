@@ -223,9 +223,9 @@ async def test_inject_into_async_generator_fixture(
     assert injected_async_generator_fixture == "service"
 
 
-def test_container_testing_mode_enabled(container: Container) -> None:
-    """Test that container is in testing mode when enable_testing_mode is called."""
-    assert container._testing_mode is True
+def test_container_test_mode_enabled(container: Container) -> None:
+    """Test that container is in test mode when enable_test_mode is called."""
+    assert container._test_mode is True
 
 
 @pytest.mark.inject

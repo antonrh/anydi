@@ -48,7 +48,7 @@ class Resolver:
     @property
     def override_mode(self) -> bool:
         """Check if override mode is enabled."""
-        return bool(self._overrides) or getattr(self._container, "_testing_mode", False)
+        return bool(self._overrides) or getattr(self._container, "_test_mode", False)
 
     def add_override(self, dependency_type: Any, instance: Any) -> None:
         """Add an override instance for a dependency type."""

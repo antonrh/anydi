@@ -185,7 +185,7 @@ def pytest_fixture_setup(  # noqa: C901
 def container(request: pytest.FixtureRequest) -> Container:
     """Container fixture with testing mode enabled."""
     container = _find_container(request)
-    container.enable_testing_mode()
+    container.enable_test_mode()
     return container
 
 
@@ -443,7 +443,7 @@ def _resolve_dependencies_sync(
     *,
     target: str,
 ) -> dict[str, Any]:
-    container.enable_testing_mode()
+    container.enable_test_mode()
     resolved: dict[str, Any] = {}
     for param_name, annotation in parameters:
         try:
@@ -465,7 +465,7 @@ async def _resolve_dependencies_async(
     *,
     target: str,
 ) -> dict[str, Any]:
-    container.enable_testing_mode()
+    container.enable_test_mode()
     resolved: dict[str, Any] = {}
     for param_name, annotation in parameters:
         try:
