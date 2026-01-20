@@ -900,9 +900,14 @@ class Container:
     # == Package Scanning ==
 
     def scan(
-        self, /, packages: PackageOrIterable, *, tags: Iterable[str] | None = None
+        self,
+        /,
+        packages: PackageOrIterable,
+        *,
+        tags: Iterable[str] | None = None,
+        ignore: PackageOrIterable | None = None,
     ) -> None:
-        self._scanner.scan(packages=packages, tags=tags)
+        self._scanner.scan(packages=packages, tags=tags, ignore=ignore)
 
     # == Build ==
 

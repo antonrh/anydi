@@ -1,6 +1,6 @@
-from anydi import injectable
+from anydi import Inject, injectable
 
 
 @injectable(tags=["a", "a1"])
-def a1_handler() -> None:
+def a1_handler(name: str = Inject()) -> None:
     pass
