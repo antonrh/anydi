@@ -3219,6 +3219,7 @@ class TestContainerOverride:
         overridden_name = "overridden"
 
         container = Container()
+        container.enable_test_mode()
 
         @container.provider(scope="singleton")
         def name() -> str:
@@ -3229,8 +3230,22 @@ class TestContainerOverride:
 
         assert container.resolve(str) == origin_name
 
+    def test_override_without_test_mode_warning(self) -> None:
+        """Test that override() without test mode triggers a warning."""
+        container = Container()
+        container.register(str, lambda: "original")
+
+        with pytest.warns(
+            UserWarning, match=r"Using override\(\) without enabling test mode"
+        ):
+            with container.override(str, "overridden"):
+                assert container.resolve(str) == "overridden"
+
+        assert container.resolve(str) == "original"
+
     def test_override_instance_provider_not_registered_using_strict_mode(self) -> None:
         container = Container()
+        container.enable_test_mode()
 
         with pytest.raises(LookupError, match="The provider `str` is not registered."):
             with container.override(str, "test"):
@@ -3240,6 +3255,7 @@ class TestContainerOverride:
         overridden_uuid = uuid.uuid4()
 
         container = Container()
+        container.enable_test_mode()
 
         @container.provider(scope="transient")
         def uuid_provider() -> uuid.UUID:
@@ -3255,6 +3271,7 @@ class TestContainerOverride:
         overridden = "overridden"
 
         container = Container()
+        container.enable_test_mode()
 
         @container.provider(scope="singleton")
         def message() -> Iterator[str]:
@@ -3270,6 +3287,7 @@ class TestContainerOverride:
         overridden = "overridden"
 
         container = Container()
+        container.enable_test_mode()
 
         @container.provider(scope="singleton")
         async def message() -> AsyncIterator[str]:
@@ -3280,6 +3298,7 @@ class TestContainerOverride:
 
     def test_override_registered_instance(self) -> None:
         container = Container()
+        container.enable_test_mode()
         container.register(Annotated[str, "param"], lambda: "param", scope="singleton")
 
         @singleton
@@ -3316,6 +3335,7 @@ class TestContainerOverride:
 
     async def test_override_instance_async_resolved(self) -> None:
         container = Container()
+        container.enable_test_mode()
         container.register(Annotated[str, "param"], lambda: "param", scope="singleton")
 
         @singleton
@@ -3355,6 +3375,7 @@ class TestContainerOverride:
 
     def test_override_instance_first(self) -> None:
         container = Container()
+        container.enable_test_mode()
 
         @dataclass
         class Item:
@@ -3405,6 +3426,7 @@ class TestContainerOverride:
                 initialized = True
 
         container = Container()
+        container.enable_test_mode()
 
         @container.provider(scope="singleton")
         def service() -> Service:
@@ -3423,6 +3445,7 @@ class TestContainerOverride:
                 self.value = 42
 
         container = Container()
+        container.enable_test_mode()
         container.register(ServiceWithoutDict, scope="singleton")
 
         with container.override(ServiceWithoutDict, ServiceWithoutDict()):
@@ -3436,6 +3459,7 @@ class TestContainerOverride:
                 self.name = "original"
 
         container = Container()
+        container.enable_test_mode()
 
         override_instance = Service()
         override_instance.name = "override"
@@ -3447,6 +3471,7 @@ class TestContainerOverride:
 
     def test_override_no_double_wrapping(self) -> None:
         container = Container()
+        container.enable_test_mode()
         container.register(int, lambda: 1)
 
         instance = 2
@@ -3457,6 +3482,7 @@ class TestContainerOverride:
 
     def test_override_deprecated_interface(self) -> None:
         container = Container()
+        container.enable_test_mode()
         container.register(int, factory=lambda: 0)
 
         with pytest.warns(

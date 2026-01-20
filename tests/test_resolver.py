@@ -74,6 +74,7 @@ class TestResolver:
     def test_resolver_override_check_include_not_set(self) -> None:
         """Test override check with include_not_set=True logic."""
         container = Container()
+        container.enable_test_mode()
 
         class Service:
             def __init__(self, val: int) -> None:
@@ -89,6 +90,7 @@ class TestResolver:
     async def test_resolver_async_override(self) -> None:
         """Test async resolution with override."""
         container = Container()
+        container.enable_test_mode()
         container.register(int, lambda: 1, scope="singleton")
 
         with container.override(int, 2):
@@ -98,6 +100,7 @@ class TestResolver:
     def test_resolver_from_context_with_override(self) -> None:
         """Test from_context provider with override."""
         container = Container()
+        container.enable_test_mode()
         container.register(int, scope="request", from_context=True)
 
         with container.request_context():
@@ -107,6 +110,7 @@ class TestResolver:
     async def test_resolver_async_from_context_with_override(self) -> None:
         """Test async from_context provider with override."""
         container = Container()
+        container.enable_test_mode()
         container.register(int, scope="request", from_context=True)
 
         async with container.arequest_context():
@@ -116,6 +120,7 @@ class TestResolver:
     def test_resolver_post_resolve_override_nested(self) -> None:
         """Test nested dependency override patching."""
         container = Container()
+        container.enable_test_mode()
 
         class Config:
             def __init__(self, val: int) -> None:
@@ -142,6 +147,7 @@ class TestResolver:
     def test_resolver_override_not_set(self) -> None:
         """Test _get_override_for when not set."""
         container = Container()
+        container.enable_test_mode()
         container.register(int, lambda: 1, scope="singleton")
         container.register(str, lambda: "s", scope="singleton")
 
@@ -299,6 +305,7 @@ class TestResolver:
     def test_resolver_get_cached_async_override(self) -> None:
         """Test get_cached with is_async=True and override_mode=True."""
         container = Container()
+        container.enable_test_mode()
         resolver = container._resolver
         container.register(int, lambda: 1)
 
@@ -372,11 +379,15 @@ class TestResolver:
     def test_resolver_add_remove_override(self) -> None:
         """Test add_override and remove_override directly on resolver."""
         container = Container()
+
         resolver = container._resolver
         resolver.add_override(int, 10)
+
         assert resolver.override_mode is True
         assert resolver._get_override_for(int) == 10
+
         resolver.remove_override(int)
+
         assert resolver.override_mode is False
         assert resolver._get_override_for(int) is anydi._types.NOT_SET
 
@@ -400,6 +411,7 @@ class TestResolver:
     def test_resolver_post_resolve_override_complex(self) -> None:
         """Test complex _post_resolve_override scenario with InstanceProxy."""
         container = Container()
+        container.enable_test_mode()
 
         class Dependency:
             def __init__(self, val: int):
@@ -426,6 +438,7 @@ class TestResolver:
 
             # Test dynamic patching behavior
             assert service.dep.val == 1
+
             with container.override(Dependency, Dependency(2)):
                 assert service.dep.val == 2
 
