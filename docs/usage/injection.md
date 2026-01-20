@@ -151,3 +151,16 @@ container.scan(["app.handlers"], tags=["tag1"])
 ```
 
 This scans only `@injectable` items with the specified tags in the `app.handlers` module.
+
+## Ignoring packages during scan
+
+Use the `ignore` parameter to exclude specific packages or modules from scanning. This helps avoid circular imports or infinite loops when modules have complex import dependencies:
+
+```python
+from anydi import Container
+
+container = Container()
+container.scan("app", ignore=["app.tests", "app.migrations"])
+```
+
+See [Auto-Registration - Ignoring packages](providers/auto-registration.md#ignoring-packages) for more details.

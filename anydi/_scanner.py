@@ -33,18 +33,24 @@ class Scanner:
         self._container = container
 
     def scan(
-        self, /, packages: PackageOrIterable, *, tags: Iterable[str] | None = None
+        self,
+        /,
+        packages: PackageOrIterable,
+        *,
+        tags: Iterable[str] | None = None,
+        ignore: PackageOrIterable | None = None,
     ) -> None:
         """Scan packages or modules for decorated members and inject dependencies."""
         if isinstance(packages, (ModuleType, str)):
             packages = [packages]
 
         tags_list = list(tags) if tags else []
+        ignore_prefixes = self._normalize_ignore(ignore)
         provided_classes: list[type[Provided]] = []
         injectable_dependencies: list[ScannedDependency] = []
 
         # Single pass: collect both @provided classes and @injectable functions
-        for module in self._iter_modules(packages):
+        for module in self._iter_modules(packages, ignore_prefixes=ignore_prefixes):
             provided_classes.extend(self._scan_module_for_provided(module))
             injectable_dependencies.extend(
                 self._scan_module_for_injectable(module, tags=tags_list)
@@ -65,7 +71,34 @@ class Scanner:
             decorated = self._container.inject()(dependency.member)
             setattr(dependency.module, dependency.member.__name__, decorated)
 
-    def _iter_modules(self, packages: Iterable[Package]) -> Iterator[ModuleType]:
+    def _normalize_ignore(self, ignore: PackageOrIterable | None) -> list[str]:
+        """Normalize ignore parameter to a list of module name prefixes."""
+        if ignore is None:
+            return []
+
+        if isinstance(ignore, (ModuleType, str)):
+            ignore = [ignore]
+
+        prefixes: list[str] = []
+        for item in ignore:
+            if isinstance(item, ModuleType):
+                prefixes.append(item.__name__)
+            else:
+                prefixes.append(item)
+        return prefixes
+
+    def _should_ignore_module(
+        self, module_name: str, ignore_prefixes: list[str]
+    ) -> bool:
+        """Check if a module should be ignored based on ignore prefixes."""
+        for prefix in ignore_prefixes:
+            if module_name == prefix or module_name.startswith(prefix + "."):
+                return True
+        return False
+
+    def _iter_modules(
+        self, packages: Iterable[Package], *, ignore_prefixes: list[str]
+    ) -> Iterator[ModuleType]:
         """Iterate over all modules in the given packages."""
         for package in packages:
             if isinstance(package, str):
@@ -73,14 +106,16 @@ class Scanner:
 
             # Single module (not a package)
             if not hasattr(package, "__path__"):
-                yield package
+                if not self._should_ignore_module(package.__name__, ignore_prefixes):
+                    yield package
                 continue
 
             # Package - walk all submodules
             for module_info in pkgutil.walk_packages(
                 package.__path__, prefix=package.__name__ + "."
             ):
-                yield importlib.import_module(module_info.name)
+                if not self._should_ignore_module(module_info.name, ignore_prefixes):
+                    yield importlib.import_module(module_info.name)
 
     def _scan_module_for_provided(self, module: ModuleType) -> list[type[Provided]]:
         """Scan a module for @provided classes."""

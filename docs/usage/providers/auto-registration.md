@@ -242,6 +242,38 @@ By calling `scan()` before `build()`, `AnyDI` can:
 - Check that all dependencies exist.
 - Find circular dependencies or scope problems at startup.
 
+### Ignoring packages
+
+Use the `ignore` parameter to exclude specific packages or modules from scanning. This is useful to:
+
+- **Avoid circular imports** - when modules have complex import dependencies
+- **Prevent infinite loops** - when scanning would trigger problematic module loading
+- **Exclude test/migration code** - keep test fixtures and database migrations out of production container
+
+```python
+from anydi import Container
+
+container = Container()
+
+# Scan myapp but ignore the tests subpackage
+container.scan("myapp", ignore=["myapp.tests"])
+
+# Ignore multiple packages
+container.scan("myapp", ignore=["myapp.tests", "myapp.migrations"])
+
+# Ignore using module objects
+import myapp.tests
+container.scan("myapp", ignore=[myapp.tests])
+```
+
+The `ignore` parameter accepts:
+- A single string: `ignore="myapp.tests"`
+- A list of strings: `ignore=["myapp.tests", "myapp.migrations"]`
+- Module objects: `ignore=[myapp.tests]`
+- Mixed: `ignore=["myapp.tests", some_module]`
+
+When a package is ignored, all its submodules are also ignored.
+
 ---
 
 **Related Topics:**

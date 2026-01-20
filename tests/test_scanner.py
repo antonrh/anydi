@@ -1,8 +1,12 @@
+import importlib
+import sys
+
 import pytest
 from pytest_mock import MockerFixture
 
 from anydi import Container
 
+from tests.fixtures import Service
 from tests.scan_app import ScanAppModule
 
 
@@ -123,3 +127,105 @@ class TestContainerScanner:
         repo = container.resolve(IRepository)
         assert isinstance(repo, UserRepository)
         assert repo.get(1) == {"id": 1, "name": "Alice"}
+
+    def test_scan_ignore_package_with_string(self) -> None:
+        """Test ignoring a package using string path."""
+        from tests.scan_app.a.a1 import handlers as a1_handlers
+        from tests.scan_app.b import handlers as b_handlers
+
+        b_handlers = importlib.reload(b_handlers)
+        a1_handlers = importlib.reload(a1_handlers)
+
+        container = Container()
+        container.register(str, lambda: "hello")
+        container.register(Service, Service)
+
+        # Check initial state
+        assert not hasattr(b_handlers.b_handler, "__wrapped__")
+        assert not hasattr(a1_handlers.a1_handler, "__wrapped__")
+
+        # Scan with ignore
+        container.scan("tests.scan_app", ignore=["tests.scan_app.b"])
+
+        # Verify module identity
+        assert a1_handlers is sys.modules["tests.scan_app.a.a1.handlers"]
+
+        # b_handlers should be ignored
+        assert not hasattr(b_handlers.b_handler, "__wrapped__"), (
+            "b_handlers.b_handler should not be wrapped (ignored)"
+        )
+
+        # a1_handlers should be scanned
+        assert hasattr(a1_handlers.a1_handler, "__wrapped__"), (
+            "a1_handlers.a1_handler should be wrapped (scanned)"
+        )
+
+    def test_scan_ignore_package_with_module(self) -> None:
+        """Test ignoring a package using module object."""
+        import tests.scan_app.b as b_package
+        from tests.scan_app.a.a1 import handlers as a1_handlers
+        from tests.scan_app.b import handlers as b_handlers
+
+        b_handlers = importlib.reload(b_handlers)
+        a1_handlers = importlib.reload(a1_handlers)
+
+        container = Container()
+        container.register(str, lambda: "hello")
+        container.register(Service, Service)
+
+        # Scan with ignore using module object
+        container.scan("tests.scan_app", ignore=[b_package])
+
+        # b_handlers should be ignored
+        assert not hasattr(b_handlers.b_handler, "__wrapped__")
+
+        # a1_handlers should be scanned
+        assert hasattr(a1_handlers.a1_handler, "__wrapped__")
+
+    def test_scan_ignore_single_string(self) -> None:
+        """Test ignoring a single string (not a list)."""
+        from tests.scan_app.a.a1 import handlers as a1_handlers
+        from tests.scan_app.b import handlers as b_handlers
+
+        b_handlers = importlib.reload(b_handlers)
+        a1_handlers = importlib.reload(a1_handlers)
+
+        container = Container()
+        container.register(str, lambda: "hello")
+        container.register(Service, Service)
+
+        # Scan with ignore as single string
+        container.scan("tests.scan_app", ignore="tests.scan_app.b")
+
+        # b_handlers should be ignored
+        assert not hasattr(b_handlers.b_handler, "__wrapped__")
+
+        # a1_handlers should be scanned
+        assert hasattr(a1_handlers.a1_handler, "__wrapped__")
+
+    def test_scan_ignore_multiple_packages(self) -> None:
+        """Test ignoring multiple packages."""
+        from tests.scan_app.a.a1 import handlers as a1_handlers
+        from tests.scan_app.a.a3 import handlers as a3_handlers
+        from tests.scan_app.b import handlers as b_handlers
+
+        b_handlers = importlib.reload(b_handlers)
+        a1_handlers = importlib.reload(a1_handlers)
+        a3_handlers = importlib.reload(a3_handlers)
+
+        container = Container()
+        container.register(str, lambda: "hello")
+        container.register(Service, Service)
+
+        # Scan with multiple ignores
+        container.scan(
+            "tests.scan_app",
+            ignore=["tests.scan_app.b", "tests.scan_app.a.a3"],
+        )
+
+        # b_handlers and a3_handlers should be ignored
+        assert not hasattr(b_handlers.b_handler, "__wrapped__")
+        assert not hasattr(a3_handlers.a_a3_handler_1, "__wrapped__")
+
+        # a1_handlers should be scanned
+        assert hasattr(a1_handlers.a1_handler, "__wrapped__")
