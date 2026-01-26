@@ -151,9 +151,9 @@ This approach is useful when you want to:
 
 ## Pytest Plugin
 
-`AnyDI` has a pytest plugin that injects dependencies into test functions automatically. This makes tests simpler and cleaner.
+`AnyDI` has a pytest plugin that injects dependencies into test functions and fixtures. This makes tests simpler and cleaner.
 
-**Important:** The pytest plugin automatically enables test mode on the container, so you don't need to call `enable_test_mode()` or use the `test_mode()` context manager when using the plugin. You can use `container.override()` directly in your tests.
+**Important:** The pytest plugin automatically enables test mode on the container. You can use `container.override()` directly in your tests without calling `enable_test_mode()`.
 
 ### Configuration
 
@@ -178,6 +178,7 @@ anydi_container = "myapp.container:container"
 ```
 
 The configuration accepts:
+
 - Container instances: `myapp.container:container` or `myapp.container.container`
 - Factory functions: `myapp.container:create_container`
 
@@ -191,7 +192,7 @@ def create_container() -> Container:
 
 **Option 2: Define a `container` fixture**
 
-Or you can override a `container` fixture in your test suite (e.g., in `conftest.py`):
+Or define a `container` fixture in your test suite (e.g., in `conftest.py`):
 
 ```python
 import pytest
@@ -206,38 +207,22 @@ def container() -> Container:
     return myapp_container
 ```
 
-**Note:** The fixture approach takes priority over the configuration if both are defined.
-
-### Auto-injection mode
-
-By default, you need to mark tests with `@pytest.mark.inject` for dependency injection. To inject dependencies into all test functions automatically, set `anydi_autoinject` to `True`:
-
-```ini
-# pytest.ini
-[pytest]
-anydi_autoinject = true
-```
-
-```toml
-# pyproject.toml
-[tool.pytest.ini_options]
-anydi_autoinject = true
-```
+**Note:** The fixture takes priority over the configuration if both are defined.
 
 ### Usage
 
-#### Basic injection
+#### Explicit injection with `Provide[T]`
 
-Use the `@pytest.mark.inject` decorator to inject dependencies into test functions:
+Use `Provide[T]` to mark parameters for injection from the container:
 
 ```python
-import pytest
-
-from anydi import Container
+from anydi import Container, Provide
 
 
-@pytest.mark.inject
-def test_service_get_items(container: Container, service: Service) -> None:
+def test_service_get_items(
+    container: Container,
+    service: Provide[Service],
+) -> None:
     repo_mock = mock.Mock(spec=Repository)
     repo_mock.all.return_value = [Item(name="mock1"), Item(name="mock2")]
 
@@ -245,15 +230,35 @@ def test_service_get_items(container: Container, service: Service) -> None:
         assert service.get_items() == [Item(name="mock1"), Item(name="mock2")]
 ```
 
-Dependencies are resolved from the container automatically based on type annotations.
+Dependencies are resolved from the container based on type annotations.
 
-#### Fixture priority
+### Auto-injection
 
-Pytest fixtures always have higher priority than dependency injection. If a pytest fixture and `@pytest.mark.inject` both provide the same parameter, the fixture value is used.
+To inject dependencies into all test functions automatically, set `anydi_autoinject`:
 
-#### Fixture injection
+```ini
+# pytest.ini
+[pytest]
+anydi_autoinject = true
+```
 
-`anydi_fixture_inject_enabled` enables dependency injection for fixtures with `@pytest.mark.inject`. It is **disabled** by default. You need to enable it if you want fixtures to use container injection. This option does heavy monkey patching of `pytest.fixture` and is experimental, so use it only if you understand the risks:
+```toml
+# pyproject.toml
+[tool.pytest.ini_options]
+anydi_autoinject = true
+```
+
+With auto-injection, you don't need `Provide[T]`. The plugin injects any parameter that matches a type in the container:
+
+```python
+# With anydi_autoinject = true
+def test_service(service: Service) -> None:
+    assert service.get_items() == []
+```
+
+### Fixture injection
+
+By default, fixture injection is disabled. To enable it, set `anydi_fixture_inject_enabled`:
 
 ```ini
 # pytest.ini
@@ -267,12 +272,12 @@ anydi_fixture_inject_enabled = true
 anydi_fixture_inject_enabled = true
 ```
 
-When fixture injection is enabled, use the marker on any fixture and annotate parameters you want from the container. This works for sync, generator, and async fixtures (async fixtures still need the `anyio` plugin, like async tests):
+When enabled, use `Provide[T]` in fixtures to inject dependencies from the container:
 
 ```python
 import pytest
 
-from anydi import Container
+from anydi import Container, Provide
 
 
 class UserRepository:
@@ -297,8 +302,7 @@ def container() -> Container:
 
 
 @pytest.fixture
-@pytest.mark.inject
-def user_service(service: UserService) -> UserService:
+def user_service(service: Provide[UserService]) -> UserService:
     return service
 
 
@@ -306,7 +310,59 @@ def test_uses_injected_fixture(user_service: UserService) -> None:
     assert user_service.get_user_name(1) == "Alice"
 ```
 
-#### Testing with `.create()`
+This works for sync, generator, and async fixtures. Async fixtures need the `anyio` plugin.
+
+If `anydi_autoinject` is also enabled, fixtures automatically get dependencies without `Provide[T]`:
+
+```python
+# With anydi_fixture_inject_enabled = true AND anydi_autoinject = true
+@pytest.fixture
+def user_service(service: UserService) -> UserService:
+    return service
+```
+
+#### Mixed parameters
+
+You can mix injected dependencies with regular pytest fixtures:
+
+```python
+@pytest.fixture
+def settings() -> dict[str, str]:
+    return {"env": "test"}
+
+
+@pytest.fixture
+def service_with_settings(
+    repo: Provide[Repository],  # from container
+    settings: dict[str, str],   # from pytest fixture
+) -> Service:
+    return Service(repo, settings)
+```
+
+#### Fixture priority
+
+Pytest fixtures always have higher priority than dependency injection. If a pytest fixture and `Provide[T]` both match a parameter, the fixture value is used.
+
+**Note:** Only parameters with types registered in the container are injected. Other parameters are resolved as regular pytest fixtures.
+
+### Deprecated: `@pytest.mark.inject`
+
+The `@pytest.mark.inject` marker is deprecated. Use `Provide[T]` instead:
+
+```python
+# Old way (deprecated)
+@pytest.mark.inject
+def test_service(service: Service) -> None:
+    ...
+
+# New way (recommended)
+def test_service(service: Provide[Service]) -> None:
+    ...
+```
+
+Using the deprecated marker shows a `DeprecationWarning`.
+
+### Testing with `.create()`
 
 For more control over dependency injection in tests, use the `.create()` method to instantiate classes with overridden dependencies:
 
