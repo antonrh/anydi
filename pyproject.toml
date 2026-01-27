@@ -114,6 +114,7 @@ enableExperimentalFeatures = true
 addopts = [
     "--strict-config",
     "--strict-markers",
+    "-p", "no:anydi",
 ]
 xfail_strict = true
 junit_family = "xunit2"

@@ -1,11 +1,17 @@
-from collections.abc import AsyncIterator, Iterator
-from typing import Any
+import sys
+from typing import Annotated, Any
 from unittest import mock
 
 import pytest
 
-from anydi import Container
+from anydi import Container, Inject, Provide
 from anydi.ext import pytest_plugin
+
+if "-p" not in sys.argv or "anydi" not in sys.argv:
+    pytest.skip(
+        "Plugin tests are skipped by default; run with -p anydi.",
+        allow_module_level=True,
+    )
 
 
 class Repository:
@@ -40,12 +46,7 @@ def container() -> Container:
 
 
 def test_anydi_autoinject_default(request: pytest.FixtureRequest) -> None:
-    assert request.config.getini("anydi_autoinject") is False
-
-
-def test_anydi_inject_all_default(request: pytest.FixtureRequest) -> None:
-    """Test deprecated option still works (for backward compatibility)."""
-    assert request.config.getini("anydi_inject_all") is False
+    assert request.config.getini("anydi_autoinject") is True
 
 
 def test_no_container_setup(
@@ -181,48 +182,6 @@ def test_get_container_no_fixture_no_config(
         pytest_plugin._find_container(request)
 
 
-@pytest.fixture
-@pytest.mark.inject
-def injected_fixture(service: Service) -> str:
-    return service.name
-
-
-def test_inject_into_fixture(injected_fixture: str) -> None:
-    assert injected_fixture == "service"
-
-
-@pytest.fixture
-@pytest.mark.inject
-def injected_generator_fixture(service: Service) -> Iterator[str]:
-    yield service.name  # noqa: PT022
-
-
-def test_inject_into_generator_fixture(injected_generator_fixture: str) -> None:
-    assert injected_generator_fixture == "service"
-
-
-@pytest.fixture
-@pytest.mark.inject
-async def injected_async_fixture(service: Service) -> str:
-    return service.name
-
-
-async def test_inject_into_async_fixture(injected_async_fixture: str) -> None:
-    assert injected_async_fixture == "service"
-
-
-@pytest.fixture
-@pytest.mark.inject
-async def injected_async_generator_fixture(service: Service) -> AsyncIterator[str]:
-    yield service.name  # noqa: PT022
-
-
-async def test_inject_into_async_generator_fixture(
-    injected_async_generator_fixture: str,
-) -> None:
-    assert injected_async_generator_fixture == "service"
-
-
 def test_container_test_mode_enabled(container: Container) -> None:
     """Test that container is in test mode when enable_test_mode is called."""
     assert container._test_mode is True
@@ -251,3 +210,55 @@ def test_override_works_for_injected_service(
 
     # After override context, original behavior is restored
     assert service.get_item(100) is None
+
+
+def test_explicit_provide_in_test(service: Provide[Service]) -> None:
+    """Test explicit injection via Provide[T] in test functions."""
+    assert isinstance(service, Service)
+    assert service.name == "service"
+
+
+async def test_explicit_provide_in_async_test(service: Provide[Service]) -> None:
+    """Test explicit injection via Provide[T] in async test functions."""
+    assert isinstance(service, Service)
+    assert service.name == "service"
+
+
+def test_explicit_annotated_inject_in_test(
+    service: Annotated[Service, Inject()],
+) -> None:
+    """Test explicit injection via Annotated[T, Inject()] in test functions."""
+    assert isinstance(service, Service)
+    assert service.name == "service"
+
+
+async def test_explicit_annotated_inject_in_async_test(
+    service: Annotated[Service, Inject()],
+) -> None:
+    """Test explicit injection via Annotated[T, Inject()] in async test functions."""
+    assert isinstance(service, Service)
+    assert service.name == "service"
+
+
+@pytest.fixture
+def settings_fixture() -> dict[str, str]:
+    """Regular pytest fixture."""
+    return {"env": "test", "debug": "true"}
+
+
+def test_mixed_params_in_test(
+    service: Provide[Service],
+    settings_fixture: dict[str, str],
+) -> None:
+    """Test mixing DI injection with regular pytest fixtures in test function."""
+    assert isinstance(service, Service)
+    assert settings_fixture == {"env": "test", "debug": "true"}
+
+
+def test_explicit_injection_priority(
+    repo: Provide[Repository],  # Explicit - should be injected
+    container: Container,  # Regular fixture - should use fixture
+) -> None:
+    """Test that explicit markers take priority and coexist with fixtures."""
+    assert isinstance(repo, Repository)
+    assert isinstance(container, Container)
