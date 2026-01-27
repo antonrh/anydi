@@ -1,3 +1,4 @@
+import sys
 from typing import Annotated, Any
 from unittest import mock
 
@@ -5,6 +6,12 @@ import pytest
 
 from anydi import Container, Inject, Provide
 from anydi.ext import pytest_plugin
+
+if "-p" not in sys.argv or "anydi" not in sys.argv:
+    pytest.skip(
+        "Plugin tests are skipped by default; run with -p anydi.",
+        allow_module_level=True,
+    )
 
 
 class Repository:

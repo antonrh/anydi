@@ -5,7 +5,7 @@ import inspect
 import logging
 import warnings
 from collections.abc import Generator
-from typing import Annotated, Any, cast, get_args, get_origin
+from typing import TYPE_CHECKING, Annotated, Any, cast, get_args, get_origin
 
 import pytest
 from anyio.pytest_plugin import extract_backend_and_options, get_runner
@@ -13,6 +13,9 @@ from typing_extensions import get_annotations
 
 from anydi import Container, import_container
 from anydi._marker import is_marker
+
+if TYPE_CHECKING:
+    from _pytest.fixtures import SubRequest
 
 logger = logging.getLogger(__name__)
 
@@ -44,7 +47,7 @@ def pytest_configure(config: pytest.Config) -> None:
 
 @pytest.hookimpl(hookwrapper=True)
 def pytest_fixture_setup(
-    fixturedef: pytest.FixtureDef[Any], request: pytest.SubRequest
+    fixturedef: pytest.FixtureDef[Any], request: SubRequest
 ) -> Generator[None]:
     """Automatically enable test mode on the container fixture."""
     yield
