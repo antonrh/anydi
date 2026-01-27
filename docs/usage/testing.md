@@ -234,116 +234,26 @@ Dependencies are resolved from the container based on type annotations.
 
 ### Auto-injection
 
-To inject dependencies into all test functions automatically, set `anydi_autoinject`:
-
-```ini
-# pytest.ini
-[pytest]
-anydi_autoinject = true
-```
-
-```toml
-# pyproject.toml
-[tool.pytest.ini_options]
-anydi_autoinject = true
-```
-
-With auto-injection, you don't need `Provide[T]`. The plugin injects any parameter that matches a type in the container:
+Auto-injection is **enabled by default**. The plugin automatically injects any test parameter that matches a type registered in the container:
 
 ```python
-# With anydi_autoinject = true
 def test_service(service: Service) -> None:
     assert service.get_items() == []
 ```
 
-### Fixture injection
-
-By default, fixture injection is disabled. To enable it, set `anydi_fixture_inject_enabled`:
+To disable auto-injection, set `anydi_autoinject = false`:
 
 ```ini
 # pytest.ini
 [pytest]
-anydi_fixture_inject_enabled = true
+anydi_autoinject = false
 ```
 
 ```toml
 # pyproject.toml
 [tool.pytest.ini_options]
-anydi_fixture_inject_enabled = true
+anydi_autoinject = false
 ```
-
-When enabled, use `Provide[T]` in fixtures to inject dependencies from the container:
-
-```python
-import pytest
-
-from anydi import Container, Provide
-
-
-class UserRepository:
-    def get_name(self, user_id: int) -> str:
-        return "Alice" if user_id == 1 else "Unknown"
-
-
-class UserService:
-    def __init__(self, repo: UserRepository) -> None:
-        self.repo = repo
-
-    def get_user_name(self, user_id: int) -> str:
-        return self.repo.get_name(user_id)
-
-
-@pytest.fixture(scope="session")
-def container() -> Container:
-    container = Container()
-    container.register(UserRepository)
-    container.register(UserService)
-    return container
-
-
-@pytest.fixture
-def user_service(service: Provide[UserService]) -> UserService:
-    return service
-
-
-def test_uses_injected_fixture(user_service: UserService) -> None:
-    assert user_service.get_user_name(1) == "Alice"
-```
-
-This works for sync, generator, and async fixtures. Async fixtures need the `anyio` plugin.
-
-If `anydi_autoinject` is also enabled, fixtures automatically get dependencies without `Provide[T]`:
-
-```python
-# With anydi_fixture_inject_enabled = true AND anydi_autoinject = true
-@pytest.fixture
-def user_service(service: UserService) -> UserService:
-    return service
-```
-
-#### Mixed parameters
-
-You can mix injected dependencies with regular pytest fixtures:
-
-```python
-@pytest.fixture
-def settings() -> dict[str, str]:
-    return {"env": "test"}
-
-
-@pytest.fixture
-def service_with_settings(
-    repo: Provide[Repository],  # from container
-    settings: dict[str, str],   # from pytest fixture
-) -> Service:
-    return Service(repo, settings)
-```
-
-#### Fixture priority
-
-Pytest fixtures always have higher priority than dependency injection. If a pytest fixture and `Provide[T]` both match a parameter, the fixture value is used.
-
-**Note:** Only parameters with types registered in the container are injected. Other parameters are resolved as regular pytest fixtures.
 
 ### Deprecated: `@pytest.mark.inject`
 

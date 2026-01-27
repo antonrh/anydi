@@ -15,4 +15,4 @@ fmt: ## Run code formatters
 
 test:  ## Run unit tests
 	uv run pytest -vv tests --ignore=tests/ext/test_pytest_plugin.py --cov=anydi -p no:anydi
-	uv run pytest -vv tests/ext/test_pytest_plugin.py --cov=anydi --cov-append -o anydi_fixture_inject_enabled=true
+	uv run pytest -vv tests/ext/test_pytest_plugin.py --cov=anydi --cov-append
