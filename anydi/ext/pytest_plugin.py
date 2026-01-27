@@ -4,6 +4,7 @@ import importlib.util
 import inspect
 import logging
 import warnings
+from collections.abc import Generator
 from typing import Annotated, Any, cast, get_args, get_origin
 
 import pytest
@@ -41,12 +42,22 @@ def pytest_configure(config: pytest.Config) -> None:
     )
 
 
+@pytest.hookimpl(hookwrapper=True)
+def pytest_fixture_setup(
+    fixturedef: pytest.FixtureDef[Any], request: pytest.SubRequest
+) -> Generator[None]:
+    """Automatically enable test mode on the container fixture."""
+    yield
+    if fixturedef.argname == "container" and fixturedef.cached_result is not None:
+        container = fixturedef.cached_result[0]
+        if isinstance(container, Container):
+            container.enable_test_mode()
+
+
 @pytest.fixture(scope="session")
 def container(request: pytest.FixtureRequest) -> Container:
-    """Container fixture with testing mode enabled."""
-    container = _find_container(request)
-    container.enable_test_mode()
-    return container
+    """Container fixture."""
+    return _find_container(request)
 
 
 @pytest.fixture(autouse=True)
@@ -60,7 +71,6 @@ def _anydi_inject(request: pytest.FixtureRequest) -> None:
         return
 
     container = cast(Container, request.getfixturevalue("container"))
-    container.enable_test_mode()
 
     warned = False
     for name, dependency_type in parameters:
@@ -96,7 +106,6 @@ def _anydi_ainject(request: pytest.FixtureRequest) -> None:
         )
 
     container = cast(Container, request.getfixturevalue("container"))
-    container.enable_test_mode()
 
     async def _resolve() -> None:
         warned = False

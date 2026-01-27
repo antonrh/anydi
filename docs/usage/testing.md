@@ -99,7 +99,7 @@ def test_handler() -> None:
         assert get_items() == [Item(name="mock1"), Item(name="mock2")]
 ```
 
-## Testing with Modules
+## Overriding Providers with Modules
 
 You can create a testing module that overrides providers from your application modules. Use `@provider(scope="...", override=True)` to replace specific providers:
 
@@ -153,8 +153,6 @@ This approach is useful when you want to:
 
 `AnyDI` has a pytest plugin that injects dependencies into test functions. This makes tests simpler and cleaner.
 
-**Important:** The pytest plugin automatically enables test mode on the container. You can use `container.override()` directly in your tests without calling `enable_test_mode()`.
-
 ### Configuration
 
 #### Container setup
@@ -204,7 +202,6 @@ from myapp import container as myapp_container
 
 @pytest.fixture(scope="session")
 def container() -> Container:
-    myapp_container.enable_test_mode()
     return myapp_container
 ```
 
