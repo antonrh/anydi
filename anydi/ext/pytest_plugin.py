@@ -62,16 +62,13 @@ def _anydi_inject(request: pytest.FixtureRequest) -> None:
     container = cast(Container, request.getfixturevalue("container"))
     container.enable_test_mode()
 
-    resolvable = [
-        (name, tp) for name, tp in parameters if container.has_provider_for(tp)
-    ]
-    if not resolvable:
-        return
-
-    if uses_deprecated:
-        _warn_deprecated_marker(request.node.name)
-
-    for name, dependency_type in resolvable:
+    warned = False
+    for name, dependency_type in parameters:
+        if not container.has_provider_for(dependency_type):
+            continue
+        if uses_deprecated and not warned:
+            _warn_deprecated_marker(request.node.name)
+            warned = True
         try:
             request.node.funcargs[name] = container.resolve(dependency_type)
         except Exception:  # pragma: no cover
@@ -101,19 +98,16 @@ def _anydi_ainject(request: pytest.FixtureRequest) -> None:
     container = cast(Container, request.getfixturevalue("container"))
     container.enable_test_mode()
 
-    resolvable = [
-        (name, tp) for name, tp in parameters if container.has_provider_for(tp)
-    ]
-    if not resolvable:
-        return
-
-    if uses_deprecated:
-        _warn_deprecated_marker(request.node.name)
-
     async def _resolve() -> None:
-        for name, tp in resolvable:
+        warned = False
+        for name, dependency_type in parameters:
+            if not container.has_provider_for(dependency_type):
+                continue
+            if uses_deprecated and not warned:
+                _warn_deprecated_marker(request.node.name)
+                warned = True
             try:
-                request.node.funcargs[name] = await container.aresolve(tp)
+                request.node.funcargs[name] = await container.aresolve(dependency_type)
             except Exception:  # pragma: no cover
                 logger.warning(
                     "Failed to resolve '%s' for %s", name, request.node.nodeid
@@ -124,11 +118,6 @@ def _anydi_ainject(request: pytest.FixtureRequest) -> None:
 
     with get_runner(backend_name, backend_options) as runner:
         runner.run_fixture(_resolve, {})
-
-
-# ---------------------------------------------------------------------------
-# Internal helpers
-# ---------------------------------------------------------------------------
 
 
 def _get_injectable_params(
@@ -155,13 +144,13 @@ def _get_injectable_params(
         if name in ("request", "return"):
             continue
 
-        tp, is_explicit = _extract_type(annotation)
+        dependency_type, is_explicit = _extract_dependency_type(annotation)
 
         if is_explicit:
             has_any_explicit = True
-            explicit_params.append((name, tp))
+            explicit_params.append((name, dependency_type))
         elif name in fixture_names:
-            all_params.append((name, tp))
+            all_params.append((name, dependency_type))
 
     # Priority: explicit markers > deprecated @pytest.mark.inject > autoinject
     if has_any_explicit:
@@ -173,7 +162,7 @@ def _get_injectable_params(
     return [], False
 
 
-def _extract_type(annotation: Any) -> tuple[Any, bool]:
+def _extract_dependency_type(annotation: Any) -> tuple[Any, bool]:
     """Extract the actual type and whether it has an explicit injection marker.
 
     Handles Provide[T] and Annotated[T, Inject()].
@@ -214,8 +203,8 @@ def _find_container(request: pytest.FixtureRequest) -> Container:
 
 def _warn_deprecated_marker(test_name: str) -> None:
     warnings.warn(
-        f"Using @pytest.mark.inject on test '{test_name}' is "
-        "deprecated. Use Provide[T] or Annotated[T, Inject()] instead.",
+        f"Using @pytest.mark.inject on test '{test_name}' is deprecated. "
+        "Use Provide[T] instead.",
         DeprecationWarning,
         stacklevel=4,
     )

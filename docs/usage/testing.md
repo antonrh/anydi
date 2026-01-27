@@ -151,7 +151,7 @@ This approach is useful when you want to:
 
 ## Pytest Plugin
 
-`AnyDI` has a pytest plugin that injects dependencies into test functions and fixtures. This makes tests simpler and cleaner.
+`AnyDI` has a pytest plugin that injects dependencies into test functions. This makes tests simpler and cleaner.
 
 **Important:** The pytest plugin automatically enables test mode on the container. You can use `container.override()` directly in your tests without calling `enable_test_mode()`.
 
