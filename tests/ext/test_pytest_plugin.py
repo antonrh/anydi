@@ -205,11 +205,6 @@ def test_override_works_for_injected_service(
     assert service.get_item(100) is None
 
 
-# =============================================================================
-# Explicit injection tests - Provide[T] variant
-# =============================================================================
-
-
 def test_explicit_provide_in_test(service: Provide[Service]) -> None:
     """Test explicit injection via Provide[T] in test functions."""
     assert isinstance(service, Service)
@@ -220,11 +215,6 @@ async def test_explicit_provide_in_async_test(service: Provide[Service]) -> None
     """Test explicit injection via Provide[T] in async test functions."""
     assert isinstance(service, Service)
     assert service.name == "service"
-
-
-# =============================================================================
-# Explicit injection tests - Annotated[T, Inject()] variant
-# =============================================================================
 
 
 def test_explicit_annotated_inject_in_test(
@@ -243,11 +233,6 @@ async def test_explicit_annotated_inject_in_async_test(
     assert service.name == "service"
 
 
-# =============================================================================
-# Mixed parameters - DI + pytest fixtures
-# =============================================================================
-
-
 @pytest.fixture
 def settings_fixture() -> dict[str, str]:
     """Regular pytest fixture."""
@@ -261,11 +246,6 @@ def test_mixed_params_in_test(
     """Test mixing DI injection with regular pytest fixtures in test function."""
     assert isinstance(service, Service)
     assert settings_fixture == {"env": "test", "debug": "true"}
-
-
-# =============================================================================
-# Priority tests - explicit injection takes priority over autoinject
-# =============================================================================
 
 
 def test_explicit_injection_priority(
