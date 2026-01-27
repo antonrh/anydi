@@ -2,7 +2,7 @@
 
 ## Test Mode
 
-When overriding dependencies in tests, AnyDI uses a special **test mode** that enables proper override support throughout the dependency graph. Test mode ensures that overridden dependencies are correctly propagated to all dependent services.
+When overriding dependencies in tests, `AnyDI` uses a special **test mode** that enables proper override support throughout the dependency graph. Test mode ensures that overridden dependencies are correctly propagated to all dependent services.
 
 ### Enabling Test Mode
 
@@ -30,7 +30,7 @@ finally:
 
 ### Why Test Mode Matters
 
-AnyDI compiles optimized resolvers for fast dependency resolution. Test mode switches to a separate set of resolvers that include override checking logic. This ensures:
+`AnyDI` compiles optimized resolvers for fast dependency resolution. Test mode switches to a separate set of resolvers that include override checking logic. This ensures:
 
 - Overrides are checked at every resolution point
 - Nested dependencies correctly receive overridden instances
@@ -204,6 +204,7 @@ from myapp import container as myapp_container
 
 @pytest.fixture(scope="session")
 def container() -> Container:
+    myapp_container.enable_test_mode()
     return myapp_container
 ```
 
