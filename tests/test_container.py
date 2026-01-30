@@ -3543,6 +3543,72 @@ class TestContainerOverride:
 
         assert container.resolve(int) == 0
 
+    def test_override_canonical_resolves_via_alias(self) -> None:
+        """Override canonical type, resolve via alias."""
+
+        class IService:
+            pass
+
+        class ServiceImpl(IService):
+            pass
+
+        class MockService(IService):
+            pass
+
+        container = Container()
+        container.enable_test_mode()
+        container.register(ServiceImpl, scope="singleton")
+        container.alias(IService, ServiceImpl)
+
+        mock = MockService()
+        with container.override(ServiceImpl, mock):
+            assert container.resolve(IService) is mock
+            assert container.resolve(ServiceImpl) is mock
+
+    def test_override_alias_resolves_via_canonical(self) -> None:
+        """Override alias type, resolve via canonical."""
+
+        class IService:
+            pass
+
+        class ServiceImpl(IService):
+            pass
+
+        class MockService(IService):
+            pass
+
+        container = Container()
+        container.enable_test_mode()
+        container.register(ServiceImpl, scope="singleton")
+        container.alias(IService, ServiceImpl)
+
+        mock = MockService()
+        with container.override(IService, mock):
+            assert container.resolve(IService) is mock
+            assert container.resolve(ServiceImpl) is mock
+
+    async def test_override_alias_async(self) -> None:
+        """Override with alias works in async resolution."""
+
+        class IService:
+            pass
+
+        class ServiceImpl(IService):
+            pass
+
+        class MockService(IService):
+            pass
+
+        container = Container()
+        container.enable_test_mode()
+        container.register(ServiceImpl, scope="singleton")
+        container.alias(IService, ServiceImpl)
+
+        mock = MockService()
+        with container.override(ServiceImpl, mock):
+            assert await container.aresolve(IService) is mock
+            assert await container.aresolve(ServiceImpl) is mock
+
 
 # Test data for import_container tests
 class _TestService:

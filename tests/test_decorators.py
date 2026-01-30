@@ -3,7 +3,7 @@ from abc import ABC, abstractmethod
 import pytest
 
 from anydi import Module, injectable, provided, provider, request, singleton, transient
-from anydi._decorators import is_injectable, is_provided
+from anydi._decorators import get_alias_list, is_injectable, is_provided
 
 
 class IService(ABC):
@@ -33,6 +33,46 @@ def test_is_provided_has_scope() -> None:
     assert is_provided(Service)
 
 
+def test_get_alias_list_single() -> None:
+    @singleton(alias=IService)
+    class ServiceImpl(IService):
+        def do_something(self) -> None:
+            pass
+
+    assert is_provided(ServiceImpl)
+    assert get_alias_list(ServiceImpl.__provided__) == [IService]
+
+
+def test_get_alias_list_list() -> None:
+    class IReader:
+        pass
+
+    class IWriter:
+        pass
+
+    @singleton(alias=[IReader, IWriter])
+    class ReadWriteService:
+        pass
+
+    assert is_provided(ReadWriteService)
+    assert get_alias_list(ReadWriteService.__provided__) == [IReader, IWriter]
+
+
+def test_get_alias_list_tuple() -> None:
+    class IReader:
+        pass
+
+    class IWriter:
+        pass
+
+    @provided(scope="singleton", alias=(IReader, IWriter))
+    class ReadWriteService:
+        pass
+
+    assert is_provided(ReadWriteService)
+    assert get_alias_list(ReadWriteService.__provided__) == [IReader, IWriter]
+
+
 # provided decorator tests
 
 
@@ -57,6 +97,18 @@ def test_provided_decorator_with_alias() -> None:
     assert ServiceImpl.__provided__ == {
         "scope": "singleton",
         "alias": IService,
+    }
+
+
+def test_provided_decorator_with_from_context() -> None:
+    @provided(scope="request", from_context=True)
+    class Service:
+        pass
+
+    assert is_provided(Service)
+    assert Service.__provided__ == {
+        "scope": "request",
+        "from_context": True,
     }
 
 
