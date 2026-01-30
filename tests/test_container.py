@@ -284,6 +284,23 @@ class TestContainerRegistration:
         ):
             container.alias(str, str)
 
+    def test_alias_duplicate_error(self, container: Container) -> None:
+        class IService:
+            pass
+
+        class ServiceA:
+            pass
+
+        class ServiceB:
+            pass
+
+        container.register(ServiceA, scope="singleton")
+        container.register(ServiceB, scope="singleton")
+        container.alias(IService, ServiceA)
+
+        with pytest.raises(ValueError, match="Alias .* is already registered"):
+            container.alias(IService, ServiceB)
+
     def test_alias_after_build_error(self, container: Container) -> None:
         container.register(str, lambda: "test", scope="singleton")
         container.build()

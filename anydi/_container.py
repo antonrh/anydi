@@ -385,6 +385,11 @@ class Container:
             )
         if alias_type == canonical_type:
             raise ValueError("Alias type cannot be the same as canonical type.")
+        if alias_type in self._aliases:
+            raise ValueError(
+                f"Alias `{type_repr(alias_type)}` is already registered "
+                f"for `{type_repr(self._aliases[alias_type])}`."
+            )
         self._aliases[alias_type] = canonical_type
 
     def _resolve_alias(self, dependency_type: Any) -> Any:
