@@ -128,17 +128,22 @@ repo2 = container.resolve(IRepository)
 assert repo is repo2  # Same instance
 ```
 
-All decorators support `alias`:
+All decorators support `alias` (single or list):
 
 ```python
+# Single alias
 @singleton(alias=IRepository)
-@transient(alias=IRepository)
-@request(alias=IRepository)
-@provided(scope="singleton", alias=IRepository)
+class UserRepository(IRepository):
+    pass
+
+# Multiple aliases
+@singleton(alias=[IReader, IWriter, IDeleter])
+class CRUDRepository(IReader, IWriter, IDeleter):
+    pass
 ```
 
 !!! note "Alias Semantics"
-    The class (`UserRepository`) is the primary registration. The alias (`IRepository`) is an additional key that resolves to the same instance. See [Type Aliases](basics.md#type-aliases) for more details.
+    The class is the primary registration. Aliases are additional keys that resolve to the same instance. See [Type Aliases](basics.md#type-aliases) for more details.
 
 ### `@request` with `from_context`
 

@@ -34,10 +34,14 @@ class ProvidedMetadata(TypedDict):
     from_context: NotRequired[bool]
 
 
-@overload
-def provided(
-    *, scope: Scope, alias: Any = NOT_SET, from_context: bool = False
-) -> Callable[[ClassT], ClassT]: ...
+def get_alias_list(provided: ProvidedMetadata) -> list[Any]:
+    """Get alias list from __provided__ metadata, normalizing single to list."""
+    alias = provided.get("alias")
+    if alias is None:
+        return []
+    if isinstance(alias, list | tuple):
+        return list(alias)  # type: ignore
+    return [alias]
 
 
 def provided(

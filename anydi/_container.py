@@ -17,7 +17,7 @@ from typing import Any, Literal, TypeVar, get_args, get_origin, overload
 from typing_extensions import ParamSpec, Self, type_repr
 
 from ._context import InstanceContext
-from ._decorators import is_provided
+from ._decorators import get_alias_list, is_provided
 from ._graph import Graph
 from ._injector import Injector
 from ._marker import Marker
@@ -620,10 +620,10 @@ class Container:
                     False,
                     defaults,
                 )
-                # Register alias if specified
-                alias_type = dependency_type.__provided__.get("alias")
-                if alias_type is not None and not self.ready:
-                    self.alias(alias_type, dependency_type)
+                # Register aliases if specified
+                if not self.ready:
+                    for alias_type in get_alias_list(dependency_type.__provided__):
+                        self.alias(alias_type, dependency_type)
                 registered = True
             else:
                 raise LookupError(
@@ -704,9 +704,8 @@ class Container:
                         False,
                         None,
                     )
-                    # Register alias if specified
-                    alias_type = dependency_type.__provided__.get("alias")
-                    if alias_type is not None:
+                    # Register aliases if specified
+                    for alias_type in get_alias_list(dependency_type.__provided__):
                         self._aliases[alias_type] = dependency_type
                     # Recursively ensure the @provided class is resolved
                     dep_provider = self._ensure_provider_resolved(
@@ -1008,9 +1007,10 @@ class Container:
                             False,
                             None,
                         )
-                        # Register alias if specified
-                        alias_type = param_dependency_type.__provided__.get("alias")
-                        if alias_type is not None:
+                        # Register aliases if specified
+                        for alias_type in get_alias_list(
+                            param_dependency_type.__provided__
+                        ):
                             self._aliases[alias_type] = param_dependency_type
                     elif param.has_default:
                         # Has default, can be missing

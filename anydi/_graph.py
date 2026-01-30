@@ -21,8 +21,8 @@ class Graph:
 
     def _get_aliases_for(self, dependency_type: Any) -> list[str]:
         """Get list of alias names that point to a dependency type."""
-        aliases = []
-        for alias, canonical in self._container._aliases.items():
+        aliases: list[str] = []
+        for alias, canonical in self._container.aliases.items():
             if canonical == dependency_type:
                 aliases.append(type_repr(alias).rsplit(".", 1)[-1])
         return aliases

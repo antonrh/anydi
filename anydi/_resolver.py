@@ -106,7 +106,7 @@ class Resolver:
         cache[provider.dependency_type] = compiled
 
         # Also store under all aliases that point to this type
-        for alias, canonical in self._container._aliases.items():
+        for alias, canonical in self._container.aliases.items():
             if canonical == provider.dependency_type:
                 cache[alias] = compiled
 

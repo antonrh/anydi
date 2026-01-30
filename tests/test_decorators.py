@@ -98,6 +98,24 @@ def test_singleton_decorator_with_alias() -> None:
     }
 
 
+def test_singleton_decorator_with_multiple_aliases() -> None:
+    class IReader:
+        pass
+
+    class IWriter:
+        pass
+
+    @singleton(alias=[IReader, IWriter])
+    class ReadWriteService:
+        pass
+
+    assert is_provided(ReadWriteService)
+    assert ReadWriteService.__provided__ == {
+        "alias": [IReader, IWriter],
+        "scope": "singleton",
+    }
+
+
 # transient decorator tests
 
 
