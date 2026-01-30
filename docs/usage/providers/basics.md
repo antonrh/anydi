@@ -67,17 +67,17 @@ Use `alias()` to resolve a dependency using an alternative type:
 from anydi import Container
 
 container = Container()
-container.register(IRepository, UserRepository, scope="singleton")
-container.alias(UserRepository, IRepository)
+container.register(UserRepository, scope="singleton")
+container.alias(IRepository, UserRepository)
 
 # Both resolve to the same instance
-repo1 = container.resolve(IRepository)
-repo2 = container.resolve(UserRepository)
+repo1 = container.resolve(UserRepository)
+repo2 = container.resolve(IRepository)
 assert repo1 is repo2
 ```
 
 !!! tip
-    When using `scan()` with `dependency_type`, aliases are created automatically. See [Auto-Registration](auto-registration.md#register-with-a-different-dependency_type).
+    When using `scan()` with `alias`, aliases are created automatically. See [Auto-Registration](auto-registration.md#register-with-an-alias).
 
 ## Unregistering providers
 
