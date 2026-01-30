@@ -105,6 +105,11 @@ class Resolver:
         # Store the compiled functions in the cache
         cache[provider.dependency_type] = compiled
 
+        # Also store under all aliases that point to this type
+        for alias, canonical in self._container._aliases.items():
+            if canonical == provider.dependency_type:
+                cache[alias] = compiled
+
         return compiled
 
     def _add_override_check(

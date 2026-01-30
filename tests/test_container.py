@@ -258,6 +258,55 @@ class TestContainerRegistration:
         assert container.is_registered(Annotated[str, "msg1"])
         assert container.is_registered(Annotated[str, "msg2"])
 
+    def test_alias(self, container: Container) -> None:
+        class IService:
+            pass
+
+        class ServiceImpl(IService):
+            pass
+
+        container.register(IService, ServiceImpl, scope="singleton")
+        container.alias(ServiceImpl, IService)
+
+        # Both should be considered registered
+        assert container.is_registered(IService)
+        assert container.is_registered(ServiceImpl)
+
+        # Both should resolve to the same instance
+        service1 = container.resolve(IService)
+        service2 = container.resolve(ServiceImpl)
+        assert service1 is service2
+        assert isinstance(service1, ServiceImpl)
+
+    def test_alias_same_type_error(self, container: Container) -> None:
+        with pytest.raises(
+            ValueError, match="Alias type cannot be the same as canonical type."
+        ):
+            container.alias(str, str)
+
+    def test_alias_after_build_error(self, container: Container) -> None:
+        container.register(str, lambda: "test", scope="singleton")
+        container.build()
+
+        with pytest.raises(
+            RuntimeError,
+            match="Cannot register aliases after build\\(\\) has been called.",
+        ):
+            container.alias(int, str)
+
+    def test_aliases_property(self, container: Container) -> None:
+        class IService:
+            pass
+
+        class ServiceImpl(IService):
+            pass
+
+        container.register(IService, ServiceImpl, scope="singleton")
+        container.alias(ServiceImpl, IService)
+
+        assert ServiceImpl in container.aliases
+        assert container.aliases[ServiceImpl] == IService
+
     def test_register_providers_via_constructor(self) -> None:
         container = Container(
             providers=[

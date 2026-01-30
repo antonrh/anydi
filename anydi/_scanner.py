@@ -58,13 +58,14 @@ class Scanner:
 
         # First: register @provided classes
         for cls in provided_classes:
-            dependency_type = cls.__provided__.get("dependency_type", cls)
-            if not self._container.is_registered(dependency_type):
+            if not self._container.is_registered(cls):
                 scope = cls.__provided__["scope"]
                 from_context = cls.__provided__.get("from_context", False)
-                self._container.register(
-                    dependency_type, cls, scope=scope, from_context=from_context
-                )
+                self._container.register(cls, cls, scope=scope, from_context=from_context)
+            # Create alias if specified (alias → cls)
+            alias_type = cls.__provided__.get("alias")
+            if alias_type is not None:
+                self._container.alias(alias_type, cls)
 
         # Second: inject @injectable functions
         for dependency in injectable_dependencies:

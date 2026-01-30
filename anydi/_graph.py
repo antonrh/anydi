@@ -19,6 +19,14 @@ class Graph:
     def __init__(self, container: Container) -> None:
         self._container = container
 
+    def _get_aliases_for(self, dependency_type: Any) -> list[str]:
+        """Get list of alias names that point to a dependency type."""
+        aliases = []
+        for alias, canonical in self._container._aliases.items():
+            if canonical == dependency_type:
+                aliases.append(type_repr(alias).rsplit(".", 1)[-1])
+        return aliases
+
     def draw(
         self,
         output_format: Literal["tree", "mermaid", "dot", "json"] = "tree",
@@ -127,14 +135,16 @@ class Graph:
                     }
                 )
 
-            providers.append(
-                {
-                    "type": self._get_name(provider, full_path),
-                    "scope": provider.scope,
-                    "from_context": provider.from_context,
-                    "dependencies": dependencies,
-                }
-            )
+            aliases = self._get_aliases_for(provider.dependency_type)
+            provider_data: dict[str, Any] = {
+                "type": self._get_name(provider, full_path),
+                "scope": provider.scope,
+                "from_context": provider.from_context,
+                "dependencies": dependencies,
+            }
+            if aliases:
+                provider_data["aliases"] = aliases
+            providers.append(provider_data)
 
         return json.dumps({"providers": providers}, indent=ident)
 
@@ -167,19 +177,20 @@ class Graph:
 
         return "\n".join(lines)
 
-    @classmethod
     def _format_tree_node(
-        cls, provider: Provider, full_path: bool, param_name: str | None = None
+        self, provider: Provider, full_path: bool, param_name: str | None = None
     ) -> str:
-        name = cls._get_name(provider, full_path)
+        name = self._get_name(provider, full_path)
         scope_label = Graph._get_scope_label(provider.scope, provider.from_context)
         context_marker = " [context]" if provider.from_context else ""
+        aliases = self._get_aliases_for(provider.dependency_type)
+        alias_marker = f" [alias: {', '.join(aliases)}]" if aliases else ""
         if param_name:
-            return f"{param_name}: {name} ({scope_label}){context_marker}"
-        return f"{name} ({scope_label}){context_marker}"
+            return f"{param_name}: {name} ({scope_label}){context_marker}{alias_marker}"
+        return f"{name} ({scope_label}){context_marker}{alias_marker}"
 
-    @staticmethod
     def _render_tree_children(
+        self,
         provider: Provider,
         prefix: str,
         visited: set[Any],
@@ -197,10 +208,10 @@ class Graph:
                 continue
             is_last = i == len(deps) - 1
             connector = "└── " if is_last else "├── "
-            node_text = Graph._format_tree_node(dep_provider, full_path, param.name)
+            node_text = self._format_tree_node(dep_provider, full_path, param.name)
             lines.append(f"{prefix}{connector}{node_text}")
             extension = "    " if is_last else "│   "
-            Graph._render_tree_children(
+            self._render_tree_children(
                 dep_provider, prefix + extension, visited, lines, full_path
             )
 

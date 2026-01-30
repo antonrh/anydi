@@ -47,16 +47,16 @@ def test_provided_decorator() -> None:
     }
 
 
-def test_provided_decorator_with_dependency_type() -> None:
-    @provided(IService, scope="singleton")
+def test_provided_decorator_with_alias() -> None:
+    @provided(scope="singleton", alias=IService)
     class ServiceImpl:
         def do_something(self) -> None:
             pass
 
     assert is_provided(ServiceImpl)
     assert ServiceImpl.__provided__ == {
-        "dependency_type": IService,
         "scope": "singleton",
+        "alias": IService,
     }
 
 
@@ -85,15 +85,15 @@ def test_singleton_decorator_call() -> None:
     }
 
 
-def test_singleton_decorator_with_dependency_type() -> None:
-    @singleton(dependency_type=IService)
+def test_singleton_decorator_with_alias() -> None:
+    @singleton(alias=IService)
     class ServiceImpl:
         def do_something(self) -> None:
             pass
 
     assert is_provided(ServiceImpl)
     assert ServiceImpl.__provided__ == {
-        "dependency_type": IService,
+        "alias": IService,
         "scope": "singleton",
     }
 
@@ -123,15 +123,15 @@ def test_transient_decorator_call() -> None:
     }
 
 
-def test_transient_decorator_with_dependency_type() -> None:
-    @transient(dependency_type=IService)
+def test_transient_decorator_with_alias() -> None:
+    @transient(alias=IService)
     class ServiceImpl:
         def do_something(self) -> None:
             pass
 
     assert is_provided(ServiceImpl)
     assert ServiceImpl.__provided__ == {
-        "dependency_type": IService,
+        "alias": IService,
         "scope": "transient",
     }
 
@@ -178,28 +178,28 @@ def test_request_decorator_with_from_context() -> None:
     }
 
 
-def test_request_decorator_with_dependency_type() -> None:
-    @request(dependency_type=IService)
+def test_request_decorator_with_alias() -> None:
+    @request(alias=IService)
     class ServiceImpl:
         def do_something(self) -> None:
             pass
 
     assert is_provided(ServiceImpl)
     assert ServiceImpl.__provided__ == {
-        "dependency_type": IService,
+        "alias": IService,
         "scope": "request",
     }
 
 
-def test_request_decorator_with_dependency_type_and_from_context() -> None:
-    @request(dependency_type=IService, from_context=True)
+def test_request_decorator_with_alias_and_from_context() -> None:
+    @request(alias=IService, from_context=True)
     class ServiceImpl:
         def do_something(self) -> None:
             pass
 
     assert is_provided(ServiceImpl)
     assert ServiceImpl.__provided__ == {
-        "dependency_type": IService,
+        "alias": IService,
         "scope": "request",
         "from_context": True,
     }

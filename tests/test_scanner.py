@@ -113,20 +113,44 @@ class TestContainerScanner:
         # Verify both classes are registered
         assert container.is_registered(SingletonService)
 
-    def test_scan_registers_provided_class_with_dependency_type(
+    def test_scan_registers_provided_class_with_alias(
         self, container: Container
     ) -> None:
         container.scan(["tests.scan_app.c"])
 
         from .scan_app.c.services import IRepository, UserRepository
 
-        # Verify class is registered under interface
-        assert container.is_registered(IRepository)
+        # Verify class is registered
+        assert container.is_registered(UserRepository)
 
-        # Resolve by interface
-        repo = container.resolve(IRepository)
+        # Resolve by class
+        repo = container.resolve(UserRepository)
         assert isinstance(repo, UserRepository)
         assert repo.get(1) == {"id": 1, "name": "Alice"}
+
+        # Resolve by alias (interface)
+        repo2 = container.resolve(IRepository)
+        assert repo is repo2
+
+    def test_scan_creates_alias_for_interface(
+        self, container: Container
+    ) -> None:
+        container.scan(["tests.scan_app.c"])
+
+        from .scan_app.c.services import IRepository, UserRepository
+
+        # Verify alias is created (IRepository → UserRepository)
+        assert IRepository in container.aliases
+        assert container.aliases[IRepository] == UserRepository
+
+        # Verify both types can be resolved
+        assert container.is_registered(UserRepository)
+        assert container.is_registered(IRepository)
+
+        # Verify both resolve to the same instance
+        repo_by_class = container.resolve(UserRepository)
+        repo_by_interface = container.resolve(IRepository)
+        assert repo_by_class is repo_by_interface
 
     def test_scan_ignore_package_with_string(self) -> None:
         """Test ignoring a package using string path."""
