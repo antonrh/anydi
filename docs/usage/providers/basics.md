@@ -59,6 +59,26 @@ service = container.resolve(NotificationService)
 service.notify("user-123", "Hello!")
 ```
 
+## Type Aliases
+
+Use `alias()` to resolve a dependency using an alternative type:
+
+```python
+from anydi import Container
+
+container = Container()
+container.register(UserRepository, scope="singleton")
+container.alias(IRepository, UserRepository)
+
+# Both resolve to the same instance
+repo1 = container.resolve(UserRepository)
+repo2 = container.resolve(IRepository)
+assert repo1 is repo2
+```
+
+!!! tip
+    When using `scan()` with `alias`, aliases are created automatically. See [Auto-Registration](auto-registration.md#register-with-an-alias).
+
 ## Unregistering providers
 
 To unregister a provider, use the `unregister` method of the `Container`. The method takes the dependency type you want to remove.

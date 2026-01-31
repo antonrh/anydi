@@ -96,13 +96,13 @@ repo = container.resolve(UserRepository)
 | `@transient` | `@provided(scope="transient")` |
 | `@request` | `@provided(scope="request")` |
 
-### Register with a different `dependency_type`
+### Register with an `alias`
 
-Use `dependency_type` to register a class as a different type (e.g., a base class or protocol). This works with `container.scan()`:
+Use `alias` to make a class resolvable by an interface or base type. This works with `container.scan()`:
 
 ```python
 from abc import ABC, abstractmethod
-from anydi import Container, provided
+from anydi import Container, singleton
 
 
 class IRepository(ABC):
@@ -111,7 +111,7 @@ class IRepository(ABC):
         pass
 
 
-@provided(IRepository, scope="singleton")
+@singleton(alias=IRepository)
 class UserRepository(IRepository):
     def find(self, id: int) -> dict:
         return {"id": id, "name": "Alice"}
@@ -120,17 +120,30 @@ class UserRepository(IRepository):
 container = Container()
 container.scan(["myapp.repositories"])
 
-# Resolve by dependency type
-repo = container.resolve(IRepository)
+# Resolve by class (primary)
+repo = container.resolve(UserRepository)
+
+# Resolve by interface (alias)
+repo2 = container.resolve(IRepository)
+assert repo is repo2  # Same instance
 ```
 
-All decorators support `dependency_type` as keyword argument:
+All decorators support `alias` (single or list):
 
 ```python
-@singleton(dependency_type=IRepository)
+# Single alias
+@singleton(alias=IRepository)
 class UserRepository(IRepository):
     pass
+
+# Multiple aliases
+@singleton(alias=[IReader, IWriter, IDeleter])
+class CRUDRepository(IReader, IWriter, IDeleter):
+    pass
 ```
+
+!!! note "Alias Semantics"
+    The class is the primary registration. Aliases are additional keys that resolve to the same instance. See [Type Aliases](basics.md#type-aliases) for more details.
 
 ### `@request` with `from_context`
 
@@ -169,7 +182,7 @@ class UserRepository:
 This keeps your classes free from framework imports. The `__provided__` dict supports:
 
 - `scope` (required) - `"singleton"`, `"transient"`, or `"request"`
-- `dependency_type` (optional) - the type to register as, e.g., a base class or protocol (works with `scan()`)
+- `alias` (optional) - the type to register as, e.g., a base class or protocol (works with `scan()`)
 - `from_context` (optional) - `True` if set via `context.set()`, only for `"request"` scope
 
 ## Mixing explicit and auto-registration

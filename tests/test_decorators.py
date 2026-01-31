@@ -3,7 +3,7 @@ from abc import ABC, abstractmethod
 import pytest
 
 from anydi import Module, injectable, provided, provider, request, singleton, transient
-from anydi._decorators import is_injectable, is_provided
+from anydi._decorators import get_alias_list, is_injectable, is_provided
 
 
 class IService(ABC):
@@ -33,6 +33,46 @@ def test_is_provided_has_scope() -> None:
     assert is_provided(Service)
 
 
+def test_get_alias_list_single() -> None:
+    @singleton(alias=IService)
+    class ServiceImpl(IService):
+        def do_something(self) -> None:
+            pass
+
+    assert is_provided(ServiceImpl)
+    assert get_alias_list(ServiceImpl.__provided__) == [IService]
+
+
+def test_get_alias_list_list() -> None:
+    class IReader:
+        pass
+
+    class IWriter:
+        pass
+
+    @singleton(alias=[IReader, IWriter])
+    class ReadWriteService:
+        pass
+
+    assert is_provided(ReadWriteService)
+    assert get_alias_list(ReadWriteService.__provided__) == [IReader, IWriter]
+
+
+def test_get_alias_list_tuple() -> None:
+    class IReader:
+        pass
+
+    class IWriter:
+        pass
+
+    @provided(scope="singleton", alias=(IReader, IWriter))
+    class ReadWriteService:
+        pass
+
+    assert is_provided(ReadWriteService)
+    assert get_alias_list(ReadWriteService.__provided__) == [IReader, IWriter]
+
+
 # provided decorator tests
 
 
@@ -47,16 +87,28 @@ def test_provided_decorator() -> None:
     }
 
 
-def test_provided_decorator_with_dependency_type() -> None:
-    @provided(IService, scope="singleton")
+def test_provided_decorator_with_alias() -> None:
+    @provided(scope="singleton", alias=IService)
     class ServiceImpl:
         def do_something(self) -> None:
             pass
 
     assert is_provided(ServiceImpl)
     assert ServiceImpl.__provided__ == {
-        "dependency_type": IService,
         "scope": "singleton",
+        "alias": IService,
+    }
+
+
+def test_provided_decorator_with_from_context() -> None:
+    @provided(scope="request", from_context=True)
+    class Service:
+        pass
+
+    assert is_provided(Service)
+    assert Service.__provided__ == {
+        "scope": "request",
+        "from_context": True,
     }
 
 
@@ -85,15 +137,33 @@ def test_singleton_decorator_call() -> None:
     }
 
 
-def test_singleton_decorator_with_dependency_type() -> None:
-    @singleton(dependency_type=IService)
+def test_singleton_decorator_with_alias() -> None:
+    @singleton(alias=IService)
     class ServiceImpl:
         def do_something(self) -> None:
             pass
 
     assert is_provided(ServiceImpl)
     assert ServiceImpl.__provided__ == {
-        "dependency_type": IService,
+        "alias": IService,
+        "scope": "singleton",
+    }
+
+
+def test_singleton_decorator_with_multiple_aliases() -> None:
+    class IReader:
+        pass
+
+    class IWriter:
+        pass
+
+    @singleton(alias=[IReader, IWriter])
+    class ReadWriteService:
+        pass
+
+    assert is_provided(ReadWriteService)
+    assert ReadWriteService.__provided__ == {
+        "alias": [IReader, IWriter],
         "scope": "singleton",
     }
 
@@ -123,15 +193,15 @@ def test_transient_decorator_call() -> None:
     }
 
 
-def test_transient_decorator_with_dependency_type() -> None:
-    @transient(dependency_type=IService)
+def test_transient_decorator_with_alias() -> None:
+    @transient(alias=IService)
     class ServiceImpl:
         def do_something(self) -> None:
             pass
 
     assert is_provided(ServiceImpl)
     assert ServiceImpl.__provided__ == {
-        "dependency_type": IService,
+        "alias": IService,
         "scope": "transient",
     }
 
@@ -178,28 +248,28 @@ def test_request_decorator_with_from_context() -> None:
     }
 
 
-def test_request_decorator_with_dependency_type() -> None:
-    @request(dependency_type=IService)
+def test_request_decorator_with_alias() -> None:
+    @request(alias=IService)
     class ServiceImpl:
         def do_something(self) -> None:
             pass
 
     assert is_provided(ServiceImpl)
     assert ServiceImpl.__provided__ == {
-        "dependency_type": IService,
+        "alias": IService,
         "scope": "request",
     }
 
 
-def test_request_decorator_with_dependency_type_and_from_context() -> None:
-    @request(dependency_type=IService, from_context=True)
+def test_request_decorator_with_alias_and_from_context() -> None:
+    @request(alias=IService, from_context=True)
     class ServiceImpl:
         def do_something(self) -> None:
             pass
 
     assert is_provided(ServiceImpl)
     assert ServiceImpl.__provided__ == {
-        "dependency_type": IService,
+        "alias": IService,
         "scope": "request",
         "from_context": True,
     }

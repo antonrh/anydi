@@ -1,5 +1,7 @@
 """Tests for the graph method."""
 
+import json
+
 from anydi import Container
 
 
@@ -256,8 +258,6 @@ class TestContainerGraph:
 
     def test_graph_json_format(self) -> None:
         """Test graph output in JSON format."""
-        import json
-
         container = Container()
         container.register(GraphDatabase, scope="singleton")
         container.register(GraphRepository, scope="singleton")
@@ -283,8 +283,6 @@ class TestContainerGraph:
 
     def test_graph_json_with_context(self) -> None:
         """Test JSON format includes from_context flag."""
-        import json
-
         container = Container()
         container.register(GraphDatabase, scope="singleton")
         container.register(GraphCurrentUser, scope="request", from_context=True)
@@ -299,8 +297,6 @@ class TestContainerGraph:
 
     def test_graph_json_full_path(self) -> None:
         """Test JSON format with full module path."""
-        import json
-
         container = Container()
         container.register(GraphDatabase, scope="singleton")
         container.register(GraphRepository, scope="singleton")
@@ -318,11 +314,67 @@ class TestContainerGraph:
 
     def test_graph_json_empty(self) -> None:
         """Test JSON graph with no dependencies."""
-        import json
-
         container = Container()
 
         result = container.graph(output_format="json")
         data = json.loads(result)
 
         assert data == {"providers": []}
+
+    def test_graph_with_aliases(self) -> None:
+        """Test graph formats correctly show aliases."""
+
+        class IDatabase:
+            pass
+
+        class DatabaseImpl(IDatabase):
+            pass
+
+        container = Container()
+        container.register(DatabaseImpl, scope="singleton")
+        container.alias(IDatabase, DatabaseImpl)
+
+        # Test tree format with alias
+        tree_result = container.graph(output_format="tree")
+        assert "[alias: IDatabase]" in tree_result
+
+        # Test JSON format with alias
+        json_result = container.graph(output_format="json")
+        data = json.loads(json_result)
+
+        providers_by_type = {p["type"]: p for p in data["providers"]}
+        assert "DatabaseImpl" in providers_by_type
+        assert providers_by_type["DatabaseImpl"]["aliases"] == ["IDatabase"]
+
+    def test_graph_tree_shared_dependencies(self) -> None:
+        """Test tree format doesn't repeat shared dependencies (cycle prevention)."""
+
+        class SharedDep:
+            pass
+
+        class ServiceA:
+            def __init__(self, shared: SharedDep) -> None:
+                self.shared = shared
+
+        class ServiceB:
+            def __init__(self, shared: SharedDep) -> None:
+                self.shared = shared
+
+        class Controller:
+            def __init__(self, a: ServiceA, b: ServiceB) -> None:
+                self.a = a
+                self.b = b
+
+        container = Container()
+        container.register(SharedDep, scope="singleton")
+        container.register(ServiceA, scope="singleton")
+        container.register(ServiceB, scope="singleton")
+        container.register(Controller, scope="singleton")
+
+        result = container.graph(output_format="tree")
+
+        # The tree should show shared dep under both services
+        assert "SharedDep" in result
+        assert "ServiceA" in result
+        assert "ServiceB" in result
+        assert "Controller" in result

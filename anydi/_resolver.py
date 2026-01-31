@@ -51,12 +51,24 @@ class Resolver:
         return bool(self._overrides) or getattr(self._container, "_test_mode", False)
 
     def add_override(self, dependency_type: Any, instance: Any) -> None:
-        """Add an override instance for a dependency type."""
+        """Add an override for a type, its canonical type, and all aliases."""
         self._overrides[dependency_type] = instance
+        canonical = self._container.aliases.get(dependency_type)
+        if canonical is not None:
+            self._overrides[canonical] = instance
+        for alias, canon in self._container.aliases.items():
+            if canon == dependency_type:
+                self._overrides[alias] = instance
 
     def remove_override(self, dependency_type: Any) -> None:
-        """Remove an override instance for a dependency type."""
+        """Remove an override for a type, its canonical type, and all aliases."""
         self._overrides.pop(dependency_type, None)
+        canonical = self._container.aliases.get(dependency_type)
+        if canonical is not None:
+            self._overrides.pop(canonical, None)
+        for alias, canon in self._container.aliases.items():
+            if canon == dependency_type:
+                self._overrides.pop(alias, None)
 
     def clear_caches(self) -> None:
         """Clear all cached resolvers."""
@@ -104,6 +116,11 @@ class Resolver:
 
         # Store the compiled functions in the cache
         cache[provider.dependency_type] = compiled
+
+        # Also store under all aliases that point to this type
+        for alias, canonical in self._container.aliases.items():
+            if canonical == provider.dependency_type:
+                cache[alias] = compiled
 
         return compiled
 

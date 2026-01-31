@@ -444,3 +444,80 @@ class TestResolver:
 
             # Test already patched class path
             container._resolver._post_resolve_override(Service, service)
+
+    def test_resolver_alias_caching(self) -> None:
+        """Test that resolving via alias uses the same cache entry."""
+
+        class IService:
+            pass
+
+        class ServiceImpl(IService):
+            pass
+
+        container = Container()
+        container.register(ServiceImpl, scope="singleton")
+        container.alias(IService, ServiceImpl)
+
+        # Resolve via concrete type
+        instance1 = container.resolve(ServiceImpl)
+
+        # Resolve via alias - should get same instance
+        instance2 = container.resolve(IService)
+
+        assert instance1 is instance2
+
+    def test_resolver_override_via_alias(self) -> None:
+        """Test that override on canonical type works when resolving via alias."""
+
+        class IService:
+            def get_value(self) -> int:
+                return 0
+
+        class ServiceImpl(IService):
+            def get_value(self) -> int:
+                return 1
+
+        class MockService(IService):
+            def get_value(self) -> int:
+                return 999
+
+        container = Container()
+        container.enable_test_mode()
+        container.register(ServiceImpl, scope="singleton")
+        container.alias(IService, ServiceImpl)
+
+        # Override the canonical type
+        with container.override(ServiceImpl, MockService()):
+            # Resolve via alias should get the override
+            result = container.resolve(IService)
+            assert result.get_value() == 999
+
+    def test_resolver_override_via_alias_direct(self) -> None:
+        """Test that override on alias type also overrides canonical type."""
+
+        class IService:
+            def get_value(self) -> int:
+                return 0
+
+        class ServiceImpl(IService):
+            def get_value(self) -> int:
+                return 1
+
+        class MockService(IService):
+            def get_value(self) -> int:
+                return 999
+
+        container = Container()
+        container.enable_test_mode()
+        container.register(ServiceImpl, scope="singleton")
+        container.alias(IService, ServiceImpl)
+
+        # Override the alias type - should affect both alias and canonical
+        with container.override(IService, MockService()):
+            # Resolve via alias should get the override
+            result = container.resolve(IService)
+            assert result.get_value() == 999
+
+            # Resolve via canonical should also get the override
+            result2 = container.resolve(ServiceImpl)
+            assert result2.get_value() == 999

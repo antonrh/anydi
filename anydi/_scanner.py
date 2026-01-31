@@ -8,7 +8,7 @@ from dataclasses import dataclass
 from types import ModuleType
 from typing import TYPE_CHECKING, Any
 
-from ._decorators import Provided, is_injectable, is_provided
+from ._decorators import Provided, get_alias_list, is_injectable, is_provided
 
 if TYPE_CHECKING:
     from ._container import Container
@@ -58,13 +58,15 @@ class Scanner:
 
         # First: register @provided classes
         for cls in provided_classes:
-            dependency_type = cls.__provided__.get("dependency_type", cls)
-            if not self._container.is_registered(dependency_type):
+            if not self._container.is_registered(cls):
                 scope = cls.__provided__["scope"]
                 from_context = cls.__provided__.get("from_context", False)
                 self._container.register(
-                    dependency_type, cls, scope=scope, from_context=from_context
+                    cls, cls, scope=scope, from_context=from_context
                 )
+            # Create aliases if specified (alias → cls)
+            for alias_type in get_alias_list(cls.__provided__):
+                self._container.alias(alias_type, cls)
 
         # Second: inject @injectable functions
         for dependency in injectable_dependencies:

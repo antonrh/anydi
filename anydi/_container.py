@@ -17,7 +17,7 @@ from typing import Any, Literal, TypeVar, get_args, get_origin, overload
 from typing_extensions import ParamSpec, Self, type_repr
 
 from ._context import InstanceContext
-from ._decorators import is_provided
+from ._decorators import get_alias_list, is_provided
 from ._graph import Graph
 from ._injector import Injector
 from ._marker import Marker
@@ -49,6 +49,7 @@ class Container:
         }
 
         self._resources: dict[str, list[Any]] = defaultdict(list)
+        self._aliases: dict[Any, Any] = {}  # alias_type → canonical_type
         self._singleton_context = InstanceContext()
         self._scoped_context: dict[str, ContextVar[InstanceContext]] = {}
 
@@ -94,6 +95,11 @@ class Container:
     def providers(self) -> dict[type[Any], Provider]:
         """Get the registered providers."""
         return self._providers
+
+    @property
+    def aliases(self) -> dict[Any, Any]:
+        """Get the registered aliases."""
+        return self._aliases
 
     @property
     def ready(self) -> bool:
@@ -370,9 +376,30 @@ class Container:
             dependency_type, factory, scope, from_context, override, None
         )
 
+    def alias(self, alias_type: Any, canonical_type: Any, /) -> None:
+        """Register an alias for a dependency type."""
+        if self.ready:
+            raise RuntimeError(
+                "Cannot register aliases after build() has been called. "
+                "All aliases must be registered before building the container."
+            )
+        if alias_type == canonical_type:
+            raise ValueError("Alias type cannot be the same as canonical type.")
+        if alias_type in self._aliases:
+            raise ValueError(
+                f"Alias `{type_repr(alias_type)}` is already registered "
+                f"for `{type_repr(self._aliases[alias_type])}`."
+            )
+        self._aliases[alias_type] = canonical_type
+
+    def _resolve_alias(self, dependency_type: Any) -> Any:
+        """Resolve an alias to its canonical type."""
+        return self._aliases.get(dependency_type, dependency_type)
+
     def is_registered(self, dependency_type: Any, /) -> bool:
         """Check if a provider is registered for the specified dependency type."""
-        return dependency_type in self._providers
+        canonical = self._resolve_alias(dependency_type)
+        return canonical in self._providers
 
     def has_provider_for(self, dependency_type: Any, /) -> bool:
         """Check if a provider exists for the specified dependency type."""
@@ -570,9 +597,10 @@ class Container:
         return provider
 
     def _get_provider(self, dependency_type: Any) -> Provider:
-        """Get provider by dependency type."""
+        """Get provider by dependency type, resolving aliases."""
+        canonical = self._resolve_alias(dependency_type)
         try:
-            return self._providers[dependency_type]
+            return self._providers[canonical]
         except KeyError:
             raise LookupError(
                 f"The provider for `{type_repr(dependency_type)}` has "
@@ -597,6 +625,10 @@ class Container:
                     False,
                     defaults,
                 )
+                # Register aliases if specified
+                if not self.ready:
+                    for alias_type in get_alias_list(dependency_type.__provided__):
+                        self.alias(alias_type, dependency_type)
                 registered = True
             else:
                 raise LookupError(
@@ -677,6 +709,9 @@ class Container:
                         False,
                         None,
                     )
+                    # Register aliases if specified
+                    for alias_type in get_alias_list(dependency_type.__provided__):
+                        self._aliases[alias_type] = dependency_type
                     # Recursively ensure the @provided class is resolved
                     dep_provider = self._ensure_provider_resolved(
                         dep_provider, resolving
@@ -977,6 +1012,11 @@ class Container:
                             False,
                             None,
                         )
+                        # Register aliases if specified
+                        for alias_type in get_alias_list(
+                            param_dependency_type.__provided__
+                        ):
+                            self._aliases[alias_type] = param_dependency_type
                     elif param.has_default:
                         # Has default, can be missing
                         resolved_params.append(param)

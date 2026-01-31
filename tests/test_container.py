@@ -258,6 +258,72 @@ class TestContainerRegistration:
         assert container.is_registered(Annotated[str, "msg1"])
         assert container.is_registered(Annotated[str, "msg2"])
 
+    def test_alias(self, container: Container) -> None:
+        class IService:
+            pass
+
+        class ServiceImpl(IService):
+            pass
+
+        container.register(IService, ServiceImpl, scope="singleton")
+        container.alias(ServiceImpl, IService)
+
+        # Both should be considered registered
+        assert container.is_registered(IService)
+        assert container.is_registered(ServiceImpl)
+
+        # Both should resolve to the same instance
+        service1 = container.resolve(IService)
+        service2 = container.resolve(ServiceImpl)
+        assert service1 is service2
+        assert isinstance(service1, ServiceImpl)
+
+    def test_alias_same_type_error(self, container: Container) -> None:
+        with pytest.raises(
+            ValueError, match="Alias type cannot be the same as canonical type."
+        ):
+            container.alias(str, str)
+
+    def test_alias_duplicate_error(self, container: Container) -> None:
+        class IService:
+            pass
+
+        class ServiceA:
+            pass
+
+        class ServiceB:
+            pass
+
+        container.register(ServiceA, scope="singleton")
+        container.register(ServiceB, scope="singleton")
+        container.alias(IService, ServiceA)
+
+        with pytest.raises(ValueError, match="Alias .* is already registered"):
+            container.alias(IService, ServiceB)
+
+    def test_alias_after_build_error(self, container: Container) -> None:
+        container.register(str, lambda: "test", scope="singleton")
+        container.build()
+
+        with pytest.raises(
+            RuntimeError,
+            match="Cannot register aliases after build\\(\\) has been called.",
+        ):
+            container.alias(int, str)
+
+    def test_aliases_property(self, container: Container) -> None:
+        class IService:
+            pass
+
+        class ServiceImpl(IService):
+            pass
+
+        container.register(IService, ServiceImpl, scope="singleton")
+        container.alias(ServiceImpl, IService)
+
+        assert ServiceImpl in container.aliases
+        assert container.aliases[ServiceImpl] == IService
+
     def test_register_providers_via_constructor(self) -> None:
         container = Container(
             providers=[
@@ -3493,6 +3559,72 @@ class TestContainerOverride:
                 assert container.resolve(int) == 42
 
         assert container.resolve(int) == 0
+
+    def test_override_canonical_resolves_via_alias(self) -> None:
+        """Override canonical type, resolve via alias."""
+
+        class IService:
+            pass
+
+        class ServiceImpl(IService):
+            pass
+
+        class MockService(IService):
+            pass
+
+        container = Container()
+        container.enable_test_mode()
+        container.register(ServiceImpl, scope="singleton")
+        container.alias(IService, ServiceImpl)
+
+        mock = MockService()
+        with container.override(ServiceImpl, mock):
+            assert container.resolve(IService) is mock
+            assert container.resolve(ServiceImpl) is mock
+
+    def test_override_alias_resolves_via_canonical(self) -> None:
+        """Override alias type, resolve via canonical."""
+
+        class IService:
+            pass
+
+        class ServiceImpl(IService):
+            pass
+
+        class MockService(IService):
+            pass
+
+        container = Container()
+        container.enable_test_mode()
+        container.register(ServiceImpl, scope="singleton")
+        container.alias(IService, ServiceImpl)
+
+        mock = MockService()
+        with container.override(IService, mock):
+            assert container.resolve(IService) is mock
+            assert container.resolve(ServiceImpl) is mock
+
+    async def test_override_alias_async(self) -> None:
+        """Override with alias works in async resolution."""
+
+        class IService:
+            pass
+
+        class ServiceImpl(IService):
+            pass
+
+        class MockService(IService):
+            pass
+
+        container = Container()
+        container.enable_test_mode()
+        container.register(ServiceImpl, scope="singleton")
+        container.alias(IService, ServiceImpl)
+
+        mock = MockService()
+        with container.override(ServiceImpl, mock):
+            assert await container.aresolve(IService) is mock
+            assert await container.aresolve(ServiceImpl) is mock
 
 
 # Test data for import_container tests

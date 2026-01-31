@@ -30,7 +30,7 @@ class IRepository(ABC):
         pass
 
 
-@provided(IRepository, scope="singleton")
+@provided(scope="singleton", alias=IRepository)
 class UserRepository(IRepository):
     """User repository implementation."""
 
