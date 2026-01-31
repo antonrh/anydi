@@ -77,6 +77,7 @@ class ProviderDef:
     _: KW_ONLY
     from_context: bool = False
     scope: Scope = "singleton"
+    alias: Any = NOT_SET
     interface: Any = NOT_SET
     call: Callable[..., Any] = NOT_SET
 
