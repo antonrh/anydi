@@ -8,7 +8,8 @@ from dataclasses import dataclass
 from types import ModuleType
 from typing import TYPE_CHECKING, Any
 
-from ._decorators import Provided, get_alias_list, is_injectable, is_provided
+from ._decorators import Provided, is_injectable, is_provided
+from ._types import to_list
 
 if TYPE_CHECKING:
     from ._container import Container
@@ -65,7 +66,7 @@ class Scanner:
                     cls, cls, scope=scope, from_context=from_context
                 )
             # Create aliases if specified (alias → cls)
-            for alias_type in get_alias_list(cls.__provided__):
+            for alias_type in to_list(cls.__provided__.get("alias")):
                 self._container.alias(alias_type, cls)
 
         # Second: inject @injectable functions

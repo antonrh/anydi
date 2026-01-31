@@ -34,16 +34,6 @@ class ProvidedMetadata(TypedDict):
     from_context: NotRequired[bool]
 
 
-def get_alias_list(provided: ProvidedMetadata) -> list[Any]:
-    """Get alias list from __provided__ metadata, normalizing single to list."""
-    alias = provided.get("alias")
-    if alias is None:
-        return []
-    if isinstance(alias, list | tuple):
-        return list(alias)  # type: ignore
-    return [alias]
-
-
 def provided(
     *, scope: Scope, alias: Any = NOT_SET, from_context: bool = False
 ) -> Callable[[ClassT], ClassT]:
@@ -162,10 +152,11 @@ def is_provided(cls: Any) -> TypeGuard[type[Provided]]:
 class ProviderMetadata(TypedDict):
     scope: Scope
     override: bool
+    alias: NotRequired[Any]
 
 
 def provider(
-    *, scope: Scope, override: bool = False
+    *, scope: Scope, override: bool = False, alias: Any = NOT_SET
 ) -> Callable[
     [Callable[Concatenate[ModuleT, P], T]], Callable[Concatenate[ModuleT, P], T]
 ]:
@@ -174,7 +165,10 @@ def provider(
     def decorator(
         target: Callable[Concatenate[ModuleT, P], T],
     ) -> Callable[Concatenate[ModuleT, P], T]:
-        target.__provider__ = ProviderMetadata(scope=scope, override=override)  # type: ignore
+        metadata: ProviderMetadata = {"scope": scope, "override": override}
+        if alias is not NOT_SET:
+            metadata["alias"] = alias
+        target.__provider__ = metadata  # type: ignore
         return target
 
     return decorator

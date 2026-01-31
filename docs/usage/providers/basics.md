@@ -61,14 +61,23 @@ service.notify("user-123", "Hello!")
 
 ## Type Aliases
 
-Use `alias()` to resolve a dependency using an alternative type:
+Use the `alias` parameter in `register()` or `@provider` to register aliases inline:
 
 ```python
 from anydi import Container
 
 container = Container()
-container.register(UserRepository, scope="singleton")
-container.alias(IRepository, UserRepository)
+
+# Single alias
+container.register(UserRepository, scope="singleton", alias=IRepository)
+
+# Multiple aliases
+container.register(RedisCache, scope="singleton", alias=[ICache, IStore])
+
+# With @provider decorator
+@container.provider(scope="singleton", alias=IDatabase)
+def database() -> Database:
+    return Database()
 
 # Both resolve to the same instance
 repo1 = container.resolve(UserRepository)
@@ -76,8 +85,15 @@ repo2 = container.resolve(IRepository)
 assert repo1 is repo2
 ```
 
+Alternatively, use `alias()` method separately:
+
+```python
+container.register(UserRepository, scope="singleton")
+container.alias(IRepository, UserRepository)
+```
+
 !!! tip
-    When using `scan()` with `alias`, aliases are created automatically. See [Auto-Registration](auto-registration.md#register-with-an-alias).
+    When using `scan()` with `@provided(alias=...)`, aliases are created automatically. See [Auto-Registration](auto-registration.md#register-with-an-alias).
 
 ## Unregistering providers
 
