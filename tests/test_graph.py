@@ -1,5 +1,7 @@
 """Tests for the graph method."""
 
+import json
+
 from anydi import Container
 
 
@@ -256,8 +258,6 @@ class TestContainerGraph:
 
     def test_graph_json_format(self) -> None:
         """Test graph output in JSON format."""
-        import json
-
         container = Container()
         container.register(GraphDatabase, scope="singleton")
         container.register(GraphRepository, scope="singleton")
@@ -283,8 +283,6 @@ class TestContainerGraph:
 
     def test_graph_json_with_context(self) -> None:
         """Test JSON format includes from_context flag."""
-        import json
-
         container = Container()
         container.register(GraphDatabase, scope="singleton")
         container.register(GraphCurrentUser, scope="request", from_context=True)
@@ -299,8 +297,6 @@ class TestContainerGraph:
 
     def test_graph_json_full_path(self) -> None:
         """Test JSON format with full module path."""
-        import json
-
         container = Container()
         container.register(GraphDatabase, scope="singleton")
         container.register(GraphRepository, scope="singleton")
@@ -318,8 +314,6 @@ class TestContainerGraph:
 
     def test_graph_json_empty(self) -> None:
         """Test JSON graph with no dependencies."""
-        import json
-
         container = Container()
 
         result = container.graph(output_format="json")
@@ -329,7 +323,6 @@ class TestContainerGraph:
 
     def test_graph_with_aliases(self) -> None:
         """Test graph formats correctly show aliases."""
-        import json
 
         class IDatabase:
             pass

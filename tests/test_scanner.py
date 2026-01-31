@@ -4,10 +4,11 @@ import sys
 import pytest
 from pytest_mock import MockerFixture
 
-from anydi import Container
+from anydi import Container, singleton
 
 from tests.fixtures import Service
 from tests.scan_app import ScanAppModule
+from tests.scan_app.c.services import IRepository, UserRepository
 
 
 class TestContainerScanner:
@@ -118,8 +119,6 @@ class TestContainerScanner:
     ) -> None:
         container.scan(["tests.scan_app.c"])
 
-        from .scan_app.c.services import IRepository, UserRepository
-
         # Verify class is registered
         assert container.is_registered(UserRepository)
 
@@ -135,8 +134,6 @@ class TestContainerScanner:
     def test_scan_creates_alias_for_interface(self, container: Container) -> None:
         container.scan(["tests.scan_app.c"])
 
-        from .scan_app.c.services import IRepository, UserRepository
-
         # Verify alias is created (IRepository → UserRepository)
         assert IRepository in container.aliases
         assert container.aliases[IRepository] == UserRepository
@@ -151,8 +148,6 @@ class TestContainerScanner:
         assert repo_by_class is repo_by_interface
 
     def test_scan_creates_multiple_aliases(self, container: Container) -> None:
-        from anydi import singleton
-
         class IReader:
             pass
 
