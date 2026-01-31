@@ -83,13 +83,13 @@ class Container:
         # Register providers
         providers = providers or []
         for provider in providers:
-            self._register_provider(
+            self.register(
                 provider.dependency_type,
                 provider.factory,
-                provider.scope,
-                provider.from_context,
-                False,
-                None,
+                scope=provider.scope,
+                from_context=provider.from_context,
+                alias=provider.alias,
+                override=False,
             )
 
         # Register modules

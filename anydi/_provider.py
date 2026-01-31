@@ -76,3 +76,4 @@ class ProviderDef:
     _: KW_ONLY
     from_context: bool = False
     scope: Scope = "singleton"
+    alias: Any = NOT_SET
