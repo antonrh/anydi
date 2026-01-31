@@ -17,7 +17,7 @@ from typing import Any, Literal, TypeVar, get_args, get_origin, overload
 from typing_extensions import ParamSpec, Self, type_repr
 
 from ._context import InstanceContext
-from ._decorators import get_alias_list, is_provided
+from ._decorators import is_provided
 from ._graph import Graph
 from ._injector import Injector
 from ._marker import Marker
@@ -25,7 +25,15 @@ from ._module import ModuleDef, ModuleRegistrar
 from ._provider import Provider, ProviderDef, ProviderKind, ProviderParameter
 from ._resolver import Resolver
 from ._scanner import PackageOrIterable, Scanner
-from ._types import NOT_SET, Event, Scope, is_event_type, is_iterator_type, is_none_type
+from ._types import (
+    NOT_SET,
+    Event,
+    Scope,
+    is_event_type,
+    is_iterator_type,
+    is_none_type,
+    to_list,
+)
 
 T = TypeVar("T", bound=Any)
 P = ParamSpec("P")
@@ -345,6 +353,7 @@ class Container:
         scope: Scope = "singleton",
         from_context: bool = False,
         override: bool = False,
+        alias: Any = NOT_SET,
         interface: Any = NOT_SET,
         call: Callable[..., Any] = NOT_SET,
     ) -> Provider:
@@ -372,9 +381,15 @@ class Container:
             dependency_type = interface
         if factory is NOT_SET:
             factory = call if call is not NOT_SET else dependency_type
-        return self._register_provider(
+        provider = self._register_provider(
             dependency_type, factory, scope, from_context, override, None
         )
+
+        # Register aliases if specified
+        for alias_type in to_list(alias):
+            self.alias(alias_type, provider.dependency_type)
+
+        return provider
 
     def alias(self, alias_type: Any, canonical_type: Any, /) -> None:
         """Register an alias for a dependency type."""
@@ -427,12 +442,19 @@ class Container:
         self._delete_provider(provider)
 
     def provider(
-        self, *, scope: Scope, override: bool = False
+        self, *, scope: Scope, override: bool = False, alias: Any = NOT_SET
     ) -> Callable[[Callable[P, T]], Callable[P, T]]:
         """Decorator to register a provider function with the specified scope."""
 
         def decorator(call: Callable[P, T]) -> Callable[P, T]:
-            self._register_provider(NOT_SET, call, scope, False, override, None)
+            provider = self._register_provider(
+                NOT_SET, call, scope, False, override, None
+            )
+
+            # Register aliases if specified
+            for alias_type in to_list(alias):
+                self.alias(alias_type, provider.dependency_type)
+
             return call
 
         return decorator
@@ -627,7 +649,8 @@ class Container:
                 )
                 # Register aliases if specified
                 if not self.ready:
-                    for alias_type in get_alias_list(dependency_type.__provided__):
+                    aliases = to_list(dependency_type.__provided__.get("alias"))
+                    for alias_type in aliases:
                         self.alias(alias_type, dependency_type)
                 registered = True
             else:
@@ -710,7 +733,8 @@ class Container:
                         None,
                     )
                     # Register aliases if specified
-                    for alias_type in get_alias_list(dependency_type.__provided__):
+                    aliases = to_list(dependency_type.__provided__.get("alias"))
+                    for alias_type in aliases:
                         self._aliases[alias_type] = dependency_type
                     # Recursively ensure the @provided class is resolved
                     dep_provider = self._ensure_provider_resolved(
@@ -1013,9 +1037,8 @@ class Container:
                             None,
                         )
                         # Register aliases if specified
-                        for alias_type in get_alias_list(
-                            param_dependency_type.__provided__
-                        ):
+                        provided_meta = param_dependency_type.__provided__
+                        for alias_type in to_list(provided_meta.get("alias")):
                             self._aliases[alias_type] = param_dependency_type
                     elif param.has_default:
                         # Has default, can be missing

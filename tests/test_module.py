@@ -118,3 +118,49 @@ class TestContainerModuleRegistrator:
         # When Component2 is resolved, it should use the overridden Component1
         result = container.resolve(Component2)
         assert result.component.name == "override"
+
+    def test_register_module_provider_with_alias(self, container: Container) -> None:
+        class IDatabase:
+            pass
+
+        class Database(IDatabase):
+            pass
+
+        class AppModule(Module):
+            @provider(scope="singleton", alias=IDatabase)
+            def database(self) -> Database:
+                return Database()
+
+        container.register_module(AppModule)
+
+        assert container.is_registered(IDatabase)
+        assert container.is_registered(Database)
+
+        db1 = container.resolve(IDatabase)
+        db2 = container.resolve(Database)
+        assert db1 is db2
+        assert isinstance(db1, Database)
+
+    def test_register_module_provider_with_multiple_aliases(
+        self, container: Container
+    ) -> None:
+        class ICache:
+            pass
+
+        class IStore:
+            pass
+
+        class RedisCache(ICache, IStore):
+            pass
+
+        class CacheModule(Module):
+            @provider(scope="singleton", alias=[ICache, IStore])
+            def cache(self) -> RedisCache:
+                return RedisCache()
+
+        container.register_module(CacheModule)
+
+        cache1 = container.resolve(ICache)
+        cache2 = container.resolve(IStore)
+        cache3 = container.resolve(RedisCache)
+        assert cache1 is cache2 is cache3

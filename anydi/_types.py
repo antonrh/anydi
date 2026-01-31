@@ -43,3 +43,12 @@ def is_none_type(tp: Any) -> bool:
 def is_iterator_type(tp: Any) -> bool:
     """Check if the given object is an iterator type."""
     return tp in (Iterator, AsyncIterator)
+
+
+def to_list(value: Any) -> list[Any]:
+    """Convert a value to a list, handling None and sequences."""
+    if value is None or value is NOT_SET:
+        return []
+    if isinstance(value, list | tuple):
+        return list(value)  # type: ignore[arg-type]
+    return [value]

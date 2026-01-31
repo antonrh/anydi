@@ -324,6 +324,85 @@ class TestContainerRegistration:
         assert ServiceImpl in container.aliases
         assert container.aliases[ServiceImpl] == IService
 
+    def test_register_with_alias(self, container: Container) -> None:
+        class IService:
+            pass
+
+        class ServiceImpl(IService):
+            pass
+
+        container.register(ServiceImpl, scope="singleton", alias=IService)
+
+        assert container.is_registered(IService)
+        assert container.is_registered(ServiceImpl)
+
+        service1 = container.resolve(IService)
+        service2 = container.resolve(ServiceImpl)
+        assert service1 is service2
+        assert isinstance(service1, ServiceImpl)
+
+    def test_register_with_multiple_aliases(self, container: Container) -> None:
+        class IRepository:
+            pass
+
+        class IReadRepository:
+            pass
+
+        class RepositoryImpl(IRepository, IReadRepository):
+            pass
+
+        container.register(
+            RepositoryImpl, scope="singleton", alias=[IRepository, IReadRepository]
+        )
+
+        assert container.is_registered(IRepository)
+        assert container.is_registered(IReadRepository)
+        assert container.is_registered(RepositoryImpl)
+
+        repo1 = container.resolve(IRepository)
+        repo2 = container.resolve(IReadRepository)
+        repo3 = container.resolve(RepositoryImpl)
+        assert repo1 is repo2 is repo3
+
+    def test_provider_decorator_with_alias(self, container: Container) -> None:
+        class IDatabase:
+            pass
+
+        class Database(IDatabase):
+            pass
+
+        @container.provider(scope="singleton", alias=IDatabase)
+        def provide_database() -> Database:
+            return Database()
+
+        assert container.is_registered(IDatabase)
+        assert container.is_registered(Database)
+
+        db1 = container.resolve(IDatabase)
+        db2 = container.resolve(Database)
+        assert db1 is db2
+
+    def test_provider_decorator_with_multiple_aliases(
+        self, container: Container
+    ) -> None:
+        class ICache:
+            pass
+
+        class IStore:
+            pass
+
+        class RedisCache(ICache, IStore):
+            pass
+
+        @container.provider(scope="singleton", alias=[ICache, IStore])
+        def provide_cache() -> RedisCache:
+            return RedisCache()
+
+        cache1 = container.resolve(ICache)
+        cache2 = container.resolve(IStore)
+        cache3 = container.resolve(RedisCache)
+        assert cache1 is cache2 is cache3
+
     def test_register_providers_via_constructor(self) -> None:
         container = Container(
             providers=[

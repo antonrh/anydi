@@ -63,5 +63,16 @@ assert container.is_registered(Service)
 assert container.is_registered(Repository)
 ```
 
+## Aliases in Modules
+
+Use the `alias` parameter in `@provider` to register type aliases:
+
+```python
+class AppModule(Module):
+    @provider(scope="singleton", alias=IDatabase)
+    def database(self) -> Database:
+        return Database()
+```
+
 Modules help you keep your code organized and manage dependencies easier.
 
