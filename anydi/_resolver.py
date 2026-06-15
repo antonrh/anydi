@@ -471,7 +471,8 @@ class Resolver:
         if with_override:
             create_lines.append("    if override_mode:")
             create_lines.append(
-                "        inst = resolver._post_resolve_override(_dependency_type, inst)"
+                "        inst = resolver._post_resolve_override("
+                "_dependency_type, inst, context)"
             )
         create_lines.append("    return inst")
 
@@ -747,7 +748,24 @@ class Resolver:
             return instance
         return InstanceProxy(instance, dependency_type=dependency_type)
 
-    def _post_resolve_override(self, dependency_type: Any, instance: Any) -> Any:
+    def _resolve_wrapped(self, dependency_type: Any, context: Any) -> Any:
+        """Resolve a wrapped dependency for the resolver getter.
+
+        Prefers an active override, then the captured scope context (so that
+        re-resolution during scope nesting reads from the correct scope), and
+        finally falls back to ``container.resolve()``.
+        """
+        if dependency_type in self._overrides:
+            return self._overrides[dependency_type]
+        if context is not None:
+            cached = context.get(dependency_type, NOT_SET)
+            if cached is not NOT_SET:
+                return cached
+        return self._container.resolve(dependency_type)
+
+    def _post_resolve_override(
+        self, dependency_type: Any, instance: Any, context: Any = None
+    ) -> Any:
         """Hook for patching resolved instances to support override."""
         if dependency_type in self._overrides:
             return self._overrides[dependency_type]
@@ -763,11 +781,13 @@ class Resolver:
             if isinstance(value, InstanceProxy)
         }
 
+        # Capture the context the instance was created in so that
+        # re-resolution during nesting reads from the correct scope.
+        captured_context = context
+
         def __resolver_getter__(name: str) -> Any:
             if name in wrapped:
-                _dependency_type = wrapped[name]
-                # Resolve the dependency if it's wrapped
-                return self._container.resolve(_dependency_type)
+                return self._resolve_wrapped(wrapped[name], captured_context)
             raise LookupError
 
         # Attach the resolver getter to the instance

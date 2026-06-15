@@ -171,18 +171,24 @@ class Container:
         await self._singleton_context.aclose()
 
     @contextlib.contextmanager
-    def scoped_context(self, scope: str) -> Iterator[InstanceContext]:
-        """Obtain a context manager for the request-scoped context."""
+    def scoped_context(
+        self, scope: str, *, replace: bool = False
+    ) -> Iterator[InstanceContext]:
+        """Obtain a context manager for the specified scoped context.
+
+        Reuses the currently active context if one exists, otherwise opens a
+        fresh one. With ``replace=True`` always opens a fresh, isolated context
+        that temporarily shadows any active one and is restored on exit.
+        """
         context_var = self._get_scoped_context_var(scope)
 
-        # Check if context already exists (re-entering same scope)
-        context = context_var.get(None)
-        if context is not None:
-            # Reuse existing context, don't create a new one
-            yield context
+        # Reuse the active context unless an isolated replacement is requested.
+        existing_context = context_var.get(None)
+        if existing_context is not None and not replace:
+            yield existing_context
             return
 
-        # Create new context
+        # Create new context (first entry, or a replacing re-entry)
         context = InstanceContext()
         token = context_var.set(context)
 
@@ -192,23 +198,31 @@ class Container:
                 continue
             self.resolve(dependency_type)
 
-        with context:
-            yield context
+        try:
+            with context:
+                yield context
+        finally:
             context_var.reset(token)
 
     @contextlib.asynccontextmanager
-    async def ascoped_context(self, scope: str) -> AsyncIterator[InstanceContext]:
-        """Obtain a context manager for the specified scoped context."""
+    async def ascoped_context(
+        self, scope: str, *, replace: bool = False
+    ) -> AsyncIterator[InstanceContext]:
+        """Obtain an async context manager for the specified scoped context.
+
+        Reuses the currently active context if one exists, otherwise opens a
+        fresh one. With ``replace=True`` always opens a fresh, isolated context
+        that temporarily shadows any active one and is restored on exit.
+        """
         context_var = self._get_scoped_context_var(scope)
 
-        # Check if context already exists (re-entering same scope)
-        context = context_var.get(None)
-        if context is not None:
-            # Reuse existing context, don't create a new one
-            yield context
+        # Reuse the active context unless an isolated replacement is requested.
+        existing_context = context_var.get(None)
+        if existing_context is not None and not replace:
+            yield existing_context
             return
 
-        # Create new context
+        # Create new context (first entry, or a replacing re-entry)
         context = InstanceContext()
         token = context_var.set(context)
 
@@ -218,8 +232,10 @@ class Container:
                 continue
             await self.aresolve(dependency_type)
 
-        async with context:
-            yield context
+        try:
+            async with context:
+                yield context
+        finally:
             context_var.reset(token)
 
     @contextlib.contextmanager
@@ -233,6 +249,34 @@ class Container:
         """Obtain an async context manager for the request-scoped context."""
         async with self.ascoped_context("request") as context:
             yield context
+
+    def get_scoped_context(self, scope: str) -> InstanceContext:
+        """Get the currently active context for the specified scope.
+
+        Returns the InstanceContext that is currently active for the given
+        scope name. This is useful when you need to access or modify the
+        current scope's context without creating a new one.
+
+        Raises:
+            LookupError: If the scope context has not been started.
+            ValueError: If the scope is reserved or not registered.
+        """
+        return self._get_scoped_context(scope)
+
+    def try_get_scoped_context(self, scope: str) -> InstanceContext | None:
+        """Get the currently active context for the specified scope, or None.
+
+        Like :meth:`get_scoped_context`, but returns None when the scope has
+        not been entered instead of raising ``LookupError``. This is the
+        non-throwing variant for callers that branch on whether a scope is
+        currently active (e.g. optional dependencies that fall back to a
+        no-op when a deeper scope is not present).
+
+        Raises:
+            ValueError: If the scope is reserved or not registered.
+        """
+        scoped_context_var = self._get_scoped_context_var(scope)
+        return scoped_context_var.get(None)
 
     def _get_scoped_context(self, scope: str) -> InstanceContext:
         scoped_context_var = self._get_scoped_context_var(scope)
