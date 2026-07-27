@@ -60,7 +60,7 @@ requires-dist = [
 
 [package.metadata.requires-dev]
 dev = [
-    { name = "fastapi", specifier = ">=0.140.0" },
+    { name = "fastapi", specifier = ">=0.100.0" },
     { name = "faststream", specifier = ">=0.6,<0.7" },
     { name = "httpx", specifier = ">=0.26.0" },
     { name = "pydantic-settings", specifier = ">=2.4.0,<3" },
