@@ -68,16 +68,26 @@ def _iter_dependencies(dependant: Dependant) -> Iterator[Dependant]:
             yield from _iter_dependencies(sub_dependant)
 
 
+def _dependant_cache_key(dependant: Dependant) -> tuple[Any, ...]:
+    """Compute a hashable dedup key (FastAPI 0.140 dropped ``Dependant.cache_key``)."""
+    cache_key = getattr(dependant, "cache_key", None)
+    if cache_key is not None:
+        return cache_key
+    scopes = getattr(dependant, "own_oauth_scopes", None) or []
+    return (dependant.call, tuple(sorted(set(scopes))))
+
+
 def _validate_route_dependencies(
     route: APIRoute | APIWebSocketRoute,
     container: Container,
     patched: set[tuple[Any, ...]],
 ) -> None:
     for dependant in _iter_dependencies(route.dependant):
-        if dependant.cache_key in patched:
+        cache_key = _dependant_cache_key(dependant)
+        if cache_key in patched:
             continue
-        patched.add(dependant.cache_key)
-        call, *_ = dependant.cache_key
+        patched.add(cache_key)
+        call = dependant.call
         if not call:
             continue  # pragma: no cover
         for parameter in inspect.signature(call, eval_str=True).parameters.values():
