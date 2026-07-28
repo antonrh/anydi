@@ -15,7 +15,7 @@ from anydi import (
     reset_global_container,
     set_global_container,
 )
-from anydi._global import GlobalRef
+from anydi._global import GlobalRef, uses_global_container
 
 from tests.fixtures import Service
 
@@ -80,6 +80,13 @@ class TestGlobalContainer:
         container = create_global_container()
 
         assert get_global_container_or_none() is container
+
+    def test_uses_global_container(self) -> None:
+        assert uses_global_container() is False
+
+        global_ref(Service)
+
+        assert uses_global_container() is True
 
     def test_reset_global_container(self) -> None:
         create_global_container()
@@ -166,6 +173,29 @@ class TestGlobalRef:
 
     def test_global_ref_is_global_ref_instance(self) -> None:
         assert type(global_ref(Service)) is GlobalRef
+
+    def test_global_ref_caches_instance(self) -> None:
+        calls: list[int] = []
+
+        container = create_global_container()
+
+        @container.provider(scope="singleton")
+        def get_service() -> Service:
+            calls.append(1)
+            return Service(ident="global")
+
+        service = global_ref(Service)
+
+        assert service.ident == "global"
+        assert service.ident == "global"
+
+        assert len(calls) == 1
+
+    def test_global_ref_binds_on_operator_access(self) -> None:
+        service = global_ref(Service)
+
+        with pytest.raises(RuntimeError, match="Cannot resolve"):
+            bool(service)
 
     def test_global_ref_is_not_retained(self) -> None:
         """Test that discarded references are not kept alive by the module."""

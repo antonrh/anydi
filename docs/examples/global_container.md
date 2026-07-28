@@ -127,7 +127,7 @@ if __name__ == "__main__":
 Imports the application container, so the pytest plugin picks it up as the `container` fixture.
 
 ```python
-from app.container import container  # noqa: F401
+from app.container import container
 ```
 
 `tests/test_users.py`
