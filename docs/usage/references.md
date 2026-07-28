@@ -1,6 +1,6 @@
 # References
 
-`container.ref()` returns a lazy reference to a dependency. It behaves like the dependency itself, but resolves it on first attribute access. Use it in plain functions that you do not want to decorate or run through the container.
+`container.ref()` returns a lazy reference to a dependency. It behaves like the dependency itself, but resolves it on first attribute access. Use it in plain functions that you do not want to decorate or run through the container. When the container itself is out of reach, use the [global container](global-container.md).
 
 ## Example
 
@@ -35,6 +35,8 @@ The reference is a transparent proxy. Attribute access, method calls, `isinstanc
 
 Nothing is resolved until the first attribute access. You can create a reference before its provider is registered.
 
+A reference takes whatever `resolve()` takes, including [named providers](providers/annotated.md) and [type aliases](providers/basics.md#type-aliases).
+
 ## Caching
 
 Singleton instances are cached inside the reference. The cache is dropped when the container state changes: on `override()`, `reset()`, `release()`, provider re-registration or container close.
@@ -46,38 +48,6 @@ Pass `cache=False` to resolve a singleton on every access:
 ```python
 service = container.ref(GreetingService, cache=False)
 ```
-
-## Named dependencies
-
-References work with [named providers](providers/annotated.md) and [type aliases](providers/basics.md#type-aliases):
-
-```python
-from typing import Annotated
-
-
-class Database:
-    def __init__(self, host: str) -> None:
-        self.host = host
-
-
-@container.provider(scope="singleton")
-def primary_db() -> Annotated[Database, "primary"]:
-    return Database(host="db-primary.local")
-
-
-@container.provider(scope="singleton")
-def replica_db() -> Annotated[Database, "replica"]:
-    return Database(host="db-replica.local")
-
-
-primary = container.ref(Annotated[Database, "primary"])
-replica = container.ref(Annotated[Database, "replica"])
-
-assert primary.host == "db-primary.local"
-assert replica.host == "db-replica.local"
-```
-
-Each reference keeps its own name, so overriding one of them in tests leaves the other one alone.
 
 ## Transient dependencies
 
@@ -184,82 +154,3 @@ The resource is started by `astart()` and closed by `aclose()`. The database its
 ## Testing
 
 A reference always asks the container for the current instance, so `override()` is picked up. See [Testing](testing.md#overriding-lazy-references).
-
-## Global container
-
-A module that the container imports cannot import the container back, so `container.ref()` is not available there. A decorator that needs a dependency is the usual case.
-
-`create_global_container()` makes a container available process-wide, and `global_ref()` references a dependency without naming it.
-
-```python
-# app/adapters/cache.py
-import functools
-from typing import Protocol
-
-from anydi import global_ref
-
-
-class Cache(Protocol):
-    def get(self, key: str) -> str | None: ...
-
-    def set(self, key: str, value: str) -> None: ...
-
-
-cache = global_ref(Cache)
-
-
-def cached(func):
-    @functools.wraps(func)
-    def wrapper(*args, **kwargs):
-        key = func.__qualname__
-
-        if (value := cache.get(key)) is not None:
-            return value
-
-        value = func(*args, **kwargs)
-        cache.set(key, value)
-        return value
-
-    return wrapper
-```
-
-```python
-# app/container.py
-from anydi import create_global_container
-
-from app.adapters.cache import Cache, MemoryCache
-
-container = create_global_container()
-
-
-@container.provider(scope="singleton")
-def cache_provider() -> Cache:
-    return MemoryCache()
-```
-
-A global reference binds on first access, so the modules can be imported in any order. In everything else it behaves like `container.ref()`.
-
-See the [example application](../examples/global_container.md) for the whole picture.
-
-### Managing the container
-
-```python
-get_global_container()            # raises if it is not set
-get_global_container_or_none()    # None instead of raising
-set_global_container(container)   # register an existing container
-reset_global_container()          # unset it, references bind again
-```
-
-There is one global container per process. `create_global_container()` raises if one is already set, so replacing it takes an explicit `reset_global_container()`.
-
-Using a reference while the container is unset raises `RuntimeError` naming the dependency. The reference reports its state without resolving anything:
-
-```python
-<GlobalRef for app.adapters.cache.Cache, unbound>
-```
-
-### Testing with the global container
-
-The pytest plugin makes the `container` fixture global, so references resolve against the container under test, `override()` included. A container created with `create_global_container()` is picked up by the fixture, which makes the `anydi_container` setting unnecessary.
-
-Prefer `container.ref()` wherever the container can be reached, it says which container it belongs to.

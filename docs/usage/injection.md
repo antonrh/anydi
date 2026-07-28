@@ -138,7 +138,7 @@ container.close()
 
 The scan method takes a list of module paths and searches them for functions or classes with `@inject` decorator.
 
-## Scanning by tags
+### Scanning by tags
 
 You can scan for specific tags only. Use the tags argument like this:
 
@@ -151,7 +151,7 @@ container.scan(["app.handlers"], tags=["tag1"])
 
 This scans only `@injectable` items with the specified tags in the `app.handlers` module.
 
-## Ignoring packages during scan
+### Ignoring packages during scan
 
 Use the `ignore` parameter to exclude specific packages or modules from scanning. This helps avoid circular imports or infinite loops when modules have complex import dependencies:
 

@@ -31,7 +31,9 @@ nav:
       - Auto-Registration: usage/providers/auto-registration.md
     - Scopes: usage/scopes.md
     - Dependency Injection: usage/injection.md
-    - References: usage/references.md
+    - References:
+      - Overview: usage/references.md
+      - Global Container: usage/global-container.md
     - Modules: usage/modules.md
     - Testing: usage/testing.md
     - CLI: usage/cli.md
