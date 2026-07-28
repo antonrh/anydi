@@ -3,6 +3,7 @@ from typing import Annotated, Any
 from unittest import mock
 
 import pytest
+import wrapt
 
 from anydi import Container, Inject, provided
 from anydi._ref import Ref
@@ -497,3 +498,7 @@ class TestRefUsage:
         db = container.ref(Database)
 
         assert type(db) is Ref
+
+    def test_ref_is_built_on_the_pure_python_proxy(self) -> None:
+        # The C proxy ignores the `__wrapped__` property that makes a reference lazy
+        assert Ref.__bases__[0] is not wrapt.ObjectProxy

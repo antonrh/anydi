@@ -7,7 +7,7 @@ from typing import TYPE_CHECKING, Any
 from typing_extensions import type_repr
 
 # Pure-Python `ObjectProxy`: the C one ignores a `__wrapped__` property override
-from wrapt.wrappers import ObjectProxy
+from wrapt.wrappers import ObjectProxy  # ty: ignore[unresolved-import]
 
 from ._types import NOT_SET
 
@@ -56,6 +56,12 @@ class Ref(ObjectProxy):
                 self._self_cache = False
 
         return instance
+
+    def __getattr__(self, name: str) -> Any:
+        # Fast path for a cached instance, skipping the `__wrapped__` property
+        if self._self_epoch == self._self_container._epoch:
+            return getattr(self._self_instance, name)
+        return getattr(self.__wrapped__, name)
 
     def __repr__(self) -> str:
         # Deliberately does not resolve the dependency

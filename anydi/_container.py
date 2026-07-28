@@ -993,7 +993,7 @@ class Container:
             return provider.scope
         # `@provided` classes are only registered on first resolve
         if inspect.isclass(dependency_type) and is_provided(dependency_type):
-            return cast(Scope, dependency_type.__provided__.get("scope", "singleton"))
+            return dependency_type.__provided__.get("scope", "singleton")
         return None
 
     def _invalidate_refs(self) -> None:

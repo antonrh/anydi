@@ -168,7 +168,7 @@ class TestResolver:
                 return "HELLO"
 
         proxy = InstanceProxy(Callable(), dependency_type=Callable)
-        assert proxy() == "HELLO"
+        assert proxy() == "HELLO"  # ty: ignore[call-non-callable]
 
     def test_callable_dependency_in_test_mode(self) -> None:
         """Test that callable dependencies work in test mode (override mode)."""
