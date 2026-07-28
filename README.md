@@ -31,6 +31,7 @@ Main features:
 * **Resource management**: Context manager protocol support for lifecycle management.
 * **Modular**: Container and module composition for large applications.
 * **Auto-scan**: Automatic discovery of injectable callables.
+* **Lazy references**: Module-level access to dependencies without injection.
 * **Generic support**: Automatic TypeVar resolution for generic base classes.
 * **Framework integrations**: Extensions for popular frameworks.
 * **Testing**: Provider override mechanism for test isolation.
@@ -96,6 +97,26 @@ def greet(service: Provide[GreetingService]) -> str:
 if __name__ == "__main__":
     print(container.run(greet))
 ```
+
+### Or Use a Lazy Reference (`app/main.py`)
+
+```python
+from app.container import container
+from app.services import GreetingService
+
+
+service = container.ref(GreetingService)
+
+
+def greet() -> str:
+    return service.greet("World")
+
+
+if __name__ == "__main__":
+    print(greet())
+```
+
+The container owns the providers, scopes and lifespan either way. Injection and lazy references are two styles of reaching the same dependency.
 
 ### Test with Overrides (`tests/test_app.py`)
 

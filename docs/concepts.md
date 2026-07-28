@@ -237,7 +237,12 @@ def send_welcome(service: Provide[EmailService]):
     service.send("user@example.com", "Welcome")
 
 container.run(send_welcome)
+
+# Lazy reference, resolved on first attribute access
+service = container.ref(EmailService)
 ```
+
+The container owns the dependencies and their lifecycle. How your code reaches them is a matter of taste: inject them into functions, resolve them manually, or keep a lazy reference at module level. All three use the same providers, the same scopes and the same overrides in tests.
 
 ## Lifecycle Management
 

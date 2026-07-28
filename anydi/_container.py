@@ -24,6 +24,7 @@ from ._injector import Injector
 from ._marker import Marker
 from ._module import ModuleDef, ModuleRegistrar
 from ._provider import Provider, ProviderDef, ProviderKind, ProviderParameter
+from ._ref import Ref
 from ._resolver import Resolver
 from ._scanner import PackageOrIterable, Scanner
 from ._types import (
@@ -72,6 +73,12 @@ class Container:
 
         # Build state
         self._ready = False
+
+        # Bumped whenever instances cached by lazy references must be re-resolved
+        self._epoch = 0
+
+        # Dependency types referenced by `ref()`, re-validated on build()
+        self._pending_refs: list[Any] = []
 
         # Test mode (enables override support for all resolutions)
         self._test_mode = False
@@ -135,6 +142,7 @@ class Container:
         exc_tb: types.TracebackType | None,
     ) -> Any:
         """Exit the singleton context."""
+        self._invalidate_refs()
         return self._singleton_context.__exit__(exc_type, exc_val, exc_tb)
 
     def start(self) -> None:
@@ -145,6 +153,7 @@ class Container:
 
     def close(self) -> None:
         """Close the singleton context."""
+        self._invalidate_refs()
         self._singleton_context.close()
 
     async def __aenter__(self) -> Self:
@@ -159,6 +168,7 @@ class Container:
         exc_tb: types.TracebackType | None,
     ) -> bool:
         """Exit the singleton context."""
+        self._invalidate_refs()
         return await self._singleton_context.__aexit__(exc_type, exc_val, exc_tb)
 
     async def astart(self) -> None:
@@ -168,6 +178,7 @@ class Container:
 
     async def aclose(self) -> None:
         """Close the singleton context asynchronously."""
+        self._invalidate_refs()
         await self._singleton_context.aclose()
 
     @contextlib.contextmanager
@@ -435,6 +446,7 @@ class Container:
 
         # Cleanup provider references
         self._delete_provider(provider)
+        self._invalidate_refs()
 
     def provider(
         self, *, scope: Scope, override: bool = False, alias: Any = NOT_SET
@@ -611,6 +623,7 @@ class Container:
         self._set_provider(provider)
         if override:
             self._resolver.clear_caches()
+            self._invalidate_refs()
 
         # Resolve dependencies for providers registered after build()
         if self.ready:
@@ -909,9 +922,11 @@ class Container:
             return None
         context = self._get_instance_context(provider.scope)
         del context[dependency_type]
+        self._invalidate_refs()
 
     def reset(self) -> None:
         """Reset resolved instances."""
+        self._invalidate_refs()
         for dependency_type, provider in self._providers.items():
             if provider.scope == "transient":
                 continue
@@ -920,6 +935,70 @@ class Container:
             except LookupError:
                 continue
             del context[dependency_type]
+
+    # == Lazy References ==
+
+    def ref(self, dependency_type: TypeForm[T], /, *, cache: bool = True) -> T:
+        """Create a lazy reference resolved on first attribute access."""
+        if dependency_type not in self._pending_refs:
+            self._pending_refs.append(dependency_type)
+        self._validate_ref(dependency_type)
+        return cast(T, Ref(self, dependency_type, cache=cache))
+
+    def _validate_ref(self, dependency_type: Any) -> None:
+        """Validate that a dependency can be referenced."""
+        # A reference needs an instance to refer to, a transient scope has none
+        if self._get_ref_scope(dependency_type) == "transient":
+            raise TypeError(
+                f"The dependency `{type_repr(dependency_type)}` cannot be "
+                "referenced: it has a `transient` scope, so every access would "
+                "create a new instance. Register it as a singleton if it is "
+                "stateless, or use `partial(container.resolve, "
+                f"{type_repr(dependency_type)})` to create a fresh instance "
+                "per call."
+            )
+
+        seen: set[Any] = set()
+        stack: list[Any] = [dependency_type]
+
+        while stack:
+            canonical = self._resolve_alias(stack.pop())
+            if canonical in seen:
+                continue
+            seen.add(canonical)
+
+            provider = self._providers.get(canonical)
+            # Providers registered later are re-validated by build()
+            if provider is None:
+                continue
+
+            # Async singleton resources are already created by `astart()`
+            if provider.is_async and not (
+                provider.is_resource and provider.scope == "singleton"
+            ):
+                raise TypeError(
+                    f"The dependency `{type_repr(dependency_type)}` cannot be "
+                    f"referenced: the provider `{provider}` is asynchronous and "
+                    "cannot be resolved in synchronous mode. Make the provider "
+                    "synchronous and move the asynchronous setup into a singleton "
+                    "resource."
+                )
+
+            stack.extend(param.dependency_type for param in provider.parameters)
+
+    def _get_ref_scope(self, dependency_type: Any) -> Scope | None:
+        """Get the scope of a referenced dependency, if it is known yet."""
+        provider = self._providers.get(self._resolve_alias(dependency_type))
+        if provider is not None:
+            return provider.scope
+        # `@provided` classes are only registered on first resolve
+        if inspect.isclass(dependency_type) and is_provided(dependency_type):
+            return cast(Scope, dependency_type.__provided__.get("scope", "singleton"))
+        return None
+
+    def _invalidate_refs(self) -> None:
+        """Invalidate instances cached by lazy references."""
+        self._epoch += 1
 
     # == Injection Utilities ==
 
@@ -980,6 +1059,9 @@ class Container:
         self._detect_circular_dependencies()
         self._validate_scope_compatibility()
 
+        for dependency_type in self._pending_refs:
+            self._validate_ref(dependency_type)
+
         self._ready = True
 
     def rebuild(self) -> None:
@@ -987,6 +1069,7 @@ class Container:
         if self._ready:
             self._ready = False
             self._resolver.clear_caches()
+            self._invalidate_refs()
         self.build()
 
     def graph(
@@ -1237,10 +1320,12 @@ class Container:
                 f"The provider `{type_repr(dependency_type)}` is not registered."
             )
         self._resolver.add_override(dependency_type, instance)
+        self._invalidate_refs()
         try:
             yield
         finally:
             self._resolver.remove_override(dependency_type)
+            self._invalidate_refs()
 
 
 def import_container(container_path: str) -> Container:

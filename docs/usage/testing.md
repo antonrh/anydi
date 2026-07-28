@@ -99,6 +99,30 @@ def test_handler() -> None:
         assert get_items() == [Item(name="mock1"), Item(name="mock2")]
 ```
 
+### Overriding Lazy References
+
+Dependencies obtained with [`container.ref()`](injection.md#lazy-references) are overridden the same way. A reference always asks the container for the current instance. The override applies even if the reference was already used:
+
+```python
+container = Container()
+
+container.register(Repository, Repository, scope="singleton")
+
+repo = container.ref(Repository)
+
+
+def get_items() -> list[Item]:
+    return repo.all()
+
+
+def test_handler() -> None:
+    repo_mock = mock.Mock(spec=Repository)
+    repo_mock.all.return_value = [Item(name="mock1"), Item(name="mock2")]
+
+    with container.test_mode(), container.override(Repository, repo_mock):
+        assert get_items() == [Item(name="mock1"), Item(name="mock2")]
+```
+
 ## Overriding Providers with Modules
 
 You can create a testing module that overrides providers from your application modules. Use `@provider(scope="...", override=True)` to replace specific providers:
