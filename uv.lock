@@ -26,7 +26,6 @@ version = "0.77.0"
 source = { editable = "." }
 dependencies = [
     { name = "anyio" },
-    { name = "sniffio" },
     { name = "typing-extensions" },
     { name = "wrapt" },
 ]
@@ -43,6 +42,7 @@ dev = [
     { name = "pytest-mock" },
     { name = "redis" },
     { name = "ruff" },
+    { name = "sniffio" },
     { name = "starlette" },
     { name = "ty" },
     { name = "typer" },
@@ -55,7 +55,6 @@ docs = [
 [package.metadata]
 requires-dist = [
     { name = "anyio", specifier = ">=3.7.1" },
-    { name = "sniffio", specifier = ">=1.3.0" },
     { name = "typing-extensions", specifier = ">=4.15.0,<5" },
     { name = "wrapt", specifier = ">=1.17.0" },
 ]
@@ -72,6 +71,7 @@ dev = [
     { name = "pytest-mock", specifier = ">=3.14.1" },
     { name = "redis", specifier = ">=5.0.4,<6" },
     { name = "ruff", specifier = ">=0.16.0" },
+    { name = "sniffio", specifier = ">=1.3.0" },
     { name = "starlette", specifier = ">=0.37.2" },
     { name = "ty", specifier = ">=0.0.64" },
     { name = "typer", specifier = ">=0.20.0" },
