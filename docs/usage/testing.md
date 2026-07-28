@@ -101,7 +101,7 @@ def test_handler() -> None:
 
 ### Overriding Lazy References
 
-Dependencies obtained with [`container.ref()`](injection.md#lazy-references) are overridden the same way. A reference always asks the container for the current instance. The override applies even if the reference was already used:
+Dependencies obtained with [`container.ref()`](references.md) are overridden the same way. A reference always asks the container for the current instance. The override applies even if the reference was already used:
 
 ```python
 container = Container()
