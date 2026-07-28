@@ -812,6 +812,50 @@ class TestContainerRegistration:
         with pytest.raises(LookupError, match=r"The provider `str` is not registered."):
             container.unregister(str)
 
+    def test_unregister_resolved_provider(self, container: Container) -> None:
+        container.register(str, lambda: "test", scope="singleton")
+
+        assert container.resolve(str) == "test"
+
+        container.unregister(str)
+
+        with pytest.raises(LookupError, match="is either not registered"):
+            container.resolve(str)
+
+    def test_unregister_by_alias_releases_instance(self, container: Container) -> None:
+        class IService:
+            pass
+
+        class ServiceImpl(IService):
+            pass
+
+        container.register(ServiceImpl, scope="singleton", alias=IService)
+        container.resolve(ServiceImpl)
+
+        container.unregister(IService)
+
+        assert not container.is_resolved(ServiceImpl)
+
+    def test_unregister_dependency_of_released_provider(
+        self, container: Container
+    ) -> None:
+        class Repository:
+            pass
+
+        class Service:
+            def __init__(self, repository: Repository) -> None:
+                self.repository = repository
+
+        container.register(Repository, scope="singleton")
+        container.register(Service, scope="singleton")
+        container.resolve(Service)
+
+        container.unregister(Repository)
+        container.release(Service)
+
+        with pytest.raises(LookupError, match="`repository`"):
+            container.resolve(Service)
+
     def test_unregister_provider_removes_aliases(self, container: Container) -> None:
         class IService:
             pass

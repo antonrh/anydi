@@ -109,17 +109,14 @@ class Resolver:
 
         # Recursively compile dependencies first
         for param in provider.parameters:
-            if param.provider is not None:
-                # Look up the current provider to handle overrides
-                # Resolve alias to canonical type if needed
-                canonical_type = self._container.aliases.get(
-                    param.dependency_type, param.dependency_type
-                )
-                current_provider = self._container.providers.get(canonical_type)
-                if current_provider is not None:
-                    self.compile(current_provider, is_async=is_async)
-                else:
-                    self.compile(param.provider, is_async=is_async)
+            # Look up the current provider to handle overrides
+            # Resolve alias to canonical type if needed
+            canonical_type = self._container.aliases.get(
+                param.dependency_type, param.dependency_type
+            )
+            current_provider = self._container.providers.get(canonical_type)
+            if current_provider is not None:
+                self.compile(current_provider, is_async=is_async)
 
         # Compile the resolver and creator functions
         compiled = self._compile_resolver(
@@ -213,21 +210,17 @@ class Resolver:
             param_names[idx] = param.name
             param_shared_scopes[idx] = param.shared_scope
 
-            if param.provider is not None:
-                # Look up the current provider from the container to handle overrides
-                # Resolve alias to canonical type if needed
-                canonical_type = self._container.aliases.get(
-                    param.dependency_type, param.dependency_type
-                )
-                current_provider = self._container.providers.get(canonical_type)
-                if current_provider is not None:
-                    compiled = cache.get(current_provider.dependency_type)
-                else:
-                    # Fallback to the original provider if not in container
-                    compiled = cache.get(param.provider.dependency_type)
+            # Look up the current provider from the container to handle overrides
+            # Resolve alias to canonical type if needed
+            canonical_type = self._container.aliases.get(
+                param.dependency_type, param.dependency_type
+            )
+            current_provider = self._container.providers.get(canonical_type)
+
+            if current_provider is not None:
+                compiled = cache.get(current_provider.dependency_type)
                 if compiled is None:
-                    compiled = self.compile(param.provider, is_async=is_async)
-                    cache[param.provider.dependency_type] = compiled
+                    compiled = self.compile(current_provider, is_async=is_async)
                 param_resolvers[idx] = compiled.resolve
             else:
                 # Generate unresolved message for params without a provider

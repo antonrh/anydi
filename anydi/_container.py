@@ -393,10 +393,12 @@ class Container:
             except LookupError:
                 pass
             else:
-                del context[dependency_type]
+                del context[provider.dependency_type]
 
         # Cleanup provider references
         self._delete_provider(provider)
+        # Compiled resolvers may reference the provider, drop them all
+        self._resolver.clear_caches()
         self._invalidate_refs()
 
     def provider(
