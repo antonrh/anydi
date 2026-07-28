@@ -93,7 +93,7 @@ container.alias(IRepository, UserRepository)
 ```
 
 !!! tip
-    When using `scan()` with `@provided(alias=...)`, aliases are created automatically. See [Auto-Registration](auto-registration.md#register-with-an-alias).
+    When using `scan()` with `@provided(alias=...)`, aliases are created automatically. See [Auto-Registration](auto-registration.md#aliases).
 
 ## Unregistering providers
 
