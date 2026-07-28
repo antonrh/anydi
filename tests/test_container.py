@@ -3211,6 +3211,24 @@ class TestContainerCustomScopes:
                 # Should be the same instance
                 assert instance1 is instance2
 
+    def test_request_context_released_after_exception(
+        self, container: Container
+    ) -> None:
+        """Test that a failed request does not leak its context into the next one."""
+        container.register(UniqueId, scope="request")
+        resolved: list[UniqueId] = []
+
+        def failing_request() -> None:
+            with container.request_context():
+                resolved.append(container.resolve(UniqueId))
+                raise ValueError("boom")
+
+        with pytest.raises(ValueError, match="boom"):
+            failing_request()
+
+        with container.request_context():
+            assert container.resolve(UniqueId) is not resolved[0]
+
     def test_get_context_scopes_default(self, container: Container) -> None:
         """Test get_context_scopes with default scopes."""
         # Default context scopes: singleton and request

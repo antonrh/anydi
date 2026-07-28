@@ -2,14 +2,19 @@ from __future__ import annotations
 
 import contextlib
 import threading
+from collections.abc import Iterator
+from contextvars import Token
 from types import TracebackType
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 import anyio.to_thread
 from typing_extensions import Self
 
 from ._async_lock import AsyncRLock
-from ._types import NOT_SET
+from ._types import NOT_SET, is_event_type
+
+if TYPE_CHECKING:
+    from ._container import Container
 
 
 class InstanceContext:
@@ -112,3 +117,90 @@ class InstanceContext:
         if self._async_lock is None:
             self._async_lock = AsyncRLock()
         return self._async_lock
+
+
+class ScopedContext:
+    """A context manager entering and leaving a scoped instance context."""
+
+    __slots__ = ("_container", "_context", "_scope", "_token", "_var")
+
+    def __init__(self, container: Container, scope: str) -> None:
+        self._container = container
+        self._scope = scope
+        self._var = container._get_scoped_context_var(scope)
+        self._context: InstanceContext | None = None
+        self._token: Token[InstanceContext] | None = None
+
+    def _enter(self) -> tuple[InstanceContext, bool]:
+        """Return the context to use and whether this scope created it."""
+        if self._token is not None:
+            raise RuntimeError(f"The {self._scope} context is already entered.")
+        context = self._var.get(None)
+        if context is not None:
+            # Reuse existing context, don't create a new one
+            self._context = context
+            return context, False
+        context = InstanceContext()
+        self._token = self._var.set(context)
+        self._context = context
+        return context, True
+
+    def _events(self) -> Iterator[Any]:
+        """Iterate over the event resources of the scope."""
+        for dependency_type in self._container._resources.get(self._scope, ()):
+            if is_event_type(dependency_type):
+                yield dependency_type
+
+    def _exit(self) -> tuple[InstanceContext, Token[InstanceContext]] | None:
+        """Return the context to close and its token, or None when not owned."""
+        token = self._token
+        context = self._context
+        if token is None or context is None:
+            # The context was owned by an outer scope
+            return None
+        self._token = None
+        return context, token
+
+    def __enter__(self) -> InstanceContext:
+        context, created = self._enter()
+        if created:
+            for dependency_type in self._events():
+                self._container.resolve(dependency_type)
+        return context
+
+    def __exit__(
+        self,
+        exc_type: type[BaseException] | None,
+        exc_val: BaseException | None,
+        exc_tb: TracebackType | None,
+    ) -> Any:
+        owned = self._exit()
+        if owned is None:
+            return None
+        context, token = owned
+        try:
+            return context.__exit__(exc_type, exc_val, exc_tb)
+        finally:
+            self._var.reset(token)
+
+    async def __aenter__(self) -> InstanceContext:
+        context, created = self._enter()
+        if created:
+            for dependency_type in self._events():
+                await self._container.aresolve(dependency_type)
+        return context
+
+    async def __aexit__(
+        self,
+        exc_type: type[BaseException] | None,
+        exc_val: BaseException | None,
+        exc_tb: TracebackType | None,
+    ) -> Any:
+        owned = self._exit()
+        if owned is None:
+            return None
+        context, token = owned
+        try:
+            return await context.__aexit__(exc_type, exc_val, exc_tb)
+        finally:
+            self._var.reset(token)

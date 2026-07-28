@@ -10,13 +10,13 @@ import types
 import uuid
 import warnings
 from collections import defaultdict
-from collections.abc import AsyncIterator, Callable, Iterable, Iterator, Sequence
+from collections.abc import Callable, Iterable, Iterator, Sequence
 from contextvars import ContextVar
 from typing import Any, Literal, TypeVar, cast, get_args, get_origin, overload
 
 from typing_extensions import ParamSpec, Self, TypeForm, type_repr
 
-from ._context import InstanceContext
+from ._context import InstanceContext, ScopedContext
 from ._decorators import is_provided
 from ._generics import build_typevar_map, resolve_typevars
 from ._graph import Graph
@@ -31,7 +31,6 @@ from ._types import (
     NOT_SET,
     Event,
     Scope,
-    is_event_type,
     is_iterator_type,
     is_none_type,
     to_list,
@@ -181,69 +180,21 @@ class Container:
         self._invalidate_refs()
         await self._singleton_context.aclose()
 
-    @contextlib.contextmanager
-    def scoped_context(self, scope: str) -> Iterator[InstanceContext]:
+    def scoped_context(self, scope: str) -> ScopedContext:
         """Obtain a context manager for the request-scoped context."""
-        context_var = self._get_scoped_context_var(scope)
+        return ScopedContext(self, scope)
 
-        # Check if context already exists (re-entering same scope)
-        context = context_var.get(None)
-        if context is not None:
-            # Reuse existing context, don't create a new one
-            yield context
-            return
-
-        # Create new context
-        context = InstanceContext()
-        token = context_var.set(context)
-
-        # Resolve all request resources
-        for dependency_type in self._resources.get(scope, []):
-            if not is_event_type(dependency_type):
-                continue
-            self.resolve(dependency_type)
-
-        with context:
-            yield context
-            context_var.reset(token)
-
-    @contextlib.asynccontextmanager
-    async def ascoped_context(self, scope: str) -> AsyncIterator[InstanceContext]:
+    def ascoped_context(self, scope: str) -> ScopedContext:
         """Obtain a context manager for the specified scoped context."""
-        context_var = self._get_scoped_context_var(scope)
+        return ScopedContext(self, scope)
 
-        # Check if context already exists (re-entering same scope)
-        context = context_var.get(None)
-        if context is not None:
-            # Reuse existing context, don't create a new one
-            yield context
-            return
-
-        # Create new context
-        context = InstanceContext()
-        token = context_var.set(context)
-
-        # Resolve all request resources
-        for dependency_type in self._resources.get(scope, []):
-            if not is_event_type(dependency_type):
-                continue
-            await self.aresolve(dependency_type)
-
-        async with context:
-            yield context
-            context_var.reset(token)
-
-    @contextlib.contextmanager
-    def request_context(self) -> Iterator[InstanceContext]:
+    def request_context(self) -> ScopedContext:
         """Obtain a context manager for the request-scoped context."""
-        with self.scoped_context("request") as context:
-            yield context
+        return ScopedContext(self, "request")
 
-    @contextlib.asynccontextmanager
-    async def arequest_context(self) -> AsyncIterator[InstanceContext]:
+    def arequest_context(self) -> ScopedContext:
         """Obtain an async context manager for the request-scoped context."""
-        async with self.ascoped_context("request") as context:
-            yield context
+        return ScopedContext(self, "request")
 
     def _get_scoped_context(self, scope: str) -> InstanceContext:
         scoped_context_var = self._get_scoped_context_var(scope)
