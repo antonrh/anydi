@@ -1940,6 +1940,18 @@ class TestContainerResolution:
 
         assert not container.is_resolved(str)
 
+    def test_release_then_resolve_creates_new_instance(
+        self, container: Container
+    ) -> None:
+        counter = iter(range(100))
+        container.register(str, lambda: f"instance{next(counter)}", scope="singleton")
+
+        assert container.resolve(str) == "instance0"
+
+        container.release(str)
+
+        assert container.resolve(str) == "instance1"
+
     def test_release_transient_instance(self, container: Container) -> None:
         container.register(str, lambda: "test", scope="transient")
 
@@ -2308,6 +2320,18 @@ class TestContainerContext:
 
         assert not container.is_resolved(str)
         assert not container.is_resolved(int)
+
+    def test_reset_then_resolve_creates_new_instance(
+        self, container: Container
+    ) -> None:
+        counter = iter(range(100))
+        container.register(str, lambda: f"instance{next(counter)}", scope="singleton")
+
+        assert container.resolve(str) == "instance0"
+
+        container.reset()
+
+        assert container.resolve(str) == "instance1"
 
     def test_reset_transient(self, container: Container) -> None:
         container.register(str, lambda: "test", scope="transient")
@@ -3438,6 +3462,21 @@ class TestContainerOverride:
             assert container.resolve(str) == overridden_name
 
         assert container.resolve(str) == origin_name
+
+    def test_override_already_resolved_instance(self) -> None:
+        container = Container()
+        container.enable_test_mode()
+
+        @container.provider(scope="singleton")
+        def name() -> str:
+            return "origin"
+
+        assert container.resolve(str) == "origin"
+
+        with container.override(str, "overridden"):
+            assert container.resolve(str) == "overridden"
+
+        assert container.resolve(str) == "origin"
 
     def test_override_without_test_mode_warning(self) -> None:
         """Test that override() without test mode triggers a warning."""

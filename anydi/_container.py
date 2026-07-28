@@ -864,8 +864,13 @@ class Container:
 
     def resolve(self, dependency_type: TypeForm[T], /) -> T:
         """Resolve an instance by dependency type using compiled sync resolver."""
-        cached = self._resolver.get_cached(dependency_type, is_async=False)
+        cached = self._resolver.sync_cache.get(dependency_type)
         if cached is not None:
+            store = cached.store
+            if store is not None:
+                instance = store.get(dependency_type, NOT_SET)
+                if instance is not NOT_SET:
+                    return instance
             return cached.resolve(self)
 
         provider = self._get_or_register_provider(dependency_type)
@@ -874,8 +879,13 @@ class Container:
 
     async def aresolve(self, dependency_type: TypeForm[T], /) -> T:
         """Resolve an instance by dependency type asynchronously."""
-        cached = self._resolver.get_cached(dependency_type, is_async=True)
+        cached = self._resolver.async_cache.get(dependency_type)
         if cached is not None:
+            store = cached.store
+            if store is not None:
+                instance = store.get(dependency_type, NOT_SET)
+                if instance is not NOT_SET:
+                    return instance
             return await cached.resolve(self)
 
         provider = self._get_or_register_provider(dependency_type)
@@ -1276,10 +1286,12 @@ class Container:
     def enable_test_mode(self) -> None:
         """Enable test mode for override support on all resolutions."""
         self._test_mode = True
+        self._resolver.refresh_mode()
 
     def disable_test_mode(self) -> None:
         """Disable test mode for override support on all resolutions."""
         self._test_mode = False
+        self._resolver.refresh_mode()
 
     @contextlib.contextmanager
     def test_mode(self) -> Iterator[None]:
@@ -1287,11 +1299,11 @@ class Container:
             yield
             return
 
-        self._test_mode = True
+        self.enable_test_mode()
         try:
             yield
         finally:
-            self._test_mode = False
+            self.disable_test_mode()
 
     @contextlib.contextmanager
     def override(
