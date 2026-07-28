@@ -812,6 +812,50 @@ class TestContainerRegistration:
         with pytest.raises(LookupError, match=r"The provider `str` is not registered."):
             container.unregister(str)
 
+    def test_unregister_resolved_provider(self, container: Container) -> None:
+        container.register(str, lambda: "test", scope="singleton")
+
+        assert container.resolve(str) == "test"
+
+        container.unregister(str)
+
+        with pytest.raises(LookupError, match="is either not registered"):
+            container.resolve(str)
+
+    def test_unregister_by_alias_releases_instance(self, container: Container) -> None:
+        class IService:
+            pass
+
+        class ServiceImpl(IService):
+            pass
+
+        container.register(ServiceImpl, scope="singleton", alias=IService)
+        container.resolve(ServiceImpl)
+
+        container.unregister(IService)
+
+        assert not container.is_resolved(ServiceImpl)
+
+    def test_unregister_dependency_of_released_provider(
+        self, container: Container
+    ) -> None:
+        class Repository:
+            pass
+
+        class Service:
+            def __init__(self, repository: Repository) -> None:
+                self.repository = repository
+
+        container.register(Repository, scope="singleton")
+        container.register(Service, scope="singleton")
+        container.resolve(Service)
+
+        container.unregister(Repository)
+        container.release(Service)
+
+        with pytest.raises(LookupError, match="`repository`"):
+            container.resolve(Service)
+
     def test_unregister_provider_removes_aliases(self, container: Container) -> None:
         class IService:
             pass
@@ -1940,6 +1984,18 @@ class TestContainerResolution:
 
         assert not container.is_resolved(str)
 
+    def test_release_then_resolve_creates_new_instance(
+        self, container: Container
+    ) -> None:
+        counter = iter(range(100))
+        container.register(str, lambda: f"instance{next(counter)}", scope="singleton")
+
+        assert container.resolve(str) == "instance0"
+
+        container.release(str)
+
+        assert container.resolve(str) == "instance1"
+
     def test_release_transient_instance(self, container: Container) -> None:
         container.register(str, lambda: "test", scope="transient")
 
@@ -2308,6 +2364,18 @@ class TestContainerContext:
 
         assert not container.is_resolved(str)
         assert not container.is_resolved(int)
+
+    def test_reset_then_resolve_creates_new_instance(
+        self, container: Container
+    ) -> None:
+        counter = iter(range(100))
+        container.register(str, lambda: f"instance{next(counter)}", scope="singleton")
+
+        assert container.resolve(str) == "instance0"
+
+        container.reset()
+
+        assert container.resolve(str) == "instance1"
 
     def test_reset_transient(self, container: Container) -> None:
         container.register(str, lambda: "test", scope="transient")
@@ -3187,6 +3255,24 @@ class TestContainerCustomScopes:
                 # Should be the same instance
                 assert instance1 is instance2
 
+    def test_request_context_released_after_exception(
+        self, container: Container
+    ) -> None:
+        """Test that a failed request does not leak its context into the next one."""
+        container.register(UniqueId, scope="request")
+        resolved: list[UniqueId] = []
+
+        def failing_request() -> None:
+            with container.request_context():
+                resolved.append(container.resolve(UniqueId))
+                raise ValueError("boom")
+
+        with pytest.raises(ValueError, match="boom"):
+            failing_request()
+
+        with container.request_context():
+            assert container.resolve(UniqueId) is not resolved[0]
+
     def test_get_context_scopes_default(self, container: Container) -> None:
         """Test get_context_scopes with default scopes."""
         # Default context scopes: singleton and request
@@ -3438,6 +3524,21 @@ class TestContainerOverride:
             assert container.resolve(str) == overridden_name
 
         assert container.resolve(str) == origin_name
+
+    def test_override_already_resolved_instance(self) -> None:
+        container = Container()
+        container.enable_test_mode()
+
+        @container.provider(scope="singleton")
+        def name() -> str:
+            return "origin"
+
+        assert container.resolve(str) == "origin"
+
+        with container.override(str, "overridden"):
+            assert container.resolve(str) == "overridden"
+
+        assert container.resolve(str) == "origin"
 
     def test_override_without_test_mode_warning(self) -> None:
         """Test that override() without test mode triggers a warning."""

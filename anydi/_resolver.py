@@ -34,6 +34,8 @@ class InstanceProxy(wrapt.ObjectProxy):
 class CompiledResolver(NamedTuple):
     resolve: Any
     create: Any
+    # Singleton instance store, set only when overrides cannot interfere
+    store: Any = None
 
 
 class Resolver:
@@ -47,11 +49,20 @@ class Resolver:
         self._async_override_cache: dict[Any, CompiledResolver] = {}
         # Override instances storage
         self._overrides: dict[Any, Any] = {}
+        # Mode state, kept as plain attributes to keep resolution cheap
+        self.override_mode = False
+        self.sync_cache = self._cache
+        self.async_cache = self._async_cache
 
-    @property
-    def override_mode(self) -> bool:
-        """Check if override mode is enabled."""
-        return bool(self._overrides) or getattr(self._container, "_test_mode", False)
+    def refresh_mode(self) -> None:
+        """Recompute the override mode and select the matching caches."""
+        self.override_mode = bool(self._overrides) or self._container._test_mode
+        if self.override_mode:
+            self.sync_cache = self._override_cache
+            self.async_cache = self._async_override_cache
+        else:
+            self.sync_cache = self._cache
+            self.async_cache = self._async_cache
 
     def add_override(self, dependency_type: Any, instance: Any) -> None:
         """Add an override for a type, its canonical type, and all aliases."""
@@ -61,6 +72,7 @@ class Resolver:
             self._overrides[canonical_type] = instance
         for alias in self._container.get_aliases_for(dependency_type):
             self._overrides[alias] = instance
+        self.refresh_mode()
 
     def remove_override(self, dependency_type: Any) -> None:
         """Remove an override for a type, its canonical type, and all aliases."""
@@ -70,6 +82,7 @@ class Resolver:
             self._overrides.pop(canonical_type, None)
         for alias in self._container.get_aliases_for(dependency_type):
             self._overrides.pop(alias, None)
+        self.refresh_mode()
 
     def clear_caches(self) -> None:
         """Clear all cached resolvers."""
@@ -82,19 +95,13 @@ class Resolver:
         self, dependency_type: Any, *, is_async: bool
     ) -> CompiledResolver | None:
         """Get cached resolver if it exists."""
-        if self.override_mode:
-            cache = self._async_override_cache if is_async else self._override_cache
-        else:
-            cache = self._async_cache if is_async else self._cache
+        cache = self.async_cache if is_async else self.sync_cache
         return cache.get(dependency_type)
 
     def compile(self, provider: Provider, *, is_async: bool) -> CompiledResolver:
         """Compile an optimized resolver function for the given provider."""
         # Select the appropriate cache based on sync/async mode and override mode
-        if self.override_mode:
-            cache = self._async_override_cache if is_async else self._override_cache
-        else:
-            cache = self._async_cache if is_async else self._cache
+        cache = self.async_cache if is_async else self.sync_cache
 
         # Check if already compiled in cache
         if provider.dependency_type in cache:
@@ -102,22 +109,25 @@ class Resolver:
 
         # Recursively compile dependencies first
         for param in provider.parameters:
-            if param.provider is not None:
-                # Look up the current provider to handle overrides
-                # Resolve alias to canonical type if needed
-                canonical_type = self._container.aliases.get(
-                    param.dependency_type, param.dependency_type
-                )
-                current_provider = self._container.providers.get(canonical_type)
-                if current_provider is not None:
-                    self.compile(current_provider, is_async=is_async)
-                else:
-                    self.compile(param.provider, is_async=is_async)
+            # Look up the current provider to handle overrides
+            # Resolve alias to canonical type if needed
+            canonical_type = self._container.aliases.get(
+                param.dependency_type, param.dependency_type
+            )
+            current_provider = self._container.providers.get(canonical_type)
+            if current_provider is not None:
+                self.compile(current_provider, is_async=is_async)
 
         # Compile the resolver and creator functions
         compiled = self._compile_resolver(
             provider, is_async=is_async, with_override=self.override_mode
         )
+
+        # Let resolution read a cached singleton without calling the resolver
+        if not self.override_mode and provider.scope == "singleton":
+            compiled = compiled._replace(
+                store=self._container._singleton_context._items
+            )
 
         # Store the compiled functions in the cache
         cache[provider.dependency_type] = compiled
@@ -200,21 +210,17 @@ class Resolver:
             param_names[idx] = param.name
             param_shared_scopes[idx] = param.shared_scope
 
-            if param.provider is not None:
-                # Look up the current provider from the container to handle overrides
-                # Resolve alias to canonical type if needed
-                canonical_type = self._container.aliases.get(
-                    param.dependency_type, param.dependency_type
-                )
-                current_provider = self._container.providers.get(canonical_type)
-                if current_provider is not None:
-                    compiled = cache.get(current_provider.dependency_type)
-                else:
-                    # Fallback to the original provider if not in container
-                    compiled = cache.get(param.provider.dependency_type)
+            # Look up the current provider from the container to handle overrides
+            # Resolve alias to canonical type if needed
+            canonical_type = self._container.aliases.get(
+                param.dependency_type, param.dependency_type
+            )
+            current_provider = self._container.providers.get(canonical_type)
+
+            if current_provider is not None:
+                compiled = cache.get(current_provider.dependency_type)
                 if compiled is None:
-                    compiled = self.compile(param.provider, is_async=is_async)
-                    cache[param.provider.dependency_type] = compiled
+                    compiled = self.compile(current_provider, is_async=is_async)
                 param_resolvers[idx] = compiled.resolve
             else:
                 # Generate unresolved message for params without a provider
@@ -243,29 +249,18 @@ class Resolver:
                 "container, context, store, defaults, override_mode):"
             )
 
-        if no_params:
-            # Fast path: no parameters to resolve, skip NOT_SET check
-            if not is_async:
-                create_lines.append("    if _is_async:")
-                create_lines.append(
-                    "        raise TypeError("
-                    'f"The instance for the provider `{_dependency_repr}` '
-                    'cannot be created in synchronous mode."'
-                    ")"
-                )
-        else:
+        # An async provider can never be created synchronously
+        if not is_async and provider.is_async:
+            create_lines.append(
+                "    raise TypeError("
+                'f"The instance for the provider `{_dependency_repr}` '
+                'cannot be created in synchronous mode."'
+                ")"
+            )
+
+        if not no_params:
             # Need NOT_SET for parameter resolution
             create_lines.append("    NOT_SET_ = _NOT_SET")
-            if not is_async:
-                create_lines.append("    if _is_async:")
-                create_lines.append(
-                    "        raise TypeError("
-                    'f"The instance for the provider `{_dependency_repr}` '
-                    'cannot be created in synchronous mode."'
-                    ")"
-                )
-            # Cache the resolver cache for faster repeated access
-            create_lines.append("    cache = _cache")
 
         if not no_params:
             # Only generate parameter resolution logic if there are parameters
@@ -279,49 +274,47 @@ class Resolver:
                 create_lines.append(f"        arg_{idx} = defaults['{name}']")
                 create_lines.append("    else:")
                 # Direct dict access for shared scope params (avoids method call)
-                if param_shared_scopes[idx]:
+                shared_scope = param_shared_scopes[idx]
+                if shared_scope:
                     create_lines.append(
                         f"        cached = (context._items.get("
                         f"_param_types[{idx}], NOT_SET_) "
                         f"if context is not None else NOT_SET_)"
                     )
+                    create_lines.append("        if cached is NOT_SET_:")
+                    indent = "    "
                 else:
-                    create_lines.append("        cached = NOT_SET_")
-                create_lines.append("        if cached is NOT_SET_:")
+                    # Nothing to look up, the dependency is always resolved below
+                    indent = ""
 
                 if is_from_context:
                     # Unresolved param without provider
                     if param_has_default[idx]:
                         # Has default, use it
                         create_lines.append(
-                            f"            arg_{idx} = _param_defaults[{idx}]"
+                            f"        {indent}arg_{idx} = _param_defaults[{idx}]"
                         )
                     else:
                         # No default, raise
                         create_lines.append(
-                            "            raise LookupError("
+                            f"        {indent}raise LookupError("
                             f"_unresolved_messages[{idx}])"
                         )
                 else:
                     # Has a pre-compiled resolver, use it directly
                     create_lines.append(
-                        f"            _dep_resolver = _param_resolvers[{idx}]"
+                        f"        {indent}_dep_resolver = _param_resolvers[{idx}]"
                     )
-                    if is_async:
-                        create_lines.append(
-                            f"            arg_{idx} = await _dep_resolver("
-                            f"container, context if _param_shared_scopes[{idx}] "
-                            "else None)"
-                        )
-                    else:
-                        create_lines.append(
-                            f"            arg_{idx} = _dep_resolver("
-                            f"container, context if _param_shared_scopes[{idx}] "
-                            "else None)"
-                        )
+                    context_arg = "context" if shared_scope else "None"
+                    await_ = "await " if is_async else ""
+                    create_lines.append(
+                        f"        {indent}arg_{idx} = {await_}_dep_resolver("
+                        f"container, {context_arg})"
+                    )
 
-                create_lines.append("        else:")
-                create_lines.append(f"            arg_{idx} = cached")
+                if shared_scope:
+                    create_lines.append("        else:")
+                    create_lines.append(f"            arg_{idx} = cached")
                 # Wrap dependencies if in override mode (only for override version)
                 if with_override:
                     create_lines.append("    if override_mode:")
@@ -448,20 +441,18 @@ class Resolver:
                 create_lines.append("    else:")
                 create_lines.append("        inst = _provider_factory()")
 
-            # Handle context managers
-            if is_async:
-                create_lines.append(
-                    "    if context is not None and _is_class and _is_acm(inst):"
-                )
+            # Handle context managers, the protocol is known from the class itself
+            factory = provider.factory
+            is_cm = provider.is_class and is_context_manager(factory)
+            is_acm = provider.is_class and is_async_context_manager(factory)
+            if is_async and is_acm:
+                create_lines.append("    if context is not None:")
                 create_lines.append("        await context.aenter(inst)")
-                create_lines.append(
-                    "    elif context is not None and _is_class and _is_cm(inst):"
-                )
+            elif is_async and is_cm:
+                create_lines.append("    if context is not None:")
                 create_lines.append("        await _run_sync(context.enter, inst)")
-            else:
-                create_lines.append(
-                    "    if context is not None and _is_class and _is_cm(inst):"
-                )
+            elif is_cm:
+                create_lines.append("    if context is not None:")
                 create_lines.append("        context.enter(inst)")
 
         create_lines.append("    if context is not None and store:")
@@ -471,7 +462,8 @@ class Resolver:
         if with_override:
             create_lines.append("    if override_mode:")
             create_lines.append(
-                "        inst = resolver._post_resolve_override(_dependency_type, inst)"
+                "        inst = resolver._post_resolve_override("
+                "_dependency_type, inst, context)"
             )
         create_lines.append("    return inst")
 
@@ -509,8 +501,10 @@ class Resolver:
             if with_override:
                 self._add_override_check(resolver_lines)
 
-            # Fast path: check cached instance
-            resolver_lines.append("    inst = context.get(_dependency_type)")
+            # Fast path: check cached instance (inline dict access for speed)
+            resolver_lines.append(
+                "    inst = context._items.get(_dependency_type, NOT_SET_)"
+            )
             resolver_lines.append("    if inst is not NOT_SET_:")
             resolver_lines.append("        return inst")
 
@@ -615,22 +609,12 @@ class Resolver:
             "_dependency_type": provider.dependency_type,
             "_dependency_repr": type_repr(provider.dependency_type),
             "_provider_factory": provider.factory,
-            "_is_class": provider.is_class,
             "_param_types": param_types,
             "_param_defaults": param_defaults,
-            "_param_has_default": param_has_default,
             "_param_resolvers": param_resolvers,
-            "_param_shared_scopes": param_shared_scopes,
             "_unresolved_messages": unresolved_messages,
             "_NOT_SET": NOT_SET,
             "_contextmanager": contextlib.contextmanager,
-            "_is_cm": is_context_manager,
-            "_cache": (
-                (self._async_override_cache if is_async else self._override_cache)
-                if with_override
-                else (self._async_cache if is_async else self._cache)
-            ),
-            "_compile": self._compile_resolver,
             "resolver": self,
         }
 
@@ -643,10 +627,7 @@ class Resolver:
         # Add async-specific namespace entries
         if is_async:
             ns["_asynccontextmanager"] = contextlib.asynccontextmanager
-            ns["_is_acm"] = is_async_context_manager
             ns["_run_sync"] = anyio.to_thread.run_sync
-        else:
-            ns["_is_async"] = provider.is_async
 
         exec(src, ns)
         resolver = ns["_resolver"]
@@ -747,7 +728,19 @@ class Resolver:
             return instance
         return InstanceProxy(instance, dependency_type=dependency_type)
 
-    def _post_resolve_override(self, dependency_type: Any, instance: Any) -> Any:
+    def _resolve_wrapped(self, dependency_type: Any, context: Any) -> Any:
+        """Resolve a wrapped dependency, preferring an override, then the context."""
+        if dependency_type in self._overrides:
+            return self._overrides[dependency_type]
+        if context is not None:
+            cached = context.get(dependency_type, NOT_SET)
+            if cached is not NOT_SET:
+                return cached
+        return self._container.resolve(dependency_type)
+
+    def _post_resolve_override(
+        self, dependency_type: Any, instance: Any, context: Any = None
+    ) -> Any:
         """Hook for patching resolved instances to support override."""
         if dependency_type in self._overrides:
             return self._overrides[dependency_type]
@@ -765,9 +758,8 @@ class Resolver:
 
         def __resolver_getter__(name: str) -> Any:
             if name in wrapped:
-                _dependency_type = wrapped[name]
-                # Resolve the dependency if it's wrapped
-                return self._container.resolve(_dependency_type)
+                # The context is the one the instance was created in
+                return self._resolve_wrapped(wrapped[name], context)
             raise LookupError
 
         # Attach the resolver getter to the instance
