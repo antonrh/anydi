@@ -349,6 +349,46 @@ def test_benchmark_inject_request(
         assert result == "hello world"
 
 
+def test_benchmark_ref_singleton(
+    benchmark: BenchmarkFixture, container_singleton: Container
+) -> None:
+    """Benchmark lazy reference access with singleton scope."""
+    app = container_singleton.ref(Application)
+
+    def process() -> str:
+        return app.start()
+
+    result = benchmark(process)
+    assert result == "hello world"
+
+
+def test_benchmark_ref_singleton_without_cache(
+    benchmark: BenchmarkFixture, container_singleton: Container
+) -> None:
+    """Benchmark lazy reference access resolving on every access."""
+    app = container_singleton.ref(Application, cache=False)
+
+    def process() -> str:
+        return app.start()
+
+    result = benchmark(process)
+    assert result == "hello world"
+
+
+def test_benchmark_ref_request(
+    benchmark: BenchmarkFixture, container_request: Container
+) -> None:
+    """Benchmark lazy reference access with request scope."""
+    app = container_request.ref(Application)
+
+    def process() -> str:
+        return app.start()
+
+    with container_request.request_context():
+        result = benchmark(process)
+        assert result == "hello world"
+
+
 def test_benchmark_inject_singleton_async(
     benchmark: BenchmarkFixture, container_singleton: Container
 ) -> None:

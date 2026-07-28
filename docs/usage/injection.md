@@ -72,6 +72,196 @@ dependency: Provide[MyType]
 
 You can use any of these forms. They all do the same thing.
 
+## Lazy References
+
+`container.ref()` returns a lazy reference to a dependency. Use it in plain functions that you do not want to decorate or run through the container.
+
+The container still owns the dependency: its provider, its scope and its lifespan do not change. Only the way your code reaches it does. Injection and lazy references are two styles of the same thing, pick whichever reads better in your application.
+
+### Example
+
+```python
+from anydi import Container
+
+
+class GreetingService:
+    def greet(self, name: str) -> str:
+        return f"Hello, {name}!"
+
+
+container = Container()
+
+
+@container.provider(scope="singleton")
+def greeting_service() -> GreetingService:
+    return GreetingService()
+
+
+service = container.ref(GreetingService)
+
+
+def greet() -> str:
+    return service.greet("World")
+
+
+assert greet() == "Hello, World!"
+```
+
+The reference is a transparent proxy. Attribute access, method calls, `isinstance()` and operators go to the real instance.
+
+Nothing is resolved until the first attribute access. You can create a reference before its provider is registered.
+
+### Named dependencies
+
+References work with [named providers](providers/annotated.md) and [type aliases](providers/basics.md#type-aliases):
+
+```python
+from typing import Annotated
+
+
+class Database:
+    def __init__(self, host: str) -> None:
+        self.host = host
+
+
+@container.provider(scope="singleton")
+def primary_db() -> Annotated[Database, "primary"]:
+    return Database(host="db-primary.local")
+
+
+@container.provider(scope="singleton")
+def replica_db() -> Annotated[Database, "replica"]:
+    return Database(host="db-replica.local")
+
+
+primary = container.ref(Annotated[Database, "primary"])
+replica = container.ref(Annotated[Database, "replica"])
+
+assert primary.host == "db-primary.local"
+assert replica.host == "db-replica.local"
+```
+
+Each reference keeps its own name, so overriding one of them in tests leaves the other one alone.
+
+### Caching
+
+Singleton instances are cached inside the reference. The cache is dropped when the container state changes: on `override()`, `reset()`, `release()`, provider re-registration or container close.
+
+Scoped dependencies, both `request` and custom scopes, are never cached. The reference resolves them on every access, so instances never leak between contexts.
+
+Pass `cache=False` to resolve a singleton on every access:
+
+```python
+service = container.ref(GreetingService, cache=False)
+```
+
+### Testing
+
+A reference always asks the container for the current instance, so `override()` is picked up. See [Testing](testing.md#overriding-lazy-references).
+
+### Transient dependencies
+
+A reference needs an instance to refer to. A transient provider creates a new instance on every resolve, so `ref()` rejects it:
+
+```python
+import uuid
+
+
+class RequestTracker:
+    def __init__(self) -> None:
+        self.request_id = str(uuid.uuid4())
+
+
+@container.provider(scope="transient")
+def request_tracker() -> RequestTracker:
+    return RequestTracker()
+
+
+tracker = container.ref(RequestTracker)  # TypeError
+```
+
+Without that check, every attribute access would read a different instance, and `tracker.request_id` would change between two lines of the same function.
+
+Register the dependency as a singleton if it is stateless. If you need a fresh instance per call, use a factory:
+
+```python
+from functools import partial
+
+
+new_tracker = partial(container.resolve, RequestTracker)
+
+
+def handle() -> str:
+    tracker = new_tracker()
+    return tracker.request_id
+
+
+assert handle() != handle()
+```
+
+### Asynchronous dependencies
+
+A reference is resolved synchronously. `ref()` rejects asynchronous providers right away, instead of failing later on access:
+
+```python
+container = Container()
+
+
+@container.provider(scope="singleton")
+async def greeting_service() -> GreetingService:
+    return GreetingService()
+
+
+service = container.ref(GreetingService)  # TypeError
+```
+
+Dependencies of the referenced provider are checked too. References created before their providers are registered are checked again by `build()`.
+
+If a dependency needs asynchronous setup, keep its provider synchronous and move the setup into a resource:
+
+```python
+from collections.abc import AsyncIterator
+
+from anydi import Container
+
+
+class Database:
+    def __init__(self) -> None:
+        self.connected = False
+
+    async def connect(self) -> None:
+        self.connected = True
+
+    async def disconnect(self) -> None:
+        self.connected = False
+
+
+container = Container()
+
+
+@container.provider(scope="singleton")
+def get_db() -> Database:
+    return Database()
+
+
+@container.provider(scope="singleton")
+async def db_lifespan(db: Database) -> AsyncIterator[None]:
+    await db.connect()
+    yield
+    await db.disconnect()
+
+
+db = container.ref(Database)
+
+
+async def main() -> None:
+    async with container:
+        assert db.connected
+
+    assert not db.connected
+```
+
+The resource is started by `astart()` and closed by `aclose()`. The database itself stays synchronous, so the reference keeps working.
 
 ## Scanning Injections
 

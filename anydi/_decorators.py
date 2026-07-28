@@ -2,6 +2,7 @@ from collections.abc import Callable, Iterable
 from typing import (
     TYPE_CHECKING,
     Any,
+    ClassVar,
     Concatenate,
     ParamSpec,
     Protocol,
@@ -156,7 +157,7 @@ def request(
 
 
 class Provided(Protocol):
-    __provided__: ProvidedMetadata
+    __provided__: ClassVar[ProvidedMetadata]
 
 
 def is_provided(cls: Any) -> TypeGuard[type[Provided]]:
