@@ -27,10 +27,10 @@ class Ref(ObjectProxy):
     )
 
     def __init__(
-        self, container: Container, dependency_type: Any, *, cache: bool = True
+        self, container: Container | None, dependency_type: Any, *, cache: bool = True
     ) -> None:
         # `ObjectProxy.__init__` is skipped: it assigns to the `__wrapped__` property
-        self._self_container = container
+        self._self_container: Any = container
         self._self_dependency_type = dependency_type
         self._self_cache = cache
         self._self_instance: Any = NOT_SET
@@ -65,4 +65,4 @@ class Ref(ObjectProxy):
 
     def __repr__(self) -> str:
         # Deliberately does not resolve the dependency
-        return f"<Ref for {type_repr(self._self_dependency_type)}>"
+        return f"<{type(self).__name__} for {type_repr(self._self_dependency_type)}>"

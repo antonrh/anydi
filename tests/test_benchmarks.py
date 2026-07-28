@@ -1,4 +1,6 @@
+import contextlib
 import sys
+from collections.abc import Iterator
 
 import anyio
 import pytest
@@ -10,7 +12,13 @@ if "--codspeed" not in sys.argv:
         allow_module_level=True,
     )
 
-from anydi import Container, Inject
+from anydi import (
+    Container,
+    Inject,
+    global_ref,
+    reset_global_container,
+    set_global_container,
+)
 
 
 class Config:
@@ -90,6 +98,17 @@ class Application:
 
     def start(self) -> str:
         return self._facade.run()
+
+
+@contextlib.contextmanager
+def _global_container(container: Container) -> Iterator[Container]:
+    """Make the container global for the duration of a benchmark."""
+    reset_global_container()
+    set_global_container(container)
+    try:
+        yield container
+    finally:
+        reset_global_container()
 
 
 @pytest.fixture
@@ -387,6 +406,35 @@ def test_benchmark_ref_request(
     with container_request.request_context():
         result = benchmark(process)
         assert result == "hello world"
+
+
+def test_benchmark_global_ref_singleton(
+    benchmark: BenchmarkFixture, container_singleton: Container
+) -> None:
+    """Benchmark global reference access with singleton scope."""
+    with _global_container(container_singleton):
+        app = global_ref(Application)
+
+        def process() -> str:
+            return app.start()
+
+        result = benchmark(process)
+        assert result == "hello world"
+
+
+def test_benchmark_global_ref_request(
+    benchmark: BenchmarkFixture, container_request: Container
+) -> None:
+    """Benchmark global reference access with request scope."""
+    with _global_container(container_request):
+        app = global_ref(Application)
+
+        def process() -> str:
+            return app.start()
+
+        with container_request.request_context():
+            result = benchmark(process)
+            assert result == "hello world"
 
 
 def test_benchmark_inject_singleton_async(

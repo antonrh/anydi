@@ -42,6 +42,7 @@ nav:
     - Django: extensions/django.md
   - Examples:
     - Basic Application: examples/basic.md
+    - Global Container: examples/global_container.md
 
 markdown_extensions:
   - admonition

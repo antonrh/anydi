@@ -10,7 +10,13 @@ import pytest
 from anyio.pytest_plugin import extract_backend_and_options, get_runner
 from typing_extensions import get_annotations
 
-from anydi import Container, import_container
+from anydi import (
+    Container,
+    import_container,
+    reset_global_container,
+    set_global_container,
+)
+from anydi._global import get_global_container_or_none, uses_global_container
 from anydi._marker import is_marker
 
 if TYPE_CHECKING:
@@ -47,6 +53,11 @@ def pytest_fixture_setup(
         container = fixturedef.cached_result[0]
         if isinstance(container, Container):
             container.enable_test_mode()
+            # Let global references resolve against the container under test,
+            # without introducing a global container the application never used
+            if uses_global_container():
+                reset_global_container()
+                set_global_container(container)
 
 
 @pytest.fixture(scope="session")
@@ -179,6 +190,10 @@ def _find_container(request: pytest.FixtureRequest) -> Container:
                 f"'anydi_container={container_path}': {exc}"
             ) from exc
 
+    global_container = get_global_container_or_none()
+    if global_container is not None:
+        return global_container
+
     pluginmanager = request.config.pluginmanager
     if pluginmanager.hasplugin("django") and importlib.util.find_spec("anydi_django"):
         return import_container("anydi_django.container")
@@ -187,6 +202,6 @@ def _find_container(request: pytest.FixtureRequest) -> Container:
         None,
         request,
         "`container` fixture is not found and 'anydi_container' config is not set. "
-        "Either define a `container` fixture in your test module "
-        "or set 'anydi_container' in pytest.ini.",
+        "Either define a `container` fixture in your test module, create a global "
+        "container or set 'anydi_container' in pytest.ini.",
     )
