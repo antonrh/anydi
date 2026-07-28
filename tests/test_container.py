@@ -3211,6 +3211,113 @@ class TestContainerCustomScopes:
                 # Should be the same instance
                 assert instance1 is instance2
 
+    def test_scoped_context_isolated(self, container: Container) -> None:
+        """Test that an isolated re-entry opens a fresh context."""
+        container.register_scope("task")
+        container.register(UniqueId, scope="task")  # type: ignore[arg-type]
+
+        with container.scoped_context("task") as outer_ctx:
+            outer = container.resolve(UniqueId)
+
+            with container.scoped_context("task", isolated=True) as inner_ctx:
+                inner = container.resolve(UniqueId)
+
+                assert inner_ctx is not outer_ctx
+                assert inner is not outer
+
+            # The outer context is restored on exit
+            assert container.resolve(UniqueId) is outer
+
+    def test_scoped_context_isolated_without_active_context(
+        self, container: Container
+    ) -> None:
+        """Test that an isolated entry opens a context when none is active."""
+        container.register_scope("task")
+        container.register(UniqueId, scope="task")  # type: ignore[arg-type]
+
+        with container.scoped_context("task", isolated=True):
+            assert container.resolve(UniqueId)
+
+    def test_scoped_context_isolated_restored_after_exception(
+        self, container: Container
+    ) -> None:
+        """Test that the outer context is restored when the inner one raises."""
+        container.register_scope("task")
+        container.register(UniqueId, scope="task")  # type: ignore[arg-type]
+
+        def failing_task() -> None:
+            with container.scoped_context("task", isolated=True):
+                container.resolve(UniqueId)
+                raise ValueError("boom")
+
+        with container.scoped_context("task"):
+            outer = container.resolve(UniqueId)
+
+            with pytest.raises(ValueError, match="boom"):
+                failing_task()
+
+            assert container.resolve(UniqueId) is outer
+
+    async def test_ascoped_context_isolated(self, container: Container) -> None:
+        """Test that an async isolated re-entry opens a fresh context."""
+        container.register_scope("task")
+        container.register(UniqueId, scope="task")  # type: ignore[arg-type]
+
+        async with container.ascoped_context("task") as outer_ctx:
+            outer = await container.aresolve(UniqueId)
+
+            async with container.ascoped_context("task", isolated=True) as inner_ctx:
+                inner = await container.aresolve(UniqueId)
+
+                assert inner_ctx is not outer_ctx
+                assert inner is not outer
+
+            assert await container.aresolve(UniqueId) is outer
+
+    def test_scoped_context_isolated_closes_own_resources(
+        self, container: Container
+    ) -> None:
+        """Test that an isolated context only closes the resources it created."""
+        closed: list[str] = []
+        idents = iter(["outer", "inner"])
+
+        container.register_scope("task")
+
+        @container.provider(scope="task")
+        def service() -> Iterator[Service]:
+            ident = next(idents)
+            yield Service(ident=ident)
+            closed.append(ident)
+
+        with container.scoped_context("task"):
+            container.resolve(Service)
+
+            with container.scoped_context("task", isolated=True):
+                container.resolve(Service)
+
+            assert closed == ["inner"]
+
+        assert closed == ["inner", "outer"]
+
+    async def test_scoped_context_isolated_in_concurrent_tasks(
+        self, container: Container
+    ) -> None:
+        """Test that concurrent tasks get their own isolated context."""
+        container.register_scope("task")
+        container.register(UniqueId, scope="task")  # type: ignore[arg-type]
+
+        async def handle() -> UniqueId:
+            async with container.ascoped_context("task", isolated=True):
+                return await container.aresolve(UniqueId)
+
+        async with container.ascoped_context("task"):
+            outer = await container.aresolve(UniqueId)
+            results = await asyncio.gather(handle(), handle(), handle())
+
+            assert len({instance.id for instance in results}) == 3
+            assert outer not in results
+            assert await container.aresolve(UniqueId) is outer
+
     def test_singleton_context_reentry(self, container: Container) -> None:
         """Test that re-entering the singleton context works correctly."""
         container.register(UniqueId, scope="singleton")
