@@ -255,6 +255,59 @@ async def process_workflow() -> None:
             # Process workflow...
 ```
 
+### Re-entering an active scope
+
+Entering a scope that is already active reuses the active context, so both blocks share the same instances. Pass `isolated=True` to open a fresh, isolated context instead. It shadows the active one and is restored on exit.
+
+```python
+from anydi import Container
+
+
+class TaskContext:
+    def __init__(self, task_id: str) -> None:
+        self.task_id = task_id
+
+
+container = Container()
+container.register_scope("task")
+container.register(TaskContext, scope="task", from_context=True)
+
+
+with container.scoped_context("task") as outer:
+    outer.set(TaskContext, TaskContext(task_id="outer"))
+
+    assert container.resolve(TaskContext).task_id == "outer"
+
+    with container.scoped_context("task", isolated=True) as inner:
+        inner.set(TaskContext, TaskContext(task_id="inner"))
+
+        assert container.resolve(TaskContext).task_id == "inner"
+
+    assert container.resolve(TaskContext).task_id == "outer"
+```
+
+The fresh context has its own instances. It still resolves parent and `singleton` dependencies, but inherits nothing from the context it shadows, so `from_context` values have to be set again. On exit only its own resources are closed.
+
+This is useful when concurrent units of work each need their own scoped resources. Every task gets its own session, while the parent keeps using its own:
+
+```python
+async def handle(item: Item) -> None:
+    async with container.ascoped_context("db", isolated=True):
+        session = await container.aresolve(Session)
+        await session.execute(insert_result(item))
+
+
+async with container.ascoped_context("db"):
+    session = await container.aresolve(Session)
+    await session.execute(mark_batch_started())
+
+    await asyncio.gather(*(handle(item) for item in items))
+
+    await session.execute(mark_batch_done())
+```
+
+Without `isolated=True` all tasks would share one session, and a finished task could commit the parent's transaction.
+
 ### Best practices
 
 1. **Clear hierarchies**: Structure scopes to match your application logic (e.g., `request` → `transaction` → `batch`)

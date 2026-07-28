@@ -122,11 +122,14 @@ class InstanceContext:
 class ScopedContext:
     """A context manager entering and leaving a scoped instance context."""
 
-    __slots__ = ("_container", "_context", "_scope", "_token", "_var")
+    __slots__ = ("_container", "_context", "_isolated", "_scope", "_token", "_var")
 
-    def __init__(self, container: Container, scope: str) -> None:
+    def __init__(
+        self, container: Container, scope: str, *, isolated: bool = False
+    ) -> None:
         self._container = container
         self._scope = scope
+        self._isolated = isolated
         self._var = container._get_scoped_context_var(scope)
         self._context: InstanceContext | None = None
         self._token: Token[InstanceContext] | None = None
@@ -136,7 +139,7 @@ class ScopedContext:
         if self._token is not None:
             raise RuntimeError(f"The {self._scope} context is already entered.")
         context = self._var.get(None)
-        if context is not None:
+        if context is not None and not self._isolated:
             # Reuse existing context, don't create a new one
             self._context = context
             return context, False

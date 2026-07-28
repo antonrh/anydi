@@ -180,13 +180,13 @@ class Container:
         self._invalidate_refs()
         await self._singleton_context.aclose()
 
-    def scoped_context(self, scope: str) -> ScopedContext:
-        """Obtain a context manager for the request-scoped context."""
-        return ScopedContext(self, scope)
-
-    def ascoped_context(self, scope: str) -> ScopedContext:
+    def scoped_context(self, scope: str, *, isolated: bool = False) -> ScopedContext:
         """Obtain a context manager for the specified scoped context."""
-        return ScopedContext(self, scope)
+        return ScopedContext(self, scope, isolated=isolated)
+
+    def ascoped_context(self, scope: str, *, isolated: bool = False) -> ScopedContext:
+        """Obtain an async context manager for the specified scoped context."""
+        return ScopedContext(self, scope, isolated=isolated)
 
     def request_context(self) -> ScopedContext:
         """Obtain a context manager for the request-scoped context."""
