@@ -4,7 +4,7 @@ from unittest import mock
 
 import pytest
 
-from anydi import Container, Inject, Provide
+from anydi import Container, Inject, Provide, get_global_container, global_ref
 from anydi.ext import pytest_plugin
 
 if "-p" not in sys.argv or "anydi" not in sys.argv:
@@ -69,7 +69,7 @@ def test_no_container_setup(
     )
 
 
-def test_get_container_from_config(
+def test_get_global_container_from_config(
     request: pytest.FixtureRequest, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     """Test that container can be loaded from config (colon format)."""
@@ -89,7 +89,7 @@ def test_get_container_from_config(
     assert isinstance(container, Container)
 
 
-def test_get_container_from_config_dot_format(
+def test_get_global_container_from_config_dot_format(
     request: pytest.FixtureRequest, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     """Test container can be loaded from config (dot format, backward compatible)."""
@@ -109,7 +109,7 @@ def test_get_container_from_config_dot_format(
     assert isinstance(_container, Container)
 
 
-def test_get_container_fixture_priority(
+def test_get_global_container_fixture_priority(
     request: pytest.FixtureRequest, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     """Test that fixture takes priority over config."""
@@ -129,7 +129,7 @@ def test_get_container_fixture_priority(
     assert isinstance(_container, Container)
 
 
-def test_get_container_no_fixture_no_config(
+def test_get_global_container_no_fixture_no_config(
     request: pytest.FixtureRequest, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     """Test error when neither fixture nor config is available."""
@@ -229,3 +229,24 @@ def test_explicit_injection_priority(
     """Test that explicit markers take priority and coexist with fixtures."""
     assert isinstance(repo, Repository)
     assert isinstance(container, Container)
+
+
+# A module-level reference, created before any container exists
+global_service = global_ref(Service)
+
+
+def test_global_ref_uses_container_fixture(container: Container) -> None:
+    """Test that a global reference resolves through the container fixture."""
+    assert get_global_container() is container
+    assert global_service.name == "service"
+
+
+def test_global_ref_follows_override(container: Container) -> None:
+    """Test that overriding the container fixture applies to a global reference."""
+    service_mock = mock.Mock(spec=Service)
+    service_mock.name = "overridden"
+
+    with container.override(Service, service_mock):
+        assert global_service.name == "overridden"
+
+    assert global_service.name == "service"
