@@ -476,6 +476,34 @@ class TestResolver:
             # Test already patched class path
             container._resolver._post_resolve_override(Service, service)
 
+    def test_resolver_wrapped_dependency_uses_creation_context(self) -> None:
+        """Test that an instance resolves the scoped dependency of its own context."""
+        container = Container()
+        container.enable_test_mode()
+
+        class Session:
+            pass
+
+        class Service:
+            def __init__(self, session: Session) -> None:
+                self.session = session
+
+        container.register(Session, scope="request")
+        container.register(Service, scope="request")
+
+        with container.request_context():
+            service = container.resolve(Service)
+            own_session = service.session
+
+        with container.request_context():
+            assert container.resolve(Session) is not own_session
+            assert service.session is own_session
+
+            replacement = Session()
+
+            with container.override(Session, replacement):
+                assert service.session is replacement
+
     def test_resolver_alias_caching(self) -> None:
         """Test that resolving via alias uses the same cache entry."""
 
