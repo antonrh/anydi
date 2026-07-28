@@ -1,3 +1,5 @@
+import gc
+import weakref
 from collections.abc import Iterator
 from unittest import mock
 
@@ -22,10 +24,10 @@ from tests.fixtures import Service
 def _clean_global_state() -> Iterator[None]:
     """Keep the process-wide container and references out of other tests."""
     reset_global_container()
-    _global._refs.clear()
+    _global._dependency_types.clear()
     yield
     reset_global_container()
-    _global._refs.clear()
+    _global._dependency_types.clear()
 
 
 class TestGlobalContainer:
@@ -164,6 +166,22 @@ class TestGlobalRef:
 
     def test_global_ref_is_global_ref_instance(self) -> None:
         assert type(global_ref(Service)) is GlobalRef
+
+    def test_global_ref_is_not_retained(self) -> None:
+        """Test that discarded references are not kept alive by the module."""
+        reference = global_ref(Service)
+        weak_reference = weakref.ref(reference)
+
+        del reference
+        gc.collect()
+
+        assert weak_reference() is None
+
+    def test_global_ref_registers_dependency_type_once(self) -> None:
+        for _ in range(100):
+            global_ref(Service)
+
+        assert _global._dependency_types == [Service]
 
 
 class TestGlobalRefValidation:
