@@ -17,10 +17,44 @@ if TYPE_CHECKING:
     from ._container import Container
 
 
+class _CloseOnce:
+    """A finaliser that runs once, whichever closes it first."""
+
+    __slots__ = ("_done", "_exit")
+
+    def __init__(self, exit_: Any) -> None:
+        self._exit = exit_
+        self._done = False
+
+    def __call__(self, *exc_info: Any) -> Any:
+        if self._done:
+            return False
+        self._done = True
+        return self._exit(*exc_info)
+
+
+class _ACloseOnce(_CloseOnce):
+    """The same, awaited."""
+
+    async def __call__(self, *exc_info: Any) -> Any:
+        if self._done:
+            return False
+        self._done = True
+        return await self._exit(*exc_info)
+
+
 class InstanceContext:
     """A context to store instances."""
 
-    __slots__ = ("_async_lock", "_async_stack", "_items", "_lock", "_stack")
+    __slots__ = (
+        "_aclosers",
+        "_async_lock",
+        "_async_stack",
+        "_closers",
+        "_items",
+        "_lock",
+        "_stack",
+    )
 
     def __init__(self) -> None:
         self._items: dict[Any, Any] = {}
@@ -28,6 +62,8 @@ class InstanceContext:
         self._async_stack: contextlib.AsyncExitStack | None = None
         self._lock: threading.RLock | None = None
         self._async_lock: AsyncRLock | None = None
+        self._closers: dict[Any, _CloseOnce] = {}
+        self._aclosers: dict[Any, _ACloseOnce] = {}
 
     def get(self, key: Any, default: Any = NOT_SET) -> Any:
         """Get an instance from the context."""
@@ -37,17 +73,44 @@ class InstanceContext:
         """Set an instance in the context."""
         self._items[key] = value
 
-    def enter(self, cm: contextlib.AbstractContextManager[Any]) -> Any:
+    def enter(
+        self, cm: contextlib.AbstractContextManager[Any], key: Any = NOT_SET
+    ) -> Any:
         """Enter the context."""
         if self._stack is None:
             self._stack = contextlib.ExitStack()
-        return self._stack.enter_context(cm)
+        instance = cm.__enter__()
+        closer = _CloseOnce(cm.__exit__)
+        self._stack.push(closer)
+        if key is not NOT_SET:
+            self._closers[key] = closer
+        return instance
 
-    async def aenter(self, cm: contextlib.AbstractAsyncContextManager[Any]) -> Any:
+    async def aenter(
+        self, cm: contextlib.AbstractAsyncContextManager[Any], key: Any = NOT_SET
+    ) -> Any:
         """Enter the context asynchronously."""
         if self._async_stack is None:
             self._async_stack = contextlib.AsyncExitStack()
-        return await self._async_stack.enter_async_context(cm)
+        instance = await cm.__aenter__()
+        closer = _ACloseOnce(cm.__aexit__)
+        self._async_stack.push_async_exit(closer)
+        if key is not NOT_SET:
+            self._aclosers[key] = closer
+        return instance
+
+    def release(self, key: Any) -> None:
+        """Close the instance's resource, if it has one, and forget it."""
+        if key in self._aclosers:
+            raise RuntimeError(
+                f"The instance of {key} holds an asynchronous resource, which "
+                "only an asynchronous close can release. Close the context "
+                "with `aclose()` instead."
+            )
+        closer = self._closers.pop(key, None)
+        if closer is not None:
+            closer(None, None, None)
+        self._items.pop(key, None)
 
     def __setitem__(self, key: Any, value: Any) -> None:
         self._items[key] = value

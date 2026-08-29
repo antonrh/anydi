@@ -2023,6 +2023,55 @@ class TestContainerResolution:
 
         assert not container.is_resolved(str)
 
+    def test_release_closes_the_resource(self, container: Container) -> None:
+        events = []
+
+        def provide_conn() -> Iterator[str]:
+            events.append("open")
+            yield "conn"
+            events.append("close")
+
+        container.register(str, provide_conn, scope="singleton")
+
+        container.resolve(str)
+        container.release(str)
+
+        assert events == ["open", "close"]
+
+        container.resolve(str)
+        container.close()
+
+        assert events == ["open", "close", "open", "close"]
+
+    def test_reset_closes_the_resources(self, container: Container) -> None:
+        events = []
+
+        def provide_conn() -> Iterator[str]:
+            events.append("open")
+            yield "conn"
+            events.append("close")
+
+        container.register(str, provide_conn, scope="singleton")
+
+        container.resolve(str)
+        container.reset()
+
+        assert events == ["open", "close"]
+
+    async def test_release_refuses_an_async_resource(
+        self, container: Container
+    ) -> None:
+        @container.provider(scope="singleton")
+        async def provide_conn() -> AsyncIterator[str]:
+            yield "conn"
+
+        await container.aresolve(str)
+
+        with pytest.raises(RuntimeError, match="aclose"):
+            container.release(str)
+
+        await container.aclose()
+
     def test_on_the_fly_resolution_with_circular_dependency(self) -> None:
         """Test circular dependency detection during on-the-fly resolution."""
 
