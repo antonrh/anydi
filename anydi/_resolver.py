@@ -547,12 +547,21 @@ class Resolver:
             resolver_lines.append("    if inst is not NOT_SET_:")
             resolver_lines.append("        return inst")
 
+            # Tasks share the scope's context, so create the instance once.
+            if is_async:
+                resolver_lines.append("    async with context.alock():")
+            else:
+                resolver_lines.append("    with context.lock():")
+            resolver_lines.append("        inst = context.get(_dependency_type)")
+            resolver_lines.append("        if inst is not NOT_SET_:")
+            resolver_lines.append("            return inst")
             self._add_create_call(
                 resolver_lines,
                 is_async=is_async,
                 with_override=with_override,
                 context="context",
                 store=True,
+                indent="        ",
             )
 
         create_resolver_lines: list[str] = []
