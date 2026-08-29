@@ -1396,6 +1396,24 @@ class TestContainerResolution:
 
         assert len(unique_ids) == 10
 
+    async def test_resolve_scoped_coro_safe_in_one_context(
+        self, container: Container
+    ) -> None:
+        @container.provider(scope="request")
+        async def provide_unique_id() -> UniqueId:
+            await asyncio.sleep(0)  # a provider that waits, as a real one does
+            return UniqueId()
+
+        unique_ids = set()
+
+        async def use_unique_id() -> None:
+            unique_ids.add(await container.aresolve(UniqueId))
+
+        async with container.arequest_context():
+            await asyncio.gather(*[use_unique_id() for _ in range(10)])
+
+        assert len(unique_ids) == 1
+
     def test_resolve_request_scoped(self, container: Container) -> None:
         instance = "test"
 
