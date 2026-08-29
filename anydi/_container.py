@@ -884,7 +884,7 @@ class Container:
         if provider.scope == "transient":
             return None
         context = self._get_instance_context(provider.scope)
-        del context[dependency_type]
+        context.release(dependency_type)
         self._invalidate_refs()
 
     def reset(self) -> None:
@@ -897,7 +897,7 @@ class Container:
                 context = self._get_instance_context(provider.scope)
             except LookupError:
                 continue
-            del context[dependency_type]
+            context.release(dependency_type)
 
     # == Lazy References ==
 

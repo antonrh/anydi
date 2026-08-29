@@ -384,7 +384,7 @@ class Resolver:
                 create_lines.append(
                     "        cm = _asynccontextmanager(_provider_factory)()"
                 )
-            create_lines.append("    inst = await context.aenter(cm)")
+            create_lines.append("    inst = await context.aenter(cm, _dependency_type)")
         elif is_generator:
             # Sync generator - use sync context manager
             create_lines.append("    if context is None:")
@@ -418,9 +418,11 @@ class Resolver:
                 create_lines.append("        cm = _contextmanager(_provider_factory)()")
             if is_async:
                 # In async mode, run sync context manager enter in thread
-                create_lines.append("    inst = await _run_sync(context.enter, cm)")
+                create_lines.append(
+                    "    inst = await _run_sync(context.enter, cm, _dependency_type)"
+                )
             else:
-                create_lines.append("    inst = context.enter(cm)")
+                create_lines.append("    inst = context.enter(cm, _dependency_type)")
         else:
             if param_names:
                 call_args = ", ".join(
@@ -447,13 +449,17 @@ class Resolver:
             is_acm = provider.is_class and is_async_context_manager(factory)
             if is_async and is_acm:
                 create_lines.append("    if context is not None:")
-                create_lines.append("        await context.aenter(inst)")
+                create_lines.append(
+                    "        await context.aenter(inst, _dependency_type)"
+                )
             elif is_async and is_cm:
                 create_lines.append("    if context is not None:")
-                create_lines.append("        await _run_sync(context.enter, inst)")
+                create_lines.append(
+                    "        await _run_sync(context.enter, inst, _dependency_type)"
+                )
             elif is_cm:
                 create_lines.append("    if context is not None:")
-                create_lines.append("        context.enter(inst)")
+                create_lines.append("        context.enter(inst, _dependency_type)")
 
         create_lines.append("    if context is not None and store:")
         create_lines.append("        context._items[_dependency_type] = inst")
