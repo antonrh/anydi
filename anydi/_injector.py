@@ -26,6 +26,10 @@ T = TypeVar("T", bound=Any)
 P = ParamSpec("P")
 
 
+CACHE_LIMIT = 1024
+"""How many callables the injector remembers before it forgets the oldest."""
+
+
 class Injector:
     """Handles dependency injection for callables."""
 
@@ -40,7 +44,7 @@ class Injector:
 
         injected_params = self._get_injected_params(call)
         if not injected_params:
-            self._cache[call] = call
+            self._remember(call, call)
             return call
 
         if inspect.iscoroutinefunction(call):
@@ -51,7 +55,7 @@ class Injector:
                     kwargs[name] = await self.container.aresolve(annotation)
                 return cast(T, await call(*args, **kwargs))
 
-            self._cache[call] = awrapper
+            self._remember(call, awrapper)
 
             return awrapper  # type: ignore
 
@@ -61,9 +65,17 @@ class Injector:
                 kwargs[name] = self.container.resolve(annotation)
             return call(*args, **kwargs)
 
-        self._cache[call] = wrapper
+        self._remember(call, wrapper)
 
         return wrapper
+
+    def _remember(self, call: Callable[..., Any], injected: Callable[..., Any]) -> None:
+        """Cache the injected callable, forgetting the oldest one past the limit."""
+        # A callable built per call, such as a lambda or a partial, would grow
+        # the cache without end.
+        if len(self._cache) >= CACHE_LIMIT:
+            del self._cache[next(iter(self._cache))]
+        self._cache[call] = injected
 
     def _get_injected_params(self, call: Callable[..., Any]) -> dict[str, Any]:
         """Get the injected parameters of a callable object."""

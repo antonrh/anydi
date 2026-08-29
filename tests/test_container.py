@@ -4,7 +4,7 @@ import logging
 import threading
 import uuid
 import warnings
-from collections.abc import AsyncIterator, Iterator
+from collections.abc import AsyncIterator, Callable, Iterator
 from dataclasses import dataclass
 from typing import Annotated, Any, Generic, TypeVar
 from unittest import mock
@@ -24,6 +24,7 @@ from anydi import (
     singleton,
     transient,
 )
+from anydi._injector import CACHE_LIMIT
 from anydi._resolver import InstanceProxy
 from anydi._types import Event
 
@@ -3593,6 +3594,25 @@ class TestContainerCustomScopes:
 
 
 class TestContainerInjector:
+    def test_the_injected_callables_cache_is_bounded(
+        self, container: Container
+    ) -> None:
+        @container.provider(scope="singleton")
+        def message() -> str:
+            return "test"
+
+        def make(index: int) -> Callable[..., str]:
+            def func(message: str = Inject()) -> str:
+                return message
+
+            func.__name__ = f"func{index}"
+            return func
+
+        for index in range(CACHE_LIMIT + 10):
+            container.run(make(index))
+
+        assert len(container._injector._cache) == CACHE_LIMIT
+
     def test_inject_using_inject_marker(self, container: Container) -> None:
         @container.provider(scope="singleton")
         def message() -> str:
