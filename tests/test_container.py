@@ -2298,6 +2298,23 @@ class TestContainerCreate:
 class TestContainerContext:
     """Tests for container Context functionality."""
 
+    async def test_close_refuses_async_resources(self, container: Container) -> None:
+        closed = []
+
+        @container.provider(scope="singleton")
+        async def provide_conn() -> AsyncIterator[str]:
+            yield "conn"
+            closed.append("conn")
+
+        await container.aresolve(str)
+
+        with pytest.raises(RuntimeError, match="aclose"):
+            container.close()
+
+        await container.aclose()
+
+        assert closed == ["conn"]
+
     def test_failed_scope_entry_unwinds(self, container: Container) -> None:
         events = []
 
