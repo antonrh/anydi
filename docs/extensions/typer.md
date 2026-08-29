@@ -166,8 +166,8 @@ app = typer.Typer()
 
 @app.callback()
 def main_callback(
-    verbose: bool = typer.Option(False, "--verbose", "-v"),
     config: Provide[AppConfig],
+    verbose: bool = typer.Option(False, "--verbose", "-v"),
 ) -> None:
     """Main application."""
     config.verbose = verbose

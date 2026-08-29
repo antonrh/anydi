@@ -192,7 +192,7 @@ Configure Django (`settings.py`):
 
 ```python
 INSTALLED_APPS = [
-    ...
+    ...,
     "anydi_django",
 ]
 
