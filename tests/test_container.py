@@ -2298,6 +2298,48 @@ class TestContainerCreate:
 class TestContainerContext:
     """Tests for container Context functionality."""
 
+    def test_failed_scope_entry_unwinds(self, container: Container) -> None:
+        events = []
+
+        class Opened(Event): ...
+
+        class Failing(Event): ...
+
+        @container.provider(scope="request")
+        def provide_opened() -> Iterator[Opened]:
+            events.append("open")
+            try:
+                yield Opened()
+            finally:
+                events.append("close")
+
+        @container.provider(scope="request")
+        def provide_failing() -> Iterator[Failing]:
+            raise ValueError("no")
+            yield Failing()
+
+        with pytest.raises(ValueError, match="no"):
+            with container.request_context():
+                pass
+
+        assert events == ["open", "close"]
+        # The scope unset itself, so nothing of it reaches the next one.
+        assert container._get_scoped_context_var("request").get(None) is None
+
+    async def test_failed_async_scope_entry_unwinds(self, container: Container) -> None:
+        class Failing(Event): ...
+
+        @container.provider(scope="request")
+        async def provide_failing() -> AsyncIterator[Failing]:
+            raise ValueError("no")
+            yield Failing()
+
+        with pytest.raises(ValueError, match="no"):
+            async with container.arequest_context():
+                pass
+
+        assert container._get_scoped_context_var("request").get(None) is None
+
     def test_start_and_close_singleton_context(self, container: Container) -> None:
         events = []
 

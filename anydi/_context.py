@@ -167,8 +167,13 @@ class ScopedContext:
     def __enter__(self) -> InstanceContext:
         context, created = self._enter()
         if created:
-            for dependency_type in self._events():
-                self._container.resolve(dependency_type)
+            try:
+                for dependency_type in self._events():
+                    self._container.resolve(dependency_type)
+            except BaseException as exc:
+                # Python skips `__exit__` when `__enter__` raises.
+                self.__exit__(type(exc), exc, exc.__traceback__)
+                raise
         return context
 
     def __exit__(
@@ -189,8 +194,13 @@ class ScopedContext:
     async def __aenter__(self) -> InstanceContext:
         context, created = self._enter()
         if created:
-            for dependency_type in self._events():
-                await self._container.aresolve(dependency_type)
+            try:
+                for dependency_type in self._events():
+                    await self._container.aresolve(dependency_type)
+            except BaseException as exc:
+                # Python skips `__aexit__` when `__aenter__` raises.
+                await self.__aexit__(type(exc), exc, exc.__traceback__)
+                raise
         return context
 
     async def __aexit__(
