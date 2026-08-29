@@ -1,7 +1,7 @@
 site_name: AnyDI
 site_description: Dependency Injection library
 site_author: Anton Ruhlov
-site_url: https://github.com/python-anydi/anydi
+site_url: https://anydi.readthedocs.io/en/stable/
 
 theme:
   name: material

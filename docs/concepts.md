@@ -169,7 +169,7 @@ container.run(process_order)
 ```
 
 ### Why use dependency injection:
-- **Testability**: Easy to substitute mocks and test doubles
+- **Testability**: Substitute mocks and test doubles
 - **Flexibility**: Can swap implementations without modifying code
 - **Maintainability**: Explicit dependencies make code easier to understand
 - **Decoupling**: Services don't need to know dependency instantiation logic

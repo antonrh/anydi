@@ -27,7 +27,7 @@ ANYDI = {
 
 This configuration injects dependencies into your Django views in the specified URLconf.
 
-Let's say you have a service class you want to inject into your views:
+Say you have a service class to inject into your views:
 
 ```python
 class HelloService:

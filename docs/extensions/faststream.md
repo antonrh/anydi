@@ -1,6 +1,6 @@
 # FastStream Extension
 
-You can integrate `AnyDI` with [`FastStream`](https://faststream.airt.ai/latest/) easily. Since `FastStream` uses [`FastDepends`](https://github.com/Lancetnik/FastDepends), you can use the same `Provide[...]` annotation or `Inject()` marker as with FastAPI extension, instead of FastDepends' `Depends`.
+[`FastStream`](https://faststream.airt.ai/latest/) resolves dependencies with [`FastDepends`](https://github.com/Lancetnik/FastDepends), so `AnyDI` slots into it the same way as into `FastAPI`: use the `Provide[...]` annotation or the `Inject()` marker in place of `Depends`.
 
 !!! warning "Version Requirement"
 

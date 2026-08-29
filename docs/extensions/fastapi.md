@@ -1,6 +1,6 @@
 # FastAPI Extension
 
-You can use `AnyDI` with `FastAPI` easily. Since `FastAPI` has its own dependency injection, you can use `Provide` annotation or `Inject` marker instead of the standard `Depends`.
+`FastAPI` has a dependency injection of its own, so `AnyDI` slots into it: use the `Provide` annotation or the `Inject` marker in place of `Depends`.
 
 
 ```python

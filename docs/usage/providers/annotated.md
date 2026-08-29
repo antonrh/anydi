@@ -40,7 +40,7 @@ assert primary.host == "db-primary.local"
 assert replica.host == "db-replica.local"
 ```
 
-In this example, we define two providers for different database connections. The `Annotated` type hint with a string lets you choose which provider to use by the name in the annotation.
+The two providers above return different database connections. The `Annotated` type hint carries the name, so the annotation itself says which provider to use.
 
 ## Use Cases
 
