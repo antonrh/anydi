@@ -72,14 +72,31 @@ class InstanceContext:
         exc_tb: TracebackType | None,
     ) -> Any:
         """Exit the context."""
+        self._reject_async_resources()
+        return self._exit_stack(exc_type, exc_val, exc_tb)
+
+    def _exit_stack(
+        self,
+        exc_type: type[BaseException] | None,
+        exc_val: BaseException | None,
+        exc_tb: TracebackType | None,
+    ) -> Any:
+        """Close the synchronous resources, whichever exit is running."""
         if self._stack is None:
             return False
         return self._stack.__exit__(exc_type, exc_val, exc_tb)
 
     def close(self) -> None:
         """Close the scoped context."""
-        if self._stack is not None:
-            self._stack.__exit__(None, None, None)
+        self.__exit__(None, None, None)
+
+    def _reject_async_resources(self) -> None:
+        if self._async_stack is not None:
+            raise RuntimeError(
+                "This context holds asynchronous resources. Close it with "
+                "`aclose()`, or exit it with `async with`, so that they are "
+                "closed too."
+            )
 
     async def __aenter__(self) -> Self:
         """Enter the context asynchronously."""
@@ -96,7 +113,7 @@ class InstanceContext:
         async_exit = False
         if self._stack is not None:
             sync_exit = await anyio.to_thread.run_sync(
-                self.__exit__, exc_type, exc_val, exc_tb
+                self._exit_stack, exc_type, exc_val, exc_tb
             )
         if self._async_stack is not None:
             async_exit = await self._async_stack.__aexit__(exc_type, exc_val, exc_tb)
