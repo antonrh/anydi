@@ -7,7 +7,6 @@ from collections.abc import Generator
 from typing import TYPE_CHECKING, Annotated, Any, cast, get_args, get_origin
 
 import pytest
-from anyio.pytest_plugin import extract_backend_and_options, get_runner
 from typing_extensions import get_annotations
 
 from anydi import (
@@ -120,6 +119,19 @@ def _anydi_ainject(request: pytest.FixtureRequest) -> None:
                 logger.warning(
                     "Failed to resolve '%s' for %s", name, request.node.nodeid
                 )
+
+    # `anyio` keeps these out of its public API, so a version that renames them
+    # breaks async injection only, not every test run that imports this plugin.
+    try:
+        from anyio.pytest_plugin import extract_backend_and_options, get_runner
+    except ImportError:  # pragma: no cover - a version that moved them
+        pytest.fail(
+            "Injecting dependencies into async tests needs "  # ty: ignore[invalid-argument-type]
+            "`extract_backend_and_options` and `get_runner` from "
+            "`anyio.pytest_plugin`, which this version of `anyio` does not "
+            "have. Resolve the dependency in the test instead, or report it.",
+            pytrace=False,  # ty: ignore[parameter-already-assigned]
+        )
 
     anyio_backend = request.getfixturevalue("anyio_backend")
     backend_name, backend_options = extract_backend_and_options(anyio_backend)

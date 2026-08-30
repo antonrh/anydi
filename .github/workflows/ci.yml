@@ -84,6 +84,29 @@ jobs:
       - name: Run tests
         run: uv run --no-sync pytest tests
 
+  upstream:
+    name: Run unit tests on anyio main
+    runs-on: ubuntu-latest
+    # The pytest plugin uses two helpers `anyio` keeps out of its public API,
+    # and it loads in every test run of everyone who installs `anydi`.
+    continue-on-error: true
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          python-version: '3.12'
+          enable-cache: true
+      - name: Install dependencies
+        run: uv sync --all-extras --dev
+      - name: Take anyio from main
+        run: uv pip install --upgrade "anyio @ git+https://github.com/agronholm/anyio"
+      - name: Run tests
+        run: |
+          uv run --no-sync pytest tests
+          uv run --no-sync pytest tests/ext/test_pytest_plugin.py -p anydi
+
   benchmarks:
     name: Run benchmarks
     runs-on: ubuntu-latest
