@@ -82,3 +82,6 @@ target/
 # Benchmark files
 .codspeed
 bench*.py
+
+# Personal Claude Code settings, unlike the skills next to them
+.claude/settings.local.json
