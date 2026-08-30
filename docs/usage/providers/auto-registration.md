@@ -104,7 +104,7 @@ class CRUDRepository(IReader, IWriter):
 !!! note
     The class is the primary registration. Aliases are additional keys resolving to the same instance. See [Type Aliases](basics.md#type-aliases).
 
-## Request Scope with Context
+## Request scope with context
 
 Use `from_context=True` when the instance is set via `context.set()`:
 
@@ -126,7 +126,7 @@ with container.request_context() as ctx:
     assert req.path == "/users"
 ```
 
-## Generic TypeVar Resolution
+## Generic TypeVar resolution
 
 `AnyDI` automatically resolves TypeVars when inheriting from generic base classes:
 
@@ -214,7 +214,7 @@ container.scan(".", ignore=[".api"])     # Relative ignore
 
 ### Circular import detection
 
-If a scanned module imports the container at module level, it triggers another `scan()` call. `AnyDI` detects this and raises `RuntimeError`.
+If scanning a package starts a second `scan()` of that package, `AnyDI` detects it and raises `RuntimeError`.
 
 **Solutions:**
 
@@ -222,7 +222,7 @@ If a scanned module imports the container at module level, it triggers another `
 - Add problematic modules to `ignore`
 - Keep container in a module that doesn't get scanned
 
-## Mixing with Explicit Registration
+## Mixing with explicit registration
 
 Combine explicit and auto-registration:
 

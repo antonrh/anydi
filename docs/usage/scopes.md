@@ -167,7 +167,7 @@ The `from_context=True` option tells `AnyDI` that:
 
 This makes the dependency explicit and type-safe. The `from_context` option can only be used with scoped contexts (like `request`), not with `singleton` or `transient` scopes.
 
-## Custom Scopes
+## Custom scopes
 
 You can create custom scopes for your application. Custom scopes are useful when you need to manage dependencies differently from the standard scopes.
 
@@ -199,7 +199,8 @@ For example, if you have: `workflow` → `task` → `singleton`, then:
 - `workflow` providers can use `workflow`, `task`, and `singleton` dependencies
 - `task` providers can use `task` and `singleton` dependencies
 - `singleton` providers can only use `singleton` dependencies
-- `transient` providers can use any dependencies
+- `transient` providers can use any dependencies, as long as the scope they
+  belong to is open
 
 ### How to use custom scopes
 
@@ -243,7 +244,7 @@ with container.scoped_context("task"):
         assert engine.task_context.task_id == "task-123"
 ```
 
-### Async Custom Scopes
+### Async custom scopes
 
 Custom scopes also support async contexts:
 
@@ -315,7 +316,7 @@ Without `isolated=True` all tasks would share one session, and a finished task c
 3. **Use clear names**: Choose names that show the scope purpose (`task`, `session`, `tenant`, etc.)
 4. **Validate dependencies**: Container automatically checks that dependencies follow the hierarchy rules
 
-### Common Use Cases
+### Common use cases
 
 #### Multi-tenancy
 ```python

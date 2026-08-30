@@ -1,8 +1,8 @@
-# Pydantic Settings Extension
+# Pydantic settings extension
 
 The Pydantic Settings extension loads settings from a Pydantic model into an `AnyDI` container.
 
-## Quick Start
+## Quick start
 
 If you have a Pydantic `BaseSettings` model for application settings:
 

@@ -21,19 +21,20 @@ edit_uri: ""
 
 nav:
   - Home: index.md
-  - Core Concepts: concepts.md
-  - Usage Guide:
+  - Getting started: getting-started.md
+  - Core concepts: concepts.md
+  - Usage guide:
     - Providers:
       - Overview: usage/providers/index.md
       - Basics: usage/providers/basics.md
-      - Named Providers: usage/providers/annotated.md
-      - Resource Management: usage/providers/resources.md
-      - Auto-Registration: usage/providers/auto-registration.md
+      - Named providers: usage/providers/annotated.md
+      - Resource management: usage/providers/resources.md
+      - Auto-registration: usage/providers/auto-registration.md
     - Scopes: usage/scopes.md
-    - Dependency Injection: usage/injection.md
+    - Dependency injection: usage/injection.md
     - References:
       - Overview: usage/references.md
-      - Global Container: usage/global-container.md
+      - Global container: usage/global-container.md
     - Modules: usage/modules.md
     - Testing: usage/testing.md
     - CLI: usage/cli.md
@@ -41,11 +42,25 @@ nav:
     - FastAPI: extensions/fastapi.md
     - FastStream: extensions/faststream.md
     - Typer: extensions/typer.md
-    - Pydantic Settings: extensions/pydantic_settings.md
+    - Pydantic settings: extensions/pydantic_settings.md
     - Django: extensions/django.md
   - Examples:
-    - Basic Application: examples/basic.md
-    - Global Container: examples/global_container.md
+    - Basic application: examples/basic.md
+    - Global container: examples/global_container.md
+  - Reference: reference.md
+
+plugins:
+  - search
+  - mkdocstrings:
+      handlers:
+        python:
+          options:
+            docstring_style: google
+            show_source: false
+            show_root_heading: true
+            separate_signature: true
+            members_order: source
+            filters: ["!^_"]
 
 markdown_extensions:
   - admonition
