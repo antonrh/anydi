@@ -1,4 +1,4 @@
-# Typer Extension
+# Typer extension
 
 You can use `AnyDI` with [`Typer`](https://typer.tiangolo.com/) to add dependency injection to CLI applications. This extension supports both sync and async commands for building modern CLI tools with clean dependency management.
 
@@ -444,7 +444,7 @@ def test_send_email_failure() -> None:
     assert "Failed to send email" in result.stderr
 ```
 
-### Testing Async Commands
+### Testing async commands
 
 Async commands are tested the same way as sync commands - `CliRunner` handles the async execution automatically:
 

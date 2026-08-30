@@ -1,10 +1,10 @@
 # Providers
 
-Providers are the core of `AnyDI`. A provider is a function or class that returns an instance of a specific type. After registering a provider with `Container`, you can use it to resolve dependencies in your application.
+This section covers how to register providers, name several of one type, hand out resources that need closing, and let `AnyDI` register classes for you. [Provider basics](basics.md) starts from what a provider is.
 
-## Quick Examples
+## Quick examples
 
-### Basic Provider
+### Basic provider
 ```python
 from anydi import Container
 
@@ -15,7 +15,7 @@ def config() -> dict:
     return {"env": "production"}
 ```
 
-### Named Provider
+### Named provider
 ```python
 from typing import Annotated
 
@@ -24,7 +24,7 @@ def primary_db() -> Annotated[Database, "primary"]:
     return Database(host="primary.db")
 ```
 
-### Resource Provider
+### Resource provider
 ```python
 from typing import Iterator
 
@@ -36,7 +36,7 @@ def database() -> Iterator[Database]:
     db.disconnect()
 ```
 
-### Auto-Registered Provider
+### Auto-Registered provider
 ```python
 from anydi import singleton
 
@@ -46,7 +46,7 @@ class UserService:
         self.db = db
 ```
 
-## Learn More
+## Learn more
 
 - **[Provider Basics](basics.md)** - Register, unregister, and check provider status
 - **[Named Providers](annotated.md)** - Register multiple providers for the same type

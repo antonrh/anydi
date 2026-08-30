@@ -1,6 +1,6 @@
-# Django Extension
+# Django extension
 
-## Quick Start
+## Quick start
 
 Install `anydi` with `Django` support:
 
@@ -27,7 +27,7 @@ ANYDI = {
 
 This configuration injects dependencies into your Django views in the specified URLconf.
 
-Let's say you have a service class you want to inject into your views:
+Say you have a service class to inject into your views:
 
 ```python
 class HelloService:
@@ -102,7 +102,7 @@ class UserModule:
 You can now use the UserService in your views as demonstrated in the Quick Start section.
 
 
-## Custom Container
+## Custom container
 
 To use a custom container, you can specify the `CONTAINER_FACTORY` setting:
 
@@ -124,7 +124,7 @@ def get_container() -> Container:
     return container
 ```
 
-## Request Scope
+## Request scope
 
 To use `request`-scoped dependencies in your Django application, add the `request_scoped_middleware`. This middleware creates request-specific dependency instances at the start of each request. They stay available for the request duration.
 

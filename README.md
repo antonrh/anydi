@@ -25,8 +25,6 @@ Main features:
 * **Type-safe**: Uses type hints for dependency resolution.
 * **Async support**: Works with both sync and async code.
 * **Scopes**: Provides singleton, transient, and request scopes. Supports custom scope definitions.
-* **Simple**: Minimal boilerplate with straightforward API.
-* **Fast**: Low overhead dependency resolution.
 * **Named providers**: Use `Annotated[...]` for multiple providers per type.
 * **Resource management**: Context manager protocol support for lifecycle management.
 * **Modular**: Container and module composition for large applications.
@@ -42,9 +40,9 @@ Main features:
 pip install anydi
 ```
 
-## Quick Example
+## Quick example
 
-### Define a Service (`app/services.py`)
+### Define a service (`app/services.py`)
 
 ```python
 class GreetingService:
@@ -52,7 +50,7 @@ class GreetingService:
         return f"Hello, {name}!"
 ```
 
-### Create the Container and Providers (`app/container.py`)
+### Create the container and providers (`app/container.py`)
 
 ```python
 from anydi import Container
@@ -68,7 +66,7 @@ def service() -> GreetingService:
     return GreetingService()
 ```
 
-### Resolve Dependencies Directly
+### Resolve dependencies directly
 
 ```python
 from app.container import container
@@ -81,7 +79,7 @@ if __name__ == "__main__":
     print(service.greet("World"))
 ```
 
-### Inject Into Functions (`app/main.py`)
+### Inject into functions (`app/main.py`)
 
 ```python
 from anydi import Provide
@@ -98,7 +96,7 @@ if __name__ == "__main__":
     print(container.run(greet))
 ```
 
-### Or Use a Lazy Reference (`app/main.py`)
+### Or use a lazy reference (`app/main.py`)
 
 ```python
 from app.container import container
@@ -118,7 +116,7 @@ if __name__ == "__main__":
 
 The container owns the providers, scopes and lifespan either way. Injection and lazy references are two styles of reaching the same dependency.
 
-### Test with Overrides (`tests/test_app.py`)
+### Test with overrides (`tests/test_app.py`)
 
 ```python
 from unittest import mock
@@ -132,7 +130,7 @@ def test_greet() -> None:
     service_mock = mock.Mock(spec=GreetingService)
     service_mock.greet.return_value = "Mocked"
 
-    with container.override(GreetingService, service_mock):
+    with container.test_mode(), container.override(GreetingService, service_mock):
         result = container.run(greet)
 
     assert result == "Mocked"
@@ -164,7 +162,7 @@ async def greet(
 anydi.ext.fastapi.install(app, container)
 ```
 
-### Test the FastAPI Integration (`test_api.py`)
+### Test the FastAPI integration (`test_api.py`)
 
 ```python
 from unittest import mock
@@ -183,7 +181,7 @@ def test_api_greeting() -> None:
     service_mock = mock.Mock(spec=GreetingService)
     service_mock.greet.return_value = "Mocked"
 
-    with container.override(GreetingService, service_mock):
+    with container.test_mode(), container.override(GreetingService, service_mock):
         response = client.get("/greeting")
 
     assert response.json() == {"greeting": "Mocked"}
@@ -253,23 +251,23 @@ urlpatterns = [
 ]
 ```
 
-## Learn More
+## Documentation
 
-Want to know more? Here are helpful resources:
+**Guides:**
+- [Getting started](https://anydi.readthedocs.io/en/stable/getting-started/)
+- [Core Concepts](https://anydi.readthedocs.io/en/stable/concepts/)
+- [Providers](https://anydi.readthedocs.io/en/stable/usage/providers/)
+- [Scopes](https://anydi.readthedocs.io/en/stable/usage/scopes/)
+- [Dependency Injection](https://anydi.readthedocs.io/en/stable/usage/injection/)
+- [Testing](https://anydi.readthedocs.io/en/stable/usage/testing/)
+- [Reference](https://anydi.readthedocs.io/en/stable/reference/)
 
-**Core Documentation:**
-- [Core Concepts](https://anydi.readthedocs.io/en/stable/concepts/) - Learn about containers, providers, scopes, and dependency injection
-- [Providers](https://anydi.readthedocs.io/en/stable/usage/providers/) - How to register providers and manage resources
-- [Scopes](https://anydi.readthedocs.io/en/stable/usage/scopes/) - How to use built-in and custom scopes
-- [Dependency Injection](https://anydi.readthedocs.io/en/stable/usage/injection/) - Different ways to inject dependencies
-- [Testing](https://anydi.readthedocs.io/en/stable/usage/testing/) - How to test your code with provider overrides
+**Framework integrations:**
+- [FastAPI](https://anydi.readthedocs.io/en/stable/extensions/fastapi/)
+- [Django](https://anydi.readthedocs.io/en/stable/extensions/django/)
+- [FastStream](https://anydi.readthedocs.io/en/stable/extensions/faststream/)
+- [Typer](https://anydi.readthedocs.io/en/stable/extensions/typer/)
+- [Pydantic Settings](https://anydi.readthedocs.io/en/stable/extensions/pydantic_settings/)
 
-**Framework Integrations:**
-- [FastAPI](https://anydi.readthedocs.io/en/stable/extensions/fastapi/) - How to use with FastAPI
-- [Django](https://anydi.readthedocs.io/en/stable/extensions/django/) - How to use with Django and Django Ninja
-- [FastStream](https://anydi.readthedocs.io/en/stable/extensions/faststream/) - How to use with message brokers
-- [Typer](https://anydi.readthedocs.io/en/stable/extensions/typer/) - How to use in CLI applications
-- [Pydantic Settings](https://anydi.readthedocs.io/en/stable/extensions/pydantic_settings/) - How to manage configuration
-
-**Full Documentation:**
-- [Read the Docs](https://anydi.readthedocs.io/) - All documentation with examples and guides
+**Everything else:**
+- [Read the Docs](https://anydi.readthedocs.io/)

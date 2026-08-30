@@ -1,8 +1,8 @@
-# Command Line Interface
+# Command line interface
 
 `AnyDI` provides a CLI tool to validate and visualize your dependency graph.
 
-## Basic Usage
+## Basic usage
 
 ```shell
 anydi myapp.container:container
@@ -16,7 +16,7 @@ You can also use a factory function that returns a container:
 anydi myapp.container:create_container
 ```
 
-## Output Formats
+## Output formats
 
 ### Tree (Default)
 
@@ -91,7 +91,7 @@ digraph G {
 }
 ```
 
-#### Render with Graphviz
+#### Render with graphviz
 
 Install Graphviz:
 
@@ -178,7 +178,7 @@ anydi myapp:container -o json --indent 4 > graph.json
 
 ## Options
 
-### Full Module Path
+### Full module path
 
 Show full module paths in output:
 
@@ -194,7 +194,7 @@ myapp.services.UserService (singleton)
     └── db: myapp.database.Database (singleton)
 ```
 
-### Scan Packages
+### Scan packages
 
 Scan packages for providers before generating graph:
 
@@ -202,7 +202,7 @@ Scan packages for providers before generating graph:
 anydi myapp:container -s myapp
 ```
 
-## All Options
+## All options
 
 | Option            | Short | Description                                      |
 |-------------------|-------|--------------------------------------------------|

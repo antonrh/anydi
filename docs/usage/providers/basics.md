@@ -1,7 +1,6 @@
-# Provider Basics
+# Provider basics
 
-Providers are the main part of `AnyDI`. A provider is a function or class that returns an instance of a specific type.
-After you register a provider with `Container`, you can use it to resolve dependencies in your application.
+A provider is a function or a class that returns an instance of one type. You register it with `Container`, and from then on the container can resolve that type wherever it is asked for.
 
 ## Registering providers
 
@@ -59,7 +58,7 @@ service = container.resolve(NotificationService)
 service.notify("user-123", "Hello!")
 ```
 
-## Type Aliases
+## Type aliases
 
 Use the `alias` parameter in `register()` or `@provider` to register aliases inline:
 

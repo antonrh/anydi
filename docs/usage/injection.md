@@ -1,4 +1,4 @@
-# Dependency Injection
+# Dependency injection
 
 To use dependencies from the `Container`, you need to inject them into functions or classes. The recommended way is using the `Provide` annotation with `container.run()`.
 
@@ -60,7 +60,7 @@ handler()
 
 The service argument has a default value `Inject()`. This tells `AnyDI` which dependency to inject when you call the handler function.
 
-## Annotation Equivalents
+## Annotation equivalents
 
 `AnyDI` understands these different ways to declare injected dependency (they all work the same):
 
@@ -72,7 +72,7 @@ dependency: Provide[MyType]
 
 You can use any of these forms. They all do the same thing.
 
-## Scanning Injections
+## Scanning injections
 
 `AnyDI` can scan Python modules or packages to find and inject dependencies automatically.
 Your application might look like this:

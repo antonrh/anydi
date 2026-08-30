@@ -1,10 +1,10 @@
-# Resource Management
+# Resource management
 
 Resource providers are special providers that need to start and stop. This is useful for database connections, file handles, network sockets, or any resources that need cleanup.
 
 `AnyDI` supports both sync and async resource providers.
 
-## Synchronous Resources
+## Synchronous resources
 
 Here is an example of a synchronous resource provider that manages the lifecycle of a Resource object:
 
@@ -53,7 +53,7 @@ container.close()
 
 In this example, the `database_provider` function returns an iterator that yields a `DatabaseConnection` object. The `.connect()` method is called when the resource is created. The `.disconnect()` method is called when the resource is released.
 
-## Asynchronous Resources
+## Asynchronous resources
 
 Here is an example of an asynchronous resource provider that manages the lifecycle of an asynchronous Resource object:
 
@@ -110,7 +110,7 @@ asyncio.run(main())
 
 In this example, the `async_database_provider` function returns an async iterator that yields an `AsyncDatabase` object. The `.astart()` method is called when the resource is created. The `.aclose()` method is called when the resource is released.
 
-## Resource Events
+## Resource events
 
 Sometimes it is useful to split instance creation and lifecycle management into separate providers. This keeps instance creation separate from lifecycle management.
 
