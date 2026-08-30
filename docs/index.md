@@ -21,8 +21,6 @@ Main features:
 * **Type-safe**: Uses type hints for dependency resolution.
 * **Async support**: Works with both sync and async code.
 * **Scopes**: Provides singleton, transient, and request scopes. Supports custom scope definitions.
-* **Simple**: Minimal boilerplate with straightforward API.
-* **Fast**: Low overhead dependency resolution.
 * **Named providers**: Use `Annotated[...]` for multiple providers per type.
 * **Resource management**: Context manager protocol support for lifecycle management.
 * **Modular**: Container and module composition for large applications.
@@ -39,9 +37,9 @@ Main features:
 pip install anydi
 ```
 
-## Quick Example
+## Quick example
 
-### Define a Service (`app/services.py`)
+### Define a service (`app/services.py`)
 
 ```python
 class GreetingService:
@@ -49,7 +47,7 @@ class GreetingService:
         return f"Hello, {name}!"
 ```
 
-### Create the Container and Providers (`app/container.py`)
+### Create the container and providers (`app/container.py`)
 
 ```python
 from anydi import Container
@@ -65,7 +63,7 @@ def service() -> GreetingService:
     return GreetingService()
 ```
 
-### Resolve Dependencies Directly
+### Resolve dependencies directly
 
 ```python
 from app.container import container
@@ -78,7 +76,7 @@ if __name__ == "__main__":
     print(service.greet("World"))
 ```
 
-### Inject Into Functions (`app/main.py`)
+### Inject into functions (`app/main.py`)
 
 ```python
 from anydi import Provide
@@ -95,7 +93,7 @@ if __name__ == "__main__":
     print(container.run(greet))
 ```
 
-### Test with Overrides (`tests/test_app.py`)
+### Test with overrides (`tests/test_app.py`)
 
 ```python
 from unittest import mock
@@ -109,7 +107,7 @@ def test_greet() -> None:
     service_mock = mock.Mock(spec=GreetingService)
     service_mock.greet.return_value = "Mocked"
 
-    with container.override(GreetingService, service_mock):
+    with container.test_mode(), container.override(GreetingService, service_mock):
         result = container.run(greet)
 
     assert result == "Mocked"
@@ -139,7 +137,7 @@ async def greet(
 anydi.ext.fastapi.install(app, container)
 ```
 
-### Test the FastAPI Integration (`test_api.py`)
+### Test the FastAPI integration (`test_api.py`)
 
 ```python
 from unittest import mock
@@ -158,7 +156,7 @@ def test_api_greeting() -> None:
     service_mock = mock.Mock(spec=GreetingService)
     service_mock.greet.return_value = "Mocked"
 
-    with container.override(GreetingService, service_mock):
+    with container.test_mode(), container.override(GreetingService, service_mock):
         response = client.get("/greeting")
 
     assert response.json() == {"greeting": "Mocked"}
@@ -228,20 +226,20 @@ urlpatterns = [
 ]
 ```
 
-## Learn More
+## Documentation
 
-Want to know more? Here are helpful resources:
+**Guides:**
+- [Getting started](getting-started.md)
+- [Core Concepts](concepts.md)
+- [Providers](usage/providers/index.md)
+- [Scopes](usage/scopes.md)
+- [Dependency Injection](usage/injection.md)
+- [Testing](usage/testing.md)
+- [Reference](reference.md)
 
-**Core Documentation:**
-- [Core Concepts](concepts.md) - Learn about containers, providers, scopes, and dependency injection
-- [Providers](usage/providers/index.md) - How to register providers and manage resources
-- [Scopes](usage/scopes.md) - How to use built-in and custom scopes
-- [Dependency Injection](usage/injection.md) - Different ways to inject dependencies
-- [Testing](usage/testing.md) - How to test your code with provider overrides
-
-**Framework Integrations:**
-- [FastAPI](extensions/fastapi.md) - How to use with FastAPI
-- [Django](extensions/django.md) - How to use with Django and Django Ninja
-- [FastStream](extensions/faststream.md) - How to use with message brokers
-- [Typer](extensions/typer.md) - How to use in CLI applications
-- [Pydantic Settings](extensions/pydantic_settings.md) - How to manage configuration
+**Framework integrations:**
+- [FastAPI](extensions/fastapi.md)
+- [Django](extensions/django.md)
+- [FastStream](extensions/faststream.md)
+- [Typer](extensions/typer.md)
+- [Pydantic Settings](extensions/pydantic_settings.md)

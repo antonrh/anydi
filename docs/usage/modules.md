@@ -63,7 +63,7 @@ assert container.is_registered(Service)
 assert container.is_registered(Repository)
 ```
 
-## Aliases in Modules
+## Aliases in modules
 
 Use the `alias` parameter in `@provider` to register type aliases:
 

@@ -1,4 +1,4 @@
-# Core Concepts
+# Core concepts
 
 Learn these basic concepts to use `AnyDI` better.
 
@@ -14,7 +14,7 @@ container = Container()
 
 You can think of container as a registry that knows how to create and manage all your services.
 
-### What container does:
+### What container does
 - Stores providers (using lazy registration)
 - Resolves dependencies on demand
 - Manages object lifecycles (singleton, transient, request)
@@ -52,12 +52,12 @@ class NotificationService:
         self.email = email
 ```
 
-### Types of Providers:
+### Types of providers
 - **Function providers**: Functions decorated with `@container.provider()`
 - **Class providers**: Classes decorated with `@singleton`, `@transient`, or `@request`
 - **Resource providers**: Generators that manage lifecycle
 
-### Dependency Graph
+### Dependency graph
 
 `AnyDI` uses **lazy registration**. This means that when you register a provider, it doesn't check dependencies right away. The check happens later, either when you first resolve the provider with `resolve()`, or when you validate all providers at once with `build()`.
 
@@ -107,7 +107,7 @@ my_service = container.resolve(Service)
 container.build()
 ```
 
-#### Benefits of `build()`:
+#### Benefits of `build()`
 - **Catch errors early**: Finds circular dependencies and scope problems before the application runs.
 - **Check everything**: Checks the entire dependency graph in one step.
 
@@ -136,15 +136,15 @@ def user_context() -> UserContext:
     return UserContext()
 ```
 
-### Built-in scopes:
+### Built-in scopes
 - **singleton**: Created one time and used everywhere
 - **transient**: New instance created every time you need it
 - **request**: Created one time per request context
 
-### Custom scopes:
+### Custom scopes
 You can create your own scopes for special cases like background jobs, user sessions, or multi-tenancy.
 
-## Dependency Injection
+## Dependency injection
 
 Dependency injection means that dependencies are given to a function or class automatically. You don't need to create them manually.
 
@@ -168,13 +168,13 @@ def process_order(service: Provide[OrderService]) -> None:
 container.run(process_order)
 ```
 
-### Why use dependency injection:
+### Why use dependency injection
 - **Testability**: Substitute mocks and test doubles
 - **Flexibility**: Can swap implementations without modifying code
 - **Maintainability**: Explicit dependencies make code easier to understand
 - **Decoupling**: Services don't need to know dependency instantiation logic
 
-## Dependency Type
+## Dependency type
 
 A dependency type is a type annotation that identifies a dependency. Usually it is a class, but it can be any type. In the container, it's represented as the `dependency_type`.
 
@@ -201,7 +201,7 @@ class LocalStorage:
 container.register(StorageBackend, lambda: LocalStorage(), scope="singleton")
 ```
 
-### Named dependency types:
+### Named dependency types
 You can use `Annotated` to register multiple providers for the same type:
 
 ```python
@@ -227,7 +227,7 @@ Resolution is the process when container creates an instance with all its depend
 service = container.resolve(EmailService)
 ```
 
-### Automatic vs manual resolution:
+### Automatic vs manual resolution
 ```python
 # Manual resolution
 service = container.resolve(EmailService)
@@ -244,7 +244,7 @@ service = container.ref(EmailService)
 
 The container owns the dependencies and their lifecycle. How your code reaches them is a matter of taste: inject them into functions, resolve them manually, or keep a lazy reference at module level. All three use the same providers, the same scopes and the same overrides in tests.
 
-## Lifecycle Management
+## Lifecycle management
 
 Lifecycle management controls when resources are created, used, and cleaned up.
 
@@ -275,7 +275,7 @@ db = container.resolve(Database)
 container.close()
 ```
 
-### Context managers:
+### Context managers
 `AnyDI` works with Python's context managers:
 
 ```python
@@ -341,7 +341,7 @@ with container:
     print(users)
 ```
 
-## Next Steps
+## Next steps
 
 - [Providers](usage/providers/index.md) - Learn more about providers
 - [Scopes](usage/scopes.md) - Deep dive into scopes

@@ -1,8 +1,8 @@
-# Named Providers
+# Named providers
 
 Sometimes you need to register multiple providers for the same type. For example, you might want multiple database connections or different implementations of the same type. You can do this with the `Annotated` type hint and a string name to tell providers apart.
 
-## Basic Usage
+## Basic usage
 
 ```python
 from typing import Annotated
@@ -42,9 +42,9 @@ assert replica.host == "db-replica.local"
 
 The two providers above return different database connections. The `Annotated` type hint carries the name, so the annotation itself says which provider to use.
 
-## Use Cases
+## Use cases
 
-### Multiple Configurations
+### Multiple configurations
 
 ```python
 from typing import Annotated
@@ -76,7 +76,7 @@ prod_client = container.resolve(Annotated[APIClient, "production"])
 staging_client = container.resolve(Annotated[APIClient, "staging"])
 ```
 
-### Different Implementations
+### Different implementations
 
 ```python
 from typing import Annotated, Protocol
