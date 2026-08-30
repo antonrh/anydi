@@ -1,0 +1,48 @@
+name: Release
+
+# A tag that names a version publishes it. Nothing else does.
+on:
+  push:
+    tags:
+      - '[0-9]+.[0-9]+.[0-9]+'
+
+permissions:
+  contents: read
+
+jobs:
+  release:
+    name: Publish to PyPI
+    runs-on: ubuntu-latest
+    environment: release
+    permissions:
+      # What PyPI's trusted publishing signs the upload with, in place of a
+      # token this repository would otherwise have to keep.
+      id-token: write
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          python-version: '3.10'
+          enable-cache: true
+      - name: Check the tag against the version
+        run: |
+          tagged="${GITHUB_REF_NAME}"
+          declared="$(uv version --short --frozen)"
+          if [ "$tagged" != "$declared" ]; then
+            echo "The tag says $tagged and pyproject.toml says $declared." >&2
+            exit 1
+          fi
+      - name: Install dependencies
+        run: uv sync --all-extras --dev
+      # A release runs them again: the tag may not be what CI last saw.
+      - name: Lint
+        run: uv run ty check && uv run ruff check && uv run ruff format --check
+      - name: Run tests
+        run: uv run pytest tests
+      - name: Build
+        run: uv build
+      - name: Publish
+        run: uv publish --trusted-publishing always
