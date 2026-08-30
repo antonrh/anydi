@@ -1,5 +1,14 @@
 from __future__ import annotations
 
+try:
+    import pydantic_settings  # noqa: F401
+except ImportError:  # pragma: no cover - CI installs it
+    message = (
+        "This extension needs `pydantic-settings`. "
+        "Install it with `pip install pydantic-settings`."
+    )
+    raise ImportError(message) from None
+
 from collections.abc import Callable, Iterable
 from typing import Annotated, Any
 

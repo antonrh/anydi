@@ -2,6 +2,14 @@
 
 from __future__ import annotations
 
+try:
+    import faststream  # noqa: F401
+except ImportError:  # pragma: no cover - CI installs it
+    message = (
+        "This extension needs `faststream`. Install it with `pip install faststream`."
+    )
+    raise ImportError(message) from None
+
 import inspect
 from functools import cached_property
 from typing import TYPE_CHECKING, Any, cast

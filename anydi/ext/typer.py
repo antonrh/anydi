@@ -2,6 +2,12 @@
 
 from __future__ import annotations
 
+try:
+    import typer  # noqa: F401
+except ImportError:  # pragma: no cover - CI installs it
+    message = "This extension needs `typer`. Install it with `pip install typer`."
+    raise ImportError(message) from None
+
 import asyncio
 import concurrent.futures
 import contextlib
