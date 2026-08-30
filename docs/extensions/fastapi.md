@@ -1,6 +1,6 @@
-# FastAPI Extension
+# FastAPI extension
 
-You can use `AnyDI` with `FastAPI` easily. Since `FastAPI` has its own dependency injection, you can use `Provide` annotation or `Inject` marker instead of the standard `Depends`.
+`FastAPI` has a dependency injection of its own, so `AnyDI` slots into it: use the `Provide` annotation or the `Inject` marker in place of `Depends`.
 
 
 ```python
@@ -92,7 +92,7 @@ app = FastAPI(lifespan=lifespan)
 ```
 
 
-## Request Scope
+## Request scope
 
 To use `request`-scoped dependencies in your `FastAPI` application, use the `RequestScopedMiddleware`. This middleware creates dependencies that are tied to each request lifecycle. You can also access the `Request` object.
 
@@ -126,6 +126,9 @@ class UserService:
 
 
 container = Container()
+# The middleware puts the request into the scoped context, and this is what
+# lets a provider take it as a parameter.
+container.register(Request, scope="request", from_context=True)
 
 
 @container.provider(scope="request")
@@ -153,10 +156,10 @@ async def get_user(
 anydi.ext.fastapi.install(app, container)
 ```
 
-With this setup, you can use request-scoped dependencies in your application. `Request` is automatically available in request-scoped providers, so you can access the request object and its data.
+The middleware puts the `Request` into the request context for the length of the call. Registering it with `from_context=True` is what lets a request-scoped provider take it as a parameter.
 
 
-## WebSocket Support
+## WebSocket support
 
 `AnyDI` supports WebSocket endpoints in FastAPI with a dedicated `websocket` scope for connection-specific state. The `websocket` scope is registered automatically when you call `anydi.ext.fastapi.install()`.
 
@@ -172,7 +175,7 @@ The `websocket` scope lets you create dependencies that:
 - Are isolated between different connections
 - Can use request-scoped and singleton dependencies
 
-### Basic WebSocket Example
+### Basic WebSocket example
 
 Here's a simple example of using dependency injection in a WebSocket endpoint:
 
@@ -195,6 +198,8 @@ class ConnectionState:
 
 
 container = Container()
+# `install()` registers this scope too, but the providers below need it now.
+container.register_scope("websocket", parents=["request"])
 
 
 @container.provider(scope="websocket")
@@ -230,7 +235,7 @@ anydi.ext.fastapi.install(app, container)
 
 In this example, each WebSocket connection gets its own `ConnectionState` instance that stays alive for all messages in that connection. When the connection closes, the instance is cleaned up automatically.
 
-### Resource Cleanup
+### Resource cleanup
 
 WebSocket-scoped dependencies support automatic cleanup using generator-based providers:
 
@@ -265,15 +270,17 @@ async def websocket_database(
     # Cleanup automatically happens here
 ```
 
-### Accessing WebSocket Object
+### Accessing WebSocket object
 
-The `WebSocket` object is automatically available in both `request` and `websocket` scoped providers:
+The middleware puts the `WebSocket` into the context. Register it with `from_context=True`, and `request` and `websocket` scoped providers can take it as a parameter:
 
 ```python
 from dataclasses import dataclass
 from typing import Any
 
 from starlette.websockets import WebSocket
+
+container.register(WebSocket, scope="websocket", from_context=True)
 
 
 @dataclass
@@ -300,7 +307,7 @@ async def websocket_info(
     await websocket.close()
 ```
 
-### Concurrent Connections
+### Concurrent connections
 
 Each WebSocket connection maintains its own isolated scope:
 
@@ -323,7 +330,7 @@ async def websocket_concurrent(
         await websocket.send_text(response)
 ```
 
-### Scope Hierarchy
+### Scope hierarchy
 
 Since `websocket` inherits from `request` scope, websocket-scoped providers can inject request-scoped dependencies:
 
