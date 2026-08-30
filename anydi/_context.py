@@ -108,9 +108,11 @@ class InstanceContext:
                 "with `aclose()` instead."
             )
         closer = self._closers.pop(key, None)
+        # Dropped first: a finaliser that raises must not leave the instance
+        # behind, or the next resolution hands out a closed one.
+        self._items.pop(key, None)
         if closer is not None:
             closer(None, None, None)
-        self._items.pop(key, None)
 
     def __setitem__(self, key: Any, value: Any) -> None:
         self._items[key] = value
