@@ -2,6 +2,12 @@
 
 from __future__ import annotations
 
+try:
+    import fastapi  # noqa: F401
+except ImportError:  # pragma: no cover - CI installs it
+    message = "This extension needs `fastapi`. Install it with `pip install fastapi`."
+    raise ImportError(message) from None
+
 import inspect
 from collections.abc import Iterable, Iterator
 from typing import Annotated, Any, cast

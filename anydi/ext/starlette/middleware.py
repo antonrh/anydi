@@ -2,6 +2,14 @@
 
 from __future__ import annotations
 
+try:
+    import starlette  # noqa: F401
+except ImportError:  # pragma: no cover - CI installs it
+    message = (
+        "This extension needs `starlette`. Install it with `pip install starlette`."
+    )
+    raise ImportError(message) from None
+
 from contextlib import AsyncExitStack
 
 from starlette.requests import Request
