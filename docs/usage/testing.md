@@ -1,10 +1,10 @@
 # Testing
 
-## Test Mode
+## Test mode
 
 When overriding dependencies in tests, `AnyDI` uses a special **test mode** that enables proper override support throughout the dependency graph. Test mode ensures that overridden dependencies are correctly propagated to all dependent services.
 
-### Enabling Test Mode
+### Enabling test mode
 
 You can enable test mode in two ways:
 
@@ -28,7 +28,7 @@ finally:
     container.disable_test_mode()
 ```
 
-### Why Test Mode Matters
+### Why test mode matters
 
 `AnyDI` compiles optimized resolvers for fast dependency resolution. Test mode switches to a separate set of resolvers that include override checking logic. This ensures:
 
@@ -38,7 +38,7 @@ finally:
 
 **Note:** If you use the pytest plugin (see below), test mode is automatically enabled for you.
 
-## Overriding Dependencies
+## Overriding dependencies
 
 Use the `.override(dependency_type, instance)` context manager to replace a dependency temporarily during testing. It helps you isolate code from its dependencies.
 The `container.override()` works only inside the `with` block. When the block ends, the original dependency comes back.
@@ -72,6 +72,8 @@ class Service:
 
 
 container = Container()
+container.register(Repository, scope="singleton")
+container.register(Service, scope="singleton")
 
 
 @container.inject
@@ -99,7 +101,7 @@ def test_handler() -> None:
         assert get_items() == [Item(name="mock1"), Item(name="mock2")]
 ```
 
-### Overriding Lazy References
+### Overriding lazy references
 
 Dependencies obtained with [`container.ref()`](references.md) are overridden the same way. A reference always asks the container for the current instance. The override applies even if the reference was already used:
 
@@ -123,7 +125,7 @@ def test_handler() -> None:
         assert get_items() == [Item(name="mock1"), Item(name="mock2")]
 ```
 
-## Overriding Providers with Modules
+## Overriding providers with modules
 
 You can create a testing module that overrides providers from your application modules. Use `@provider(scope="...", override=True)` to replace specific providers:
 
@@ -173,7 +175,7 @@ This approach is useful when you want to:
 - Override multiple providers in one place
 - Share testing configuration across multiple test files
 
-## Pytest Plugin
+## The pytest plugin
 
 `AnyDI` has a pytest plugin that injects dependencies into test functions. This makes tests simpler and cleaner.
 
