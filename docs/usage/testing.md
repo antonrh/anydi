@@ -1,43 +1,5 @@
 # Testing
 
-## Test mode
-
-When overriding dependencies in tests, `AnyDI` uses a special **test mode** that enables proper override support throughout the dependency graph. Test mode ensures that overridden dependencies are correctly propagated to all dependent services.
-
-### Enabling test mode
-
-You can enable test mode in two ways:
-
-**Using the context manager (recommended):**
-
-```python
-with container.test_mode():
-    with container.override(Repository, mock_repo):
-        # All resolutions here will use the override
-        service = container.resolve(Service)
-```
-
-**Using explicit methods:**
-
-```python
-container.enable_test_mode()
-try:
-    with container.override(Repository, mock_repo):
-        service = container.resolve(Service)
-finally:
-    container.disable_test_mode()
-```
-
-### Why test mode matters
-
-`AnyDI` compiles optimized resolvers for fast dependency resolution. Test mode switches to a separate set of resolvers that include override checking logic. This ensures:
-
-- Overrides are checked at every resolution point
-- Nested dependencies correctly receive overridden instances
-- No performance impact in production (normal resolvers have no override checks)
-
-**Note:** If you use the pytest plugin (see below), test mode is automatically enabled for you.
-
 ## Overriding dependencies
 
 Use the `.override(dependency_type, instance)` context manager to replace a dependency temporarily during testing. It helps you isolate code from its dependencies.
@@ -106,10 +68,6 @@ def test_handler() -> None:
 Dependencies obtained with [`container.ref()`](references.md) are overridden the same way. A reference always asks the container for the current instance. The override applies even if the reference was already used:
 
 ```python
-container = Container()
-
-container.register(Repository, Repository, scope="singleton")
-
 repo = container.ref(Repository)
 
 
@@ -124,6 +82,44 @@ def test_handler() -> None:
     with container.test_mode(), container.override(Repository, repo_mock):
         assert get_items() == [Item(name="mock1"), Item(name="mock2")]
 ```
+
+## Test mode
+
+When overriding dependencies in tests, `AnyDI` uses a special **test mode** that enables proper override support throughout the dependency graph. Test mode ensures that overridden dependencies are correctly propagated to all dependent services.
+
+### Enabling test mode
+
+You can enable test mode in two ways:
+
+**Using the context manager (recommended):**
+
+```python
+with container.test_mode():
+    with container.override(Repository, mock.Mock(spec=Repository)):
+        # Every resolution here uses the override
+        service = container.resolve(Service)
+```
+
+**Using explicit methods:**
+
+```python
+container.enable_test_mode()
+try:
+    with container.override(Repository, mock.Mock(spec=Repository)):
+        service = container.resolve(Service)
+finally:
+    container.disable_test_mode()
+```
+
+### Why test mode matters
+
+`AnyDI` compiles optimized resolvers for fast dependency resolution. Test mode switches to a separate set of resolvers that include override checking logic. This ensures:
+
+- Overrides are checked at every resolution point
+- Nested dependencies correctly receive overridden instances
+- No performance impact in production (normal resolvers have no override checks)
+
+**Note:** If you use the pytest plugin (see below), test mode is automatically enabled for you.
 
 ## Overriding providers with modules
 
