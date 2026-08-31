@@ -161,7 +161,9 @@ class Provided(Protocol):
 
 
 def is_provided(cls: Any) -> TypeGuard[type[Provided]]:
-    return hasattr(cls, "__provided__") and "scope" in cls.__provided__
+    # A subclass inherits `__provided__`, but nobody marked it.
+    metadata = getattr(cls, "__dict__", {}).get("__provided__")
+    return metadata is not None and "scope" in metadata
 
 
 class ProviderMetadata(TypedDict):
