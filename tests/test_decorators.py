@@ -347,3 +347,27 @@ def test_injectable_decorator_with_tags() -> None:
     assert my_func.__injectable__ == {
         "tags": ["tag1", "tag2"],
     }
+
+
+def test_is_not_provided_by_inheritance() -> None:
+    @singleton
+    class BaseSender:
+        pass
+
+    class SmtpSender(BaseSender):
+        pass
+
+    assert is_provided(BaseSender)
+    assert not is_provided(SmtpSender)
+
+
+def test_a_decorated_subclass_is_provided() -> None:
+    @singleton
+    class BaseSender:
+        pass
+
+    @singleton
+    class SmtpSender(BaseSender):
+        pass
+
+    assert is_provided(SmtpSender)

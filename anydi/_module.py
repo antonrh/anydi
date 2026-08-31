@@ -15,11 +15,16 @@ class ModuleMeta(type):
     """A metaclass used for the Module base class."""
 
     def __new__(cls, name: str, bases: tuple[type, ...], attrs: dict[str, Any]) -> Any:
-        attrs["providers"] = [
+        # Keyed by name, so a subclass replaces a provider it redefines.
+        providers: dict[str, ProviderMetadata] = {}
+        for base in reversed(bases):
+            providers.update(getattr(base, "providers", ()))
+        providers.update(
             (name, value.__provider__)
             for name, value in attrs.items()
             if is_provider(value)
-        ]
+        )
+        attrs["providers"] = list(providers.items())
         return super().__new__(cls, name, bases, attrs)
 
 

@@ -166,3 +166,47 @@ class TestContainerModuleRegistrator:
         cache2 = container.resolve(IStore)
         cache3 = container.resolve(RedisCache)
         assert cache1 is cache2 is cache3
+
+    def test_module_subclass_keeps_the_base_providers(
+        self, container: Container
+    ) -> None:
+        class Config:
+            pass
+
+        class Repo:
+            def __init__(self, config: Config) -> None:
+                self.config = config
+
+        class BaseModule(Module):
+            @provider(scope="singleton")
+            def config(self) -> Config:
+                return Config()
+
+        class AppModule(BaseModule):
+            @provider(scope="singleton")
+            def repo(self, config: Config) -> Repo:
+                return Repo(config=config)
+
+        container.register_module(AppModule)
+
+        assert container.is_registered(Config)
+        assert isinstance(container.resolve(Repo).config, Config)
+
+    def test_module_subclass_replaces_a_provider_it_redefines(
+        self, container: Container
+    ) -> None:
+        class BaseModule(Module):
+            @provider(scope="singleton")
+            def message(self) -> str:
+                return "base"
+
+        class AppModule(BaseModule):
+            @provider(scope="singleton")
+            def message(self) -> str:
+                return "app"
+
+        assert [name for name, _ in AppModule.providers] == ["message"]
+
+        container.register_module(AppModule)
+
+        assert container.resolve(str) == "app"
