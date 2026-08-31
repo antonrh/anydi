@@ -43,3 +43,13 @@ anydi.ext.pydantic_settings.install(Settings(), container, prefix="my_settings")
 
 app_name = container.resolve(Annotated[str, "my_settings.app_name"])
 ```
+
+## Installing twice
+
+Installing two settings models that share a field name raises a `LookupError` naming the model and the field. Give one of them its own prefix, or pass `override=True` to replace the values already in the container:
+
+```python
+anydi.ext.pydantic_settings.install(Settings(app_name="Other App"), container, override=True)
+
+assert container.resolve(Annotated[str, "settings.app_name"]) == "Other App"
+```

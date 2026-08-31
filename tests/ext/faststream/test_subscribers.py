@@ -80,6 +80,25 @@ def broker() -> RedisBroker:
     ) -> None:
         _request_context_results.append(f"{message}:{ctx.request_id}")
 
+    # One subscriber carrying two handlers, not just the first one
+    multi = broker.subscriber("email.multi")
+
+    @multi(filter=lambda msg: msg.content_type == "application/json")
+    async def send_multi_json(
+        message: EmailMessage,
+        mail_service: MailService = Inject(),
+    ) -> None:
+        result = await mail_service.send_mail(email=message.to, message="json")
+        _email_results.append((result.email, result.message))
+
+    @multi
+    async def send_multi_text(
+        message: str,
+        mail_service: MailService = Inject(),
+    ) -> None:
+        result = await mail_service.send_mail(email=message, message="text")
+        _email_results.append((result.email, result.message))
+
     anydi.ext.faststream.install(broker, container)
 
     return broker
@@ -123,6 +142,18 @@ async def test_singleton_dependency_with_provide_annotation(
 
     assert len(_email_results) == 1
     assert _email_results[0] == ("admin@example.com", "Alert: System notification")
+
+
+async def test_every_handler_of_a_subscriber_is_injected(
+    broker: RedisBroker,
+) -> None:
+    """Test injection into the second handler registered on one subscriber."""
+    _email_results.clear()
+
+    async with TestRedisBroker(broker) as br:
+        await br.publish("user@example.com", channel="email.multi")
+
+    assert _email_results == [("user@example.com", "text")]
 
 
 async def test_request_scoped_dependency_with_inject_marker(

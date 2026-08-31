@@ -1,5 +1,6 @@
 from typing import Annotated
 
+import pytest
 from pydantic import computed_field
 from pydantic_settings import BaseSettings
 
@@ -30,6 +31,33 @@ def test_install_settings() -> None:
     assert container.resolve(Annotated[int, "settings.param_int"]) == 42
     assert container.resolve(Annotated[float, "settings.param_float"]) == 3.14
     assert container.resolve(Annotated[str, "settings.param_computed"]) == "computed"
+
+
+def test_install_twice_reports_the_field() -> None:
+    container = Container()
+
+    anydi.ext.pydantic_settings.install(Settings(), container)
+
+    with pytest.raises(
+        LookupError,
+        match=(
+            r"`Settings.param_str` is already registered as `settings.param_str`\. "
+            r"Install it under another `prefix`, or pass `override=True` to "
+            r"replace it\."
+        ),
+    ):
+        anydi.ext.pydantic_settings.install(Settings(), container)
+
+
+def test_install_twice_with_override() -> None:
+    container = Container()
+
+    anydi.ext.pydantic_settings.install(Settings(), container)
+    anydi.ext.pydantic_settings.install(
+        Settings(param_str="changed"), container, override=True
+    )
+
+    assert container.resolve(Annotated[str, "settings.param_str"]) == "changed"
 
 
 def test_install_multiple_settings() -> None:

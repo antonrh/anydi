@@ -77,7 +77,8 @@ extend_marker(FastStreamMarker)
 
 
 def _get_broker_handlers(broker: BrokerUsecase[Any, Any]) -> list[Any]:
-    return [subscriber.calls[0].handler for subscriber in broker.subscribers]
+    # A subscriber holds one call per handler registered on it, not just one.
+    return [call.handler for sub in broker.subscribers for call in sub.calls]
 
 
 def install(broker: BrokerUsecase[Any, Any], container: Container) -> None:

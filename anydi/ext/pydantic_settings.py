@@ -23,6 +23,7 @@ def install(
     container: Container,
     *,
     prefix: str = "settings.",
+    override: bool = False,
 ) -> None:
     """Install Pydantic settings into an AnyDI container."""
 
@@ -41,11 +42,21 @@ def install(
             else:
                 continue
 
-            container.register(
-                Annotated[origin, f"{prefix}{setting_name}"],
-                _get_setting_value(getattr(_settings, setting_name)),
-                scope="singleton",
-            )
+            interface = f"{prefix}{setting_name}"
+            try:
+                container.register(
+                    Annotated[origin, interface],
+                    _get_setting_value(getattr(_settings, setting_name)),
+                    scope="singleton",
+                    override=override,
+                )
+            except LookupError:
+                # Say which field collided, not just which annotation.
+                raise LookupError(
+                    f"`{settings_cls.__name__}.{setting_name}` is already "
+                    f"registered as `{interface}`. Install it under another "
+                    "`prefix`, or pass `override=True` to replace it."
+                ) from None
 
     if isinstance(settings, BaseSettings):
         _register_settings(settings)
