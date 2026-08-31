@@ -451,20 +451,24 @@ class TestRefInvalidation:
         assert db.dsn == "postgres://1"
 
     def test_ref_reflects_resolve_after_close(self, container: Container) -> None:
+        closed = []
+
         @container.provider(scope="singleton")
         def get_db() -> Iterator[Database]:
             db = Database()
             yield db
             db.closed = True
+            closed.append(db)
 
         db = container.ref(Database)
 
         with container:
             assert db.dsn == "postgres://localhost"
 
-        # Closing finalizes the resource, but the container keeps the instance
-        assert db.closed is True
-        assert db == container.resolve(Database)
+        # Closing finalizes the resource, so the reference reads a new instance
+        assert len(closed) == 1
+        assert db.closed is False
+        assert db != closed[0]
 
 
 class TestRefUsage:
