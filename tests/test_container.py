@@ -2023,6 +2023,43 @@ class TestContainerResolution:
 
         assert not container.is_resolved(str)
 
+    def test_a_reopened_container_makes_the_resource_again(
+        self, container: Container
+    ) -> None:
+        events = []
+
+        def provide_conn() -> Iterator[str]:
+            events.append("open")
+            yield "conn"
+            events.append("close")
+
+        container.register(str, provide_conn, scope="singleton")
+
+        with container:
+            container.resolve(str)
+        with container:
+            container.resolve(str)
+
+        assert events == ["open", "close", "open", "close"]
+
+    def test_a_reopened_container_keeps_what_it_did_not_close(
+        self, container: Container
+    ) -> None:
+        made = []
+
+        class Service:
+            def __init__(self) -> None:
+                made.append(self)
+
+        container.register(Service, Service, scope="singleton")
+
+        with container:
+            first = container.resolve(Service)
+        with container:
+            assert container.resolve(Service) is first
+
+        assert len(made) == 1
+
     def test_release_forgets_an_instance_whose_finaliser_raises(
         self, container: Container
     ) -> None:

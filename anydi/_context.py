@@ -138,7 +138,10 @@ class InstanceContext:
     ) -> Any:
         """Exit the context."""
         self._reject_async_resources()
-        return self._exit_stack(exc_type, exc_val, exc_tb)
+        try:
+            return self._exit_stack(exc_type, exc_val, exc_tb)
+        finally:
+            self._forget_closed()
 
     def _exit_stack(
         self,
@@ -182,11 +185,21 @@ class InstanceContext:
             )
         if self._async_stack is not None:
             async_exit = await self._async_stack.__aexit__(exc_type, exc_val, exc_tb)
+        self._forget_closed()
         return bool(sync_exit) or bool(async_exit)
 
     async def aclose(self) -> None:
         """Close the scoped context asynchronously."""
         await self.__aexit__(None, None, None)
+
+    def _forget_closed(self) -> None:
+        """Drop the instances whose resources this context closed."""
+        for key in (*self._closers, *self._aclosers):
+            self._items.pop(key, None)
+        self._closers.clear()
+        self._aclosers.clear()
+        self._stack = None
+        self._async_stack = None
 
     def lock(self) -> threading.RLock:
         """Acquire the context lock."""
