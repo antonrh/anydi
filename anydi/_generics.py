@@ -6,9 +6,12 @@ from types import UnionType
 from typing import Annotated, Any, TypeVar, Union, get_args, get_origin
 
 
-def build_typevar_map(cls: type[Any]) -> dict[TypeVar, type[Any]]:
+def build_typevar_map(
+    cls: type[Any], known: dict[TypeVar, type[Any]] | None = None
+) -> dict[TypeVar, type[Any]]:
     """Build a mapping from TypeVars to concrete types for a class."""
-    typevar_map: dict[TypeVar, type[Any]] = {}
+    # `known` carries what the subclass resolved, for bases that renamed a param
+    typevar_map: dict[TypeVar, type[Any]] = dict(known or {})
 
     orig_bases = getattr(cls, "__orig_bases__", ())
 
@@ -17,7 +20,7 @@ def build_typevar_map(cls: type[Any]) -> dict[TypeVar, type[Any]]:
         if origin is None:
             # Not a parameterized generic, check if it's a class with bases
             if isinstance(base, type):
-                typevar_map.update(build_typevar_map(base))
+                typevar_map.update(build_typevar_map(base, typevar_map))
             continue
 
         args = get_args(base)
@@ -35,7 +38,7 @@ def build_typevar_map(cls: type[Any]) -> dict[TypeVar, type[Any]]:
 
         # Recursively process the origin class
         if isinstance(origin, type):
-            typevar_map.update(build_typevar_map(origin))
+            typevar_map.update(build_typevar_map(origin, typevar_map))
     return typevar_map
 
 
@@ -57,7 +60,8 @@ def _map_typevars_to_args(
             if arg in typevar_map:
                 new_map[type_param] = typevar_map[arg]
         else:
-            new_map[type_param] = arg
+            # Resolve TypeVars nested in the argument, like `Repo[Box[T]]`
+            new_map[type_param] = resolve_typevars(arg, typevar_map)
     return new_map
 
 

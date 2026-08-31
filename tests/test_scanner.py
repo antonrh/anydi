@@ -1,11 +1,13 @@
 import importlib
 import sys
+import threading
+from pathlib import Path
 
 import pytest
 from pytest_mock import MockerFixture
 
 from anydi import Container, singleton
-from anydi._scanner import Scanner
+from anydi._scanner import Scanner, _scanning_packages
 
 from tests.fixtures import Service
 from tests.scan_app import ScanAppModule
@@ -294,7 +296,7 @@ class TestContainerScanner:
         """Test that recursive scan() calls are detected (e.g., via lazy proxy)."""
         scanner = Scanner(container)
         # Simulate scan already in progress for this package
-        Scanner._scanning_packages.add("tests.scan_app")
+        _scanning_packages().add("tests.scan_app")
 
         try:
             with pytest.raises(RuntimeError) as exc_info:
@@ -305,7 +307,29 @@ class TestContainerScanner:
             assert "tests.scan_app" in error_message
             assert "Solutions:" in error_message
         finally:
-            Scanner._scanning_packages.discard("tests.scan_app")
+            _scanning_packages().discard("tests.scan_app")
+
+    def test_scan_same_package_from_two_threads(self) -> None:
+        """Test that two containers can scan the same package at once."""
+        barrier = threading.Barrier(2)
+        errors: list[Exception] = []
+
+        def scan() -> None:
+            container = Container()
+            container.register_module(ScanAppModule)
+            barrier.wait()
+            try:
+                container.scan("tests.scan_app")
+            except Exception as exc:
+                errors.append(exc)
+
+        threads = [threading.Thread(target=scan) for _ in range(2)]
+        for thread in threads:
+            thread.start()
+        for thread in threads:
+            thread.join()
+
+        assert errors == []
 
 
 class TestRelativePackageScanning:
@@ -376,3 +400,24 @@ class TestRelativePackageScanning:
         assert scanner._has_relative_packages(".")
         assert not scanner._has_relative_packages(["absolute"])
         assert not scanner._has_relative_packages(None)
+
+    def test_caller_package_named_like_anydi(self, tmp_path: Path) -> None:
+        """Test that a package named like `anydi` is still seen as the caller."""
+        package = tmp_path / "anydi_shop"
+        package.mkdir()
+        (package / "__init__.py").write_text("")
+        (package / "app.py").write_text(
+            "from anydi import Container\n"
+            "from anydi._scanner import Scanner\n"
+            "caller_package = Scanner(Container())._get_caller_package(['.'], None)\n"
+        )
+
+        sys.path.insert(0, str(tmp_path))
+        try:
+            app = importlib.import_module("anydi_shop.app")
+        finally:
+            sys.path.remove(str(tmp_path))
+            sys.modules.pop("anydi_shop.app", None)
+            sys.modules.pop("anydi_shop", None)
+
+        assert app.caller_package == "anydi_shop"
