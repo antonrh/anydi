@@ -3,6 +3,7 @@ from __future__ import annotations
 import importlib
 import inspect
 import pkgutil
+import threading
 from collections.abc import Iterable, Iterator
 from dataclasses import dataclass
 from types import ModuleType
@@ -17,6 +18,21 @@ if TYPE_CHECKING:
 Package = ModuleType | str
 PackageOrIterable = Package | Iterable[Package]
 
+_scanning = threading.local()
+
+
+def _scanning_packages() -> set[str]:
+    """Return the packages this thread is scanning."""
+    packages: set[str] | None = getattr(_scanning, "packages", None)
+    if packages is None:
+        packages = _scanning.packages = set()
+    return packages
+
+
+def _is_anydi_module(module_name: str) -> bool:
+    """Check if the module belongs to anydi itself."""
+    return module_name == "anydi" or module_name.startswith("anydi.")
+
 
 @dataclass(kw_only=True)
 class ScannedDependency:
@@ -30,8 +46,6 @@ class ScannedDependency:
 
 
 class Scanner:
-    _scanning_packages: set[str] = set()
-
     def __init__(self, container: Container) -> None:
         self._container = container
         self._importing_modules: set[str] = set()
@@ -61,7 +75,8 @@ class Scanner:
         ignore = self._resolve_relative_packages(ignore, caller_package)
 
         pkg_names = {p if isinstance(p, str) else p.__name__ for p in packages}
-        overlap = pkg_names & Scanner._scanning_packages
+        scanning = _scanning_packages()
+        overlap = pkg_names & scanning
         if overlap:
             raise RuntimeError(
                 f"Circular import detected: scan() called recursively!\n\n"
@@ -74,11 +89,11 @@ class Scanner:
                 "- Avoid lazy container initialization in scanned modules"
             )
 
-        Scanner._scanning_packages.update(pkg_names)
+        scanning.update(pkg_names)
         try:
             self._do_scan(packages, tags=tags, ignore=ignore)
         finally:
-            Scanner._scanning_packages -= pkg_names
+            scanning -= pkg_names
 
     def _do_scan(  # noqa: C901
         self,
@@ -163,7 +178,7 @@ class Scanner:
                 if frame is None:
                     break
                 module_name = frame.f_globals.get("__name__")
-                if module_name and not module_name.startswith("anydi"):
+                if module_name and not _is_anydi_module(module_name):
                     # Return package portion (remove module name if present)
                     if "." in module_name:
                         return module_name.rsplit(".", 1)[0]

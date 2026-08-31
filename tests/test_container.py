@@ -4377,6 +4377,27 @@ class TestContainerGenericResolution:
         assert isinstance(service, FinalService)
         assert isinstance(service.repo, UserRepository)
 
+    def test_resolve_generic_renamed_along_the_way(self) -> None:
+        """Test resolving when an intermediate class renames the parameter."""
+
+        class Service(Generic[ModelT]):
+            def __init__(self, repo: Repository[ModelT]) -> None:
+                self.repo = repo
+
+        class MiddleService(Service[U], Generic[U]):  # ty: ignore[invalid-type-arguments]
+            pass
+
+        class UserService(MiddleService[User]):
+            pass
+
+        container = Container()
+        container.register(UserRepository, alias=Repository[User])
+        container.register(UserService)
+
+        service = container.resolve(UserService)
+
+        assert isinstance(service.repo, UserRepository)
+
     def test_resolve_multiple_type_params(self) -> None:
         """Test resolving with multiple type parameters."""
 

@@ -20,6 +20,7 @@ T = TypeVar("T", bound=Model)
 U = TypeVar("U", bound=Model)
 T_any = TypeVar("T_any")
 U_any = TypeVar("U_any")
+V_any = TypeVar("V_any")
 
 
 class Repository(Generic[T]):
@@ -61,6 +62,36 @@ class FullySpecialized(PartialSpecialized[Guest]):
     pass
 
 
+# Inheritance that renames the parameter along the way
+class RenamingService(BaseService[U_any], Generic[U_any]):
+    pass
+
+
+class RenamedConcrete(RenamingService[User]):
+    pass
+
+
+class RenamingAgain(RenamingService[V_any], Generic[V_any]):
+    pass
+
+
+class RenamedTwice(RenamingAgain[Guest]):
+    pass
+
+
+# A parameter nested inside the argument of a base
+class Box(Generic[T_any]):
+    pass
+
+
+class BoxedService(BaseService[Box[V_any]], Generic[V_any]):
+    pass
+
+
+class BoxedConcrete(BoxedService[User]):
+    pass
+
+
 # Test build_typevar_map
 def test_build_typevar_map_basic() -> None:
     typevar_map = build_typevar_map(UserHandler)
@@ -85,6 +116,25 @@ def test_build_typevar_map_multiple_params() -> None:
     typevar_map = build_typevar_map(FullySpecialized)
     assert typevar_map[T_any] is User
     assert typevar_map[U_any] is Guest
+
+
+def test_build_typevar_map_renamed_param() -> None:
+    typevar_map = build_typevar_map(RenamedConcrete)
+    assert typevar_map[U_any] is User
+    assert typevar_map[T_any] is User
+
+
+def test_build_typevar_map_renamed_param_twice() -> None:
+    typevar_map = build_typevar_map(RenamedTwice)
+    assert typevar_map[V_any] is Guest
+    assert typevar_map[U_any] is Guest
+    assert typevar_map[T_any] is Guest
+
+
+def test_build_typevar_map_nested_arg() -> None:
+    typevar_map = build_typevar_map(BoxedConcrete)
+    assert typevar_map[V_any] is User
+    assert typevar_map[T_any] == Box[User]
 
 
 # Test resolve_typevars
