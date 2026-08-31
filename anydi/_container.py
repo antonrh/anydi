@@ -890,6 +890,7 @@ class Container:
     def reset(self) -> None:
         """Reset resolved instances."""
         self._invalidate_refs()
+        failure: BaseException | None = None
         for dependency_type, provider in self._providers.items():
             if provider.scope == "transient":
                 continue
@@ -897,7 +898,12 @@ class Container:
                 context = self._get_instance_context(provider.scope)
             except LookupError:
                 continue
-            context.release(dependency_type)
+            try:
+                context.release(dependency_type)
+            except Exception as exc:  # the rest still resets
+                failure = failure or exc
+        if failure is not None:
+            raise failure
 
     # == Lazy References ==
 

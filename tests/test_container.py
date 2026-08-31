@@ -2023,6 +2023,54 @@ class TestContainerResolution:
 
         assert not container.is_resolved(str)
 
+    def test_release_forgets_an_instance_whose_finaliser_raises(
+        self, container: Container
+    ) -> None:
+        events = []
+
+        def provide_conn() -> Iterator[str]:
+            events.append("open")
+            yield "conn"
+            raise RuntimeError("no")
+
+        container.register(str, provide_conn, scope="singleton")
+        container.resolve(str)
+
+        with pytest.raises(RuntimeError, match="no"):
+            container.release(str)
+
+        assert not container.is_resolved(str)
+
+        container.resolve(str)
+
+        assert events == ["open", "open"]
+
+    def test_reset_releases_them_all_when_one_finaliser_raises(
+        self, container: Container
+    ) -> None:
+        events = []
+
+        def provide_first() -> Iterator[str]:
+            yield "first"
+            events.append("first")
+            raise RuntimeError("no")
+
+        def provide_second() -> Iterator[int]:
+            yield 1
+            events.append("second")
+
+        container.register(str, provide_first, scope="singleton")
+        container.register(int, provide_second, scope="singleton")
+        container.resolve(str)
+        container.resolve(int)
+
+        with pytest.raises(RuntimeError, match="no"):
+            container.reset()
+
+        assert events == ["first", "second"]
+        assert not container.is_resolved(str)
+        assert not container.is_resolved(int)
+
     def test_release_closes_the_resource(self, container: Container) -> None:
         events = []
 
