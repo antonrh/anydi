@@ -22,7 +22,7 @@ wheels = [
 
 [[package]]
 name = "anydi"
-version = "0.79.1"
+version = "0.80.0"
 source = { editable = "." }
 dependencies = [
     { name = "anyio" },
