@@ -52,6 +52,41 @@ async def say_hello(
 ```
 
 
+Routes added after `install` are validated as they are added, so `install` and route registration can go in either order.
+
+
+## Mounted applications
+
+`install` walks the applications mounted under the one it is given, so the routes of a sub-application resolve from the same container. Add the `RequestScopedMiddleware` to the outer application:
+
+```python
+from fastapi import FastAPI
+from starlette.middleware import Middleware
+
+import anydi.ext.fastapi
+from anydi import Container, Provide
+from anydi.ext.fastapi import RequestScopedMiddleware
+
+container = Container()
+container.register(HelloService)
+
+admin = FastAPI()
+
+
+@admin.get("/hello")
+async def say_hello(hello_service: Provide[HelloService]) -> str:
+    return await hello_service.say_hello(name="admin")
+
+
+app = FastAPI(middleware=[Middleware(RequestScopedMiddleware, container=container)])
+app.mount("/admin", admin)
+
+anydi.ext.fastapi.install(app, container)
+```
+
+A sub-application that was installed with a container of its own keeps it.
+
+
 ## Lifespan support
 
 If you need to use `AnyDI` resources in your `FastAPI` application, you can add `AnyDI` startup and shutdown events to the `FastAPI` lifecycle events.

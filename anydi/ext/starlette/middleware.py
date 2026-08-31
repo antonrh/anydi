@@ -32,6 +32,9 @@ class RequestScopedMiddleware:
             await self.app(scope, receive, send)
             return
 
+        # A mounted application replaces `scope["app"]` with itself.
+        scope["anydi.container"] = self.container
+
         async with AsyncExitStack() as stack:
             # Create request context first (parent scope)
             request_context = await stack.enter_async_context(
